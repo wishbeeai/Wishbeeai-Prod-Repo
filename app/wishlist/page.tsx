@@ -1,4 +1,4 @@
-import Header from "@/components/header"
+import { Header } from "@/components/header"
 import Footer from "@/components/footer"
 import AIWishlistCreator from "@/components/ai-wishlist-creator"
 

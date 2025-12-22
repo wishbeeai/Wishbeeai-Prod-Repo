@@ -1,4 +1,4 @@
-import Header from "@/components/header"
+import { Header } from "@/components/header"
 import Hero from "@/components/hero"
 import Steps from "@/components/steps"
 import AIGiftAssistant from "@/components/ai-gift-assistant"

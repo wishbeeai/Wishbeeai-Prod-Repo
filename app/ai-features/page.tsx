@@ -1,4 +1,4 @@
-import Header from "@/components/header"
+import { Header } from "@/components/header"
 import Footer from "@/components/footer"
 import AIClipExtension from "@/components/ai-clip-extension"
 import AITitleSuggestions from "@/components/ai-title-suggestions"
