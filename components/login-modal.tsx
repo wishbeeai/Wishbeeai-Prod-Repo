@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,6 +21,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const { signIn, signUp } = useAuth();
+  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,8 +32,10 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
       if (isSignUp) {
         await signUp(email, password, name);
         alert('Sign up successful! Please check your email to verify your account.');
+        router.push('/profile');
       } else {
         await signIn(email, password);
+        router.push('/profile');
       }
       onClose();
       setEmail('');

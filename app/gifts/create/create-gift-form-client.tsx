@@ -315,18 +315,6 @@ export function CreateGiftFormClient() {
           return
         }
 
-        if (data.oxylabsAuthFailed) {
-          setOxylabsAuthFailed(true)
-          toast({
-            title: "⚠️ Oxylabs Authentication Failed",
-            description:
-              "Please update OXYLABS_USERNAME and OXYLABS_PASSWORD in the Vars section. See the red warning box for details.",
-            variant: "destructive",
-            duration: 8000,
-          })
-          return
-        }
-
         if (data.error) {
           console.error("[v0] API returned error:", data)
           toast({
