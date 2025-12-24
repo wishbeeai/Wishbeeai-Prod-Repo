@@ -26,7 +26,7 @@ interface ExtractedProduct {
   }
 }
 
-export default function TabbedWishlistCreator() {
+export function TabbedWishlistCreator() {
   const { toast } = useToast()
   const router = useRouter()
 

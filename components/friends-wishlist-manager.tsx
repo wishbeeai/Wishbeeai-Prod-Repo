@@ -55,7 +55,7 @@ interface FriendWishlist {
   giftingHistory: number
 }
 
-export default function FriendsWishlistManager() {
+export function FriendsWishlistManager() {
   const [friends, setFriends] = useState<FriendWishlist[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [selectedFriend, setSelectedFriend] = useState<FriendWishlist | null>(null)

@@ -10,7 +10,7 @@ interface AITitleSuggestionsProps {
   onSelect?: (title: string, description: string) => void
 }
 
-export default function AITitleSuggestions({ productName = "Espresso Machine", onSelect }: AITitleSuggestionsProps) {
+export function AITitleSuggestions({ productName = "Espresso Machine", onSelect }: AITitleSuggestionsProps) {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
 

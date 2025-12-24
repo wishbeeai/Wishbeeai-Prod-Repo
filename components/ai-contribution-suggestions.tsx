@@ -10,7 +10,7 @@ interface AIContributionSuggestionsProps {
   onSelect?: (amount: number) => void
 }
 
-export default function AIContributionSuggestions({
+export function AIContributionSuggestions({
   goalAmount = 500,
   currentAmount = 150,
   onSelect,

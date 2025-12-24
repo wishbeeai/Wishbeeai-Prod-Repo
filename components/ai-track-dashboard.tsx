@@ -15,7 +15,7 @@ import {
   Bell,
 } from "lucide-react"
 
-export default function AITrackDashboard() {
+export function AITrackDashboard() {
   // Mock AI insights
   const paceAnalysis = {
     status: "on-track",

@@ -8,11 +8,13 @@ import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { LoginModal } from "./login-modal"
+import { SignUpModal } from "./signup-modal"
 
-export default function AIGiftAssistant() {
+export function AIGiftAssistant() {
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
   const [collectionTitle, setCollectionTitle] = useState("")
   const [productUrl, setProductUrl] = useState("")
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
+  const [isSignUpModalOpen, setIsSignUpModalOpen] = useState(false)
   const [pendingAction, setPendingAction] = useState<"banner" | "extract" | null>(null)
 
   const { toast } = useToast()
@@ -124,10 +126,10 @@ export default function AIGiftAssistant() {
         onLoginSuccess={handleLoginSuccess}
         onSwitchToSignUp={() => {
           setIsLoginModalOpen(false)
-          setIsLoginModalOpen(true)
+          setIsSignUpModalOpen(true)
         }}
       />
-      <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} />
+      <SignUpModal isOpen={isSignUpModalOpen} onClose={() => setIsSignUpModalOpen(false)} />
 
       <section className="py-16 px-4 bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50">
         <div className="container mx-auto max-w-7xl">

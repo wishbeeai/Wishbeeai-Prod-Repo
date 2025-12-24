@@ -13,7 +13,7 @@ interface SignUpModalProps {
   onSignUpSuccess?: () => void
 }
 
-export default function SignUpModal({ isOpen, onClose, onSwitchToLogin, onSignUpSuccess }: SignUpModalProps) {
+export function SignUpModal({ isOpen, onClose, onSwitchToLogin, onSignUpSuccess }: SignUpModalProps) {
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")

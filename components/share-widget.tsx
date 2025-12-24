@@ -4,7 +4,7 @@ import { MessageCircle, Mail, Share2, Users } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useState } from "react"
 
-export default function ShareWidget() {
+export function ShareWidget() {
   const { toast } = useToast()
   const [shareUrl] = useState(typeof window !== "undefined" ? window.location.href : "")
 

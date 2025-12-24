@@ -1,6 +1,6 @@
 "use client"
 
-export default function Steps() {
+export function Steps() {
   return (
     <section
       id="how-it-works"

@@ -1,11 +1,11 @@
 import { Header } from "@/components/header"
-import Footer from "@/components/footer"
-import AIClipExtension from "@/components/ai-clip-extension"
-import AITitleSuggestions from "@/components/ai-title-suggestions"
-import AIGoalOptimizer from "@/components/ai-goal-optimizer"
-import AIContributionSuggestions from "@/components/ai-contribution-suggestions"
-import AIGreetingGenerator from "@/components/ai-greeting-generator"
-import AITrackDashboard from "@/components/ai-track-dashboard"
+import { Footer } from "@/components/footer"
+import { AIClipExtension } from "@/components/ai-clip-extension"
+import { AITitleSuggestions } from "@/components/ai-title-suggestions"
+import { AIGoalOptimizer } from "@/components/ai-goal-optimizer"
+import { AIContributionSuggestions } from "@/components/ai-contribution-suggestions"
+import { AIGreetingGenerator } from "@/components/ai-greeting-generator"
+import { AITrackDashboard } from "@/components/ai-track-dashboard"
 
 export const metadata = {
   title: "AI Features - Wishbee.ai",

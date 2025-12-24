@@ -33,7 +33,7 @@ interface AIInsight {
   bestTimeToBy: string
 }
 
-export default function MyWishlistDisplay() {
+export function MyWishlistDisplay() {
   const { toast } = useToast()
   const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([])
   const [aiInsights, setAiInsights] = useState<AIInsight | null>(null)

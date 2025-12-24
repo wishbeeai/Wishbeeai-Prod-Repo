@@ -20,7 +20,7 @@ const features = [
   },
 ]
 
-export default function TrackManage() {
+export function TrackManage() {
   return (
     <section className="relative py-10 sm:py-12 md:py-16 lg:py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-[#F5F1E8] via-[#EDE6D6] to-[#F5F1E8] overflow-hidden">
       {/* Decorative background elements */}

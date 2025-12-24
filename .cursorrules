@@ -1,0 +1,48 @@
+# Wishbee-AI Development Rules
+
+## Typography Scale
+When creating new pages or components, use this exact typography scale:
+
+- **H1 (Page Titles)**: `text-4xl sm:text-5xl md:text-6xl font-bold`
+- **H2 (Section Headers)**: `text-3xl sm:text-4xl md:text-5xl font-bold`
+- **H3 (Subsection Headers)**: `text-2xl sm:text-3xl md:text-4xl font-semibold`
+- **H4 (Card/Component Titles)**: `text-xl sm:text-2xl md:text-3xl font-semibold`
+
+## Mobile Button Requirements
+All interactive buttons on mobile must have:
+- **Minimum height**: `h-12` (48px) for touch-friendly interactions
+- **Touch target**: Ensure buttons are at least 44x44px for accessibility
+- Example: `h-12 px-4 sm:px-6` (mobile-first responsive)
+
+## Design System Consistency
+- Use Tailwind CSS utility classes
+- Follow mobile-first responsive design (`sm:`, `md:`, `lg:` breakpoints)
+- Maintain consistent spacing using Tailwind spacing scale
+- Use the existing color system from `app/globals.css`
+
+## Component Guidelines
+- Use TypeScript for all new components
+- Follow Next.js App Router conventions
+- Use shadcn/ui components from `components/ui/`
+- Keep components modular and reusable
+- Add proper error handling and loading states
+
+## API Routes
+- Always validate input with Zod schemas
+- Include proper error handling
+- Use the admin client (`lib/supabase/admin.ts`) only in server-side API routes
+- Never expose `SUPABASE_SERVICE_ROLE_KEY` to client-side code
+- Add authentication checks where appropriate
+
+## Security
+- Never use `SUPABASE_SERVICE_ROLE_KEY` in "use client" files
+- Always validate user authentication before database operations
+- Use the regular Supabase client for user-facing operations
+- Use the admin client only for webhooks and background tasks
+
+## Code Quality
+- Use meaningful variable and function names
+- Add comments for complex logic
+- Follow existing code style and patterns
+- Keep functions focused and single-purpose
+

@@ -8,9 +8,11 @@ import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { LoginModal } from "./login-modal"
+import { SignUpModal } from "./signup-modal"
 
-export default function QuickStartCards() {
+export function QuickStartCards() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
+  const [isSignUpModalOpen, setIsSignUpModalOpen] = useState(false)
   const router = useRouter()
   const { isAuthenticated, login } = useAuth()
   const { toast } = useToast()
@@ -50,10 +52,10 @@ export default function QuickStartCards() {
         onLoginSuccess={handleLoginSuccess}
         onSwitchToSignUp={() => {
           setIsLoginModalOpen(false)
-          setIsLoginModalOpen(true)
+          setIsSignUpModalOpen(true)
         }}
       />
-      <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} />
+      <SignUpModal isOpen={isSignUpModalOpen} onClose={() => setIsSignUpModalOpen(false)} />
 
       {/* Group Gifting */}
       <section className="px-4 bg-white">

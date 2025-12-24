@@ -9,7 +9,7 @@ interface VideoModalProps {
   videoUrl: string
 }
 
-export default function VideoModal({ isOpen, onClose, videoUrl }: VideoModalProps) {
+export function VideoModal({ isOpen, onClose, videoUrl }: VideoModalProps) {
   // Close on Escape key
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {

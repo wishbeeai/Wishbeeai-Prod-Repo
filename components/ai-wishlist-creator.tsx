@@ -38,7 +38,7 @@ interface WishlistItem {
   fundingStatus: "Ready to Fund" | "Funding In Progress" | "Purchased"
 }
 
-export default function AIWishlistCreator() {
+export function AIWishlistCreator() {
   const { toast } = useToast()
   const [webLink, setWebLink] = useState("")
   const [quantity, setQuantity] = useState(1)

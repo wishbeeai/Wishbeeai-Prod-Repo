@@ -44,7 +44,7 @@ const trendingGifts = [
   },
 ]
 
-export default function TrendingGifts() {
+export function TrendingGifts() {
   return (
     <section className="relative py-12 px-4 bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 overflow-hidden">
       <div className="absolute top-10 left-10 w-20 h-20 bg-gradient-to-br from-amber-300/20 to-yellow-300/20 rounded-full blur-2xl animate-pulse" />

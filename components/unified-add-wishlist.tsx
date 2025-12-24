@@ -40,7 +40,7 @@ interface ExtractedProduct {
   }
 }
 
-export default function UnifiedAddWishlist() {
+export function UnifiedAddWishlist() {
   const { toast } = useToast()
   const router = useRouter()
 

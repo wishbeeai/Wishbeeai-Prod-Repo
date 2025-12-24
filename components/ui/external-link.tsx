@@ -4,7 +4,7 @@ interface ExternalLinkProps extends React.SVGProps<SVGSVGElement> {
   className?: string
 }
 
-export default function ExternalLink({ className = "", ...props }: ExternalLinkProps) {
+export function ExternalLink({ className = "", ...props }: ExternalLinkProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

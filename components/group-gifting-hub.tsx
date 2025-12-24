@@ -46,7 +46,7 @@ const DEFAULT_PRODUCT: ProductData = {
   fundedPercentage: 60,
 }
 
-export default function GroupGiftingHub() {
+export function GroupGiftingHub() {
   const [product, setProduct] = useState<ProductData>(DEFAULT_PRODUCT)
   const [isLoadingProduct, setIsLoadingProduct] = useState(true)
 

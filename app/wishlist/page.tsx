@@ -1,6 +1,6 @@
 import { Header } from "@/components/header"
-import Footer from "@/components/footer"
-import AIWishlistCreator from "@/components/ai-wishlist-creator"
+import { Footer } from "@/components/footer"
+import { AIWishlistCreator } from "@/components/ai-wishlist-creator"
 
 export const metadata = {
   title: "My Wishlist - Wishbee.ai",

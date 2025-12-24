@@ -3,7 +3,7 @@
 import Image from "next/image"
 import { useToast } from "@/hooks/use-toast"
 
-export default function Hero() {
+export function Hero() {
   const { toast } = useToast()
 
   const detectBrowser = (): string => {

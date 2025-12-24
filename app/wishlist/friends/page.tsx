@@ -1,6 +1,6 @@
 import { Header } from "@/components/header"
-import Footer from "@/components/footer"
-import FriendsWishlistManager from "@/components/friends-wishlist-manager"
+import { Footer } from "@/components/footer"
+import { FriendsWishlistManager } from "@/components/friends-wishlist-manager"
 import { Users, Heart } from "lucide-react"
 
 export const metadata = {

@@ -10,7 +10,7 @@ interface AIGoalOptimizerProps {
   onApply?: (goal: number) => void
 }
 
-export default function AIGoalOptimizer({ productPrice = 299.99, onApply }: AIGoalOptimizerProps) {
+export function AIGoalOptimizer({ productPrice = 299.99, onApply }: AIGoalOptimizerProps) {
   const [selectedGoal, setSelectedGoal] = useState<number | null>(null)
 
   // AI-calculated optimal goals

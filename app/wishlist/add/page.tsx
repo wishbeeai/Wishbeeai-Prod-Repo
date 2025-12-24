@@ -1,6 +1,6 @@
 "use client"
 
-import UnifiedAddWishlist from "@/components/unified-add-wishlist"
+import { UnifiedAddWishlist } from "@/components/unified-add-wishlist"
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 

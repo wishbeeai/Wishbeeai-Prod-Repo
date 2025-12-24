@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Sparkles, Tag, DollarSign, TrendingUp, Store, Heart, Check } from "lucide-react"
 
-export default function AIClipExtension() {
+export function AIClipExtension() {
   const [isClipping, setIsClipping] = useState(false)
   const [clipped, setClipped] = useState(false)
 

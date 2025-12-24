@@ -3,7 +3,7 @@ import Link from "next/link"
 import Image from "next/image"
 import { useToast } from "@/hooks/use-toast"
 
-export default function Footer() {
+export function Footer() {
   const { toast } = useToast()
 
   const handleNavigationClick = (section: string) => {

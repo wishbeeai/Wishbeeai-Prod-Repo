@@ -1,12 +1,12 @@
 import { Header } from "@/components/header"
-import Hero from "@/components/hero"
-import Steps from "@/components/steps"
-import AIGiftAssistant from "@/components/ai-gift-assistant"
-import QuickStartCards from "@/components/quick-start-cards"
-import TrendingGifts from "@/components/trending-gifts"
-import TrackManage from "@/components/track-manage"
-import ShareWidget from "@/components/share-widget"
-import Footer from "@/components/footer"
+import { Hero } from "@/components/hero"
+import { Steps } from "@/components/steps"
+import { AIGiftAssistant } from "@/components/ai-gift-assistant"
+import { QuickStartCards } from "@/components/quick-start-cards"
+import { TrendingGifts } from "@/components/trending-gifts"
+import { TrackManage } from "@/components/track-manage"
+import { ShareWidget } from "@/components/share-widget"
+import { Footer } from "@/components/footer"
 
 export const metadata = {
   title: "Wishbee.ai - Gift Together. Give Better.",

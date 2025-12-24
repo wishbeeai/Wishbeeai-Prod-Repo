@@ -11,7 +11,7 @@ interface AIGreetingGeneratorProps {
   onSelect?: (message: string) => void
 }
 
-export default function AIGreetingGenerator({
+export function AIGreetingGenerator({
   recipientName = "Sarah",
   occasion = "birthday",
   onSelect,
