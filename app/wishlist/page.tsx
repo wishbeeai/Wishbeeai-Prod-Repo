@@ -1,10 +1,10 @@
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
-import { AIWishlistCreator } from "@/components/ai-wishlist-creator"
+import { MyWishlistDisplay } from "@/components/my-wishlist-display"
 
 export const metadata = {
   title: "My Wishlist - Wishbee.ai",
-  description: "Add items to your wishlist with AI-powered automatic extraction",
+  description: "View and manage your wishlist items",
 }
 
 export default function WishlistPage() {
@@ -20,14 +20,14 @@ export default function WishlistPage() {
       <Header />
 
       <div className="container mx-auto px-4 py-12">
-        <div className="text-center mb-12">
-          <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-gray-900 mb-4">Add to Your Wishlist</h1>
-          <p className="text-base md:text-lg lg:text-xl text-gray-600 max-w-3xl mx-auto">
-            Paste any product link - AI automatically extracts all details in seconds
+        <div className="mb-8 text-center">
+          <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-gray-900 mb-2">My Wishlist</h1>
+          <p className="text-xs sm:text-sm md:text-base lg:text-lg text-gray-600">
+            View and manage your saved wishlist items
           </p>
         </div>
 
-        <AIWishlistCreator />
+        <MyWishlistDisplay />
       </div>
 
       <Footer />
