@@ -46,3 +46,9 @@ All interactive buttons on mobile must have:
 - Follow existing code style and patterns
 - Keep functions focused and single-purpose
 
+## v0 to Supabase Bridge
+Whenever I import a UI component from v0 (using npx shadcn or copy-paste):
+- **Analyze UI intent:** Check if the component has buttons, forms, or data displays.
+- **Consult Schema:** Immediately check `lib/supabase/` and `@/types/supabase.ts` to identify the correct table (e.g., `wishlists`, `contributions`).
+- **Suggest Hooks:** Automatically suggest creating or updating a React hook or Server Action to connect this UI to the identified table.
+- **Handle Loading/Error:** Ensure every database interaction includes a loading state and a toast notification for errors.
