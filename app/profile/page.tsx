@@ -1,9 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useAuth } from "@/lib/auth-context"
-
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import {
   ArrowLeft,
   Mail,
@@ -31,36 +29,17 @@ import { toast } from "sonner"
 import { Card, CardContent } from "@/components/ui/card"
 
 export default function ProfilePage() {
-  const { user } = useAuth()
-  
-  useEffect(() => {
-    if (user) {
-      let displayName = ""
-      if (user.user_metadata?.full_name) {
-        displayName = user.user_metadata.full_name
-      } else if (user.email) {
-        const emailName = user.email.split("@")[0]
-        displayName = emailName.split(".").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")
-      }
-      setProfileData(prev => ({
-        ...prev,
-        name: displayName,
-        email: user.email || "",
-        joinDate: user.created_at ? new Date(user.created_at).toISOString().split("T")[0] : prev.joinDate
-      }))
-    }
-  }, [user])
   const [isEditing, setIsEditing] = useState(false)
   const [loadingAI, setLoadingAI] = useState(false)
   const [aiRecommendations, setAiRecommendations] = useState<any>(null)
   const [profileImage, setProfileImage] = useState<string>("/images/first-person.png")
   const [profileData, setProfileData] = useState({
-    name: "Sarah Johnson",
-    email: "sarah.johnson@email.com",
+    name: "Kavitha Segar",
+    email: "kavitha.segar@gmail.com",
     phone: "+1 (555) 123-4567",
     location: "San Francisco, CA",
     bio: "Passionate about bringing people together through meaningful gifts. Love organizing surprise celebrations!",
-    joinDate: "2024-01-15",
+    joinDate: "12/21/2025",
     birthday: "1990-05-20",
   })
 
@@ -234,7 +213,7 @@ export default function ProfilePage() {
                     </div>
                     <div className="flex items-center gap-2 justify-center md:justify-start">
                       <Calendar className="w-3 h-3 sm:w-4 sm:h-4 text-[#DAA520]" />
-                      <span>Member since {new Date(profileData.joinDate).toLocaleDateString()}</span>
+                      <span>Member since {profileData.joinDate}</span>
                     </div>
                   </div>
 
@@ -258,7 +237,7 @@ export default function ProfilePage() {
                     ) : (
                       <button
                         onClick={() => setIsEditing(true)}
-                        className="flex items-center gap-2 px-3 py-2 sm:px-4 bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#3B2F0F] rounded-lg font-semibold hover:shadow-lg transition-all text-xs sm:text-sm"
+                        className="flex items-center gap-2 px-3 py-2 sm:px-4 bg-gradient-to-r from-[#F59E0B] to-[#FBBF24] text-[#78350F] rounded-lg font-semibold hover:shadow-lg transition-all text-xs sm:text-sm"
                       >
                         <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
                         Edit Profile
