@@ -1,54 +1,692 @@
-# Wishbee-AI Development Rules
+# 🐝 WISHBEE.AI - Complete Development Rules
+# Version: 3.0 | Last Updated: December 2025
 
-## Typography Scale
-When creating new pages or components, use this exact typography scale:
+## Project Overview
+- **Name**: Wishbee.ai
+- **Description**: Gift wishlist platform with group gifting, AI features, and payment processing
+- **Domain**: https://wishbee.ai
+- **Tech Stack**: Next.js 16, React 19, TypeScript, Supabase, Stripe, Anthropic Claude API
+- **Platforms**: Web App (live), Browser Extension (planned), Mobile Apps (planned)
 
-- **H1 (Page Titles)**: `text-4xl sm:text-5xl md:text-6xl font-bold`
-- **H2 (Section Headers)**: `text-3xl sm:text-4xl md:text-5xl font-bold`
-- **H3 (Subsection Headers)**: `text-2xl sm:text-3xl md:text-4xl font-semibold`
-- **H4 (Card/Component Titles)**: `text-xl sm:text-2xl md:text-3xl font-semibold`
+---
 
-## Mobile Button Requirements
-All interactive buttons on mobile must have:
-- **Minimum height**: `h-12` (48px) for touch-friendly interactions
-- **Touch target**: Ensure buttons are at least 44x44px for accessibility
-- Example: `h-12 px-4 sm:px-6` (mobile-first responsive)
+# ═══════════════════════════════════════════════════════════════
+# 🎨 DESIGN SYSTEM - FONTS & COLORS
+# ═══════════════════════════════════════════════════════════════
 
-## Design System Consistency
-- Use Tailwind CSS utility classes
-- Follow mobile-first responsive design (`sm:`, `md:`, `lg:` breakpoints)
-- Maintain consistent spacing using Tailwind spacing scale
-- Use the existing color system from `app/globals.css`
+## FONT STANDARDIZATION (SITE-WIDE)
 
-## Component Guidelines
-- Use TypeScript for all new components
-- Follow Next.js App Router conventions
-- Use shadcn/ui components from `components/ui/`
-- Keep components modular and reusable
-- Add proper error handling and loading states
+### Font Families
+**Primary Font Stack** (Applied to all text):
+```css
+font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+```
 
-## API Routes
-- Always validate input with Zod schemas
-- Include proper error handling
-- Use the admin client (`lib/supabase/admin.ts`) only in server-side API routes
-- Never expose `SUPABASE_SERVICE_ROLE_KEY` to client-side code
-- Add authentication checks where appropriate
+### Typography Hierarchy
+
+#### H1 - Hero/Landing Page Titles
+```tsx
+className="text-xl sm:text-2xl md:text-4xl lg:text-5xl xl:text-6xl font-extrabold leading-[1.1] tracking-tight"
+```
+- Mobile: 20px | Small: 24px | Medium: 36px | Large: 48px | XL: 60px
+- Weight: 800 (font-extrabold)
+
+#### H2 - Section Headers
+```tsx
+className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold"
+```
+- Mobile: 24px | Small: 30px | Medium: 36px | Large: 48px
+- Weight: 700 (font-bold)
+
+#### H3 - Subsection Headers
+```tsx
+className="text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl font-semibold"
+```
+- Mobile: 16px | Small: 18px | Medium: 20px | Large: 24px | XL: 30px
+- Weight: 600 (font-semibold)
+
+#### H4 - Component/Card Titles
+```tsx
+className="text-lg sm:text-xl md:text-2xl font-bold"
+```
+- Mobile: 18px | Small: 20px | Medium: 24px
+- Weight: 700 (font-bold)
+
+#### Taglines/Subtitles
+```tsx
+className="text-lg sm:text-xl md:text-2xl font-semibold"
+```
+
+#### Body Text
+```tsx
+className="text-xs sm:text-sm md:text-lg"
+```
+- Mobile: 12px | Small: 14px | Medium: 18px
+- Weight: 400 (font-normal)
+
+#### Button Text
+```tsx
+className="text-sm sm:text-base md:text-lg font-semibold"
+```
+
+#### Small Text (Captions)
+```tsx
+className="text-xs sm:text-sm"
+```
+
+### Font Weight Scale
+- **font-normal** (400): Body text
+- **font-medium** (500): Emphasized text
+- **font-semibold** (600): Subheadings, buttons
+- **font-bold** (700): Headers
+- **font-extrabold** (800): Hero titles
+
+---
+
+## BUTTON COLOR STANDARDIZATION (SITE-WIDE)
+
+### Core Principle
+**Each button type has ONE unique warm gradient used EVERYWHERE across the website.**
+
+### Standard Button Anatomy
+```tsx
+// All buttons must include:
+className="h-12 px-4 sm:px-6 rounded-full text-sm sm:text-base md:text-lg font-semibold transition-all duration-200 hover:scale-105 active:scale-95 shadow-md hover:shadow-lg"
+```
+
+### Button Type → Color Mapping
+
+#### 1. PRIMARY ACTION (Create, Get Started, Sign Up)
+**Gradient**: Golden Honey
+```tsx
+className="bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] hover:from-[#F4C430] hover:to-[#DAA520]"
+```
+**Usage**: Main CTAs, Create Wishlist, Get Started, Sign Up
+**Example**:
+```tsx
+<button className="h-12 px-4 sm:px-6 rounded-full bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] text-sm sm:text-base md:text-lg font-semibold transition-all duration-200 hover:scale-105 hover:from-[#F4C430] hover:to-[#DAA520] shadow-md hover:shadow-lg">
+  Create Wishlist
+</button>
+```
+
+#### 2. SHARE BUTTON
+**Gradient**: Warm Coral
+```tsx
+className="bg-gradient-to-r from-[#FF6B6B] to-[#FF8E53] text-white hover:from-[#FF8E53] hover:to-[#FF6B6B]"
+```
+**Usage**: Share buttons (gifts, wishlists, groups)
+**Example**:
+```tsx
+<button className="h-12 px-4 sm:px-6 rounded-full bg-gradient-to-r from-[#FF6B6B] to-[#FF8E53] text-white text-sm sm:text-base md:text-lg font-semibold transition-all duration-200 hover:scale-105 hover:from-[#FF8E53] hover:to-[#FF6B6B] shadow-md hover:shadow-lg">
+  Share
+</button>
+```
+
+#### 3. EDIT BUTTON
+**Gradient**: Amber Glow
+```tsx
+className="bg-gradient-to-r from-[#F59E0B] to-[#FBBF24] text-[#78350F] hover:from-[#FBBF24] hover:to-[#F59E0B]"
+```
+**Usage**: Edit profile, Edit wishlist, Modify items
+**Example**:
+```tsx
+<button className="h-12 px-4 sm:px-6 rounded-full bg-gradient-to-r from-[#F59E0B] to-[#FBBF24] text-[#78350F] text-sm sm:text-base md:text-lg font-semibold transition-all duration-200 hover:scale-105 hover:from-[#FBBF24] hover:to-[#F59E0B] shadow-md hover:shadow-lg">
+  Edit
+</button>
+```
+
+#### 4. DELETE/REMOVE BUTTON
+**Gradient**: Sunset Red
+```tsx
+className="bg-gradient-to-r from-[#DC2626] to-[#EF4444] text-white hover:from-[#EF4444] hover:to-[#DC2626]"
+```
+**Usage**: Delete, Remove, Cancel actions
+**Example**:
+```tsx
+<button className="h-12 px-4 sm:px-6 rounded-full bg-gradient-to-r from-[#DC2626] to-[#EF4444] text-white text-sm sm:text-base md:text-lg font-semibold transition-all duration-200 hover:scale-105 hover:from-[#EF4444] hover:to-[#DC2626] shadow-md hover:shadow-lg">
+  Delete
+</button>
+```
+
+#### 5. VIEW/DETAILS BUTTON
+**Gradient**: Warm Teal
+```tsx
+className="bg-gradient-to-r from-[#14B8A6] to-[#2DD4BF] text-white hover:from-[#2DD4BF] hover:to-[#14B8A6]"
+```
+**Usage**: View Details, See More, Explore
+**Example**:
+```tsx
+<button className="h-12 px-4 sm:px-6 rounded-full bg-gradient-to-r from-[#14B8A6] to-[#2DD4BF] text-white text-sm sm:text-base md:text-lg font-semibold transition-all duration-200 hover:scale-105 hover:from-[#2DD4BF] hover:to-[#14B8A6] shadow-md hover:shadow-lg">
+  View Details
+</button>
+```
+
+#### 6. CONTRIBUTE/PAY BUTTON
+**Gradient**: Rich Purple
+```tsx
+className="bg-gradient-to-r from-[#9333EA] to-[#A855F7] text-white hover:from-[#A855F7] hover:to-[#9333EA]"
+```
+**Usage**: Contribute, Pay, Add Funds, Checkout
+**Example**:
+```tsx
+<button className="h-12 px-4 sm:px-6 rounded-full bg-gradient-to-r from-[#9333EA] to-[#A855F7] text-white text-sm sm:text-base md:text-lg font-semibold transition-all duration-200 hover:scale-105 hover:from-[#A855F7] hover:to-[#9333EA] shadow-md hover:shadow-lg">
+  Contribute Now
+</button>
+```
+
+#### 7. DOWNLOAD/EXPORT BUTTON
+**Gradient**: Ocean Blue
+```tsx
+className="bg-gradient-to-r from-[#0EA5E9] to-[#38BDF8] text-white hover:from-[#38BDF8] hover:to-[#0EA5E9]"
+```
+**Usage**: Download, Export, Save File
+**Example**:
+```tsx
+<button className="h-12 px-4 sm:px-6 rounded-full bg-gradient-to-r from-[#0EA5E9] to-[#38BDF8] text-white text-sm sm:text-base md:text-lg font-semibold transition-all duration-200 hover:scale-105 hover:from-[#38BDF8] hover:to-[#0EA5E9] shadow-md hover:shadow-lg">
+  Download
+</button>
+```
+
+#### 8. INVITE/ADD MEMBER BUTTON
+**Gradient**: Rose Pink
+```tsx
+className="bg-gradient-to-r from-[#EC4899] to-[#F472B6] text-white hover:from-[#F472B6] hover:to-[#EC4899]"
+```
+**Usage**: Invite Friends, Add Member, Send Invitation
+**Example**:
+```tsx
+<button className="h-12 px-4 sm:px-6 rounded-full bg-gradient-to-r from-[#EC4899] to-[#F472B6] text-white text-sm sm:text-base md:text-lg font-semibold transition-all duration-200 hover:scale-105 hover:from-[#F472B6] hover:to-[#EC4899] shadow-md hover:shadow-lg">
+  Invite Friends
+</button>
+```
+
+#### 9. BROWSE/EXPLORE BUTTON
+**Gradient**: Warm Orange
+```tsx
+className="bg-gradient-to-r from-[#EA580C] to-[#FB923C] text-white hover:from-[#FB923C] hover:to-[#EA580C]"
+```
+**Usage**: Browse Gifts, Explore, Discover
+**Example**:
+```tsx
+<button className="h-12 px-4 sm:px-6 rounded-full bg-gradient-to-r from-[#EA580C] to-[#FB923C] text-white text-sm sm:text-base md:text-lg font-semibold transition-all duration-200 hover:scale-105 hover:from-[#FB923C] hover:to-[#EA580C] shadow-md hover:shadow-lg">
+  Browse Gifts
+</button>
+```
+
+#### 10. TRACK/MONITOR BUTTON
+**Gradient**: Forest Green
+```tsx
+className="bg-gradient-to-r from-[#059669] to-[#10B981] text-white hover:from-[#10B981] hover:to-[#059669]"
+```
+**Usage**: Track Progress, Monitor, Analytics
+**Example**:
+```tsx
+<button className="h-12 px-4 sm:px-6 rounded-full bg-gradient-to-r from-[#059669] to-[#10B981] text-white text-sm sm:text-base md:text-lg font-semibold transition-all duration-200 hover:scale-105 hover:from-[#10B981] hover:to-[#059669] shadow-md hover:shadow-lg">
+  Track Progress
+</button>
+```
+
+#### 11. SECONDARY ACTION (Cancel, Back, Skip)
+**Style**: Outlined with Brown Border
+```tsx
+className="border-2 border-[#8B4513] text-[#8B4513] bg-transparent hover:bg-[#8B4513] hover:text-white"
+```
+**Usage**: Cancel, Back, Skip, Not Now
+**Example**:
+```tsx
+<button className="h-12 px-4 sm:px-6 rounded-full border-2 border-[#8B4513] text-[#8B4513] bg-transparent text-sm sm:text-base md:text-lg font-semibold transition-all duration-200 hover:scale-105 hover:bg-[#8B4513] hover:text-white shadow-md hover:shadow-lg">
+  Cancel
+</button>
+```
+
+#### 12. DISABLED STATE (All Buttons)
+```tsx
+className="bg-gray-300 text-gray-500 cursor-not-allowed opacity-50"
+disabled
+```
+**Example**:
+```tsx
+<button disabled className="h-12 px-4 sm:px-6 rounded-full bg-gray-300 text-gray-500 text-sm sm:text-base md:text-lg font-semibold cursor-not-allowed opacity-50">
+  Disabled
+</button>
+```
+
+### Icon Buttons (Compact Actions)
+For icon-only buttons (heart, bookmark, etc.):
+```tsx
+className="w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-110 active:scale-95"
+```
+
+**Example - Favorite (Heart Icon)**:
+```tsx
+<button className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-r from-[#EC4899] to-[#F472B6] text-white flex items-center justify-center transition-all duration-200 hover:scale-110 active:scale-95 shadow-md hover:shadow-lg">
+  <Heart className="w-5 h-5" />
+</button>
+```
+
+### Button Size Variants
+
+#### Small Button
+```tsx
+className="h-9 px-3 text-xs sm:text-sm font-semibold rounded-full"
+```
+
+#### Medium Button (Default)
+```tsx
+className="h-12 px-4 sm:px-6 text-sm sm:text-base md:text-lg font-semibold rounded-full"
+```
+
+#### Large Button
+```tsx
+className="h-14 px-6 sm:px-8 text-base sm:text-lg md:text-xl font-semibold rounded-full"
+```
+
+---
+
+## COMPLETE BUTTON REFERENCE TABLE
+
+| Button Action | Gradient Colors | Text Color | Usage Pages |
+|--------------|----------------|------------|-------------|
+| **Create/Primary** | `from-[#DAA520] to-[#F4C430]` | `#654321` | All pages with create actions |
+| **Share** | `from-[#FF6B6B] to-[#FF8E53]` | `white` | Gifts, wishlists, groups |
+| **Edit** | `from-[#F59E0B] to-[#FBBF24]` | `#78350F` | Profile, wishlist settings |
+| **Delete** | `from-[#DC2626] to-[#EF4444]` | `white` | Any delete action |
+| **View Details** | `from-[#14B8A6] to-[#2DD4BF]` | `white` | Browse pages, card actions |
+| **Contribute** | `from-[#9333EA] to-[#A855F7]` | `white` | Gift pages, payment |
+| **Download** | `from-[#0EA5E9] to-[#38BDF8]` | `white` | Export, file downloads |
+| **Invite** | `from-[#EC4899] to-[#F472B6]` | `white` | Group creation, sharing |
+| **Browse** | `from-[#EA580C] to-[#FB923C]` | `white` | Discovery pages |
+| **Track** | `from-[#059669] to-[#10B981]` | `white` | Analytics, progress |
+| **Cancel/Back** | `border-[#8B4513]` | `#8B4513` | All forms, dialogs |
+
+---
+
+## BRAND COLORS
+
+### Primary Palette
+```css
+--primary-brown: #8B4513
+--dark-brown: #654321
+--golden-start: #DAA520
+--golden-end: #F4C430
+--light-bg: #F5F1E8
+```
+
+### Text Colors
+```tsx
+text-[#8B4513]    // Primary brown (headers)
+text-[#654321]    // Dark brown (body text)
+text-gray-600     // Secondary text
+text-black        // High contrast text
+text-white        // On colored backgrounds
+```
+
+### Background Colors
+```tsx
+bg-[#F5F1E8]                              // Light cream background
+bg-gradient-to-br from-orange-50 via-amber-50 to-yellow-50  // Warm gradient bg
+```
+
+---
+
+# ═══════════════════════════════════════════════════════════════
+# 🏗️ ARCHITECTURE & CODE PATTERNS
+# ═══════════════════════════════════════════════════════════════
+
+## File Structure
+```
+wishbee-ai/
+├── app/                    # Next.js App Router
+│   ├── api/               # API routes (server-side)
+│   ├── (pages)/           # Page components
+│   └── layout.tsx         # Root layout
+├── components/            # React components
+│   ├── ui/               # shadcn/ui components
+│   └── *.tsx             # Custom components
+├── lib/                   # Utilities & configs
+│   ├── supabase/         # Supabase clients
+│   ├── auth-context.tsx  # Auth provider
+│   └── utils.ts          # Helper functions
+└── types/                 # TypeScript types
+```
+
+## Protected Files - NEVER MODIFY WITHOUT ASKING
+```
+❌ lib/auth-context.tsx
+❌ lib/supabase/client.ts
+❌ lib/supabase/server.ts
+❌ components/header.tsx
+❌ components/login-modal.tsx
+❌ .env.local
+```
+
+## Server vs Client Components
+
+### Server Components (Default)
+```tsx
+// app/page.tsx - NO 'use client'
+import { createClient } from '@/lib/supabase/server'
+
+export default async function Page() {
+  const supabase = await createClient()
+  const { data } = await supabase.from('wishlists').select()
+  return <div>{/* Render */}</div>
+}
+```
+
+### Client Components
+```tsx
+'use client' // Required at top
+
+import { useState } from 'react'
+import { useAuth } from '@/lib/auth-context'
+
+export function Component() {
+  const { user } = useAuth()
+  const [state, setState] = useState(false)
+  return <div onClick={() => setState(true)}>{/* Interactive */}</div>
+}
+```
+
+## Import/Export Conventions
+
+### ✅ CORRECT: Named Exports
+```tsx
+export function Hero() { return <div>Hero</div> }
+import { Hero } from '@/components/hero'
+```
+
+### ❌ WRONG: Default Exports
+```tsx
+export default function Hero() { } // Don't do this!
+```
+
+## API Route Pattern
+```tsx
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+import { z } from 'zod'
+
+const schema = z.object({
+  title: z.string().min(1).max(100),
+})
+
+export async function POST(req: NextRequest) {
+  try {
+    // 1. Authenticate
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    
+    // 2. Validate
+    const body = await req.json()
+    const validated = schema.parse(body)
+    
+    // 3. Database operation
+    const { data, error } = await supabase
+      .from('wishlists')
+      .insert({ ...validated, user_id: user.id })
+      .select()
+      .single()
+    
+    if (error) throw error
+    return NextResponse.json({ data }, { status: 201 })
+    
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: error.errors }, { status: 400 })
+    }
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
+  }
+}
+```
+
+---
+
+# ═══════════════════════════════════════════════════════════════
+# 🗄️ DATABASE PATTERNS
+# ═══════════════════════════════════════════════════════════════
+
+## Database Tables
+- profiles
+- wishlists
+- wishlist_items
+- gifts
+- group_gifts
+- contributions
+
+## Query Patterns
+
+### SELECT with RLS
+```tsx
+const { data } = await supabase
+  .from('wishlists')
+  .select('*')
+  .eq('user_id', user.id) // CRITICAL
+  .order('created_at', { ascending: false })
+```
+
+### INSERT
+```tsx
+const { data } = await supabase
+  .from('wishlists')
+  .insert({ title, user_id: user.id }) // CRITICAL
+  .select()
+  .single()
+```
+
+### UPDATE with Security
+```tsx
+const { data } = await supabase
+  .from('wishlists')
+  .update({ title })
+  .eq('id', wishlistId)
+  .eq('user_id', user.id) // CRITICAL: Verify ownership
+```
+
+### DELETE with Security
+```tsx
+const { error } = await supabase
+  .from('wishlists')
+  .delete()
+  .eq('id', wishlistId)
+  .eq('user_id', user.id) // CRITICAL: Verify ownership
+```
+
+---
+
+# ═══════════════════════════════════════════════════════════════
+# 🔒 SECURITY RULES (CRITICAL)
+# ═══════════════════════════════════════════════════════════════
+
+## Payment Security (PCI DSS)
+
+### Critical Rules
+```
+🔴 NEVER store credit card numbers, CVV, or card data
+🔴 NEVER log payment details
+🔴 ALWAYS use Stripe.js tokenization
+🔴 NEVER expose STRIPE_SECRET_KEY to client
+🔴 ALWAYS verify webhook signatures
+```
+
+### Client-Side Payment
+```tsx
+'use client'
+import { CardElement, useStripe, useElements } from '@stripe/react-stripe-js'
+
+export function CheckoutForm() {
+  const stripe = useStripe()
+  const elements = useElements()
+  
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    const cardElement = elements.getElement(CardElement)
+    
+    const { error, paymentMethod } = await stripe.createPaymentMethod({
+      type: 'card',
+      card: cardElement,
+    })
+    
+    if (!error) {
+      // Only send token to server
+      await fetch('/api/payment', {
+        method: 'POST',
+        body: JSON.stringify({ paymentMethodId: paymentMethod.id })
+      })
+    }
+  }
+}
+```
+
+### Server-Side Payment
+```tsx
+import Stripe from 'stripe'
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
+
+export async function POST(req: NextRequest) {
+  const { paymentMethodId, amount } = await req.json()
+  
+  // Validate amount
+  if (amount < 100 || amount > 100000) {
+    return NextResponse.json({ error: 'Invalid amount' }, { status: 400 })
+  }
+  
+  const paymentIntent = await stripe.paymentIntents.create({
+    amount,
+    currency: 'usd',
+    payment_method: paymentMethodId,
+    confirm: true,
+  })
+  
+  return NextResponse.json({ success: true })
+}
+```
+
+## Input Validation
+```tsx
+import { z } from 'zod'
+
+const schema = z.object({
+  title: z.string().min(1).max(100).trim(),
+  price: z.number().min(0).max(1000000),
+})
+
+const validated = schema.parse(body)
+```
+
+## Environment Variables
+
+### Required
+```bash
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=        # Server-side only!
+
+# AI
+ANTHROPIC_API_KEY=
+
+# Payments
+STRIPE_SECRET_KEY=                 # Server-side only!
+STRIPE_WEBHOOK_SECRET=             # Server-side only!
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=
+```
+
+---
+
+# ═══════════════════════════════════════════════════════════════
+# 🚫 NEVER DO (CRITICAL)
+# ═══════════════════════════════════════════════════════════════
 
 ## Security
-- Never use `SUPABASE_SERVICE_ROLE_KEY` in "use client" files
-- Always validate user authentication before database operations
-- Use the regular Supabase client for user-facing operations
-- Use the admin client only for webhooks and background tasks
+- ❌ Never expose SERVICE_ROLE_KEY or STRIPE_SECRET_KEY to client
+- ❌ Never store passwords in plain text
+- ❌ Never log sensitive data
+- ❌ Never bypass authentication
+- ❌ Never skip user_id filters
+- ❌ Never use innerHTML with user content
+- ❌ Never use eval()
 
 ## Code Quality
-- Use meaningful variable and function names
-- Add comments for complex logic
-- Follow existing code style and patterns
-- Keep functions focused and single-purpose
+- ❌ Never use export default
+- ❌ Never modify protected files without asking
+- ❌ Never commit API keys
+- ❌ Never ignore TypeScript errors
+- ❌ Never skip error handling
 
-## v0 to Supabase Bridge
-Whenever I import a UI component from v0 (using npx shadcn or copy-paste):
-- **Analyze UI intent:** Check if the component has buttons, forms, or data displays.
-- **Consult Schema:** Immediately check `lib/supabase/` and `@/types/supabase.ts` to identify the correct table (e.g., `wishlists`, `contributions`).
-- **Suggest Hooks:** Automatically suggest creating or updating a React hook or Server Action to connect this UI to the identified table.
-- **Handle Loading/Error:** Ensure every database interaction includes a loading state and a toast notification for errors.
+## Design
+- ❌ Never use arbitrary font sizes (text-[15px])
+- ❌ Never use inconsistent button colors
+- ❌ Never skip responsive variants
+- ❌ Never ignore mobile-first design
+
+---
+
+# ═══════════════════════════════════════════════════════════════
+# ✅ ALWAYS DO (BEST PRACTICES)
+# ═══════════════════════════════════════════════════════════════
+
+## Before Every Commit
+- ✅ Run `npm run lint`
+- ✅ Check for hardcoded secrets
+- ✅ Verify no console.logs
+
+## When Creating Components
+- ✅ Use TypeScript
+- ✅ Add 'use client' if using hooks
+- ✅ Use named exports
+- ✅ Include loading/error states
+- ✅ Use standardized fonts
+- ✅ Use standardized button colors
+- ✅ Follow mobile-first responsive design
+
+## When Creating API Routes
+- ✅ Validate authentication first
+- ✅ Validate input with Zod
+- ✅ Use try/catch
+- ✅ Return proper status codes
+- ✅ Filter by user_id
+
+---
+
+# ═══════════════════════════════════════════════════════════════
+# 📚 QUICK REFERENCE
+# ═══════════════════════════════════════════════════════════════
+
+## Common Commands
+```bash
+npm run dev          # Development server
+npm run build        # Production build
+npm test             # Run tests
+npm run lint         # Check code quality
+```
+
+## Common Patterns
+
+### Create Button (Primary Action)
+```tsx
+<button className="h-12 px-4 sm:px-6 rounded-full bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] text-sm sm:text-base md:text-lg font-semibold transition-all duration-200 hover:scale-105 hover:from-[#F4C430] hover:to-[#DAA520] shadow-md hover:shadow-lg">
+  Create Wishlist
+</button>
+```
+
+### Share Button
+```tsx
+<button className="h-12 px-4 sm:px-6 rounded-full bg-gradient-to-r from-[#FF6B6B] to-[#FF8E53] text-white text-sm sm:text-base md:text-lg font-semibold transition-all duration-200 hover:scale-105 hover:from-[#FF8E53] hover:to-[#FF6B6B] shadow-md hover:shadow-lg">
+  Share
+</button>
+```
+
+### Fetch User Data
+```tsx
+const { user } = useAuth()
+const { data } = await supabase
+  .from('wishlists')
+  .select('*')
+  .eq('user_id', user.id)
+```
+
+---
+
+**Version**: 3.0 | **Status**: Production | **Last Updated**: December 2025
