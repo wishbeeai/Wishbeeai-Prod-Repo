@@ -1,5 +1,4 @@
 "use client"
-import Image from "next/image";
 
 import Link from "next/link"
 import { useState } from "react"
@@ -26,7 +25,6 @@ export function Header() {
   }
 
   const handleLoginSuccess = () => {
-    login()
     setIsLoginModalOpen(false)
     toast({
       title: "Welcome back!",
@@ -103,7 +101,7 @@ export function Header() {
           <div className="flex items-center justify-between h-14 sm:h-16 md:h-20 lg:h-24 gap-2 sm:gap-4 md:gap-8">
             <Link
               href="/"
-              className="flex items-center gap-1.5 sm:gap-2 md:gap-3 hover:opacity-100 transition-all duration-300 group flex-shrink-0"
+              className="flex items-center justify-center hover:opacity-100 transition-all duration-300 group flex-shrink-0"
               onClick={() => {
                 toast({
                   title: "Going Home",
@@ -111,16 +109,16 @@ export function Header() {
                 })
               }}
             >
-              <div className="relative text-2xl sm:text-3xl md:text-4xl lg:text-5xl scale-x-[-1] hover:scale-x-[-1.1] hover:scale-y-110 transition-transform duration-300 group-hover:rotate-12 drop-shadow-[0_0_15px_rgba(218,165,32,0.6)] group-hover:drop-shadow-[0_0_25px_rgba(218,165,32,0.9)]">
-                🐝
-              </div>
-              <div className="flex flex-col gap-0.5">
-                <span className="text-[#F5DEB3] font-bold text-sm sm:text-base md:text-lg lg:text-xl xl:text-2xl leading-tight tracking-tight group-hover:opacity-90 transition-all duration-300">
-                  <Image src="/images/honey-bee-logo.png" alt="Wishbee.ai Logo" width={150} height={40} className="h-8 w-auto object-contain" />
-                </span>
-                <span className="text-[#DAA520] text-[10px] sm:text-xs md:text-sm lg:text-base font-bold tracking-normal italic group-hover:tracking-wide transition-all duration-300 font-[family-name:var(--font-dancing)] text-center">
-                  Gift Together
-                </span>
+              <div className="relative flex items-center gap-2 sm:gap-3 transition-transform duration-300 group-hover:scale-105">
+                <span className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl">🐝</span>
+                <div className="flex flex-col">
+                  <span className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extrabold text-[#F5DEB3] leading-tight">
+                    Wishbee.ai
+                  </span>
+                  <span className="text-xs sm:text-sm md:text-base lg:text-lg text-[#DAA520] font-semibold leading-tight">
+                    Gift Together
+                  </span>
+                </div>
               </div>
             </Link>
 
