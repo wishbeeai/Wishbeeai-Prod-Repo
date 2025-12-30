@@ -338,6 +338,7 @@ export function Footer() {
               </Link>
             </p>
             <p className="text-[9px] sm:text-xs text-[#F5DEB3]">
+              <Image src="/images/honey-bee-logo.png" alt="Wishbee.ai Logo" width={120} height={32} className="mb-4 h-6 w-auto object-contain" />
               © 2025 Wishbee.ai{" "}
               <Link
                 href="/privacy-policy"
