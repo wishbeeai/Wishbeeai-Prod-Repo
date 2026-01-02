@@ -404,9 +404,8 @@ export default function AdminAffiliateProductsPage() {
             </h2>
             <Button
               onClick={handleOpenAddModal}
-              className="bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] hover:from-[#F4C430] hover:to-[#DAA520] text-sm sm:text-base md:text-lg font-semibold h-12 px-4 sm:px-6 rounded-full shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105"
+              className="bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] hover:from-[#F4C430] hover:to-[#DAA520] text-xs sm:text-sm font-semibold h-9 sm:h-10 px-3 sm:px-4 rounded-full shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105"
             >
-              <Plus className="w-5 h-5 mr-2" />
               Add New Affiliate Product
             </Button>
           </div>
