@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import Image from "next/image"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { LoginModal } from "./login-modal"
 import { SignUpModal } from "./signup-modal"
@@ -19,6 +19,15 @@ export function Header() {
   
   const ADMIN_EMAIL = "wishbeeai@gmail.com"
   const isAdmin = user?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()
+  
+  // Debug: Log admin status (remove in production)
+  useEffect(() => {
+    if (user) {
+      console.log('[Header] User email:', user.email)
+      console.log('[Header] Admin email:', ADMIN_EMAIL)
+      console.log('[Header] Is admin:', isAdmin)
+    }
+  }, [user, isAdmin])
 
   const handleLogin = () => {
     setIsLoginModalOpen(true)
