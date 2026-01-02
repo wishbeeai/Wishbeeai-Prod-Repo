@@ -485,7 +485,7 @@ export default function AdminAffiliateProductsPage() {
           {/* Products Table */}
           <div className="overflow-x-auto">
             {sortedProducts.length === 0 ? (
-              <div className="py-12">
+              <div className="py-12 text-center">
                 <p className="text-gray-500 text-lg">
                   {products.length === 0
                     ? "No affiliate products yet. Add your first product to get started!"
