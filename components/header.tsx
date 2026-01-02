@@ -117,9 +117,12 @@ export function Header() {
                 🐝
               </div>
               <div className="flex flex-col gap-0.5">
-                <span className="text-[#F5DEB3] font-bold text-sm sm:text-base md:text-lg lg:text-xl xl:text-2xl leading-tight tracking-tight group-hover:opacity-90 transition-all duration-300">
-                  <Image src="/images/honey-bee-logo.png" alt="Wishbee.ai Logo" width={150} height={40} className="h-8 w-auto object-contain" />
-                </span>
+                <div className="flex items-center gap-2">
+                  <Image src="/images/honey-bee-logo.png" alt="Wishbee.ai Logo" width={150} height={40} className="h-6 sm:h-7 md:h-8 w-auto object-contain" />
+                  <span className="text-[#F5DEB3] font-bold text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl leading-tight tracking-tight group-hover:opacity-90 transition-all duration-300">
+                    Wishbee.ai
+                  </span>
+                </div>
                 <span className="text-[#DAA520] text-[10px] sm:text-xs md:text-sm lg:text-base font-bold tracking-normal italic group-hover:tracking-wide transition-all duration-300 font-[family-name:var(--font-dancing)] text-center">
                   Gift Together
                 </span>
