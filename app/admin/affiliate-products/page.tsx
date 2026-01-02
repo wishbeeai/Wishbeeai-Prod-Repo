@@ -310,8 +310,8 @@ export default function AdminAffiliateProductsPage() {
         <div className="mb-8">
           <div className="bg-card border border-border rounded-lg p-6 mb-8">
             <div className="flex flex-row items-center justify-center gap-2">
-              <Package className="w-5 h-5 sm:w-8 sm:h-8 md:w-10 md:h-10 text-[#DAA520] flex-shrink-0" />
-              <h1 className="text-xl sm:text-3xl md:text-4xl font-bold text-foreground whitespace-nowrap">
+              <Package className="w-5 h-5 sm:w-6 sm:h-6 text-[#DAA520] flex-shrink-0" />
+              <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-foreground whitespace-nowrap">
                 Manage Affiliate Products
               </h1>
             </div>
