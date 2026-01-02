@@ -113,9 +113,6 @@ export function Header() {
                 })
               }}
             >
-              <div className="relative text-2xl sm:text-3xl md:text-4xl lg:text-5xl scale-x-[-1] hover:scale-x-[-1.1] hover:scale-y-110 transition-transform duration-300 group-hover:rotate-12 drop-shadow-[0_0_15px_rgba(218,165,32,0.6)] group-hover:drop-shadow-[0_0_25px_rgba(218,165,32,0.9)]">
-                🐝
-              </div>
               <div className="flex flex-col gap-0.5">
                 <div className="flex items-center gap-2">
                   <Image src="/images/honey-bee-logo.png" alt="Wishbee.ai Logo" width={150} height={40} className="h-6 sm:h-7 md:h-8 w-auto object-contain" />
