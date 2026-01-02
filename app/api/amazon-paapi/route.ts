@@ -19,41 +19,8 @@ const commonParameters = {
  * Extract ASIN from Amazon URL
  */
 function extractASIN(url: string): string | null {
-  try {
-    // Common Amazon URL patterns:
-    // https://www.amazon.com/dp/ASIN
-    // https://www.amazon.com/product-name/dp/ASIN
-    // https://www.amazon.com/gp/product/ASIN
-    // https://www.amazon.com/exec/obidos/ASIN/ASIN
-    
-    const urlObj = new URL(url)
-    const pathname = urlObj.pathname
-    
-    // Pattern 1: /dp/ASIN or /product-name/dp/ASIN
-    const dpMatch = pathname.match(/\/dp\/([A-Z0-9]{10})/)
-    if (dpMatch) return dpMatch[1]
-    
-    // Pattern 2: /gp/product/ASIN
-    const gpMatch = pathname.match(/\/gp\/product\/([A-Z0-9]{10})/)
-    if (gpMatch) return gpMatch[1]
-    
-    // Pattern 3: /exec/obidos/ASIN/ASIN
-    const obidosMatch = pathname.match(/\/exec\/obidos\/ASIN\/([A-Z0-9]{10})/)
-    if (obidosMatch) return obidosMatch[1]
-    
-    // Pattern 4: ASIN as query parameter
-    const asinParam = urlObj.searchParams.get("asin") || urlObj.searchParams.get("ASIN")
-    if (asinParam && asinParam.length === 10) return asinParam
-    
-    // Pattern 5: Direct ASIN in path
-    const directMatch = pathname.match(/\/([A-Z0-9]{10})(?:\/|$|\?)/)
-    if (directMatch) return directMatch[1]
-    
-    return null
-  } catch (error) {
-    console.error("Error extracting ASIN:", error)
-    return null
-  }
+  const match = url.match(/\/dp\/([A-Z0-9]{10})/)
+  return match ? match[1] : null
 }
 
 /**
