@@ -486,20 +486,9 @@ export default function AdminAffiliateProductsPage() {
           <div className="overflow-x-auto">
             {sortedProducts.length === 0 ? (
               <div className="py-12">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-bold text-[#654321]">
-                    Affiliate Products (0)
-                  </h2>
-                  {products.length === 0 && (
-                    <Button
-                      onClick={handleOpenAddModal}
-                      className="bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] hover:from-[#F4C430] hover:to-[#DAA520]"
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Your First Product
-                    </Button>
-                  )}
-                </div>
+                <h2 className="text-xl font-bold text-[#654321] mb-4">
+                  Affiliate Products (0)
+                </h2>
                 <p className="text-gray-500 text-lg">
                   {products.length === 0
                     ? "No affiliate products yet. Add your first product to get started!"
