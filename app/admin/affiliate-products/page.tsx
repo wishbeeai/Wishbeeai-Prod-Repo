@@ -189,7 +189,53 @@ export default function AdminAffiliateProductsPage() {
 
     setIsExtracting(true)
     try {
-      const response = await fetch("/api/ai/extract-product", {
+      // Check if it's an Amazon URL - use PA-API if credentials are configured
+      const isAmazonUrl = url.includes("amazon.com") || url.includes("amazon.")
+      let response
+
+      if (isAmazonUrl) {
+        // Try PA-API first for Amazon products
+        try {
+          response = await fetch("/api/amazon-paapi", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ productUrl: url }),
+          })
+
+          // If PA-API succeeds, use its response
+          if (response.ok) {
+            const paapiData = await response.json()
+            if (paapiData.productData) {
+              const extracted = paapiData.productData
+              setFormData((prev) => ({
+                ...prev,
+                productName: extracted.productName || prev.productName,
+                image: extracted.imageUrl || extracted.image || prev.image,
+                category: extracted.category || prev.category,
+                source: extracted.source || "Amazon",
+                rating: extracted.rating?.toString() || prev.rating,
+                reviewCount: extracted.reviewCount?.toString() || prev.reviewCount,
+                price: extracted.price?.toString() || prev.price,
+                originalPrice: extracted.originalPrice?.toString() || prev.originalPrice,
+                amazonChoice: extracted.amazonChoice || prev.amazonChoice,
+                bestSeller: extracted.bestSeller || prev.bestSeller,
+              }))
+              toast.success("Product details extracted from Amazon PA-API successfully!")
+              setIsExtracting(false)
+              return
+            }
+          }
+          // If PA-API fails, fall through to regular extraction
+        } catch (paapiError) {
+          console.log("[PA-API] PA-API failed, falling back to regular extraction:", paapiError)
+          // Fall through to regular extraction
+        }
+      }
+
+      // Regular extraction (AI-based or scraping)
+      response = await fetch("/api/ai/extract-product", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
