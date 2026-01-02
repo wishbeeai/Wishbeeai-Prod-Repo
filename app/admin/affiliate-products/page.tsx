@@ -17,6 +17,8 @@ import {
   Bell,
   User,
   ChevronDown,
+  ArrowLeft,
+  Package,
 } from "lucide-react"
 import { toast } from "sonner"
 import {
@@ -294,52 +296,40 @@ export default function AdminAffiliateProductsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <Link href="/" className="text-2xl font-bold text-[#8B4513]">
-              Back to Home
-            </Link>
-            <div className="flex items-center gap-4">
-              <button className="relative p-2 text-gray-600 hover:text-[#8B4513]">
-                <Mail className="w-5 h-5" />
-              </button>
-              <button className="relative p-2 text-gray-600 hover:text-[#8B4513]">
-                <Bell className="w-5 h-5" />
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-              </button>
-              <div className="relative">
-                <button className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-lg">
-                  <User className="w-5 h-5" />
-                  <ChevronDown className="w-4 h-4" />
-                </button>
-              </div>
+    <div className="min-h-screen bg-[#F5F1E8]">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 text-[#8B5A3C] hover:text-[#6B4423] mb-6 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Home
+        </Link>
+
+        {/* Header */}
+        <div className="mb-8">
+          <div className="bg-card border border-border rounded-lg p-6 mb-8">
+            <div className="flex flex-row items-center justify-center gap-2">
+              <Package className="w-5 h-5 sm:w-8 sm:h-8 md:w-10 md:h-10 text-[#DAA520] flex-shrink-0" />
+              <h1 className="text-xl sm:text-3xl md:text-4xl font-bold text-foreground whitespace-nowrap">
+                Manage Affiliate Products
+              </h1>
             </div>
+            <p className="text-xs sm:text-sm text-muted-foreground text-center mt-2">
+              Admin only page to add and manage affiliate products that appear in the Browse Gifts marketplace
+            </p>
           </div>
         </div>
-      </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Page Title and Admin Info */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-[#654321] mb-2">Manage Affiliate Products</h1>
-          <p className="text-sm text-gray-600 mb-4">
-            Admin only page to add and manage affiliate products that appear in the Browse Gifts marketplace.
-          </p>
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-[#8B4513]">
-              Admin Access Email: {ADMIN_EMAIL}
-            </p>
-            <Button
-              onClick={handleOpenAddModal}
-              className="bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] hover:from-[#F4C430] hover:to-[#DAA520] text-sm sm:text-base md:text-lg font-semibold h-12 px-4 sm:px-6 rounded-full shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105"
-            >
-              <Plus className="w-5 h-5 mr-2" />
-              Add New Affiliate Product
-            </Button>
-          </div>
+        {/* Add Product Button */}
+        <div className="mb-6 flex justify-end">
+          <Button
+            onClick={handleOpenAddModal}
+            className="bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] hover:from-[#F4C430] hover:to-[#DAA520] text-sm sm:text-base md:text-lg font-semibold h-12 px-4 sm:px-6 rounded-full shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105"
+          >
+            <Plus className="w-5 h-5 mr-2" />
+            Add New Affiliate Product
+          </Button>
         </div>
 
         {/* Stats and Filters */}
