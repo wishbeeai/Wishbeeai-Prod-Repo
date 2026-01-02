@@ -66,6 +66,7 @@ export default function AdminAffiliateProductsPage() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+  const [isExtracting, setIsExtracting] = useState(false)
   const [formData, setFormData] = useState({
     productName: "",
     image: "",
@@ -171,6 +172,79 @@ export default function AdminAffiliateProductsPage() {
       bestSeller: product.bestSeller || false,
     })
     setIsEditModalOpen(true)
+  }
+
+  const handleProductLinkChange = async (url: string) => {
+    setFormData({ ...formData, productLink: url })
+    
+    // Check if it's a valid URL
+    try {
+      new URL(url)
+    } catch {
+      return // Not a valid URL, don't extract
+    }
+
+    // Only extract if URL looks valid and is not empty
+    if (!url || url.length < 10) return
+
+    setIsExtracting(true)
+    try {
+      const response = await fetch("/api/ai/extract-product", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ productUrl: url }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        
+        // Extract the product details - API returns productData object
+        const extracted = data.productData || data
+        
+        // Auto-fill form fields with extracted data
+        setFormData((prev) => ({
+          ...prev,
+          productName: extracted.productName || prev.productName,
+          image: extracted.imageUrl || extracted.image || extracted.productImageUrl || prev.image,
+          category: extracted.category || prev.category,
+          source: extracted.storeName || extracted.source || extractSourceFromUrl(url) || prev.source,
+          rating: extracted.rating?.toString() || extracted.averageRating?.toString() || prev.rating,
+          reviewCount: extracted.reviewCount?.toString() || extracted.numReviews?.toString() || extracted.reviewCount?.toString() || prev.reviewCount,
+          price: extracted.salePrice?.toString() || extracted.price?.toString() || prev.price,
+          originalPrice: extracted.originalPrice?.toString() || extracted.listPrice?.toString() || extracted.price?.toString() || prev.originalPrice,
+          amazonChoice: url.includes("amazon.com") && (extracted.amazonChoice || prev.amazonChoice),
+          bestSeller: url.includes("amazon.com") && (extracted.bestSeller || prev.bestSeller),
+        }))
+
+        toast.success("Product details extracted successfully! Please review and adjust as needed.")
+      } else {
+        const error = await response.json()
+        console.error("Extraction error:", error)
+        toast.error(error.error || error.details || "Failed to extract product details")
+      }
+    } catch (error) {
+      console.error("Error extracting product:", error)
+      toast.error("Failed to extract product details. Please fill manually.")
+    } finally {
+      setIsExtracting(false)
+    }
+  }
+
+  const extractSourceFromUrl = (url: string): string => {
+    try {
+      const hostname = new URL(url).hostname
+      if (hostname.includes("amazon")) return "Amazon"
+      if (hostname.includes("ebay")) return "eBay"
+      if (hostname.includes("walmart")) return "Walmart"
+      if (hostname.includes("target")) return "Target"
+      if (hostname.includes("bestbuy")) return "Best Buy"
+      // Extract domain name (e.g., "example.com" -> "Example")
+      return hostname.split(".")[0].charAt(0).toUpperCase() + hostname.split(".")[0].slice(1)
+    } catch {
+      return ""
+    }
   }
 
   const handleSave = async () => {
@@ -753,14 +827,31 @@ export default function AdminAffiliateProductsPage() {
             {/* Product Link */}
             <div>
               <label className="block text-sm font-medium text-[#654321] mb-2">
-                Product Link
+                Product Link {isExtracting && <span className="text-[#DAA520]">(Extracting...)</span>}
               </label>
-              <Input
-                value={formData.productLink}
-                onChange={(e) => setFormData({ ...formData, productLink: e.target.value })}
-                placeholder="https://example.com/product"
-                className="border-gray-300 focus:border-[#DAA520]"
-              />
+              <div className="relative">
+                <Input
+                  value={formData.productLink}
+                  onChange={(e) => handleProductLinkChange(e.target.value)}
+                  onPaste={(e) => {
+                    const pastedText = e.clipboardData.getData("text")
+                    if (pastedText.startsWith("http")) {
+                      setTimeout(() => handleProductLinkChange(pastedText), 100)
+                    }
+                  }}
+                  placeholder="https://example.com/product"
+                  className="border-gray-300 focus:border-[#DAA520]"
+                  disabled={isExtracting}
+                />
+                {isExtracting && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <div className="w-4 h-4 border-2 border-[#DAA520] border-t-transparent rounded-full animate-spin" />
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Paste a product URL and AI will automatically extract product details
+              </p>
             </div>
 
             {/* Amazon Badges */}
