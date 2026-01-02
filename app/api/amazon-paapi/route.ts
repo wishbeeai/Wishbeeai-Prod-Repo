@@ -107,8 +107,8 @@ async function callPAAPI(asin: string) {
     ],
   }
 
-  // Call PA-API using the client
-  return await paapi.getItems(requestParameters)
+  // Call PA-API using the package
+  return await amazonPaapi.GetItems(commonParameters, requestParameters)
 }
 
 /**
