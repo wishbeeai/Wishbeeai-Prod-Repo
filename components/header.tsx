@@ -18,16 +18,8 @@ export function Header() {
   const { toast } = useToast()
   
   const ADMIN_EMAIL = "wishbeeai@gmail.com"
-  const isAdmin = user?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()
-  
-  // Debug: Log admin status (remove in production)
-  useEffect(() => {
-    if (user) {
-      console.log('[Header] User email:', user.email)
-      console.log('[Header] Admin email:', ADMIN_EMAIL)
-      console.log('[Header] Is admin:', isAdmin)
-    }
-  }, [user, isAdmin])
+  // Only show admin menu if user is logged in and email matches exactly (case-insensitive)
+  const isAdmin = user?.email && user.email.toLowerCase().trim() === ADMIN_EMAIL.toLowerCase().trim()
 
   const handleLogin = () => {
     setIsLoginModalOpen(true)
