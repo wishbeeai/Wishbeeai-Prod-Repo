@@ -1,20 +1,18 @@
 import { NextRequest, NextResponse } from "next/server"
-import amazonPaapi from "amazon-paapi"
+import { Client } from "amazon-paapi"
 
 const AMAZON_ACCESS_KEY = process.env.AMAZON_ACCESS_KEY || ""
 const AMAZON_SECRET_KEY = process.env.AMAZON_SECRET_KEY || ""
 const AMAZON_ASSOCIATE_TAG = process.env.AMAZON_ASSOCIATE_TAG || ""
 const AMAZON_REGION = process.env.AMAZON_REGION || "us-east-1"
-const AMAZON_HOST = process.env.AMAZON_HOST || "webservices.amazon.com"
 
-// Common parameters for all PA-API requests
-const commonParameters = {
-  AccessKey: AMAZON_ACCESS_KEY,
-  SecretKey: AMAZON_SECRET_KEY,
-  PartnerTag: AMAZON_ASSOCIATE_TAG,
-  PartnerType: "Associates",
-  Marketplace: "www.amazon.com",
-}
+// Initialize PA-API client
+const paapi = new Client({
+  accessKey: AMAZON_ACCESS_KEY,
+  secretKey: AMAZON_SECRET_KEY,
+  partnerTag: AMAZON_ASSOCIATE_TAG,
+  region: AMAZON_REGION,
+})
 
 /**
  * Extract ASIN from Amazon URL
@@ -109,8 +107,8 @@ async function callPAAPI(asin: string) {
     ],
   }
 
-  // Call PA-API using the package
-  return await amazonPaapi.GetItems(commonParameters, requestParameters)
+  // Call PA-API using the client
+  return await paapi.getItems(requestParameters)
 }
 
 /**
