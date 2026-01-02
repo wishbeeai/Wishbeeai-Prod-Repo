@@ -398,12 +398,6 @@ export default function AdminAffiliateProductsPage() {
 
         {/* Stats and Filters */}
         <div className="bg-white rounded-lg shadow-md border border-gray-200 p-6 mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-[#654321]">
-              Affiliate Products ({filteredProducts.length})
-            </h2>
-          </div>
-
           {/* Search and Filters */}
           <div className="flex flex-wrap gap-4 mb-4">
             <div className="flex-1 min-w-[200px]">
