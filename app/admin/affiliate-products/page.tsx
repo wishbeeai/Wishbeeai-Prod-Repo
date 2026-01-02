@@ -398,10 +398,20 @@ export default function AdminAffiliateProductsPage() {
 
         {/* Stats and Filters */}
         <div className="bg-white rounded-lg shadow-md border border-gray-200 p-6 mb-6">
-          <div className="mb-4">
-            <h2 className="text-xl font-bold text-[#654321]">
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex-1"></div>
+            <h2 className="text-xl font-bold text-[#654321] text-right">
               Affiliate Products ({filteredProducts.length})
             </h2>
+            <div className="flex-1 flex justify-end">
+              <Button
+                onClick={handleOpenAddModal}
+                className="bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] hover:from-[#F4C430] hover:to-[#DAA520] text-sm sm:text-base md:text-lg font-semibold h-12 px-4 sm:px-6 rounded-full shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105"
+              >
+                <Plus className="w-5 h-5 mr-2" />
+                Add New Affiliate Product
+              </Button>
+            </div>
           </div>
 
           {/* Search and Filters */}
