@@ -220,13 +220,24 @@ export default function AdminAffiliateProductsPage() {
 
         toast.success("Product details extracted successfully! Please review and adjust as needed.")
       } else {
-        const error = await response.json()
-        console.error("Extraction error:", error)
-        toast.error(error.error || error.details || "Failed to extract product details")
+        let errorMessage = "Failed to extract product details"
+        try {
+          const error = await response.json()
+          errorMessage = error.error || error.details || error.message || errorMessage
+          if (Object.keys(error).length === 0) {
+            errorMessage = `Failed to extract product details (HTTP ${response.status})`
+          }
+        } catch (parseError) {
+          // If response is not JSON, use status text
+          errorMessage = `Failed to extract product details: ${response.statusText || `HTTP ${response.status}`}`
+        }
+        console.error("Extraction error:", errorMessage)
+        toast.error(errorMessage)
       }
     } catch (error) {
       console.error("Error extracting product:", error)
-      toast.error("Failed to extract product details. Please fill manually.")
+      const errorMessage = error instanceof Error ? error.message : "Network error occurred"
+      toast.error(`Failed to extract product details: ${errorMessage}. Please fill manually.`)
     } finally {
       setIsExtracting(false)
     }
