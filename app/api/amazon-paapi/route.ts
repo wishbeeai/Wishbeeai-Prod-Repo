@@ -15,6 +15,13 @@ const commonParameters = {
   Marketplace: "www.amazon.com",
 }
 
+// Create a client-like wrapper for easier usage
+const paapi = {
+  getItems: async (requestParameters: any) => {
+    return await amazonPaapi.GetItems(commonParameters, requestParameters)
+  },
+}
+
 /**
  * Extract ASIN from Amazon URL
  */
@@ -24,17 +31,15 @@ function extractASIN(url: string): string | null {
 }
 
 /**
- * Call Amazon Product Advertising API 5.0 using amazon-paapi package
+ * Fetch Amazon product using PA-API
  */
-async function callPAAPI(asin: string) {
+async function fetchAmazonProduct(asin: string) {
   if (!AMAZON_ACCESS_KEY || !AMAZON_SECRET_KEY || !AMAZON_ASSOCIATE_TAG) {
     throw new Error("Amazon PA-API credentials not configured")
   }
 
-  // Request parameters for GetItems
-  const requestParameters = {
+  const response = await paapi.getItems({
     ItemIds: [asin],
-    ItemIdType: "ASIN",
     Resources: [
       "ItemInfo.Title",
       "ItemInfo.ByLineInfo",
@@ -43,20 +48,15 @@ async function callPAAPI(asin: string) {
       "ItemInfo.Features",
       "ItemInfo.ManufactureInfo",
       "ItemInfo.ProductInfo",
-      "ItemInfo.TechnicalInfo",
-      "ItemInfo.TradeInInfo",
       "Offers.Listings.Availability.MaxOrderQuantity",
       "Offers.Listings.Availability.Message",
       "Offers.Listings.Availability.Type",
       "Offers.Listings.Condition",
-      "Offers.Listings.Condition.ConditionNote",
       "Offers.Listings.DeliveryInfo.IsAmazonFulfilled",
       "Offers.Listings.DeliveryInfo.IsFreeShippingEligible",
       "Offers.Listings.DeliveryInfo.IsPrimeEligible",
       "Offers.Listings.MerchantInfo",
       "Offers.Listings.Price",
-      "Offers.Listings.ProgramEligibility.IsPrimeExclusive",
-      "Offers.Listings.ProgramEligibility.IsPrimePantry",
       "Offers.Listings.Promotions",
       "Offers.Listings.SavingBasis",
       "Offers.Summaries.HighestPrice",
@@ -73,10 +73,13 @@ async function callPAAPI(asin: string) {
       "BrowseNodeInfo.BrowseNodes",
       "BrowseNodeInfo.WebsiteSalesRank",
     ],
+  })
+
+  if (!response.ItemsResult || !response.ItemsResult.Items || response.ItemsResult.Items.length === 0) {
+    throw new Error("No items found in PA-API response")
   }
 
-  // Call PA-API using the package
-  return await amazonPaapi.GetItems(commonParameters, requestParameters)
+  return response
 }
 
 /**
@@ -160,6 +163,11 @@ function convertPAAPIResponse(paapiResponse: any, asin: string, originalUrl: str
   const amazonChoice = false // PA-API doesn't directly provide this
   const bestSeller = browseNodeInfo.WebsiteSalesRank ? true : false
 
+  // Generate affiliate URL with associate tag
+  const affiliateUrl = originalUrl.includes("?tag=") 
+    ? originalUrl 
+    : `${originalUrl.includes("?") ? originalUrl + "&" : originalUrl + "?"}tag=${AMAZON_ASSOCIATE_TAG}`
+
   return {
     productName,
     price,
@@ -170,7 +178,7 @@ function convertPAAPIResponse(paapiResponse: any, asin: string, originalUrl: str
     source: "Amazon",
     rating: rating || 0,
     reviewCount: reviewCount || 0,
-    productLink: originalUrl,
+    productLink: affiliateUrl,
     amazonChoice,
     bestSeller,
     brand,
@@ -181,6 +189,7 @@ function convertPAAPIResponse(paapiResponse: any, asin: string, originalUrl: str
       features: features.length > 0 ? features : undefined,
     },
     stockStatus: offers.Listings?.[0]?.Availability?.Type === "Now" ? "In Stock" : "Out of Stock",
+    affiliateUrl,
   }
 }
 
@@ -229,7 +238,7 @@ export async function POST(req: NextRequest) {
     console.log(`[PA-API] Fetching product details for ASIN: ${productASIN}`)
 
     // Call PA-API
-    const paapiResponse = await callPAAPI(productASIN)
+    const paapiResponse = await fetchAmazonProduct(productASIN)
 
     // Check for errors in response
     if (paapiResponse.Errors && paapiResponse.Errors.length > 0) {
@@ -245,7 +254,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Convert to our format
-    const productData = convertPAAPIResponse(paapiResponse, productASIN, productUrl || `https://www.amazon.com/dp/${productASIN}`)
+    const productData = convertPAAPIResponse(paapiResponse, productASIN, productUrl || `https://www.amazon.com/dp/${productASIN}?tag=${AMAZON_ASSOCIATE_TAG}`)
 
     return NextResponse.json({
       success: true,
