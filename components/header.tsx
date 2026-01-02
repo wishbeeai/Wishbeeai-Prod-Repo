@@ -225,8 +225,8 @@ export function Header() {
                             >
                               <Shield className="w-4 h-4" />
                               <div>
-                                <div className="font-medium">Admin Panel</div>
-                                <div className="text-xs opacity-70">Manage affiliate products</div>
+                                <div className="font-medium">Manage Affiliate Products</div>
+                                <div className="text-xs opacity-70">Add, edit, and manage products</div>
                               </div>
                             </button>
                           </>
@@ -361,8 +361,8 @@ export function Header() {
                 >
                   <Shield className="w-4 h-4 sm:w-5 sm:h-5" />
                   <div>
-                    <div className="font-medium">Admin Panel</div>
-                    <div className="text-[10px] sm:text-xs opacity-70">Manage affiliate products</div>
+                    <div className="font-medium">Manage Affiliate Products</div>
+                    <div className="text-[10px] sm:text-xs opacity-70">Add, edit, and manage products</div>
                   </div>
                 </button>
               )}
