@@ -121,7 +121,7 @@ export async function GET(req: NextRequest) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
-    if (!user || user.email !== ADMIN_EMAIL) {
+    if (!user || user.email?.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
@@ -144,7 +144,7 @@ export async function POST(req: NextRequest) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
-    if (!user || user.email !== ADMIN_EMAIL) {
+    if (!user || user.email?.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 

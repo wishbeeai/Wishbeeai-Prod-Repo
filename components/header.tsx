@@ -18,7 +18,7 @@ export function Header() {
   const { toast } = useToast()
   
   const ADMIN_EMAIL = "wishbeeai@gmail.com"
-  const isAdmin = user?.email === ADMIN_EMAIL
+  const isAdmin = user?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()
 
   const handleLogin = () => {
     setIsLoginModalOpen(true)

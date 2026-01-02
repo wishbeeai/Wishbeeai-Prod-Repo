@@ -81,7 +81,7 @@ export default function AdminAffiliateProductsPage() {
   // Check admin access
   useEffect(() => {
     if (!authLoading) {
-      if (!user || user.email !== ADMIN_EMAIL) {
+      if (!user || user.email?.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
         router.push("/")
         toast.error("Access denied. Admin privileges required.")
       }
@@ -90,7 +90,7 @@ export default function AdminAffiliateProductsPage() {
 
   // Fetch affiliate products
   useEffect(() => {
-    if (user?.email === ADMIN_EMAIL) {
+    if (user?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
       fetchProducts()
     }
   }, [user])
@@ -289,7 +289,7 @@ export default function AdminAffiliateProductsPage() {
     )
   }
 
-  if (!user || user.email !== ADMIN_EMAIL) {
+  if (!user || user.email?.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
     return null
   }
 

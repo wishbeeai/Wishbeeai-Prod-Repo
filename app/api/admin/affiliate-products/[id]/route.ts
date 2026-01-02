@@ -156,7 +156,7 @@ export async function PUT(
 
     console.log(`[PUT API] User:`, user?.email, `Admin email:`, ADMIN_EMAIL)
 
-    if (!user || user.email !== ADMIN_EMAIL) {
+    if (!user || user.email?.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
       console.log(`[PUT API] Unauthorized - user email: ${user?.email}`)
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
@@ -309,7 +309,7 @@ export async function DELETE(
 
     console.log(`[DELETE API] User:`, user?.email, `Admin email:`, ADMIN_EMAIL)
 
-    if (!user || user.email !== ADMIN_EMAIL) {
+    if (!user || user.email?.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
       console.log(`[DELETE API] Unauthorized - user email: ${user?.email}`)
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
