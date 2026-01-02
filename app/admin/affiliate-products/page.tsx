@@ -63,6 +63,20 @@ export default function AdminAffiliateProductsPage() {
   const [editingProduct, setEditingProduct] = useState<AffiliateProduct | null>(null)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
+  const [formData, setFormData] = useState({
+    productName: "",
+    image: "",
+    category: "",
+    source: "",
+    rating: "",
+    reviewCount: "",
+    price: "",
+    originalPrice: "",
+    productLink: "",
+    amazonChoice: false,
+    bestSeller: false,
+  })
 
   // Check admin access
   useEffect(() => {
@@ -115,6 +129,113 @@ export default function AdminAffiliateProductsPage() {
     } catch (error) {
       console.error("Error deleting product:", error)
       toast.error("Failed to delete product")
+    }
+  }
+
+  const resetForm = () => {
+    setFormData({
+      productName: "",
+      image: "",
+      category: "",
+      source: "",
+      rating: "",
+      reviewCount: "",
+      price: "",
+      originalPrice: "",
+      productLink: "",
+      amazonChoice: false,
+      bestSeller: false,
+    })
+  }
+
+  const handleOpenAddModal = () => {
+    resetForm()
+    setIsAddModalOpen(true)
+  }
+
+  const handleOpenEditModal = (product: AffiliateProduct) => {
+    setEditingProduct(product)
+    setFormData({
+      productName: product.productName || "",
+      image: product.image || "",
+      category: product.category || "",
+      source: product.source || "",
+      rating: product.rating?.toString() || "",
+      reviewCount: product.reviewCount?.toString() || "",
+      price: product.price?.toString() || "",
+      originalPrice: product.originalPrice?.toString() || "",
+      productLink: product.productLink || "",
+      amazonChoice: product.amazonChoice || false,
+      bestSeller: product.bestSeller || false,
+    })
+    setIsEditModalOpen(true)
+  }
+
+  const handleSave = async () => {
+    // Validate required fields
+    if (!formData.productName.trim()) {
+      toast.error("Product name is required")
+      return
+    }
+    if (!formData.category.trim()) {
+      toast.error("Category is required")
+      return
+    }
+    if (!formData.source.trim()) {
+      toast.error("Source is required")
+      return
+    }
+    if (!formData.price || isNaN(parseFloat(formData.price))) {
+      toast.error("Valid price is required")
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      const url = isEditModalOpen && editingProduct
+        ? `/api/admin/affiliate-products/${editingProduct.id}`
+        : "/api/admin/affiliate-products"
+
+      const method = isEditModalOpen ? "PUT" : "POST"
+
+      const payload: any = {
+        productName: formData.productName.trim(),
+        image: formData.image.trim() || undefined,
+        category: formData.category.trim(),
+        source: formData.source.trim(),
+        rating: formData.rating ? parseFloat(formData.rating) : 0,
+        reviewCount: formData.reviewCount ? parseInt(formData.reviewCount, 10) : 0,
+        price: parseFloat(formData.price),
+        originalPrice: formData.originalPrice ? parseFloat(formData.originalPrice) : undefined,
+        productLink: formData.productLink.trim() || undefined,
+        amazonChoice: formData.amazonChoice,
+        bestSeller: formData.bestSeller,
+      }
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      })
+
+      if (response.ok) {
+        toast.success(isEditModalOpen ? "Product updated successfully" : "Product added successfully")
+        setIsAddModalOpen(false)
+        setIsEditModalOpen(false)
+        setEditingProduct(null)
+        resetForm()
+        fetchProducts()
+      } else {
+        const error = await response.json()
+        toast.error(error.error || "Failed to save product")
+      }
+    } catch (error) {
+      console.error("Error saving product:", error)
+      toast.error("Failed to save product")
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -213,7 +334,7 @@ export default function AdminAffiliateProductsPage() {
               Admin Access Email: {ADMIN_EMAIL}
             </p>
             <Button
-              onClick={() => setIsAddModalOpen(true)}
+              onClick={handleOpenAddModal}
               className="bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] hover:from-[#F4C430] hover:to-[#DAA520] text-sm sm:text-base md:text-lg font-semibold h-12 px-4 sm:px-6 rounded-full shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105"
             >
               <Plus className="w-5 h-5 mr-2" />
@@ -310,19 +431,37 @@ export default function AdminAffiliateProductsPage() {
 
           {/* Products Table */}
           <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4 font-semibold text-[#654321]">Product</th>
-                  <th className="text-left py-3 px-4 font-semibold text-[#654321]">Source</th>
-                  <th className="text-left py-3 px-4 font-semibold text-[#654321]">Rating</th>
-                  <th className="text-left py-3 px-4 font-semibold text-[#654321]">Reviews</th>
-                  <th className="text-left py-3 px-4 font-semibold text-[#654321]">Price</th>
-                  <th className="text-left py-3 px-4 font-semibold text-[#654321]">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedProducts.map((product) => (
+            {sortedProducts.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-gray-500 mb-4 text-lg">
+                  {products.length === 0
+                    ? "No affiliate products yet. Add your first product to get started!"
+                    : "No products match your filters. Try adjusting your search or filters."}
+                </p>
+                {products.length === 0 && (
+                  <Button
+                    onClick={handleOpenAddModal}
+                    className="bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] hover:from-[#F4C430] hover:to-[#DAA520]"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Your First Product
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="text-left py-3 px-4 font-semibold text-[#654321]">Product</th>
+                    <th className="text-left py-3 px-4 font-semibold text-[#654321]">Source</th>
+                    <th className="text-left py-3 px-4 font-semibold text-[#654321]">Rating</th>
+                    <th className="text-left py-3 px-4 font-semibold text-[#654321]">Reviews</th>
+                    <th className="text-left py-3 px-4 font-semibold text-[#654321]">Price</th>
+                    <th className="text-left py-3 px-4 font-semibold text-[#654321]">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedProducts.map((product) => (
                   <tr key={product.id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="py-4 px-4">
                       <div className="flex items-center gap-3">
@@ -374,10 +513,7 @@ export default function AdminAffiliateProductsPage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => {
-                            setEditingProduct(product)
-                            setIsEditModalOpen(true)
-                          }}
+                          onClick={() => handleOpenEditModal(product)}
                           className="border-[#DAA520] text-[#DAA520] hover:bg-[#DAA520] hover:text-white"
                         >
                           <Edit2 className="w-4 h-4" />
@@ -396,9 +532,10 @@ export default function AdminAffiliateProductsPage() {
                       </div>
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
 
           {/* Pagination */}
@@ -488,18 +625,209 @@ export default function AdminAffiliateProductsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Add/Edit Product Modal - Placeholder for now */}
+      {/* Add/Edit Product Modal */}
       <Dialog open={isAddModalOpen || isEditModalOpen} onOpenChange={(open) => {
         setIsAddModalOpen(open)
         setIsEditModalOpen(open)
-        if (!open) setEditingProduct(null)
+        if (!open) {
+          setEditingProduct(null)
+          resetForm()
+        }
       }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{isEditModalOpen ? "Edit Product" : "Add New Affiliate Product"}</DialogTitle>
+            <DialogTitle className="text-xl font-bold text-[#654321]">
+              {isEditModalOpen ? "Edit Product" : "Add New Affiliate Product"}
+            </DialogTitle>
           </DialogHeader>
-          <div className="py-4">
-            <p className="text-gray-600">Product form will be implemented next.</p>
+          <div className="py-4 space-y-4">
+            {/* Product Name */}
+            <div>
+              <label className="block text-sm font-medium text-[#654321] mb-2">
+                Product Name <span className="text-red-500">*</span>
+              </label>
+              <Input
+                value={formData.productName}
+                onChange={(e) => setFormData({ ...formData, productName: e.target.value })}
+                placeholder="Enter product name"
+                className="border-gray-300 focus:border-[#DAA520]"
+              />
+            </div>
+
+            {/* Image URL */}
+            <div>
+              <label className="block text-sm font-medium text-[#654321] mb-2">
+                Image URL
+              </label>
+              <Input
+                value={formData.image}
+                onChange={(e) => setFormData({ ...formData, image: e.target.value })}
+                placeholder="https://example.com/image.jpg"
+                className="border-gray-300 focus:border-[#DAA520]"
+              />
+              {formData.image && (
+                <img
+                  src={formData.image}
+                  alt="Preview"
+                  className="mt-2 w-24 h-24 object-cover rounded-lg border border-gray-200"
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none"
+                  }}
+                />
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              {/* Category */}
+              <div>
+                <label className="block text-sm font-medium text-[#654321] mb-2">
+                  Category <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  value={formData.category}
+                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                  placeholder="e.g., Electronics, Books"
+                  className="border-gray-300 focus:border-[#DAA520]"
+                />
+              </div>
+
+              {/* Source */}
+              <div>
+                <label className="block text-sm font-medium text-[#654321] mb-2">
+                  Source <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  value={formData.source}
+                  onChange={(e) => setFormData({ ...formData, source: e.target.value })}
+                  placeholder="e.g., Amazon, eBay"
+                  className="border-gray-300 focus:border-[#DAA520]"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              {/* Price */}
+              <div>
+                <label className="block text-sm font-medium text-[#654321] mb-2">
+                  Price <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={formData.price}
+                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                  placeholder="0.00"
+                  className="border-gray-300 focus:border-[#DAA520]"
+                />
+              </div>
+
+              {/* Original Price */}
+              <div>
+                <label className="block text-sm font-medium text-[#654321] mb-2">
+                  Original Price (optional)
+                </label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={formData.originalPrice}
+                  onChange={(e) => setFormData({ ...formData, originalPrice: e.target.value })}
+                  placeholder="0.00"
+                  className="border-gray-300 focus:border-[#DAA520]"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              {/* Rating */}
+              <div>
+                <label className="block text-sm font-medium text-[#654321] mb-2">
+                  Rating (0-5)
+                </label>
+                <Input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  max="5"
+                  value={formData.rating}
+                  onChange={(e) => setFormData({ ...formData, rating: e.target.value })}
+                  placeholder="0.0"
+                  className="border-gray-300 focus:border-[#DAA520]"
+                />
+              </div>
+
+              {/* Review Count */}
+              <div>
+                <label className="block text-sm font-medium text-[#654321] mb-2">
+                  Review Count
+                </label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.reviewCount}
+                  onChange={(e) => setFormData({ ...formData, reviewCount: e.target.value })}
+                  placeholder="0"
+                  className="border-gray-300 focus:border-[#DAA520]"
+                />
+              </div>
+            </div>
+
+            {/* Product Link */}
+            <div>
+              <label className="block text-sm font-medium text-[#654321] mb-2">
+                Product Link
+              </label>
+              <Input
+                value={formData.productLink}
+                onChange={(e) => setFormData({ ...formData, productLink: e.target.value })}
+                placeholder="https://example.com/product"
+                className="border-gray-300 focus:border-[#DAA520]"
+              />
+            </div>
+
+            {/* Amazon Badges */}
+            <div className="flex gap-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.amazonChoice}
+                  onChange={(e) => setFormData({ ...formData, amazonChoice: e.target.checked })}
+                  className="w-4 h-4 text-[#DAA520] border-gray-300 rounded focus:ring-[#DAA520]"
+                />
+                <span className="text-sm text-[#654321]">Amazon Choice</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.bestSeller}
+                  onChange={(e) => setFormData({ ...formData, bestSeller: e.target.checked })}
+                  className="w-4 h-4 text-[#DAA520] border-gray-300 rounded focus:ring-[#DAA520]"
+                />
+                <span className="text-sm text-[#654321]">Best Seller</span>
+              </label>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex justify-end gap-3 pt-4 border-t">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsAddModalOpen(false)
+                  setIsEditModalOpen(false)
+                  setEditingProduct(null)
+                  resetForm()
+                }}
+                disabled={isSaving}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSave}
+                disabled={isSaving}
+                className="bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] hover:from-[#F4C430] hover:to-[#DAA520]"
+              >
+                {isSaving ? "Saving..." : isEditModalOpen ? "Update Product" : "Add Product"}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

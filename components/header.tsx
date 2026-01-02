@@ -6,7 +6,7 @@ import { useState } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { LoginModal } from "./login-modal"
 import { SignUpModal } from "./signup-modal"
-import { ChevronDown, User, Settings, LogOut, Gift, Users, Heart, BarChart3, Menu, X } from "lucide-react"
+import { ChevronDown, User, Settings, LogOut, Gift, Users, Heart, BarChart3, Menu, X, Shield } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 
 export function Header() {
@@ -16,6 +16,9 @@ export function Header() {
   const [openDropdown, setOpenDropdown] = useState<string | null>(null)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const { toast } = useToast()
+  
+  const ADMIN_EMAIL = "wishbeeai@gmail.com"
+  const isAdmin = user?.email === ADMIN_EMAIL
 
   const handleLogin = () => {
     setIsLoginModalOpen(true)
@@ -210,6 +213,24 @@ export function Header() {
                             <div className="text-xs opacity-70">Manage preferences</div>
                           </div>
                         </button>
+                        {isAdmin && (
+                          <>
+                            <hr className="my-2 border-[#4A2F1A]" />
+                            <button
+                              onClick={() => {
+                                handleMenuClick("/admin/affiliate-products")
+                                setOpenDropdown(null)
+                              }}
+                              className="flex items-center gap-2 w-full text-left px-4 py-3 text-sm text-[#8B5A3C] hover:bg-gradient-to-r hover:from-[#6B4423] hover:via-[#8B5A3C] hover:to-[#6B4423] hover:text-[#F5DEB3] transition-all duration-150"
+                            >
+                              <Shield className="w-4 h-4" />
+                              <div>
+                                <div className="font-medium">Admin Panel</div>
+                                <div className="text-xs opacity-70">Manage affiliate products</div>
+                              </div>
+                            </button>
+                          </>
+                        )}
                         <hr className="my-2 border-[#4A2F1A]" />
                         <button
                           onClick={handleLogout}
@@ -333,6 +354,18 @@ export function Header() {
                   <div className="text-[10px] sm:text-xs opacity-70">Manage preferences</div>
                 </div>
               </button>
+              {isAdmin && (
+                <button
+                  onClick={() => handleMenuClick("/admin/affiliate-products")}
+                  className="flex items-center gap-2 w-full px-3 sm:px-4 py-2 sm:py-3 text-[#F5DEB3] hover:bg-gradient-to-r hover:from-[#6B4423] hover:via-[#8B5A3C] hover:to-[#6B4423] hover:text-[#DAA520] rounded-lg transition-all duration-200 text-left text-sm sm:text-base"
+                >
+                  <Shield className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <div>
+                    <div className="font-medium">Admin Panel</div>
+                    <div className="text-[10px] sm:text-xs opacity-70">Manage affiliate products</div>
+                  </div>
+                </button>
+              )}
               <button
                 onClick={handleLogout}
                 className="flex items-center gap-2 w-full px-3 sm:px-4 py-2 sm:py-3 text-[#F5DEB3] hover:bg-gradient-to-r hover:from-[#6B4423] hover:via-[#8B5A3C] hover:to-[#6B4423] hover:text-[#DAA520] rounded-lg transition-all duration-200 font-bold text-left text-sm sm:text-base"
