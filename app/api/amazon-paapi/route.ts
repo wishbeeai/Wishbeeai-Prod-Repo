@@ -1,32 +1,17 @@
 import { NextRequest, NextResponse } from "next/server"
-import amazonPaapi from "amazon-paapi"
+import { getAmazonItem, normalizeAmazonItem } from "@/lib/amazonClient"
 
 const AMAZON_ACCESS_KEY = process.env.AMAZON_ACCESS_KEY || ""
 const AMAZON_SECRET_KEY = process.env.AMAZON_SECRET_KEY || ""
 const AMAZON_ASSOCIATE_TAG = process.env.AMAZON_ASSOCIATE_TAG || ""
-const AMAZON_REGION = process.env.AMAZON_REGION || "us-east-1"
-
-// Common parameters for all PA-API requests
-const commonParameters = {
-  AccessKey: AMAZON_ACCESS_KEY,
-  SecretKey: AMAZON_SECRET_KEY,
-  PartnerTag: AMAZON_ASSOCIATE_TAG,
-  PartnerType: "Associates",
-  Marketplace: "www.amazon.com",
-}
-
-// Create a client-like wrapper for easier usage
-const paapi = {
-  getItems: async (requestParameters: any) => {
-    return await amazonPaapi.GetItems(commonParameters, requestParameters)
-  },
-}
 
 /**
  * Extract ASIN from Amazon URL
+ * Handles multiple Amazon URL patterns: /dp/, /gp/product/, etc.
  */
 function extractASIN(url: string): string | null {
-  const match = url.match(/\/dp\/([A-Z0-9]{10})/)
+  const regex = /(?:\/dp\/|\/gp\/product\/)([A-Z0-9]{10})/
+  const match = url.match(regex)
   return match ? match[1] : null
 }
 
@@ -38,160 +23,40 @@ async function fetchAmazonProduct(asin: string) {
     throw new Error("Amazon PA-API credentials not configured")
   }
 
-  const response = await paapi.getItems({
-    ItemIds: [asin],
-    Resources: [
-      "ItemInfo.Title",
-      "ItemInfo.ByLineInfo",
-      "ItemInfo.Classifications",
-      "ItemInfo.ExternalIds",
-      "ItemInfo.Features",
-      "ItemInfo.ManufactureInfo",
-      "ItemInfo.ProductInfo",
-      "Offers.Listings.Availability.MaxOrderQuantity",
-      "Offers.Listings.Availability.Message",
-      "Offers.Listings.Availability.Type",
-      "Offers.Listings.Condition",
-      "Offers.Listings.DeliveryInfo.IsAmazonFulfilled",
-      "Offers.Listings.DeliveryInfo.IsFreeShippingEligible",
-      "Offers.Listings.DeliveryInfo.IsPrimeEligible",
-      "Offers.Listings.MerchantInfo",
-      "Offers.Listings.Price",
-      "Offers.Listings.Promotions",
-      "Offers.Listings.SavingBasis",
-      "Offers.Summaries.HighestPrice",
-      "Offers.Summaries.LowestPrice",
-      "Offers.Summaries.OfferCount",
-      "Images.Primary.Large",
-      "Images.Primary.Medium",
-      "Images.Primary.Small",
-      "Images.Variants.Large",
-      "Images.Variants.Medium",
-      "Images.Variants.Small",
-      "CustomerReviews.StarRating",
-      "CustomerReviews.Count",
-      "BrowseNodeInfo.BrowseNodes",
-      "BrowseNodeInfo.WebsiteSalesRank",
-    ],
-  })
-
-  if (!response.ItemsResult || !response.ItemsResult.Items || response.ItemsResult.Items.length === 0) {
-    throw new Error("No items found in PA-API response")
-  }
-
-  return response
-}
-
-/**
- * Convert PA-API response to our product data format
- */
-function convertPAAPIResponse(paapiResponse: any, asin: string, originalUrl: string) {
-  if (!paapiResponse.ItemsResult || !paapiResponse.ItemsResult.Items || paapiResponse.ItemsResult.Items.length === 0) {
-    throw new Error("No items found in PA-API response")
-  }
-
-  const item = paapiResponse.ItemsResult.Items[0]
-  const itemInfo = item.ItemInfo || {}
-  const offers = item.Offers || {}
-  const images = item.Images || {}
-  const customerReviews = item.CustomerReviews || {}
-  const browseNodeInfo = item.BrowseNodeInfo || {}
-
-  // Extract product name
-  const productName = itemInfo.Title?.DisplayValue || item.ASIN
-
-  // Extract price
-  let price: number | null = null
-  let originalPrice: number | null = null
-  
-  if (offers.Listings && offers.Listings.length > 0) {
-    const listing = offers.Listings[0]
-    if (listing.Price) {
-      price = parseFloat(listing.Price.Amount || "0")
-      if (listing.Price.Currency === "USD" && price > 0) {
-        price = price / 100 // PA-API returns prices in cents
-      }
+  try {
+    console.log("[PA-API] Fetching product for ASIN:", asin)
+    const response = await getAmazonItem(asin)
+    
+    console.log("[PA-API] Raw response from getAmazonItem:", JSON.stringify(response, null, 2).substring(0, 500))
+    
+    // Check if response has Errors property (PA-API error response format)
+    if (response && typeof response === 'object' && 'Errors' in response) {
+      console.error("[PA-API] Response contains Errors:", response.Errors)
+      return response // Return as-is so error handling above can process it
     }
     
-    // Check for savings/sale price
-    if (listing.SavingBasis && listing.SavingBasis.Amount) {
-      originalPrice = parseFloat(listing.SavingBasis.Amount || "0")
-      if (listing.SavingBasis.Currency === "USD" && originalPrice > 0) {
-        originalPrice = originalPrice / 100
+    if (!response) {
+      throw new Error("No items found in PA-API response")
+    }
+
+    // Wrap in the expected response format
+    return {
+      ItemsResult: {
+        Items: [response]
       }
     }
-  }
-
-  // Extract image
-  let imageUrl: string | null = null
-  if (images.Primary) {
-    imageUrl = images.Primary.Large?.URL || images.Primary.Medium?.URL || images.Primary.Small?.URL || null
-  }
-
-  // Extract rating and review count
-  let rating: number | null = null
-  let reviewCount: number | null = null
-  
-  if (customerReviews.StarRating) {
-    rating = parseFloat(customerReviews.StarRating.Value || "0")
-  }
-  
-  if (customerReviews.Count) {
-    reviewCount = parseInt(customerReviews.Count || "0", 10)
-  }
-
-  // Extract category
-  let category: string | null = null
-  if (browseNodeInfo.BrowseNodes && browseNodeInfo.BrowseNodes.length > 0) {
-    category = browseNodeInfo.BrowseNodes[0].DisplayName || null
-  }
-  if (!category && itemInfo.Classifications) {
-    category = itemInfo.Classifications.ProductGroup?.DisplayValue || null
-  }
-
-  // Extract brand
-  let brand: string | null = null
-  if (itemInfo.ByLineInfo) {
-    brand = itemInfo.ByLineInfo.Brand?.DisplayValue || itemInfo.ByLineInfo.Manufacturer?.DisplayValue || null
-  }
-
-  // Extract features
-  const features = itemInfo.Features?.DisplayValues || []
-  const description = features.join(". ") || itemInfo.Title?.DisplayValue || ""
-
-  // Extract Amazon Choice/Best Seller
-  const amazonChoice = false // PA-API doesn't directly provide this
-  const bestSeller = browseNodeInfo.WebsiteSalesRank ? true : false
-
-  // Generate affiliate URL with associate tag
-  const affiliateUrl = originalUrl.includes("?tag=") 
-    ? originalUrl 
-    : `${originalUrl.includes("?") ? originalUrl + "&" : originalUrl + "?"}tag=${AMAZON_ASSOCIATE_TAG}`
-
-  return {
-    productName,
-    price,
-    originalPrice: originalPrice || undefined,
-    image: imageUrl,
-    imageUrl,
-    category: category || "General",
-    source: "Amazon",
-    rating: rating || 0,
-    reviewCount: reviewCount || 0,
-    productLink: affiliateUrl,
-    amazonChoice,
-    bestSeller,
-    brand,
-    description,
-    asin,
-    attributes: {
-      brand,
-      features: features.length > 0 ? features : undefined,
-    },
-    stockStatus: offers.Listings?.[0]?.Availability?.Type === "Now" ? "In Stock" : "Out of Stock",
-    affiliateUrl,
+  } catch (error) {
+    console.error("[PA-API] Error fetching Amazon product:", error)
+    const errorDetails = {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      name: error instanceof Error ? error.name : undefined,
+    }
+    console.error("[PA-API] Error details:", JSON.stringify(errorDetails, null, 2))
+    throw error
   }
 }
+
 
 export async function POST(req: NextRequest) {
   try {
@@ -222,7 +87,11 @@ export async function POST(req: NextRequest) {
       productASIN = extractASIN(productUrl)
       if (!productASIN) {
         return NextResponse.json(
-          { error: "Could not extract ASIN from Amazon URL" },
+          { 
+            error: "Invalid Amazon URL. ASIN not found.",
+            message: "Could not extract ASIN from the provided Amazon URL. Please ensure the URL contains a valid product ASIN.",
+            details: "Expected URL format: https://www.amazon.com/.../dp/ASIN or .../gp/product/ASIN"
+          },
           { status: 400 }
         )
       }
@@ -230,31 +99,88 @@ export async function POST(req: NextRequest) {
 
     if (!productASIN || productASIN.length !== 10) {
       return NextResponse.json(
-        { error: "Invalid ASIN. ASIN must be 10 characters" },
-        { status: 400 }
-      )
-    }
-
-    console.log(`[PA-API] Fetching product details for ASIN: ${productASIN}`)
-
-    // Call PA-API
-    const paapiResponse = await fetchAmazonProduct(productASIN)
-
-    // Check for errors in response
-    if (paapiResponse.Errors && paapiResponse.Errors.length > 0) {
-      const error = paapiResponse.Errors[0]
-      return NextResponse.json(
-        {
-          error: error.Message || "PA-API error",
-          code: error.Code,
-          details: error,
+        { 
+          error: "Invalid ASIN. ASIN must be 10 characters",
+          message: `The ASIN "${productASIN || "unknown"}" is not valid. ASIN must be exactly 10 characters.`,
+          details: `Received ASIN length: ${productASIN?.length || 0}`
         },
         { status: 400 }
       )
     }
 
-    // Convert to our format
-    const productData = convertPAAPIResponse(paapiResponse, productASIN, productUrl || `https://www.amazon.com/dp/${productASIN}?tag=${AMAZON_ASSOCIATE_TAG}`)
+    console.log(`[PA-API] Fetching product details for ASIN: ${productASIN}`)
+    console.log(`[PA-API] Credentials check - Access Key: ${AMAZON_ACCESS_KEY ? 'SET' : 'MISSING'}, Secret Key: ${AMAZON_SECRET_KEY ? 'SET' : 'MISSING'}, Associate Tag: ${AMAZON_ASSOCIATE_TAG ? 'SET' : 'MISSING'}`)
+
+    // Call PA-API
+    let paapiResponse
+    try {
+      paapiResponse = await fetchAmazonProduct(productASIN)
+      console.log(`[PA-API] Response received:`, JSON.stringify(paapiResponse, null, 2).substring(0, 500))
+
+      // Check for errors in response
+      if (paapiResponse.Errors && paapiResponse.Errors.length > 0) {
+        const error = paapiResponse.Errors[0]
+        console.error(`[PA-API] PA-API returned errors:`, JSON.stringify(error, null, 2))
+        return NextResponse.json(
+          {
+            error: error.Message || error.message || "PA-API error",
+            code: error.Code || error.code,
+            details: error,
+            message: error.Message || error.message || "Amazon PA-API returned an error",
+          },
+          { status: 400 }
+        )
+      }
+
+      // Check if response has items
+      if (!paapiResponse.ItemsResult || !paapiResponse.ItemsResult.Items || paapiResponse.ItemsResult.Items.length === 0) {
+        console.error(`[PA-API] No items found in response. Full response:`, JSON.stringify(paapiResponse, null, 2))
+        return NextResponse.json(
+          {
+            error: "No product data found",
+            details: "The product may not be available or the ASIN may be invalid",
+            message: "No product data found for this ASIN",
+          },
+          { status: 404 }
+        )
+      }
+    } catch (apiError) {
+      console.error(`[PA-API] Exception during API call:`, apiError)
+      const errorMessage = apiError instanceof Error ? apiError.message : String(apiError)
+      const errorStack = apiError instanceof Error ? apiError.stack : undefined
+      
+      return NextResponse.json(
+        {
+          error: "Failed to fetch product from Amazon PA-API",
+          details: errorMessage,
+          message: errorMessage,
+          stack: errorStack,
+        },
+        { status: 500 }
+      )
+    }
+
+    // Normalize the item to our format
+    const item = paapiResponse.ItemsResult.Items[0]
+    const normalized = normalizeAmazonItem(item)
+    
+    // Convert to the format expected by the frontend
+    const productData = {
+      productName: normalized.title,
+      imageUrl: normalized.image_url,
+      image: normalized.image_url,
+      price: normalized.list_price ? (normalized.list_price / 100).toString() : null, // PA-API returns in cents
+      originalPrice: normalized.list_price ? (normalized.list_price / 100).toString() : undefined,
+      rating: normalized.review_star?.Value ? parseFloat(normalized.review_star.Value) : 0,
+      reviewCount: normalized.review_count ? parseInt(normalized.review_count) : 0,
+      productLink: normalized.affiliate_url || `https://www.amazon.com/dp/${productASIN}?tag=${AMAZON_ASSOCIATE_TAG}`,
+      affiliateUrl: normalized.affiliate_url || `https://www.amazon.com/dp/${productASIN}?tag=${AMAZON_ASSOCIATE_TAG}`,
+      category: "General",
+      source: "Amazon",
+      asin: productASIN,
+      amazonChoice: false,
+      bestSeller: false,
+    }
 
     return NextResponse.json({
       success: true,
@@ -263,11 +189,13 @@ export async function POST(req: NextRequest) {
       asin: productASIN,
     })
   } catch (error) {
-    console.error("[PA-API] Error:", error)
+    console.error("[PA-API] Top-level catch error:", error)
+    console.error("[PA-API] Error stack:", error instanceof Error ? error.stack : "No stack trace")
     return NextResponse.json(
       {
         error: "Failed to fetch product from Amazon PA-API",
         details: error instanceof Error ? error.message : "Unknown error",
+        message: error instanceof Error ? error.message : "Unknown error occurred",
       },
       { status: 500 }
     )

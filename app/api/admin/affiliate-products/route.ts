@@ -121,7 +121,9 @@ export async function GET(req: NextRequest) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
-    if (!user || user.email?.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+    const userEmail = user?.email?.toLowerCase().trim()
+    const adminEmail = ADMIN_EMAIL.toLowerCase().trim()
+    if (!user || userEmail !== adminEmail) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
@@ -144,7 +146,9 @@ export async function POST(req: NextRequest) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
-    if (!user || user.email?.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+    const userEmail = user?.email?.toLowerCase().trim()
+    const adminEmail = ADMIN_EMAIL.toLowerCase().trim()
+    if (!user || userEmail !== adminEmail) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 

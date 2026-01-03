@@ -81,19 +81,24 @@ export default function AdminAffiliateProductsPage() {
     bestSeller: false,
   })
 
-  // Check admin access
+  // Check admin access - case-insensitive and trimmed for security
   useEffect(() => {
     if (!authLoading) {
-      if (!user || user.email?.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+      const userEmail = user?.email?.toLowerCase().trim()
+      const adminEmail = ADMIN_EMAIL.toLowerCase().trim()
+      if (!user || userEmail !== adminEmail) {
         router.push("/")
         toast.error("Access denied. Admin privileges required.")
+        return
       }
     }
   }, [user, authLoading, router])
 
-  // Fetch affiliate products
+  // Fetch affiliate products - only for admin
   useEffect(() => {
-    if (user?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+    const userEmail = user?.email?.toLowerCase().trim()
+    const adminEmail = ADMIN_EMAIL.toLowerCase().trim()
+    if (userEmail === adminEmail) {
       fetchProducts()
     }
   }, [user])
@@ -204,37 +209,139 @@ export default function AdminAffiliateProductsPage() {
             body: JSON.stringify({ productUrl: url }),
           })
 
-          // If PA-API succeeds, use its response
-          if (response.ok) {
-            const paapiData = await response.json()
-            if (paapiData.productData) {
-              const extracted = paapiData.productData
-              setFormData((prev) => ({
-                ...prev,
-                productName: extracted.productName || prev.productName,
-                image: extracted.imageUrl || extracted.image || prev.image,
-                category: extracted.category || prev.category,
-                source: extracted.source || "Amazon",
-                rating: extracted.rating?.toString() || prev.rating,
-                reviewCount: extracted.reviewCount?.toString() || prev.reviewCount,
-                price: extracted.price?.toString() || prev.price,
-                originalPrice: extracted.originalPrice?.toString() || prev.originalPrice,
-                amazonChoice: extracted.amazonChoice || prev.amazonChoice,
-                bestSeller: extracted.bestSeller || prev.bestSeller,
-              }))
-              toast.success("Product details extracted from Amazon PA-API successfully!")
-              setIsExtracting(false)
-              return
+          // Get response status and statusText BEFORE consuming the body
+          const responseStatus = response.status
+          const responseStatusText = response.statusText || ""
+          const responseOk = response.ok
+          
+          console.log("[PA-API] Response status:", responseStatus, "OK:", responseOk, "StatusText:", responseStatusText)
+          
+          // Parse PA-API response (always parse, then check status)
+          let paapiData: any = {}
+          let responseText = ""
+          
+          try {
+            // Try to get response as text first to see what we're dealing with
+            responseText = await response.text()
+            console.log("[PA-API] Raw response text length:", responseText.length, "Content (first 500 chars):", responseText.substring(0, 500))
+            
+            // Try to parse as JSON
+            if (responseText && responseText.trim()) {
+              try {
+                paapiData = JSON.parse(responseText)
+                console.log("[PA-API] Parsed JSON successfully. Keys:", Object.keys(paapiData))
+              } catch (jsonError) {
+                console.error("[PA-API] Failed to parse as JSON:", jsonError)
+                paapiData = { 
+                  error: "Invalid JSON response",
+                  rawText: responseText.substring(0, 200)
+                }
+              }
+            } else {
+              console.warn("[PA-API] Empty or whitespace-only response body")
+              paapiData = { 
+                error: "Empty response from server",
+                status: responseStatus,
+                statusText: responseStatusText
+              }
+            }
+          } catch (parseError) {
+            console.error("[PA-API] Failed to read response:", parseError)
+            paapiData = { 
+              error: "Unable to read response",
+              parseError: parseError instanceof Error ? parseError.message : String(parseError)
             }
           }
-          // If PA-API fails, fall through to regular extraction
+          
+          if (response.ok && paapiData.productData) {
+            const extracted = paapiData.productData
+            setFormData((prev) => ({
+              ...prev,
+              productName: extracted.productName || prev.productName,
+              image: extracted.imageUrl || extracted.image || prev.image,
+              category: extracted.category || prev.category,
+              source: extracted.source || "Amazon",
+              rating: extracted.rating?.toString() || prev.rating,
+              reviewCount: extracted.reviewCount?.toString() || prev.reviewCount,
+              price: extracted.price?.toString() || prev.price,
+              originalPrice: extracted.originalPrice?.toString() || prev.originalPrice,
+              amazonChoice: extracted.amazonChoice || prev.amazonChoice,
+              bestSeller: extracted.bestSeller || prev.bestSeller,
+            }))
+            toast.success("Product details extracted from Amazon PA-API successfully!")
+            setIsExtracting(false)
+            return
+          } else {
+            // PA-API returned an error
+            const errorMsg = paapiData.error || paapiData.message || paapiData.details || `HTTP ${responseStatus}`
+            const errorCode = paapiData.code || ""
+            
+            // Safely log error details (using saved values, not accessing response after consumption)
+            const errorDetails: any = {
+              status: responseStatus,
+              statusText: responseStatusText,
+              ok: responseOk,
+            }
+            
+            // Add all available error fields
+            if (paapiData) {
+              if (paapiData.error) errorDetails.error = paapiData.error
+              if (paapiData.message) errorDetails.message = paapiData.message
+              if (paapiData.details) errorDetails.details = paapiData.details
+              if (paapiData.code) errorDetails.code = paapiData.code
+              if (paapiData.stack) errorDetails.stack = paapiData.stack
+              
+              // Log the full paapiData for debugging
+              console.error("[PA-API] Full error response:", JSON.stringify(paapiData, null, 2))
+            }
+            
+            // Only add these if they exist
+            if (responseText) {
+              errorDetails.rawTextLength = responseText.length
+              errorDetails.rawTextPreview = responseText.substring(0, 200)
+            }
+            
+            console.error("[PA-API] Error response details:", errorDetails)
+            
+            // Provide more helpful error message based on status code
+            let userMessage = `Amazon PA-API error: ${errorMsg}`
+            
+            if (responseStatus === 500) {
+              if (errorMsg.includes("not configured") || errorMsg.includes("credentials")) {
+                userMessage = "Amazon PA-API credentials not configured. Please check your .env.local file and ensure AMAZON_ACCESS_KEY, AMAZON_SECRET_KEY, and AMAZON_ASSOCIATE_TAG are set."
+              } else if (errorMsg.includes("Forbidden") || errorMsg.includes("403")) {
+                userMessage = "Amazon PA-API returned 'Forbidden'. This usually means: 1) Your IAM credentials are invalid, 2) Your Associate Tag is not approved for PA-API, 3) Your IAM user doesn't have Product Advertising API permissions, or 4) Your credentials have expired. Please verify your credentials in the Amazon Associates Central and ensure your Associate Tag is approved for PA-API 5.0."
+              } else {
+                userMessage = `Amazon PA-API server error (${errorMsg || "Unknown error"}). Please check server logs.`
+              }
+            } else if (responseStatus === 400) {
+              userMessage = `Amazon PA-API request error: ${errorMsg}`
+            } else if (responseStatus === 401 || errorMsg.includes("Forbidden")) {
+              userMessage = "Amazon PA-API authentication failed (Forbidden). Please verify: 1) Your Access Key and Secret Key are correct, 2) Your Associate Tag is approved for PA-API 5.0 in Amazon Associates Central, 3) Your IAM user has Product Advertising API permissions enabled."
+            } else if (responseStatus === 404) {
+              userMessage = `Product not found: ${errorMsg}`
+            } else if (errorMsg.includes("Forbidden")) {
+              userMessage = "Amazon PA-API returned 'Forbidden'. Please verify your IAM credentials and ensure your Associate Tag is approved for PA-API 5.0 in Amazon Associates Central."
+            }
+            
+            if (errorCode) {
+              userMessage += ` (Code: ${errorCode})`
+            }
+            
+            toast.error(`${userMessage}. Please check PA-API credentials or fill product details manually.`)
+            setIsExtracting(false)
+            return
+          }
+          // If PA-API fails, don't fall back - just show error
         } catch (paapiError) {
-          console.log("[PA-API] PA-API failed, falling back to regular extraction:", paapiError)
-          // Fall through to regular extraction
+          console.error("[PA-API] PA-API error:", paapiError)
+          const errorMsg = paapiError instanceof Error ? paapiError.message : "Unknown error"
+          toast.error(`Amazon PA-API failed: ${errorMsg}. Please fill product details manually.`)
+          return
         }
       }
 
-      // Regular extraction (AI-based or scraping)
+      // Regular extraction (AI-based or scraping) - only for non-Amazon URLs
       response = await fetch("/api/ai/extract-product", {
         method: "POST",
         headers: {
@@ -270,6 +377,13 @@ export default function AdminAffiliateProductsPage() {
         try {
           const error = await response.json()
           errorMessage = error.error || error.details || error.message || errorMessage
+          
+          // If AI extraction is not configured, show a helpful message instead of error
+          if (errorMessage.includes("not configured") || errorMessage.includes("OPENAI")) {
+            toast.info("AI extraction not available. Please fill product details manually.")
+            return
+          }
+          
           if (Object.keys(error).length === 0) {
             errorMessage = `Failed to extract product details (HTTP ${response.status})`
           }
@@ -422,7 +536,9 @@ export default function AdminAffiliateProductsPage() {
     )
   }
 
-  if (!user || user.email?.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+  const userEmail = user?.email?.toLowerCase().trim()
+  const adminEmail = ADMIN_EMAIL.toLowerCase().trim()
+  if (!user || userEmail !== adminEmail) {
     return null
   }
 

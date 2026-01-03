@@ -38,29 +38,10 @@ export async function POST(req: Request) {
 
 export async function GET(req: Request) {
   try {
-    // In production, fetch from database
-    // For now, return mock data
-    const mockGifts = [
-      {
-        id: "1",
-        collectionTitle: "Sample Birthday Gift",
-        recipientName: "John Doe",
-        occasion: "birthday",
-        giftName: "Professional Camera",
-        description: "A high-quality camera for photography enthusiasts",
-        targetAmount: 500,
-        currentAmount: 250,
-        contributors: 5,
-        deadline: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        bannerImage: null,
-        createdDate: new Date().toISOString(),
-        status: "active",
-      },
-    ]
-
+    // Return empty array - no products displayed
     return Response.json({
       success: true,
-      gifts: mockGifts,
+      gifts: [],
     })
   } catch (error) {
     console.error("[v0] Error fetching gifts:", error)

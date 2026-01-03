@@ -6,6 +6,8 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  // Exclude problematic packages from server bundling
+  serverExternalPackages: ['amazon-paapi'],
 }
 
 export default nextConfig

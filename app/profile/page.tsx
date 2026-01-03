@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   ArrowLeft,
   Mail,
@@ -27,21 +27,103 @@ import {
 import Link from "next/link"
 import { toast } from "sonner"
 import { Card, CardContent } from "@/components/ui/card"
+import { useAuth } from "@/lib/auth-context"
+import { createClient } from "@/lib/supabase/client"
 
 export default function ProfilePage() {
+  const { user, loading: authLoading } = useAuth()
+  const [loadingProfile, setLoadingProfile] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
   const [loadingAI, setLoadingAI] = useState(false)
   const [aiRecommendations, setAiRecommendations] = useState<any>(null)
   const [profileImage, setProfileImage] = useState<string>("/images/first-person.png")
   const [profileData, setProfileData] = useState({
-    name: "Kavitha Segar",
-    email: "kavitha.segar@gmail.com",
-    phone: "+1 (555) 123-4567",
-    location: "San Francisco, CA",
-    bio: "Passionate about bringing people together through meaningful gifts. Love organizing surprise celebrations!",
-    joinDate: "12/21/2025",
-    birthday: "1990-05-20",
+    name: "",
+    email: "",
+    phone: "",
+    location: "",
+    bio: "",
+    joinDate: "",
+    birthday: "",
   })
+
+  // Fetch profile data from Supabase
+  useEffect(() => {
+    async function fetchProfile() {
+      if (!user) {
+        setLoadingProfile(false)
+        return
+      }
+
+      try {
+        setLoadingProfile(true)
+        const supabase = createClient()
+        
+        // Fetch profile from profiles table
+        const { data: profile, error } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .single()
+
+        if (error) {
+          // Only log errors that aren't "profile doesn't exist" (PGRST116)
+          // PGRST116 means no rows returned, which is expected for new users
+          if (error.code !== "PGRST116") {
+            console.error("Error fetching profile:", {
+              message: error.message,
+              code: error.code,
+              details: error.details,
+              hint: error.hint,
+            })
+          }
+          // If profile doesn't exist or there's an error, use auth user data
+          setProfileData({
+            name: user.user_metadata?.name || user.email?.split("@")[0] || "",
+            email: user.email || "",
+            phone: "",
+            location: "",
+            bio: "",
+            joinDate: user.created_at ? new Date(user.created_at).toLocaleDateString() : new Date().toLocaleDateString(),
+            birthday: "",
+          })
+        } else if (profile) {
+          setProfileData({
+            name: profile.name || user.user_metadata?.name || user.email?.split("@")[0] || "",
+            email: user.email || profile.email || "",
+            phone: profile.phone || "",
+            location: profile.location || "",
+            bio: profile.bio || "",
+            joinDate: profile.created_at ? new Date(profile.created_at).toLocaleDateString() : (user.created_at ? new Date(user.created_at).toLocaleDateString() : new Date().toLocaleDateString()),
+            birthday: profile.birthday || "",
+          })
+          if (profile.profile_image) {
+            setProfileImage(profile.profile_image)
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching profile:", error)
+        // Fallback to user email
+        if (user?.email) {
+          setProfileData({
+            name: user.user_metadata?.name || user.email.split("@")[0],
+            email: user.email,
+            phone: "",
+            location: "",
+            bio: "",
+            joinDate: user.created_at ? new Date(user.created_at).toLocaleDateString() : new Date().toLocaleDateString(),
+            birthday: "",
+          })
+        }
+      } finally {
+        setLoadingProfile(false)
+      }
+    }
+
+    if (!authLoading) {
+      fetchProfile()
+    }
+  }, [user, authLoading])
 
   const [stats] = useState({
     totalGifts: 24,
@@ -114,6 +196,35 @@ export default function ProfilePage() {
       toast.error("Failed to generate AI recommendations")
       setLoadingAI(false)
     }
+  }
+
+  // Show loading state
+  if (authLoading || loadingProfile) {
+    return (
+      <div className="min-h-screen bg-[#F5F1E8] flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-[#DAA520] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-[#654321] font-semibold">Loading profile...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Redirect if not logged in
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-[#F5F1E8] flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-[#654321] font-semibold mb-4">Please log in to view your profile</p>
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] rounded-lg font-semibold hover:shadow-lg transition-all"
+          >
+            Go to Home
+          </Link>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -510,3 +621,4 @@ export default function ProfilePage() {
     </div>
   )
 }
+

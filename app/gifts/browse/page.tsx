@@ -47,68 +47,11 @@ export default function BrowseGiftsPage() {
         console.log("[v0] API response:", data)
 
         if (data.success && data.gifts) {
-          // Add mock trending gifts for display
-          const trendingGifts: Gift[] = [
-            {
-              id: "trending-1",
-              collectionTitle: "Premium Espresso Machine",
-              giftName: "Premium Espresso Machine",
-              description: "A professional-grade espresso machine for coffee lovers",
-              targetAmount: 899,
-              currentAmount: 764,
-              contributors: 24,
-              deadline: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
-              image: "/professional-espresso-setup.png",
-              category: "Home & Kitchen",
-              createdDate: new Date().toISOString(),
-              status: "active",
-            },
-            {
-              id: "trending-2",
-              collectionTitle: "Designer Handbag",
-              giftName: "Designer Handbag",
-              description: "Luxury designer handbag for fashion enthusiasts",
-              targetAmount: 1250,
-              currentAmount: 900,
-              contributors: 18,
-              deadline: new Date(Date.now() + 8 * 24 * 60 * 60 * 1000).toISOString(),
-              image: "/luxury-quilted-handbag.png",
-              category: "Fashion",
-              createdDate: new Date().toISOString(),
-              status: "active",
-            },
-            {
-              id: "trending-3",
-              collectionTitle: "Smart Home Hub Package",
-              giftName: "Smart Home Hub Package",
-              description: "Complete smart home automation system",
-              targetAmount: 650,
-              currentAmount: 617,
-              contributors: 31,
-              deadline: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-              image: "/smart-home-devices.jpg",
-              category: "Tech",
-              createdDate: new Date().toISOString(),
-              status: "active",
-            },
-            {
-              id: "trending-4",
-              collectionTitle: "Professional Camera Kit",
-              giftName: "Professional Camera Kit",
-              description: "High-end photography equipment for professionals",
-              targetAmount: 1899,
-              currentAmount: 1139,
-              contributors: 15,
-              deadline: new Date(Date.now() + 12 * 24 * 60 * 60 * 1000).toISOString(),
-              image: "/camera-kit-professional.jpg",
-              category: "Photography",
-              createdDate: new Date().toISOString(),
-              status: "active",
-            },
-          ]
-
-          // Combine API gifts with trending gifts
-          setGifts([...trendingGifts, ...data.gifts])
+          // Set only API gifts (no trending gifts)
+          setGifts(data.gifts)
+        } else {
+          // If no gifts from API, set empty array
+          setGifts([])
         }
       } catch (error) {
         console.error("[v0] Error fetching gifts:", error)

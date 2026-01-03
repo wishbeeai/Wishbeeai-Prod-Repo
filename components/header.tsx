@@ -84,6 +84,16 @@ export function Header() {
         { title: "Add Wishlist", href: "/wishlist/add", description: "Add new items to your wishlist" },
       ],
     },
+    // Admin-only menu item - only show if user is admin
+    ...(isAdmin
+      ? [
+          {
+            title: "Manage Affiliate Products",
+            icon: Shield,
+            href: "/admin/affiliate-products",
+          },
+        ]
+      : []),
     {
       title: "Analytics",
       icon: BarChart3,
@@ -129,30 +139,27 @@ export function Header() {
 
             {user ? (
               <>
-                <div className="hidden lg:flex items-center gap-1">
+                <div className="hidden lg:flex items-center gap-1 flex-wrap">
                   {menuItems.map((item) => (
                     <div
                       key={item.title}
-                      className="relative"
+                      className="relative flex-shrink-0"
                       onMouseEnter={() => item.submenu && setOpenDropdown(item.title)}
                       onMouseLeave={() => setOpenDropdown(null)}
                     >
                       {item.submenu ? (
-                        <button className="flex items-center gap-1 px-4 py-2 text-[#F5DEB3] hover:text-[#DAA520] transition-colors duration-200 text-sm font-medium">
-                          <item.icon className="w-4 h-4" />
+                        <button className="flex items-center gap-1 px-4 py-2 text-[#F5DEB3] hover:text-[#DAA520] transition-colors duration-200 text-sm font-medium whitespace-nowrap">
+                          <item.icon className="w-4 h-4 flex-shrink-0" />
                           {item.title}
-                          <ChevronDown className="w-3 h-3" />
+                          <ChevronDown className="w-3 h-3 flex-shrink-0" />
                         </button>
                       ) : (
                         <button
                           onClick={() => handleMenuClick(item.href)}
-                          className="flex items-center gap-2 w-52 px-4 py-3 text-[#F5DEB3] hover:bg-gradient-to-r hover:from-[#6B4423] hover:via-[#8B5A3C] hover:to-[#6B4423] hover:text-[#DAA520] rounded-lg transition-all duration-200 text-sm font-medium text-left"
+                          className="flex items-center gap-2 px-4 py-2 text-[#F5DEB3] hover:bg-gradient-to-r hover:from-[#6B4423] hover:via-[#8B5A3C] hover:to-[#6B4423] hover:text-[#DAA520] rounded-lg transition-all duration-200 text-sm font-medium whitespace-nowrap"
                         >
-                          <item.icon className="w-4 h-4" />
-                          <div>
-                            <div className="font-medium">{item.title}</div>
-                            {item.title !== "Analytics" && <div className="text-xs opacity-70">{item.description}</div>}
-                          </div>
+                          <item.icon className="w-4 h-4 flex-shrink-0" />
+                          <span className="font-medium">{item.title}</span>
                         </button>
                       )}
 
@@ -216,24 +223,6 @@ export function Header() {
                             <div className="text-xs opacity-70">Manage preferences</div>
                           </div>
                         </button>
-                        {isAdmin && (
-                          <>
-                            <hr className="my-2 border-[#4A2F1A]" />
-                            <button
-                              onClick={() => {
-                                handleMenuClick("/admin/affiliate-products")
-                                setOpenDropdown(null)
-                              }}
-                              className="flex items-center gap-2 w-full text-left px-4 py-3 text-sm text-[#8B5A3C] hover:bg-gradient-to-r hover:from-[#6B4423] hover:via-[#8B5A3C] hover:to-[#6B4423] hover:text-[#F5DEB3] transition-all duration-150"
-                            >
-                              <Shield className="w-4 h-4" />
-                              <div>
-                                <div className="font-medium">Manage Affiliate Products</div>
-                                <div className="text-xs opacity-70">Add, edit, and manage products</div>
-                              </div>
-                            </button>
-                          </>
-                        )}
                         <hr className="my-2 border-[#4A2F1A]" />
                         <button
                           onClick={handleLogout}
@@ -321,12 +310,12 @@ export function Header() {
                   ) : (
                     <button
                       onClick={() => handleMenuClick(item.href)}
-                      className="flex items-center gap-2 w-full px-3 sm:px-4 py-2 sm:py-3 text-[#F5DEB3] hover:bg-gradient-to-r hover:from-[#6B4423] hover:via-[#8B5A3C] hover:to-[#6B4423] hover:text-[#DAA520] rounded-lg transition-all duration-200 text-left text-sm sm:text-base"
+                      className={`flex items-center gap-2 w-full px-3 sm:px-4 py-2 sm:py-3 text-[#F5DEB3] hover:bg-gradient-to-r hover:from-[#6B4423] hover:via-[#8B5A3C] hover:to-[#6B4423] hover:text-[#DAA520] rounded-lg transition-all duration-200 text-left text-sm sm:text-base ${item.title === "Manage Affiliate Products" ? "whitespace-nowrap" : ""}`}
                     >
-                      <item.icon className="w-4 h-4 sm:w-5 sm:h-5" />
-                      <div>
+                      <item.icon className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+                      <div className={item.title === "Manage Affiliate Products" ? "whitespace-nowrap" : ""}>
                         <div className="font-medium">{item.title}</div>
-                        {item.title !== "Analytics" && (
+                        {item.title !== "Analytics" && item.title !== "Manage Affiliate Products" && item.description && (
                           <div className="text-[10px] sm:text-xs opacity-70">{item.description}</div>
                         )}
                       </div>
@@ -357,18 +346,6 @@ export function Header() {
                   <div className="text-[10px] sm:text-xs opacity-70">Manage preferences</div>
                 </div>
               </button>
-              {isAdmin && (
-                <button
-                  onClick={() => handleMenuClick("/admin/affiliate-products")}
-                  className="flex items-center gap-2 w-full px-3 sm:px-4 py-2 sm:py-3 text-[#F5DEB3] hover:bg-gradient-to-r hover:from-[#6B4423] hover:via-[#8B5A3C] hover:to-[#6B4423] hover:text-[#DAA520] rounded-lg transition-all duration-200 text-left text-sm sm:text-base"
-                >
-                  <Shield className="w-4 h-4 sm:w-5 sm:h-5" />
-                  <div>
-                    <div className="font-medium">Manage Affiliate Products</div>
-                    <div className="text-[10px] sm:text-xs opacity-70">Add, edit, and manage products</div>
-                  </div>
-                </button>
-              )}
               <button
                 onClick={handleLogout}
                 className="flex items-center gap-2 w-full px-3 sm:px-4 py-2 sm:py-3 text-[#F5DEB3] hover:bg-gradient-to-r hover:from-[#6B4423] hover:via-[#8B5A3C] hover:to-[#6B4423] hover:text-[#DAA520] rounded-lg transition-all duration-200 font-bold text-left text-sm sm:text-base"
