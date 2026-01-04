@@ -208,15 +208,34 @@ export async function POST(req: NextRequest) {
       }
     }
     
-    // Include actual error message in response for debugging
-    // (We'll remove this after fixing the issue)
-    const actualError = error instanceof Error ? error.message : String(error)
+    // Extract actual error message - handle Postgres/Supabase errors
+    let actualError = errorMessage
+    if (error instanceof Error) {
+      actualError = error.message
+      // Try to extract more details from PostgresError
+      if ((error as any).code || (error as any).details || (error as any).hint) {
+        actualError = JSON.stringify({
+          message: error.message,
+          code: (error as any).code,
+          details: (error as any).details,
+          hint: (error as any).hint,
+        }, null, 2)
+      }
+    } else if (error && typeof error === 'object') {
+      try {
+        actualError = JSON.stringify(error, null, 2)
+      } catch (e) {
+        actualError = String(error)
+      }
+    } else {
+      actualError = String(error)
+    }
     
     return NextResponse.json(
       {
         error: errorMessage,
         details: actualError, // Include actual error for debugging
-        message: actualError, // Also include as message for easier access
+        message: error instanceof Error ? error.message : String(error), // Also include simple message
       },
       { status: 500 }
     )
