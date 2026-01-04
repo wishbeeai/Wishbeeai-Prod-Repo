@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/server"
  */
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> | { id: string } }
 ) {
   try {
     const supabase = await createClient()
@@ -20,7 +20,9 @@ export async function DELETE(
       )
     }
 
-    const { id } = params
+    // Handle params - can be a Promise in Next.js 15+
+    const resolvedParams = params instanceof Promise ? await params : params
+    const { id } = resolvedParams
 
     // First, get the item to find its wishlist_id
     const { data: item, error: fetchError } = await supabase
