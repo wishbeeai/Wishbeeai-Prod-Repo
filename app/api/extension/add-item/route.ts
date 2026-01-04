@@ -125,15 +125,16 @@ export async function POST(req: NextRequest) {
     }
 
     // Insert wishlist item
-    // Note: description column may not exist in database, so we don't include it
+    // Map to actual database schema: title, list_price (in cents), image_url, product_url
     const insertData: any = {
       wishlist_id: wishlistId,
-      product_name: validated.title,
+      title: validated.title,
       product_url: validated.url,
-      product_price: validated.price || null,
-      product_image: imageUrl,
-      // description column doesn't exist in database - removed
-      quantity: 1,
+      list_price: validated.price ? Math.round(validated.price * 100) : null, // Convert to cents
+      image_url: imageUrl,
+      currency: 'USD', // Default currency
+      source: 'extension', // Track that this came from the extension
+      price_snapshot_at: new Date(),
     }
     
     // Only add store_name if the column exists (it might not in production)
