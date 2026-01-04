@@ -3,23 +3,43 @@
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { useState, useEffect } from "react"
-import { Smartphone, Download, CheckCircle, ArrowRight } from "lucide-react"
-import { detectPlatform, handleAppDownload, type Platform } from "@/lib/app-downloads"
+import { Smartphone, Download, CheckCircle, ArrowRight, Clock } from "lucide-react"
+import { detectPlatform, handleAppDownload, isAppAvailable, type Platform } from "@/lib/app-downloads"
 import { Button } from "@/components/ui/button"
 import Image from "next/image"
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
+import { toast } from "sonner"
 
 export default function AppDownloadPage() {
+  const searchParams = useSearchParams()
   const [platform, setPlatform] = useState<Platform>("unknown")
   const [isDetecting, setIsDetecting] = useState(true)
+  const [iosAvailable, setIosAvailable] = useState(false)
+  const [androidAvailable, setAndroidAvailable] = useState(false)
 
   useEffect(() => {
     const detected = detectPlatform()
     setPlatform(detected)
+    
+    // Check app availability
+    setIosAvailable(isAppAvailable("ios"))
+    setAndroidAvailable(isAppAvailable("android"))
+    
     setIsDetecting(false)
-  }, [])
+    
+    // Show message if platform parameter is in URL
+    const platformParam = searchParams?.get("platform")
+    if (platformParam === "ios" || platformParam === "android") {
+      toast.info("The app is coming soon! We'll notify you when it's available.")
+    }
+  }, [searchParams])
 
   const handleDownload = async (targetPlatform: Platform) => {
+    const available = isAppAvailable(targetPlatform)
+    if (!available) {
+      toast.info("Coming soon! We're working hard to bring you the Wishbee app.")
+    }
     await handleAppDownload(targetPlatform, "app-download-page")
   }
 
@@ -75,32 +95,64 @@ export default function AppDownloadPage() {
           {/* Download Buttons */}
           {!isDetecting && (
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8">
-              <button
-                onClick={() => handleDownload("ios")}
-                className="hover:scale-105 hover:shadow-lg transition-all duration-300 cursor-pointer rounded-lg overflow-hidden focus:outline-none focus:ring-2 focus:ring-[#F4C430]"
-                aria-label="Download on the App Store"
-              >
-                <Image
-                  src="/images/ios-app-store-badge.png"
-                  alt="Download on the App Store"
-                  width={180}
-                  height={60}
-                  className="h-14 w-auto"
-                />
-              </button>
-              <button
-                onClick={() => handleDownload("android")}
-                className="hover:scale-105 hover:shadow-lg transition-all duration-300 cursor-pointer rounded-lg overflow-hidden focus:outline-none focus:ring-2 focus:ring-[#F4C430]"
-                aria-label="Get it on Google Play"
-              >
-                <Image
-                  src="/images/google-play-store-badge.png"
-                  alt="Get it on Google Play"
-                  width={200}
-                  height={60}
-                  className="h-14 w-auto"
-                />
-              </button>
+              <div className="relative">
+                <button
+                  onClick={() => handleDownload("ios")}
+                  className="hover:scale-105 hover:shadow-lg transition-all duration-300 cursor-pointer rounded-lg overflow-hidden focus:outline-none focus:ring-2 focus:ring-[#F4C430] disabled:opacity-75 disabled:cursor-not-allowed"
+                  aria-label={iosAvailable ? "Download on the App Store" : "iOS app coming soon"}
+                  disabled={!iosAvailable}
+                >
+                  <Image
+                    src="/images/ios-app-store-badge.png"
+                    alt={iosAvailable ? "Download on the App Store" : "iOS app coming soon"}
+                    width={180}
+                    height={60}
+                    className="h-14 w-auto"
+                  />
+                </button>
+                {!iosAvailable && (
+                  <div className="absolute -top-2 -right-2 bg-[#DAA520] text-white text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1 shadow-lg">
+                    <Clock className="w-3 h-3" />
+                    Soon
+                  </div>
+                )}
+              </div>
+              <div className="relative">
+                <button
+                  onClick={() => handleDownload("android")}
+                  className="hover:scale-105 hover:shadow-lg transition-all duration-300 cursor-pointer rounded-lg overflow-hidden focus:outline-none focus:ring-2 focus:ring-[#F4C430] disabled:opacity-75 disabled:cursor-not-allowed"
+                  aria-label={androidAvailable ? "Get it on Google Play" : "Android app coming soon"}
+                  disabled={!androidAvailable}
+                >
+                  <Image
+                    src="/images/google-play-store-badge.png"
+                    alt={androidAvailable ? "Get it on Google Play" : "Android app coming soon"}
+                    width={200}
+                    height={60}
+                    className="h-14 w-auto"
+                  />
+                </button>
+                {!androidAvailable && (
+                  <div className="absolute -top-2 -right-2 bg-[#DAA520] text-white text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1 shadow-lg">
+                    <Clock className="w-3 h-3" />
+                    Soon
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          
+          {/* Coming Soon Message */}
+          {!isDetecting && !iosAvailable && !androidAvailable && (
+            <div className="bg-gradient-to-r from-[#DAA520] to-[#F4C430] rounded-lg p-6 max-w-2xl mx-auto mb-8">
+              <div className="flex items-center gap-3 justify-center mb-2">
+                <Clock className="w-6 h-6 text-[#654321]" />
+                <h2 className="text-2xl font-bold text-[#654321]">Apps Coming Soon!</h2>
+              </div>
+              <p className="text-center text-[#654321]">
+                We're working hard to bring you native iOS and Android apps. 
+                In the meantime, you can use Wishbee in your browser or install our browser extension.
+              </p>
             </div>
           )}
 

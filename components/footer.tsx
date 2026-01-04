@@ -29,27 +29,28 @@ export function Footer() {
   const handleAppDownload = async (platform: "ios" | "android") => {
     try {
       // Import the app download utilities
-      const { handleAppDownload: trackAndDownload } = await import("@/lib/app-downloads")
+      const { handleAppDownload: trackAndDownload, isAppAvailable } = await import("@/lib/app-downloads")
       
-      // Track and open app store
+      const isAvailable = isAppAvailable(platform)
+      
+      // Track and open app store or coming soon page
       await trackAndDownload(platform, "footer")
       
-      toast({
-        title: `Opening ${platform === "ios" ? "App Store" : "Google Play"}`,
-        description: `Redirecting to download Wishbee app...`,
-      })
+      if (isAvailable) {
+        toast({
+          title: `Opening ${platform === "ios" ? "App Store" : "Google Play"}`,
+          description: `Redirecting to download Wishbee app...`,
+        })
+      } else {
+        toast({
+          title: "Coming Soon!",
+          description: `The ${platform === "ios" ? "iOS" : "Android"} app is coming soon. Stay tuned!`,
+        })
+      }
     } catch (error) {
       console.error("Error handling app download:", error)
-      // Fallback to direct links
-      const urls = {
-        ios: "https://apps.apple.com/app/wishbee",
-        android: "https://play.google.com/store/apps/details?id=com.wishbee",
-      }
-      window.open(urls[platform], "_blank")
-      toast({
-        title: `Download ${platform === "ios" ? "iOS" : "Android"} App`,
-        description: `Opening ${platform === "ios" ? "App Store" : "Google Play"}...`,
-      })
+      // Fallback: navigate to app download page
+      window.location.href = `/app-download?platform=${platform}`
     }
   }
 
