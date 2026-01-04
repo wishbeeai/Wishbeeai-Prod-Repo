@@ -7,10 +7,23 @@ export function Footer() {
   const { toast } = useToast()
 
   const handleNavigationClick = (section: string) => {
-    toast({
-      title: `Navigating to ${section}`,
-      description: `You clicked on the ${section} link`,
-    })
+    const routes: Record<string, string> = {
+      "Help": "/help",
+      "About": "/about",
+      "Contact": "/contact",
+      "Gifting Guides": "/gifting-guides",
+      "Refer a Friend": "/tell-a-friend",
+    }
+    
+    const route = routes[section]
+    if (route) {
+      window.location.href = route
+    } else {
+      toast({
+        title: `Navigating to ${section}`,
+        description: `You clicked on the ${section} link`,
+      })
+    }
   }
 
   const handleAppDownload = (platform: string) => {
@@ -113,50 +126,30 @@ export function Footer() {
               <div className="hidden sm:flex flex-wrap gap-4 lg:gap-6 text-sm font-medium">
                 <Link
                   href="/help"
-                  onClick={(e) => {
-                    e.preventDefault()
-                    handleNavigationClick("Help")
-                  }}
                   className="text-[#F5DEB3] hover:text-[#F4C430] transition-all duration-300 cursor-pointer whitespace-nowrap border-b-2 border-transparent hover:border-[#F4C430]"
                 >
                   Help
                 </Link>
                 <Link
                   href="/about"
-                  onClick={(e) => {
-                    e.preventDefault()
-                    handleNavigationClick("About")
-                  }}
                   className="text-[#F5DEB3] hover:text-[#F4C430] transition-all duration-300 cursor-pointer whitespace-nowrap border-b-2 border-transparent hover:border-[#F4C430]"
                 >
                   About
                 </Link>
                 <Link
                   href="/contact"
-                  onClick={(e) => {
-                    e.preventDefault()
-                    handleNavigationClick("Contact")
-                  }}
                   className="text-[#F5DEB3] hover:text-[#F4C430] transition-all duration-300 cursor-pointer whitespace-nowrap border-b-2 border-transparent hover:border-[#F4C430]"
                 >
                   Contact
                 </Link>
                 <Link
                   href="/gifting-guides"
-                  onClick={(e) => {
-                    e.preventDefault()
-                    handleNavigationClick("Gifting Guides")
-                  }}
                   className="text-[#F5DEB3] hover:text-[#F4C430] transition-all duration-300 cursor-pointer whitespace-nowrap border-b-2 border-transparent hover:border-[#F4C430]"
                 >
                   Gifting guides
                 </Link>
                 <Link
                   href="/tell-a-friend"
-                  onClick={(e) => {
-                    e.preventDefault()
-                    handleNavigationClick("Refer a Friend")
-                  }}
                   className="text-[#F5DEB3] hover:text-[#F4C430] transition-all duration-300 cursor-pointer whitespace-nowrap border-b-2 border-transparent hover:border-[#F4C430]"
                 >
                   Refer a friend
