@@ -8,11 +8,12 @@ import { detectPlatform, handleAppDownload, isAppAvailable, type Platform } from
 import { Button } from "@/components/ui/button"
 import Image from "next/image"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
 import { toast } from "sonner"
 
+// Force dynamic rendering to prevent prerender errors with client-side hooks
+export const dynamic = 'force-dynamic'
+
 export default function AppDownloadPage() {
-  const searchParams = useSearchParams()
   const [platform, setPlatform] = useState<Platform>("unknown")
   const [isDetecting, setIsDetecting] = useState(true)
   const [iosAvailable, setIosAvailable] = useState(false)
@@ -29,11 +30,14 @@ export default function AppDownloadPage() {
     setIsDetecting(false)
     
     // Show message if platform parameter is in URL
-    const platformParam = searchParams?.get("platform")
-    if (platformParam === "ios" || platformParam === "android") {
-      toast.info("The app is coming soon! We'll notify you when it's available.")
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search)
+      const platformParam = urlParams.get("platform")
+      if (platformParam === "ios" || platformParam === "android") {
+        toast.info("The app is coming soon! We'll notify you when it's available.")
+      }
     }
-  }, [searchParams])
+  }, [])
 
   const handleDownload = async (targetPlatform: Platform) => {
     const available = isAppAvailable(targetPlatform)
