@@ -4,11 +4,16 @@ import { z } from "zod"
 
 // Schema for extension item data
 const extensionItemSchema = z.object({
-  title: z.string().min(1),
+  title: z.string().min(1).max(500),
   url: z.string().url(),
-  image: z.union([z.string().url(), z.string().startsWith('/'), z.null()]).optional().nullable(),
-  price: z.union([z.number(), z.null()]).optional().nullable(),
-  description: z.string().optional().nullable(),
+  image: z.union([
+    z.string().url(), 
+    z.string().startsWith('/'), 
+    z.string().length(0), // Empty string
+    z.null()
+  ]).optional().nullable(),
+  price: z.union([z.number().min(0).max(10000000), z.null()]).optional().nullable(),
+  description: z.string().max(2000).optional().nullable(),
   wishlistId: z.string().optional(), // Optional - will use default wishlist if not provided
 })
 
@@ -73,13 +78,36 @@ export async function POST(req: NextRequest) {
       // Keep default storeName
     }
 
+    // Normalize image URL (handle relative URLs and empty strings)
+    let imageUrl = validated.image || null
+    if (imageUrl) {
+      // Handle empty string
+      if (imageUrl === '') {
+        imageUrl = null
+      } 
+      // Handle relative URLs
+      else if (imageUrl.startsWith('/')) {
+        try {
+          const urlObj = new URL(validated.url)
+          imageUrl = urlObj.origin + imageUrl
+        } catch (e) {
+          // If URL parsing fails, set to null
+          imageUrl = null
+        }
+      }
+      // Validate absolute URLs
+      else if (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://')) {
+        imageUrl = null
+      }
+    }
+
     // Insert wishlist item
     const insertData = {
       wishlist_id: wishlistId,
       product_name: validated.title,
       product_url: validated.url,
       product_price: validated.price || null,
-      product_image: validated.image || null,
+      product_image: imageUrl,
       description: validated.description || null,
       quantity: 1,
     }
