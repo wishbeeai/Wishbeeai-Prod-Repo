@@ -53,7 +53,18 @@ export function MyWishlistDisplay() {
             setWishlistItems([])
             return
           }
-          throw new Error("Failed to fetch wishlist items")
+          
+          // Try to get error details from response
+          let errorMessage = "Failed to fetch wishlist items"
+          try {
+            const errorData = await response.json()
+            errorMessage = errorData.error || errorMessage
+            console.error("[My Wishlist] API error:", errorData)
+          } catch (e) {
+            console.error("[My Wishlist] API error status:", response.status)
+          }
+          
+          throw new Error(errorMessage)
         }
 
         const data = await response.json()

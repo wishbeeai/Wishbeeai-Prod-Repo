@@ -59,17 +59,31 @@ export async function GET(req: NextRequest) {
     }
 
     // Transform to extension format
-    const formattedItems = (items || []).map((item) => ({
-      id: item.id,
-      title: item.product_name || "Untitled Item",
-      url: item.product_url || "#",
-      image: item.product_image || null,
-      price: item.product_price || null,
-      description: item.description || null,
-      storeName: item.store_name || "Unknown Store",
-      addedDate: item.created_at,
-      synced: true, // Items from backend are always synced
-    }))
+    const formattedItems = (items || []).map((item: any) => {
+      // Extract store name from URL if store_name doesn't exist
+      let storeName = item.store_name || "Unknown Store"
+      if (storeName === "Unknown Store" && item.product_url) {
+        try {
+          const urlObj = new URL(item.product_url)
+          storeName = urlObj.hostname.replace("www.", "").split(".")[0]
+          storeName = storeName.charAt(0).toUpperCase() + storeName.slice(1)
+        } catch (e) {
+          // Keep default storeName
+        }
+      }
+      
+      return {
+        id: item.id,
+        title: item.product_name || "Untitled Item",
+        url: item.product_url || "#",
+        image: item.product_image || null,
+        price: item.product_price || null,
+        description: item.description || null,
+        storeName,
+        addedDate: item.created_at,
+        synced: true, // Items from backend are always synced
+      }
+    })
 
     return NextResponse.json({ items: formattedItems })
   } catch (error) {

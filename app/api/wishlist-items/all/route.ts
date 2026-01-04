@@ -55,9 +55,13 @@ export async function GET(req: NextRequest) {
 
     if (itemsError) {
       console.error("[Wishlist Items All] Items query error:", itemsError)
+      // Log the full error for debugging
+      console.error("[Wishlist Items All] Error details:", JSON.stringify(itemsError, null, 2))
+      console.error("[Wishlist Items All] Wishlist IDs:", wishlistIds)
       throw itemsError
     }
 
+    // Return empty array if no items
     return NextResponse.json({ items: items || [] })
   } catch (error) {
     console.error("[Wishlist Items All] Error:", error)
