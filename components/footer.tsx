@@ -26,16 +26,30 @@ export function Footer() {
     }
   }
 
-  const handleAppDownload = (platform: string) => {
-    toast({
-      title: `Download ${platform} App`,
-      description: `Opening ${platform} store...`,
-    })
-    // In production, these would navigate to actual app store URLs
-    if (platform === "iOS") {
-      window.open("https://apps.apple.com/app/wishbee", "_blank")
-    } else if (platform === "Android") {
-      window.open("https://play.google.com/store/apps/details?id=com.wishbee", "_blank")
+  const handleAppDownload = async (platform: "ios" | "android") => {
+    try {
+      // Import the app download utilities
+      const { handleAppDownload: trackAndDownload } = await import("@/lib/app-downloads")
+      
+      // Track and open app store
+      await trackAndDownload(platform, "footer")
+      
+      toast({
+        title: `Opening ${platform === "ios" ? "App Store" : "Google Play"}`,
+        description: `Redirecting to download Wishbee app...`,
+      })
+    } catch (error) {
+      console.error("Error handling app download:", error)
+      // Fallback to direct links
+      const urls = {
+        ios: "https://apps.apple.com/app/wishbee",
+        android: "https://play.google.com/store/apps/details?id=com.wishbee",
+      }
+      window.open(urls[platform], "_blank")
+      toast({
+        title: `Download ${platform === "ios" ? "iOS" : "Android"} App`,
+        description: `Opening ${platform === "ios" ? "App Store" : "Google Play"}...`,
+      })
     }
   }
 
@@ -162,8 +176,8 @@ export function Footer() {
               <span className="text-sm font-semibold text-[#F5DEB3] whitespace-nowrap">Get the Wishbee app</span>
               <div className="flex gap-3">
                 <button
-                  onClick={() => handleAppDownload("iOS")}
-                  className="hover:scale-105 hover:shadow-lg transition-all duration-300 cursor-pointer rounded-lg overflow-hidden"
+                  onClick={() => handleAppDownload("ios")}
+                  className="hover:scale-105 hover:shadow-lg transition-all duration-300 cursor-pointer rounded-lg overflow-hidden focus:outline-none focus:ring-2 focus:ring-[#F4C430] focus:ring-offset-2 focus:ring-offset-[#6B4423]"
                   aria-label="Download on the App Store"
                 >
                   <Image
@@ -175,8 +189,8 @@ export function Footer() {
                   />
                 </button>
                 <button
-                  onClick={() => handleAppDownload("Android")}
-                  className="hover:scale-105 hover:shadow-lg transition-all duration-300 cursor-pointer rounded-lg overflow-hidden"
+                  onClick={() => handleAppDownload("android")}
+                  className="hover:scale-105 hover:shadow-lg transition-all duration-300 cursor-pointer rounded-lg overflow-hidden focus:outline-none focus:ring-2 focus:ring-[#F4C430] focus:ring-offset-2 focus:ring-offset-[#6B4423]"
                   aria-label="Get it on Google Play"
                 >
                   <Image
