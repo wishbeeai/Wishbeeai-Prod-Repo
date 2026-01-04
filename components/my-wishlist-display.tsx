@@ -38,84 +38,79 @@ export function MyWishlistDisplay() {
   const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([])
   const [aiInsights, setAiInsights] = useState<AIInsight | null>(null)
   const [isLoadingInsights, setIsLoadingInsights] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
 
-  // Sample wishlist data
+  // Fetch wishlist items from database
   useEffect(() => {
-    const sampleItems: WishlistItem[] = [
-      {
-        id: "1",
-        webLink: "https://www.dsw.com/product/naturalizer-ginger-pump/557283",
-        quantity: 1,
-        productImageUrl:
-          "https://images.dsw.com/is/image/DSWShoes/557283_600_ss_01?impolicy=qlt-medium-high&imwidth=640&imdensity=2",
-        giftName: "Naturalizer Ginger Pump - Red",
-        currentPrice: 89.99,
-        storeName: "DSW",
-        description: "Classic pump with cushioned insole for all-day comfort. Perfect for work or special occasions.",
-        category: "Clothing",
-        attributes: {
-          Color: "Red",
-          Size: "8",
-          Material: "Genuine Leather",
-          Brand: "Naturalizer",
-          "Fit Type": "Standard Width",
-          "Heel Height": "2.5 inches",
-          "Care Instructions": "Wipe clean with damp cloth",
-        },
-        stockStatus: "In Stock",
-        addedDate: "2025-01-05",
-      },
-      {
-        id: "2",
-        webLink: "https://www.macys.com/shop/product/vince-camuto-cozy-sweater",
-        quantity: 1,
-        productImageUrl: "/cozy-cream-sweater.jpg",
-        giftName: "Vince Camuto Women's Cozy Crewneck Sweater",
-        currentPrice: 69.0,
-        storeName: "Macy's",
-        description: "Soft and cozy crewneck sweater perfect for layering in cooler weather.",
-        category: "Clothing",
-        attributes: {
-          Color: "Cream",
-          Size: "Medium",
-          Material: "55% Cotton, 45% Acrylic",
-          Brand: "Vince Camuto",
-          "Fit Type": "Relaxed Fit",
-          Style: "Long Sleeve Crewneck",
-          "Care Instructions": "Machine wash cold, tumble dry low",
-        },
-        stockStatus: "In Stock",
-        addedDate: "2025-01-08",
-      },
-      {
-        id: "3",
-        webLink: "https://example.com/wireless-headphones",
-        quantity: 1,
-        productImageUrl: "/wireless-noise-cancelling-headphones.jpg",
-        giftName: "Premium Wireless Noise-Cancelling Headphones",
-        currentPrice: 299.99,
-        storeName: "Best Buy",
-        description: "High-quality wireless headphones with active noise cancellation and 30-hour battery life.",
-        category: "Electronics",
-        attributes: {
-          Color: "Matte Black",
-          Brand: "TechSound Pro",
-          "Battery Life": "30 hours",
-          Connectivity: "Bluetooth 5.0",
-          "Noise Cancellation": "Active ANC",
-          Warranty: "2 years manufacturer warranty",
-          Compatibility: "iOS, Android, Windows, Mac",
-        },
-        stockStatus: "Low Stock",
-        addedDate: "2025-01-10",
-      },
-    ]
-    setWishlistItems(sampleItems)
-  }, [])
+    const fetchWishlistItems = async () => {
+      try {
+        setIsLoading(true)
+        const response = await fetch("/api/wishlist-items/all")
+        
+        if (!response.ok) {
+          if (response.status === 401) {
+            // User not authenticated - show empty state
+            setWishlistItems([])
+            return
+          }
+          throw new Error("Failed to fetch wishlist items")
+        }
+
+        const data = await response.json()
+        const dbItems = data.items || []
+
+        // Transform database items to component format
+        const transformedItems: WishlistItem[] = dbItems.map((item: any) => {
+          // Extract store name from URL
+          let storeName = "Unknown Store"
+          try {
+            if (item.product_url) {
+              const urlObj = new URL(item.product_url)
+              storeName = urlObj.hostname.replace("www.", "").split(".")[0]
+              storeName = storeName.charAt(0).toUpperCase() + storeName.slice(1)
+            }
+          } catch (e) {
+            // Keep default storeName
+          }
+
+          return {
+            id: item.id,
+            webLink: item.product_url || "#",
+            quantity: item.quantity || 1,
+            productImageUrl: item.product_image || "/placeholder.svg",
+            giftName: item.product_name || "Untitled Item",
+            currentPrice: item.product_price || 0,
+            storeName,
+            description: item.description || "",
+            category: item.category || undefined,
+            attributes: {}, // Can be extended later
+            stockStatus: item.stock_status || "Unknown",
+            addedDate: item.created_at ? new Date(item.created_at).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
+          }
+        })
+
+        setWishlistItems(transformedItems)
+      } catch (error) {
+        console.error("Error fetching wishlist items:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load wishlist items",
+          variant: "destructive",
+        })
+        setWishlistItems([])
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchWishlistItems()
+  }, [toast])
 
   useEffect(() => {
     if (wishlistItems.length > 0) {
       handleGenerateInsights()
+    } else {
+      setAiInsights(null)
     }
   }, [wishlistItems])
 
@@ -172,7 +167,7 @@ export function MyWishlistDisplay() {
 
   const handleDelete = async (id: string) => {
     try {
-      const response = await fetch(`/api/wishlist/${id}`, {
+      const response = await fetch(`/api/wishlist-items/${id}`, {
         method: "DELETE",
       })
 
@@ -182,6 +177,7 @@ export function MyWishlistDisplay() {
           title: "Item Removed",
           description: "Item removed from your wishlist",
         })
+        // Insights will be updated automatically via useEffect when wishlistItems changes
       } else {
         throw new Error("Failed to delete")
       }
