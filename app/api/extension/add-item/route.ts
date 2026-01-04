@@ -19,15 +19,35 @@ const extensionItemSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
+    // Log request headers for debugging (in development only)
+    if (process.env.NODE_ENV === "development") {
+      console.log("[Extension Add Item] Request headers:", {
+        cookie: req.headers.get("cookie") ? "present" : "missing",
+        origin: req.headers.get("origin"),
+        referer: req.headers.get("referer"),
+      })
+    }
+
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
     
-    if (!user) {
+    if (authError) {
+      console.error("[Extension Add Item] Auth error:", JSON.stringify(authError, null, 2))
       return NextResponse.json(
-        { error: "Unauthorized. Please log in to add items to your wishlist." },
+        { error: "Authentication failed", details: authError.message },
         { status: 401 }
       )
     }
+    
+    if (!user) {
+      console.error("[Extension Add Item] No user found - cookies may not be set")
+      return NextResponse.json(
+        { error: "Unauthorized", details: "Please log in to Wishbee.ai in your browser first" },
+        { status: 401 }
+      )
+    }
+
+    console.log("[Extension Add Item] User authenticated:", user.email)
 
     const body = await req.json()
     const validated = extensionItemSchema.parse(body)

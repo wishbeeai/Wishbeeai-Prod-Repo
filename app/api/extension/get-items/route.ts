@@ -7,11 +7,20 @@ import { createClient } from "@/lib/supabase/server"
  */
 export async function GET(req: NextRequest) {
   try {
+    // Log request headers for debugging (in development only)
+    if (process.env.NODE_ENV === "development") {
+      console.log("[Extension Get Items] Request headers:", {
+        cookie: req.headers.get("cookie") ? "present" : "missing",
+        origin: req.headers.get("origin"),
+        referer: req.headers.get("referer"),
+      })
+    }
+
     const supabase = await createClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     
     if (authError) {
-      console.error("[Extension Get Items] Auth error:", authError)
+      console.error("[Extension Get Items] Auth error:", JSON.stringify(authError, null, 2))
       return NextResponse.json(
         { error: "Authentication failed", details: authError.message },
         { status: 401 }
@@ -19,11 +28,14 @@ export async function GET(req: NextRequest) {
     }
     
     if (!user) {
+      console.error("[Extension Get Items] No user found - cookies may not be set")
       return NextResponse.json(
-        { error: "Unauthorized" },
+        { error: "Unauthorized", details: "Please log in to Wishbee.ai in your browser first" },
         { status: 401 }
       )
     }
+
+    console.log("[Extension Get Items] User authenticated:", user.email)
 
     // Get all wishlists for the user
     const { data: wishlists, error: wishlistsError } = await supabase
