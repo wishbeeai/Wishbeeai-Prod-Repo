@@ -89,10 +89,10 @@ export default function AppDownloadPage() {
           <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-r from-[#DAA520] to-[#F4C430] mb-6">
             <Smartphone className="w-10 h-10 text-[#654321]" />
           </div>
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold text-[#654321] mb-6">
+          <h1 className="text-xl sm:text-2xl md:text-4xl lg:text-5xl xl:text-6xl font-extrabold leading-[1.1] tracking-tight text-[#654321] mb-6">
             Get the Wishbee App
           </h1>
-          <p className="text-xl sm:text-2xl text-gray-600 max-w-3xl mx-auto mb-8">
+          <p className="text-xs sm:text-sm md:text-lg text-gray-600 max-w-3xl mx-auto mb-8">
             Take group gifting with you wherever you go. Available on iOS and Android.
           </p>
 
@@ -115,7 +115,7 @@ export default function AppDownloadPage() {
                   />
                 </button>
                 {!iosAvailable && (
-                  <div className="absolute -top-2 -right-2 bg-[#DAA520] text-white text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1 shadow-lg">
+                  <div className="absolute -top-2 -right-2 bg-[#DAA520] text-white text-xs sm:text-sm font-bold px-2 py-1 rounded-full flex items-center gap-1 shadow-lg">
                     <Clock className="w-3 h-3" />
                     Soon
                   </div>
@@ -137,7 +137,7 @@ export default function AppDownloadPage() {
                   />
                 </button>
                 {!androidAvailable && (
-                  <div className="absolute -top-2 -right-2 bg-[#DAA520] text-white text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1 shadow-lg">
+                  <div className="absolute -top-2 -right-2 bg-[#DAA520] text-white text-xs sm:text-sm font-bold px-2 py-1 rounded-full flex items-center gap-1 shadow-lg">
                     <Clock className="w-3 h-3" />
                     Soon
                   </div>
@@ -151,9 +151,9 @@ export default function AppDownloadPage() {
             <div className="bg-gradient-to-r from-[#DAA520] to-[#F4C430] rounded-lg p-6 max-w-2xl mx-auto mb-8">
               <div className="flex items-center gap-3 justify-center mb-2">
                 <Clock className="w-6 h-6 text-[#654321]" />
-                <h2 className="text-2xl font-bold text-[#654321]">Apps Coming Soon!</h2>
+                <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-[#654321]">Apps Coming Soon!</h2>
               </div>
-              <p className="text-center text-[#654321]">
+              <p className="text-center text-xs sm:text-sm md:text-lg text-[#654321]">
                 We're working hard to bring you native iOS and Android apps. 
                 In the meantime, you can use Wishbee in your browser or install our browser extension.
               </p>
@@ -165,7 +165,7 @@ export default function AppDownloadPage() {
             <div className="bg-white rounded-lg shadow-md p-4 max-w-md mx-auto mb-8">
               <div className="flex items-center gap-3">
                 <CheckCircle className="w-6 h-6 text-green-600" />
-                <p className="text-gray-700">
+                <p className="text-xs sm:text-sm md:text-lg text-gray-700">
                   We detected you're on {platform === "ios" ? "iOS" : "Android"}. 
                   Click the button above to download!
                 </p>
@@ -179,37 +179,37 @@ export default function AppDownloadPage() {
           {features.map((feature, index) => (
             <div key={index} className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
               <div className="text-4xl mb-4">{feature.icon}</div>
-              <h3 className="text-xl font-bold text-[#654321] mb-2">{feature.title}</h3>
-              <p className="text-gray-600">{feature.description}</p>
+              <h3 className="text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl font-semibold text-[#654321] mb-2">{feature.title}</h3>
+              <p className="text-xs sm:text-sm md:text-lg text-gray-600">{feature.description}</p>
             </div>
           ))}
         </div>
 
         {/* Why Download Section */}
         <div className="bg-gradient-to-r from-[#DAA520] to-[#F4C430] rounded-lg p-8 md:p-12 mb-16">
-          <h2 className="text-3xl font-bold text-[#654321] text-center mb-8">Why Download the App?</h2>
+          <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-[#654321] text-center mb-8">Why Download the App?</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
             <div className="bg-white/90 rounded-lg p-6">
-              <h3 className="text-xl font-bold text-[#654321] mb-3">📱 Mobile-First Experience</h3>
-              <p className="text-gray-700">
+              <h3 className="text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl font-semibold text-[#654321] mb-3">📱 Mobile-First Experience</h3>
+              <p className="text-xs sm:text-sm md:text-lg text-gray-700">
                 Optimized for mobile devices with a native feel. Create and manage gifts on the go.
               </p>
             </div>
             <div className="bg-white/90 rounded-lg p-6">
-              <h3 className="text-xl font-bold text-[#654321] mb-3">🔔 Push Notifications</h3>
-              <p className="text-gray-700">
+              <h3 className="text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl font-semibold text-[#654321] mb-3">🔔 Push Notifications</h3>
+              <p className="text-xs sm:text-sm md:text-lg text-gray-700">
                 Get instant updates when friends contribute or when your gift goals are reached.
               </p>
             </div>
             <div className="bg-white/90 rounded-lg p-6">
-              <h3 className="text-xl font-bold text-[#654321] mb-3">⚡ Faster Performance</h3>
-              <p className="text-gray-700">
+              <h3 className="text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl font-semibold text-[#654321] mb-3">⚡ Faster Performance</h3>
+              <p className="text-xs sm:text-sm md:text-lg text-gray-700">
                 Native app performance means faster loading and smoother interactions.
               </p>
             </div>
             <div className="bg-white/90 rounded-lg p-6">
-              <h3 className="text-xl font-bold text-[#654321] mb-3">📸 Easy Photo Sharing</h3>
-              <p className="text-gray-700">
+              <h3 className="text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl font-semibold text-[#654321] mb-3">📸 Easy Photo Sharing</h3>
+              <p className="text-xs sm:text-sm md:text-lg text-gray-700">
                 Share gift photos and updates directly from your camera roll.
               </p>
             </div>
@@ -218,21 +218,21 @@ export default function AppDownloadPage() {
 
         {/* Alternative Download Options */}
         <div className="bg-white rounded-lg shadow-md p-8 text-center">
-          <h2 className="text-2xl font-bold text-[#654321] mb-4">Prefer to Use on Desktop?</h2>
-          <p className="text-gray-600 mb-6">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-[#654321] mb-4">Prefer to Use on Desktop?</h2>
+          <p className="text-xs sm:text-sm md:text-lg text-gray-600 mb-6">
             Wishbee works great in your browser too! Or install our browser extension for quick access.
           </p>
           <div className="flex flex-wrap justify-center gap-4">
             <Link
               href="/"
-              className="inline-flex items-center gap-2 bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] px-6 py-3 rounded-full font-semibold hover:from-[#F4C430] hover:to-[#DAA520] transition-all shadow-lg hover:shadow-xl"
+              className="inline-flex items-center gap-2 bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] px-6 py-3 rounded-full text-sm sm:text-base md:text-lg font-semibold hover:from-[#F4C430] hover:to-[#DAA520] transition-all shadow-lg hover:shadow-xl"
             >
               Use Web App
               <ArrowRight className="w-5 h-5" />
             </Link>
             <Link
               href="/"
-              className="inline-flex items-center gap-2 border-2 border-[#8B4513] text-[#8B4513] px-6 py-3 rounded-full font-semibold hover:bg-[#8B4513] hover:text-white transition-all"
+              className="inline-flex items-center gap-2 border-2 border-[#8B4513] text-[#8B4513] px-6 py-3 rounded-full text-sm sm:text-base md:text-lg font-semibold hover:bg-[#8B4513] hover:text-white transition-all"
             >
               Install Extension
               <Download className="w-5 h-5" />
