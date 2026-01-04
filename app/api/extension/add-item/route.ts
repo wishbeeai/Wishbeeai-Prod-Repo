@@ -208,10 +208,15 @@ export async function POST(req: NextRequest) {
       }
     }
     
+    // Include actual error message in response for debugging
+    // (We'll remove this after fixing the issue)
+    const actualError = error instanceof Error ? error.message : String(error)
+    
     return NextResponse.json(
       {
         error: errorMessage,
-        details: process.env.NODE_ENV === "development" ? (error instanceof Error ? error.stack : String(error)) : errorMessage,
+        details: actualError, // Include actual error for debugging
+        message: actualError, // Also include as message for easier access
       },
       { status: 500 }
     )
