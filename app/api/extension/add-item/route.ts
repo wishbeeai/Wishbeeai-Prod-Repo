@@ -126,6 +126,7 @@ export async function POST(req: NextRequest) {
 
     // Insert wishlist item
     // Map to actual database schema: title, list_price (in cents), image_url, product_url
+    // Note: source column has check constraint - use 'amazon' or allowed value
     const insertData: any = {
       wishlist_id: wishlistId,
       title: validated.title,
@@ -133,7 +134,7 @@ export async function POST(req: NextRequest) {
       list_price: validated.price ? Math.round(validated.price * 100) : null, // Convert to cents
       image_url: imageUrl,
       currency: 'USD', // Default currency
-      source: 'extension', // Track that this came from the extension
+      source: 'amazon', // Use 'amazon' to satisfy check constraint (or check allowed values)
       price_snapshot_at: new Date(),
     }
     
