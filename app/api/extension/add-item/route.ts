@@ -119,7 +119,9 @@ export async function POST(req: NextRequest) {
       .single()
 
     if (insertError) {
-      console.error("[Extension API] Error inserting wishlist item:", insertError)
+      console.error("[Extension Add Item] Error inserting wishlist item:", JSON.stringify(insertError, null, 2))
+      console.error("[Extension Add Item] Insert Data:", JSON.stringify(insertData, null, 2))
+      console.error("[Extension Add Item] Wishlist ID:", wishlistId)
       throw insertError
     }
 
@@ -142,10 +144,19 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    console.error("[Extension API] Error:", error)
+    console.error("[Extension Add Item] ===== ERROR =====")
+    console.error("[Extension Add Item] Error Type:", error?.constructor?.name || typeof error)
+    console.error("[Extension Add Item] Error Message:", error instanceof Error ? error.message : String(error))
+    console.error("[Extension Add Item] Full Error:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2))
+    if (error instanceof Error) {
+      console.error("[Extension Add Item] Stack Trace:", error.stack)
+    }
+    console.error("[Extension Add Item] ===================")
+    
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "Failed to add item to wishlist",
+        details: process.env.NODE_ENV === "development" ? (error instanceof Error ? error.stack : String(error)) : undefined,
       },
       { status: 500 }
     )

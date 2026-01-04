@@ -32,7 +32,8 @@ export async function GET(req: NextRequest) {
       .eq("user_id", user.id)
 
     if (wishlistsError) {
-      console.error("[Extension Get Items] Wishlists query error:", wishlistsError)
+      console.error("[Extension Get Items] Wishlists query error:", JSON.stringify(wishlistsError, null, 2))
+      console.error("[Extension Get Items] User ID:", user.id)
       throw wishlistsError
     }
 
@@ -54,7 +55,8 @@ export async function GET(req: NextRequest) {
       .order("created_at", { ascending: false })
 
     if (itemsError) {
-      console.error("[Extension Get Items] Items query error:", itemsError)
+      console.error("[Extension Get Items] Items query error:", JSON.stringify(itemsError, null, 2))
+      console.error("[Extension Get Items] Wishlist IDs:", wishlistIds)
       throw itemsError
     }
 
@@ -87,7 +89,15 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ items: formattedItems })
   } catch (error) {
-    console.error("[Extension Get Items] Error:", error)
+    console.error("[Extension Get Items] ===== ERROR =====")
+    console.error("[Extension Get Items] Error Type:", error?.constructor?.name || typeof error)
+    console.error("[Extension Get Items] Error Message:", error instanceof Error ? error.message : String(error))
+    console.error("[Extension Get Items] Full Error:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2))
+    if (error instanceof Error) {
+      console.error("[Extension Get Items] Stack Trace:", error.stack)
+    }
+    console.error("[Extension Get Items] ===================")
+    
     const errorMessage = error instanceof Error ? error.message : "Failed to fetch wishlist items"
     
     return NextResponse.json(
