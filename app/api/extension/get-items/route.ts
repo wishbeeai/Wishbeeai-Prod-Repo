@@ -73,10 +73,11 @@ export async function GET(req: NextRequest) {
     }
 
     // Transform to extension format
+    // Map from database schema (title, list_price in cents, image_url) to extension format
     const formattedItems = (items || []).map((item: any) => {
-      // Extract store name from URL if store_name doesn't exist
-      let storeName = item.store_name || "Unknown Store"
-      if (storeName === "Unknown Store" && item.product_url) {
+      // Extract store name from URL
+      let storeName = "Unknown Store"
+      if (item.product_url) {
         try {
           const urlObj = new URL(item.product_url)
           storeName = urlObj.hostname.replace("www.", "").split(".")[0]
@@ -86,13 +87,16 @@ export async function GET(req: NextRequest) {
         }
       }
       
+      // Convert list_price from cents to dollars
+      const price = item.list_price ? item.list_price / 100 : null
+      
       return {
         id: item.id,
-        title: item.product_name || "Untitled Item",
+        title: item.title || "Untitled Item",
         url: item.product_url || "#",
-        image: item.product_image || null,
-        price: item.product_price || null,
-        description: item.description || null,
+        image: item.image_url || null,
+        price: price,
+        description: null, // Description column doesn't exist in database
         storeName,
         addedDate: item.created_at,
         synced: true, // Items from backend are always synced
@@ -104,18 +108,41 @@ export async function GET(req: NextRequest) {
     console.error("[Extension Get Items] ===== ERROR =====")
     console.error("[Extension Get Items] Error Type:", error?.constructor?.name || typeof error)
     console.error("[Extension Get Items] Error Message:", error instanceof Error ? error.message : String(error))
-    console.error("[Extension Get Items] Full Error:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2))
+    
+    // Try to extract more details from the error
+    let errorDetails: any = {}
+    if (error && typeof error === 'object') {
+      try {
+        errorDetails = JSON.parse(JSON.stringify(error, Object.getOwnPropertyNames(error)))
+      } catch (e) {
+        errorDetails = { message: String(error) }
+      }
+    }
+    
+    console.error("[Extension Get Items] Full Error:", JSON.stringify(errorDetails, null, 2))
     if (error instanceof Error) {
       console.error("[Extension Get Items] Stack Trace:", error.stack)
     }
     console.error("[Extension Get Items] ===================")
     
-    const errorMessage = error instanceof Error ? error.message : "Failed to fetch wishlist items"
+    // Get error message - try to extract from PostgrestError or other database errors
+    let errorMessage = "Failed to fetch wishlist items"
+    if (error instanceof Error) {
+      errorMessage = error.message
+      // Check for common database errors
+      if (error.message.includes('permission denied') || error.message.includes('policy')) {
+        errorMessage = "Database access denied. Please check Row Level Security policies."
+      } else if (error.message.includes('relation') || error.message.includes('does not exist')) {
+        errorMessage = "Database table not found. Please check database schema."
+      } else if (error.message.includes('column') || error.message.includes('field')) {
+        errorMessage = "Database column not found. Please check database schema."
+      }
+    }
     
     return NextResponse.json(
       {
         error: errorMessage,
-        details: process.env.NODE_ENV === "development" ? (error instanceof Error ? error.stack : String(error)) : undefined,
+        details: process.env.NODE_ENV === "development" ? (error instanceof Error ? error.stack : String(error)) : errorMessage,
       },
       { status: 500 }
     )

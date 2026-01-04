@@ -17,6 +17,9 @@ const extensionItemSchema = z.object({
   wishlistId: z.string().optional(), // Optional - will use default wishlist if not provided
 })
 
+// Note: Database schema uses: title, list_price (in cents), image_url
+// Need to map from extension format to database format
+
 export async function POST(req: NextRequest) {
   try {
     // Log request headers for debugging (in development only)
@@ -122,15 +125,19 @@ export async function POST(req: NextRequest) {
     }
 
     // Insert wishlist item
-    const insertData = {
+    // Note: description column may not exist in database, so we don't include it
+    const insertData: any = {
       wishlist_id: wishlistId,
       product_name: validated.title,
       product_url: validated.url,
       product_price: validated.price || null,
       product_image: imageUrl,
-      description: validated.description || null,
+      // description column doesn't exist in database - removed
       quantity: 1,
     }
+    
+    // Only add store_name if the column exists (it might not in production)
+    // We'll extract it from URL on the backend if needed
 
     const { data: item, error: insertError } = await supabase
       .from("wishlist_items")
@@ -167,16 +174,43 @@ export async function POST(req: NextRequest) {
     console.error("[Extension Add Item] ===== ERROR =====")
     console.error("[Extension Add Item] Error Type:", error?.constructor?.name || typeof error)
     console.error("[Extension Add Item] Error Message:", error instanceof Error ? error.message : String(error))
-    console.error("[Extension Add Item] Full Error:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2))
+    
+    // Try to extract more details from the error
+    let errorDetails: any = {}
+    if (error && typeof error === 'object') {
+      try {
+        errorDetails = JSON.parse(JSON.stringify(error, Object.getOwnPropertyNames(error)))
+      } catch (e) {
+        errorDetails = { message: String(error) }
+      }
+    }
+    
+    console.error("[Extension Add Item] Full Error:", JSON.stringify(errorDetails, null, 2))
     if (error instanceof Error) {
       console.error("[Extension Add Item] Stack Trace:", error.stack)
     }
     console.error("[Extension Add Item] ===================")
     
+    // Get error message - try to extract from PostgrestError or other database errors
+    let errorMessage = "Failed to add item to wishlist"
+    if (error instanceof Error) {
+      errorMessage = error.message
+      // Check for common database errors
+      if (error.message.includes('permission denied') || error.message.includes('policy')) {
+        errorMessage = "Database access denied. Please check Row Level Security policies."
+      } else if (error.message.includes('relation') || error.message.includes('does not exist')) {
+        errorMessage = "Database table not found. Please check database schema."
+      } else if (error.message.includes('column') || error.message.includes('field')) {
+        errorMessage = "Database column not found. Please check database schema."
+      } else if (error.message.includes('foreign key') || error.message.includes('constraint')) {
+        errorMessage = "Database constraint violation. Please check wishlist_id."
+      }
+    }
+    
     return NextResponse.json(
       {
-        error: error instanceof Error ? error.message : "Failed to add item to wishlist",
-        details: process.env.NODE_ENV === "development" ? (error instanceof Error ? error.stack : String(error)) : undefined,
+        error: errorMessage,
+        details: process.env.NODE_ENV === "development" ? (error instanceof Error ? error.stack : String(error)) : errorMessage,
       },
       { status: 500 }
     )
