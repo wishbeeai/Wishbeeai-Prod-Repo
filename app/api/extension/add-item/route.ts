@@ -6,8 +6,8 @@ import { z } from "zod"
 const extensionItemSchema = z.object({
   title: z.string().min(1),
   url: z.string().url(),
-  image: z.string().url().optional().nullable(),
-  price: z.number().optional().nullable(),
+  image: z.union([z.string().url(), z.string().startsWith('/'), z.null()]).optional().nullable(),
+  price: z.union([z.number(), z.null()]).optional().nullable(),
   description: z.string().optional().nullable(),
   wishlistId: z.string().optional(), // Optional - will use default wishlist if not provided
 })
