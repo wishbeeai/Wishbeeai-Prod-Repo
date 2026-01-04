@@ -85,6 +85,14 @@ class PAAPI {
     } catch (error: any) {
       console.error("[PA-API] GetItems error:", error)
 
+      // Helper function to sanitize Access Key IDs from error messages
+      // Define this FIRST so it's available throughout the catch block
+      const sanitizeAccessKey = (text: string): string => {
+        // Match Access Key IDs (AKIA followed by 16 alphanumeric characters = 20 total)
+        const accessKeyPattern = /AKIA[0-9A-Z]{16}/gi
+        return text.replace(accessKeyPattern, "AKIA***REDACTED***")
+      }
+
       // Extract error details
       let errorMessage = "Unknown error"
       let errorCode = null
@@ -97,15 +105,28 @@ class PAAPI {
 
       if (error?.response?.text) {
         errorResponseText = error.response.text
-        console.error("[PA-API] Error Response Text:", errorResponseText)
+        // Sanitize the response text immediately before logging or parsing
+        const sanitizedResponseText = sanitizeAccessKey(errorResponseText)
+        console.error("[PA-API] Error Response Text:", sanitizedResponseText)
 
         try {
           const parsedError = JSON.parse(errorResponseText)
           if (parsedError.__type || parsedError.message || parsedError.Message) {
-            errorMessage = parsedError.message || parsedError.Message || JSON.stringify(parsedError)
+            // Extract message and sanitize immediately
+            const rawMessage = parsedError.message || parsedError.Message || JSON.stringify(parsedError)
+            errorMessage = sanitizeAccessKey(rawMessage)
+            
+            // Also sanitize any Errors array if present
+            if (parsedError.Errors && Array.isArray(parsedError.Errors)) {
+              parsedError.Errors = parsedError.Errors.map((err: any) => {
+                if (err.Message) err.Message = sanitizeAccessKey(err.Message)
+                if (err.message) err.message = sanitizeAccessKey(err.message)
+                return err
+              })
+            }
           }
         } catch (e) {
-          errorMessage = errorResponseText.substring(0, 500)
+          errorMessage = sanitizeAccessKey(errorResponseText.substring(0, 500))
         }
       }
 
@@ -119,22 +140,38 @@ class PAAPI {
         errorMessage = JSON.stringify(error).substring(0, 500)
       }
 
+      // Sanitize error message before using it
+      errorMessage = sanitizeAccessKey(errorMessage)
+
       // Check for Forbidden error
       if (errorMessage.includes("Forbidden") || errorMessage.includes("403") || errorCode === 403) {
-        const detailedMessage = errorResponseText
-          ? `Amazon PA-API returned Forbidden (403). Response: ${errorResponseText.substring(0, 200)}. Please verify: 1) Your IAM Access Key and Secret Key are correct, 2) Your Associate Tag (${this.partnerTag}) is approved for PA-API 5.0 in Amazon Associates Central, 3) Your IAM user has Product Advertising API permissions enabled.`
+        // Sanitize errorResponseText before including it
+        const sanitizedResponse = errorResponseText 
+          ? sanitizeAccessKey(errorResponseText.substring(0, 200))
+          : null
+        
+        // Also sanitize the errorMessage itself (it may contain Access Key from Amazon's response)
+        const sanitizedErrorMessage = sanitizeAccessKey(errorMessage)
+        
+        const detailedMessage = sanitizedResponse
+          ? `Amazon PA-API returned Forbidden (403). Response: ${sanitizedResponse}. Please verify: 1) Your IAM Access Key and Secret Key are correct, 2) Your Associate Tag (${this.partnerTag}) is approved for PA-API 5.0 in Amazon Associates Central, 3) Your IAM user has Product Advertising API permissions enabled.`
           : `Forbidden: Amazon PA-API credentials may be invalid or the associate tag may not be approved for PA-API. Please verify your credentials.`
-        throw new Error(detailedMessage)
+        
+        // Ensure the final message is also sanitized
+        throw new Error(sanitizeAccessKey(detailedMessage))
       }
 
       if (error instanceof Error) {
         if (errorResponseText) {
-          throw new Error(`${error.message}. Response: ${errorResponseText.substring(0, 300)}`)
+          const sanitizedResponse = sanitizeAccessKey(errorResponseText.substring(0, 300))
+          const combinedMessage = `${sanitizeAccessKey(error.message)}. Response: ${sanitizedResponse}`
+          throw new Error(sanitizeAccessKey(combinedMessage))
         }
-        throw error
+        throw new Error(sanitizeAccessKey(error.message))
       }
 
-      throw new Error(`PA-API GetItems failed: ${errorMessage}`)
+      // Ensure final error message is sanitized
+      throw new Error(sanitizeAccessKey(`PA-API GetItems failed: ${errorMessage}`))
     }
   }
 }
@@ -198,8 +235,14 @@ export async function getAmazonItem(asin: string) {
     return response.ItemsResult.Items[0]
   } catch (error) {
     console.error("[PA-API] Error in getAmazonItem:", error)
-    // Re-throw with more context
-    throw new Error(`Failed to fetch Amazon item: ${error instanceof Error ? error.message : String(error)}`)
+    // Helper function to sanitize Access Key IDs
+    const sanitizeAccessKey = (text: string): string => {
+      const accessKeyPattern = /AKIA[0-9A-Z]{16}/gi
+      return text.replace(accessKeyPattern, "AKIA***REDACTED***")
+    }
+    // Re-throw with more context, sanitizing any Access Key IDs
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    throw new Error(`Failed to fetch Amazon item: ${sanitizeAccessKey(errorMessage)}`)
   }
 }
 

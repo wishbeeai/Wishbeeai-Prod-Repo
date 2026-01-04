@@ -117,23 +117,28 @@ function createShortTitle(fullTitle: string, maxWords: number = 10): string {
 }
 
 export async function GET(req: NextRequest) {
+  console.log("[API] GET /api/admin/affiliate-products - Request received")
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
+    console.log("[API] User check:", { hasUser: !!user, userEmail: user?.email })
 
     const userEmail = user?.email?.toLowerCase().trim()
     const adminEmail = ADMIN_EMAIL.toLowerCase().trim()
     if (!user || userEmail !== adminEmail) {
+      console.log("[API] Unauthorized access attempt")
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    console.log("[API] Admin access confirmed, fetching products...")
     const products = getProducts()
+    console.log("[API] Products found:", products.length)
     return NextResponse.json({
       products,
       total: products.length,
     })
   } catch (error) {
-    console.error("Error fetching affiliate products:", error)
+    console.error("[API] Error fetching affiliate products:", error)
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

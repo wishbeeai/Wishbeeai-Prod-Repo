@@ -7,12 +7,62 @@ const AMAZON_ASSOCIATE_TAG = process.env.AMAZON_ASSOCIATE_TAG || ""
 
 /**
  * Extract ASIN from Amazon URL
- * Handles multiple Amazon URL patterns: /dp/, /gp/product/, etc.
+ * Handles multiple Amazon URL patterns:
+ * - /dp/ASIN
+ * - /gp/product/ASIN
+ * - /product/ASIN
+ * - /exec/obidos/ASIN/ASIN
+ * - Query parameters: ?asin=ASIN or &asin=ASIN
+ * - Short URLs: amzn.to/... (will need to follow redirect)
  */
 function extractASIN(url: string): string | null {
-  const regex = /(?:\/dp\/|\/gp\/product\/)([A-Z0-9]{10})/
-  const match = url.match(regex)
-  return match ? match[1] : null
+  if (!url) return null
+  
+  // Clean the URL - remove fragments and normalize
+  let cleanUrl = url.trim()
+  
+  // Remove URL fragment if present
+  const fragmentIndex = cleanUrl.indexOf('#')
+  if (fragmentIndex !== -1) {
+    cleanUrl = cleanUrl.substring(0, fragmentIndex)
+  }
+  
+  // Pattern 1: /dp/ASIN or /dp/ASIN/ or /dp/ASIN? or /dp/ASIN&
+  let match = cleanUrl.match(/\/dp\/([A-Z0-9]{10})(?:\/|$|\?|&)/i)
+  if (match) return match[1].toUpperCase()
+  
+  // Pattern 2: /gp/product/ASIN or /gp/product/ASIN/ or /gp/product/ASIN?
+  match = cleanUrl.match(/\/gp\/product\/([A-Z0-9]{10})(?:\/|$|\?|&)/i)
+  if (match) return match[1].toUpperCase()
+  
+  // Pattern 3: /product/ASIN
+  match = cleanUrl.match(/\/product\/([A-Z0-9]{10})(?:\/|$|\?|&)/i)
+  if (match) return match[1].toUpperCase()
+  
+  // Pattern 4: /exec/obidos/ASIN/ASIN
+  match = cleanUrl.match(/\/exec\/obidos\/ASIN\/([A-Z0-9]{10})(?:\/|$|\?|&)/i)
+  if (match) return match[1].toUpperCase()
+  
+  // Pattern 5: Query parameter ?asin=ASIN or &asin=ASIN
+  match = cleanUrl.match(/[?&]asin=([A-Z0-9]{10})(?:&|$)/i)
+  if (match) return match[1].toUpperCase()
+  
+  // Pattern 6: Query parameter ?ASIN=ASIN or &ASIN=ASIN
+  match = cleanUrl.match(/[?&]ASIN=([A-Z0-9]{10})(?:&|$)/i)
+  if (match) return match[1].toUpperCase()
+  
+  // Pattern 7: Look for ASIN in any position (10 alphanumeric chars, not preceded by another alphanumeric)
+  // This is a fallback for unusual URL formats
+  match = cleanUrl.match(/(?:^|[^A-Z0-9])([A-Z0-9]{10})(?:[^A-Z0-9]|$)/i)
+  if (match) {
+    const potentialASIN = match[1].toUpperCase()
+    // Validate it's a valid ASIN format (starts with letter or number, 10 chars)
+    if (/^[A-Z0-9]{10}$/.test(potentialASIN)) {
+      return potentialASIN
+    }
+  }
+  
+  return null
 }
 
 /**
@@ -59,6 +109,13 @@ async function fetchAmazonProduct(asin: string) {
 
 
 export async function POST(req: NextRequest) {
+  // Helper function to sanitize Access Key IDs from error messages
+  const sanitizeAccessKey = (text: string): string => {
+    // Match Access Key IDs (AKIA followed by 16 alphanumeric characters = 20 total)
+    const accessKeyPattern = /AKIA[0-9A-Z]{16}/gi
+    return text.replace(accessKeyPattern, "AKIA***REDACTED***")
+  }
+
   try {
     // Check if credentials are configured
     if (!AMAZON_ACCESS_KEY || !AMAZON_SECRET_KEY || !AMAZON_ASSOCIATE_TAG) {
@@ -84,17 +141,26 @@ export async function POST(req: NextRequest) {
     // Extract ASIN if URL provided
     let productASIN = asin
     if (!productASIN && productUrl) {
+      console.log("[PA-API] Attempting to extract ASIN from URL:", productUrl)
       productASIN = extractASIN(productUrl)
       if (!productASIN) {
+        console.error("[PA-API] Failed to extract ASIN from URL:", productUrl)
         return NextResponse.json(
           { 
             error: "Invalid Amazon URL. ASIN not found.",
             message: "Could not extract ASIN from the provided Amazon URL. Please ensure the URL contains a valid product ASIN.",
-            details: "Expected URL format: https://www.amazon.com/.../dp/ASIN or .../gp/product/ASIN"
+            details: `Supported URL formats:
+- https://www.amazon.com/dp/ASIN
+- https://www.amazon.com/gp/product/ASIN
+- https://www.amazon.com/product/ASIN
+- https://www.amazon.com/exec/obidos/ASIN/ASIN
+- URLs with ?asin=ASIN or &asin=ASIN query parameters
+Provided URL: ${productUrl.substring(0, 200)}`
           },
           { status: 400 }
         )
       }
+      console.log("[PA-API] Successfully extracted ASIN:", productASIN)
     }
 
     if (!productASIN || productASIN.length !== 10) {
@@ -109,7 +175,7 @@ export async function POST(req: NextRequest) {
     }
 
     console.log(`[PA-API] Fetching product details for ASIN: ${productASIN}`)
-    console.log(`[PA-API] Credentials check - Access Key: ${AMAZON_ACCESS_KEY ? 'SET' : 'MISSING'}, Secret Key: ${AMAZON_SECRET_KEY ? 'SET' : 'MISSING'}, Associate Tag: ${AMAZON_ASSOCIATE_TAG ? 'SET' : 'MISSING'}`)
+    // Removed credential logging to prevent exposure
 
     // Call PA-API
     let paapiResponse
@@ -121,12 +187,21 @@ export async function POST(req: NextRequest) {
       if (paapiResponse.Errors && paapiResponse.Errors.length > 0) {
         const error = paapiResponse.Errors[0]
         console.error(`[PA-API] PA-API returned errors:`, JSON.stringify(error, null, 2))
+        
+        // Sanitize error message before returning
+        const errorMessage = sanitizeAccessKey(error.Message || error.message || "PA-API error")
+        const sanitizedError = {
+          ...error,
+          Message: errorMessage,
+          message: errorMessage,
+        }
+        
         return NextResponse.json(
           {
-            error: error.Message || error.message || "PA-API error",
+            error: errorMessage,
             code: error.Code || error.code,
-            details: error,
-            message: error.Message || error.message || "Amazon PA-API returned an error",
+            details: sanitizedError,
+            message: errorMessage,
           },
           { status: 400 }
         )
@@ -146,15 +221,24 @@ export async function POST(req: NextRequest) {
       }
     } catch (apiError) {
       console.error(`[PA-API] Exception during API call:`, apiError)
-      const errorMessage = apiError instanceof Error ? apiError.message : String(apiError)
+      
+      // Extract error message and sanitize immediately
+      let errorMessage = apiError instanceof Error ? apiError.message : String(apiError)
+      errorMessage = sanitizeAccessKey(errorMessage)
+      
       const errorStack = apiError instanceof Error ? apiError.stack : undefined
+      const sanitizedStack = errorStack ? sanitizeAccessKey(errorStack) : undefined
+      
+      // Double-check: sanitize again to catch any Access Keys that might have been missed
+      const finalMessage = sanitizeAccessKey(errorMessage)
+      const finalStack = sanitizedStack ? sanitizeAccessKey(sanitizedStack) : undefined
       
       return NextResponse.json(
         {
           error: "Failed to fetch product from Amazon PA-API",
-          details: errorMessage,
-          message: errorMessage,
-          stack: errorStack,
+          details: finalMessage,
+          message: finalMessage,
+          stack: finalStack,
         },
         { status: 500 }
       )
@@ -191,11 +275,23 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error("[PA-API] Top-level catch error:", error)
     console.error("[PA-API] Error stack:", error instanceof Error ? error.stack : "No stack trace")
+    
+    // Helper function to sanitize Access Key IDs
+    const sanitizeAccessKey = (text: string): string => {
+      const accessKeyPattern = /AKIA[0-9A-Z]{16}/gi
+      return text.replace(accessKeyPattern, "AKIA***REDACTED***")
+    }
+    
+    const errorMessage = error instanceof Error ? error.message : "Unknown error"
+    const sanitizedMessage = sanitizeAccessKey(errorMessage)
+    const sanitizedStack = error instanceof Error ? sanitizeAccessKey(error.stack || "") : undefined
+    
     return NextResponse.json(
       {
         error: "Failed to fetch product from Amazon PA-API",
-        details: error instanceof Error ? error.message : "Unknown error",
-        message: error instanceof Error ? error.message : "Unknown error occurred",
+        details: sanitizedMessage,
+        message: sanitizedMessage,
+        stack: sanitizedStack,
       },
       { status: 500 }
     )
