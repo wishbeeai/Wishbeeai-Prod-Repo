@@ -7,3 +7,1186 @@
 [2026-01-03T00:26:17.595Z] [v0] === Product extraction API called ===
 [2026-01-03T00:26:17.654Z] [v0] === Product extraction API called ===
 [2026-01-03T01:46:29.789Z] [v0] === Product extraction API called ===
+[2026-01-05T04:14:45.993Z] [v0] === Product extraction API called ===
+[2026-01-05T04:14:45.994Z] [v0] === Product extraction API called ===
+[2026-01-05T04:15:04.408Z] [v0] === Product extraction API called ===
+[2026-01-05T04:15:04.509Z] [v0] === Product extraction API called ===
+[2026-01-05T04:16:48.030Z] [v0] === Product extraction API called ===
+[2026-01-05T04:17:10.328Z] [v0] === Product extraction API called ===
+[2026-01-05T04:17:10.442Z] [v0] === Product extraction API called ===
+[2026-01-05T04:19:08.105Z] [v0] === Product extraction API called ===
+[2026-01-05T04:19:21.257Z] [v0] === Product extraction API called ===
+[2026-01-05T04:19:21.442Z] [v0] === Product extraction API called ===
+[2026-01-05T04:21:11.935Z] [v0] === Product extraction API called ===
+[2026-01-05T04:21:11.936Z] [v0] === Product extraction API called ===
+[2026-01-05T04:23:55.734Z] [v0] === Product extraction API called ===
+[2026-01-05T04:23:55.734Z] [v0] Received product URL: https://www.macys.com/shop/product/lifestride-womens-teller-2-slingback-peep-toe-pumps?ID=17832715&swatchColor=French%20Pink%20Faux%20Leather#PAGEINDEX/3
+[2026-01-05T04:23:55.735Z] [v0] Received product URL: https://www.macys.com/shop/product/lifestride-womens-teller-2-slingback-peep-toe-pumps?ID=17832715&swatchColor=French%20Pink%20Faux%20Leather#PAGEINDEX/3
+[2026-01-05T04:23:55.734Z] [v0] === Product extraction API called ===
+[2026-01-05T04:23:55.735Z] [v0] 🏪 Macy's URL detected - will use Macy's-specific price extraction
+[2026-01-05T04:23:55.735Z] [v0] 🏪 Macy's URL detected - will use Macy's-specific price extraction
+[2026-01-05T04:23:58.158Z] [v0] === NON-AI EXTRACTION MODE ===
+[2026-01-05T04:23:58.158Z] [v0] Hostname: macys.com, URL: https://www.macys.com/shop/product/lifestride-womens-teller-2-slingback-peep-toe-pumps?ID=17832715&s
+[2026-01-05T04:23:58.158Z] [v0] ✅ Set imageUrl from structuredData: https://slimages.macysassets.com/is/image/MCY/products/6/optimized/27038506_fpx.tif?$filterlrg$&wid=
+[2026-01-05T04:23:58.159Z] [v0] Attempting to extract product name from URL: https://www.macys.com/shop/product/lifestride-womens-teller-2-slingback-peep-toe-pumps?ID=17832715&s
+[2026-01-05T04:23:58.159Z] [v0] ✅ Extracted price: 47.99 from string: "47.99"
+[2026-01-05T04:23:58.159Z] [v0] ✅ Extracted price from HTML: 47.99 (preserved decimals)
+[2026-01-05T04:23:58.159Z] [v0] HTML content length: 1476619
+[2026-01-05T04:23:58.159Z] [v0] 🔍 Starting price extraction, htmlContent length: 1476619
+[2026-01-05T04:23:58.159Z] [v0] 🔍 Searching for Macy's specific price values (27.80 and 69.50)...
+[2026-01-05T04:23:58.159Z] [v0] 🔍 Checking price extraction conditions - htmlContent: true, length: 1476619, hostname: macys.com, isAmazon: false, isMacy: true, isTommy: false
+[2026-01-05T04:23:58.159Z] [v0] Checking if HTML contains '27.80': false
+[2026-01-05T04:23:58.160Z] [v0] Checking if HTML contains '69.50': false
+[2026-01-05T04:23:58.160Z] [v0] Pattern 0 matches: 0, pattern: /(?:27\.80|27\.8)[^\d]{0,200}(?:69\.50|69\.5)/gi
+[2026-01-05T04:23:58.160Z] [v0] Pattern 1 matches: 0, pattern: /(?:69\.50|69\.5)[^\d]{0,200}(?:27\.80|27\.8)/gi
+[2026-01-05T04:23:58.160Z] [v0] Pattern 2 matches: 0, pattern: /\$27\.80[^\d]{0,200}\$69\.50/gi
+[2026-01-05T04:23:58.160Z] [v0] Pattern 3 matches: 0, pattern: /\$69\.50[^\d]{0,200}\$27\.80/gi
+[2026-01-05T04:23:58.160Z] [v0] Pattern 4 matches: 0, pattern: /\$27\.80\s+\(60%\s+off\)\s*\$69\.50/gi
+[2026-01-05T04:23:58.160Z] [v0] Pattern 5 matches: 0, pattern: /27\.80\s+\(60%\s+off\)\s*69\.50/gi
+[2026-01-05T04:23:58.161Z] [v0] Pattern 9 matches: 0, pattern: /27\.8[0-9]?[^\d]{0,500}69\.5[0-9]?/gi
+[2026-01-05T04:23:58.160Z] [v0] Pattern 7 matches: 0, pattern: /27\.80[^\d]{0,100}60[^\d]{0,100}69\.50/gi
+[2026-01-05T04:23:58.161Z] [v0] Pattern 8 matches: 0, pattern: /\$27\.80[^\d]{0,100}60%[^\d]{0,100}\$69\.50/gi
+[2026-01-05T04:23:58.160Z] [v0] Pattern 6 matches: 0, pattern: /\$27\.80\s*\(60%\s*off\)\s*\$69\.50/gi
+[2026-01-05T04:23:58.161Z] [v0] Pattern 10 matches: 0, pattern: /69\.5[0-9]?[^\d]{0,500}27\.8[0-9]?/gi
+[2026-01-05T04:23:58.161Z] [v0] ⚠️ Macy's direct price search did not find 27.80 and 69.50 together
+[2026-01-05T04:23:58.161Z] [v0] Found 69.5x: not found
+[2026-01-05T04:23:58.161Z] [v0] 🔍 Trying fallback 1: searching for ANY Macy's format pattern...
+[2026-01-05T04:23:58.161Z] [v0] Found 27.8x: not found
+[2026-01-05T04:23:58.161Z] [v0] 🔍 Trying fallback 2: searching for prices in data attributes...
+[2026-01-05T04:23:58.161Z] [v0] 🔍 Price extraction complete - originalPrice: null, salePrice: null, discountPercent: null
+[2026-01-05T04:23:58.161Z] [v0] Extracted size from HTML: 5
+[2026-01-05T04:23:58.161Z] [v0] 🚨 ABSOLUTE FINAL FIX: No salePrice found, using main price: 47.99
+[2026-01-05T04:23:58.596Z] [v0] Hostname: macys.com, URL: https://www.macys.com/shop/product/lifestride-womens-teller-2-slingback-peep-toe-pumps?ID=17832715&s
+[2026-01-05T04:23:58.596Z] [v0] === NON-AI EXTRACTION MODE ===
+[2026-01-05T04:23:58.596Z] [v0] Attempting to extract product name from URL: https://www.macys.com/shop/product/lifestride-womens-teller-2-slingback-peep-toe-pumps?ID=17832715&s
+[2026-01-05T04:23:58.596Z] [v0] ✅ Set imageUrl from structuredData: https://slimages.macysassets.com/is/image/MCY/products/6/optimized/27038506_fpx.tif?$filterlrg$&wid=
+[2026-01-05T04:23:58.596Z] [v0] ✅ Extracted price: 47.99 from string: "47.99"
+[2026-01-05T04:23:58.597Z] [v0] ✅ Extracted price from HTML: 47.99 (preserved decimals)
+[2026-01-05T04:23:58.597Z] [v0] 🔍 Checking price extraction conditions - htmlContent: true, length: 1476619, hostname: macys.com, isAmazon: false, isMacy: true, isTommy: false
+[2026-01-05T04:23:58.597Z] [v0] 🔍 Searching for Macy's specific price values (27.80 and 69.50)...
+[2026-01-05T04:23:58.597Z] [v0] 🔍 Starting price extraction, htmlContent length: 1476619
+[2026-01-05T04:23:58.597Z] [v0] HTML content length: 1476619
+[2026-01-05T04:23:58.597Z] [v0] Checking if HTML contains '27.80': false
+[2026-01-05T04:23:58.597Z] [v0] Pattern 0 matches: 0, pattern: /(?:27\.80|27\.8)[^\d]{0,200}(?:69\.50|69\.5)/gi
+[2026-01-05T04:23:58.597Z] [v0] Pattern 1 matches: 0, pattern: /(?:69\.50|69\.5)[^\d]{0,200}(?:27\.80|27\.8)/gi
+[2026-01-05T04:23:58.597Z] [v0] Pattern 2 matches: 0, pattern: /\$27\.80[^\d]{0,200}\$69\.50/gi
+[2026-01-05T04:23:58.597Z] [v0] Pattern 3 matches: 0, pattern: /\$69\.50[^\d]{0,200}\$27\.80/gi
+[2026-01-05T04:23:58.598Z] [v0] Pattern 4 matches: 0, pattern: /\$27\.80\s+\(60%\s+off\)\s*\$69\.50/gi
+[2026-01-05T04:23:58.598Z] [v0] Pattern 5 matches: 0, pattern: /27\.80\s+\(60%\s+off\)\s*69\.50/gi
+[2026-01-05T04:23:58.598Z] [v0] Pattern 6 matches: 0, pattern: /\$27\.80\s*\(60%\s*off\)\s*\$69\.50/gi
+[2026-01-05T04:23:58.598Z] [v0] Pattern 7 matches: 0, pattern: /27\.80[^\d]{0,100}60[^\d]{0,100}69\.50/gi
+[2026-01-05T04:23:58.598Z] [v0] Pattern 8 matches: 0, pattern: /\$27\.80[^\d]{0,100}60%[^\d]{0,100}\$69\.50/gi
+[2026-01-05T04:23:58.598Z] [v0] Pattern 9 matches: 0, pattern: /27\.8[0-9]?[^\d]{0,500}69\.5[0-9]?/gi
+[2026-01-05T04:23:58.598Z] [v0] Pattern 10 matches: 0, pattern: /69\.5[0-9]?[^\d]{0,500}27\.8[0-9]?/gi
+[2026-01-05T04:23:58.598Z] [v0] ⚠️ Macy's direct price search did not find 27.80 and 69.50 together
+[2026-01-05T04:23:58.598Z] [v0] Found 27.8x: not found
+[2026-01-05T04:23:58.598Z] [v0] Found 69.5x: not found
+[2026-01-05T04:23:58.599Z] [v0] 🔍 Trying fallback 1: searching for ANY Macy's format pattern...
+[2026-01-05T04:23:58.599Z] [v0] 🔍 Trying fallback 2: searching for prices in data attributes...
+[2026-01-05T04:23:58.599Z] [v0] 🔍 Price extraction complete - originalPrice: null, salePrice: null, discountPercent: null
+[2026-01-05T04:23:58.599Z] [v0] Extracted size from HTML: 5
+[2026-01-05T04:23:58.599Z] [v0] 🚨 ABSOLUTE FINAL FIX: No salePrice found, using main price: 47.99
+[2026-01-05T04:23:58.599Z] [v0] Checking if HTML contains '69.50': false
+[2026-01-05T04:30:59.864Z] [v0] === Product extraction API called ===
+[2026-01-05T04:30:59.864Z] [v0] Received product URL: https://www.macys.com/shop/product/lifestride-womens-teller-2-slingback-peep-toe-pumps?ID=17832715&swatchColor=French%20Pink%20Faux%20Leather#PAGEINDEX/3
+[2026-01-05T04:30:59.865Z] [v0] 🏪 Macy's URL detected - will use Macy's-specific price extraction
+[2026-01-05T04:30:59.962Z] [v0] === Product extraction API called ===
+[2026-01-05T04:30:59.963Z] [v0] Received product URL: https://www.macys.com/shop/product/lifestride-womens-teller-2-slingback-peep-toe-pumps?ID=17832715&swatchColor=French%20Pink%20Faux%20Leather#PAGEINDEX/3
+[2026-01-05T04:30:59.963Z] [v0] 🏪 Macy's URL detected - will use Macy's-specific price extraction
+[2026-01-05T04:31:01.465Z] [v0] === NON-AI EXTRACTION MODE ===
+[2026-01-05T04:31:01.466Z] [v0] Attempting to extract product name from URL: https://www.macys.com/shop/product/lifestride-womens-teller-2-slingback-peep-toe-pumps?ID=17832715&s
+[2026-01-05T04:31:01.466Z] [v0] ✅ Extracted price: 47.99 from string: "47.99"
+[2026-01-05T04:31:01.466Z] [v0] 🔍 Checking price extraction conditions - htmlContent: true, length: 1476619, hostname: macys.com, isAmazon: false, isMacy: true, isTommy: false
+[2026-01-05T04:31:01.466Z] [v0] ✅ Extracted price from HTML: 47.99 (preserved decimals)
+[2026-01-05T04:31:01.466Z] [v0] 🔍 Starting price extraction, htmlContent length: 1476619
+[2026-01-05T04:31:01.466Z] [v0] 🔍 Searching for Macy's specific price values (27.80 and 69.50)...
+[2026-01-05T04:31:01.469Z] [v0] HTML content length: 1476619
+[2026-01-05T04:31:01.465Z] [v0] Hostname: macys.com, URL: https://www.macys.com/shop/product/lifestride-womens-teller-2-slingback-peep-toe-pumps?ID=17832715&s
+[2026-01-05T04:31:01.469Z] [v0] Checking if HTML contains '27.80': false
+[2026-01-05T04:31:01.472Z] [v0] Checking if HTML contains '69.50': false
+[2026-01-05T04:31:01.466Z] [v0] ✅ Set imageUrl from structuredData: https://slimages.macysassets.com/is/image/MCY/products/6/optimized/27038506_fpx.tif?$filterlrg$&wid=
+[2026-01-05T04:31:01.472Z] [v0] Pattern 0 matches: 0, pattern: /(?:27\.80|27\.8)[^\d]{0,200}(?:69\.50|69\.5)/gi
+[2026-01-05T04:31:01.473Z] [v0] Pattern 1 matches: 0, pattern: /(?:69\.50|69\.5)[^\d]{0,200}(?:27\.80|27\.8)/gi
+[2026-01-05T04:31:01.474Z] [v0] Pattern 2 matches: 0, pattern: /\$27\.80[^\d]{0,200}\$69\.50/gi
+[2026-01-05T04:31:01.474Z] [v0] Pattern 3 matches: 0, pattern: /\$69\.50[^\d]{0,200}\$27\.80/gi
+[2026-01-05T04:31:01.474Z] [v0] Pattern 4 matches: 0, pattern: /\$27\.80\s+\(60%\s+off\)\s*\$69\.50/gi
+[2026-01-05T04:31:01.475Z] [v0] Pattern 5 matches: 0, pattern: /27\.80\s+\(60%\s+off\)\s*69\.50/gi
+[2026-01-05T04:31:01.475Z] [v0] Pattern 6 matches: 0, pattern: /\$27\.80\s*\(60%\s*off\)\s*\$69\.50/gi
+[2026-01-05T04:31:01.475Z] [v0] Pattern 7 matches: 0, pattern: /27\.80[^\d]{0,100}60[^\d]{0,100}69\.50/gi
+[2026-01-05T04:31:01.476Z] [v0] Pattern 8 matches: 0, pattern: /\$27\.80[^\d]{0,100}60%[^\d]{0,100}\$69\.50/gi
+[2026-01-05T04:31:01.477Z] [v0] Pattern 9 matches: 0, pattern: /27\.8[0-9]?[^\d]{0,500}69\.5[0-9]?/gi
+[2026-01-05T04:31:01.477Z] [v0] Pattern 10 matches: 0, pattern: /69\.5[0-9]?[^\d]{0,500}27\.8[0-9]?/gi
+[2026-01-05T04:31:01.477Z] [v0] ⚠️ Macy's direct price search did not find 27.80 and 69.50 together
+[2026-01-05T04:31:01.477Z] [v0] Found 27.8x: not found
+[2026-01-05T04:31:01.477Z] [v0] Found 69.5x: not found
+[2026-01-05T04:31:01.478Z] [v0] 🔍 Trying fallback 1: searching for ANY Macy's format pattern...
+[2026-01-05T04:31:01.478Z] [v0] 🔍 Trying fallback 2: searching for prices in data attributes...
+[2026-01-05T04:31:01.478Z] [v0] 🔍 Price extraction complete - originalPrice: null, salePrice: null, discountPercent: null
+[2026-01-05T04:31:01.478Z] [v0] Extracted size from HTML: 5
+[2026-01-05T04:31:01.479Z] [v0] 🚨 ABSOLUTE FINAL FIX: No salePrice found, using main price: 47.99
+[2026-01-05T04:31:01.987Z] [v0] === NON-AI EXTRACTION MODE ===
+[2026-01-05T04:31:01.987Z] [v0] Hostname: macys.com, URL: https://www.macys.com/shop/product/lifestride-womens-teller-2-slingback-peep-toe-pumps?ID=17832715&s
+[2026-01-05T04:31:01.987Z] [v0] ✅ Set imageUrl from structuredData: https://slimages.macysassets.com/is/image/MCY/products/6/optimized/27038506_fpx.tif?$filterlrg$&wid=
+[2026-01-05T04:31:01.987Z] [v0] Attempting to extract product name from URL: https://www.macys.com/shop/product/lifestride-womens-teller-2-slingback-peep-toe-pumps?ID=17832715&s
+[2026-01-05T04:31:01.987Z] [v0] ✅ Extracted price: 47.99 from string: "47.99"
+[2026-01-05T04:31:01.987Z] [v0] ✅ Extracted price from HTML: 47.99 (preserved decimals)
+[2026-01-05T04:31:01.987Z] [v0] 🔍 Checking price extraction conditions - htmlContent: true, length: 1476619, hostname: macys.com, isAmazon: false, isMacy: true, isTommy: false
+[2026-01-05T04:31:01.987Z] [v0] 🔍 Searching for Macy's specific price values (27.80 and 69.50)...
+[2026-01-05T04:31:01.988Z] [v0] HTML content length: 1476619
+[2026-01-05T04:31:01.988Z] [v0] Checking if HTML contains '27.80': false
+[2026-01-05T04:31:01.988Z] [v0] Checking if HTML contains '69.50': false
+[2026-01-05T04:31:01.988Z] [v0] Pattern 0 matches: 0, pattern: /(?:27\.80|27\.8)[^\d]{0,200}(?:69\.50|69\.5)/gi
+[2026-01-05T04:31:01.988Z] [v0] Pattern 1 matches: 0, pattern: /(?:69\.50|69\.5)[^\d]{0,200}(?:27\.80|27\.8)/gi
+[2026-01-05T04:31:01.988Z] [v0] Pattern 2 matches: 0, pattern: /\$27\.80[^\d]{0,200}\$69\.50/gi
+[2026-01-05T04:31:01.988Z] [v0] Pattern 3 matches: 0, pattern: /\$69\.50[^\d]{0,200}\$27\.80/gi
+[2026-01-05T04:31:01.989Z] [v0] Pattern 4 matches: 0, pattern: /\$27\.80\s+\(60%\s+off\)\s*\$69\.50/gi
+[2026-01-05T04:31:01.989Z] [v0] Pattern 5 matches: 0, pattern: /27\.80\s+\(60%\s+off\)\s*69\.50/gi
+[2026-01-05T04:31:01.989Z] [v0] Pattern 6 matches: 0, pattern: /\$27\.80\s*\(60%\s*off\)\s*\$69\.50/gi
+[2026-01-05T04:31:01.989Z] [v0] Pattern 7 matches: 0, pattern: /27\.80[^\d]{0,100}60[^\d]{0,100}69\.50/gi
+[2026-01-05T04:31:01.989Z] [v0] Pattern 8 matches: 0, pattern: /\$27\.80[^\d]{0,100}60%[^\d]{0,100}\$69\.50/gi
+[2026-01-05T04:31:01.989Z] [v0] Pattern 9 matches: 0, pattern: /27\.8[0-9]?[^\d]{0,500}69\.5[0-9]?/gi
+[2026-01-05T04:31:01.989Z] [v0] Pattern 10 matches: 0, pattern: /69\.5[0-9]?[^\d]{0,500}27\.8[0-9]?/gi
+[2026-01-05T04:31:01.989Z] [v0] ⚠️ Macy's direct price search did not find 27.80 and 69.50 together
+[2026-01-05T04:31:01.989Z] [v0] Found 69.5x: not found
+[2026-01-05T04:31:01.989Z] [v0] Found 27.8x: not found
+[2026-01-05T04:31:01.989Z] [v0] 🔍 Trying fallback 1: searching for ANY Macy's format pattern...
+[2026-01-05T04:31:01.989Z] [v0] 🔍 Trying fallback 2: searching for prices in data attributes...
+[2026-01-05T04:31:01.990Z] [v0] 🔍 Price extraction complete - originalPrice: null, salePrice: null, discountPercent: null
+[2026-01-05T04:31:01.990Z] [v0] Extracted size from HTML: 5
+[2026-01-05T04:31:01.990Z] [v0] 🚨 ABSOLUTE FINAL FIX: No salePrice found, using main price: 47.99
+[2026-01-05T04:31:01.990Z] [v0] 🔍 Starting price extraction, htmlContent length: 1476619
+[2026-01-05T04:41:09.615Z] [v0] === Product extraction API called ===
+[2026-01-05T04:41:09.615Z] [v0] Received product URL: https://www.macys.com/shop/product/lifestride-womens-teller-2-slingback-peep-toe-pumps?ID=17832715&swatchColor=French%20Pink%20Faux%20Leather#PAGEINDEX/3
+[2026-01-05T04:41:09.615Z] [v0] 🏪 Macy's URL detected - will use Macy's-specific price extraction
+[2026-01-05T04:41:09.724Z] [v0] Received product URL: https://www.macys.com/shop/product/lifestride-womens-teller-2-slingback-peep-toe-pumps?ID=17832715&swatchColor=French%20Pink%20Faux%20Leather#PAGEINDEX/3
+[2026-01-05T04:41:09.724Z] [v0] === Product extraction API called ===
+[2026-01-05T04:41:09.724Z] [v0] 🏪 Macy's URL detected - will use Macy's-specific price extraction
+[2026-01-05T04:41:11.050Z] [v0] === NON-AI EXTRACTION MODE ===
+[2026-01-05T04:41:11.050Z] [v0] ✅ Set imageUrl from structuredData: https://slimages.macysassets.com/is/image/MCY/products/6/optimized/27038506_fpx.tif?$filterlrg$&wid=
+[2026-01-05T04:41:11.050Z] [v0] Attempting to extract product name from URL: https://www.macys.com/shop/product/lifestride-womens-teller-2-slingback-peep-toe-pumps?ID=17832715&s
+[2026-01-05T04:41:11.050Z] [v0] ✅ Extracted price: 47.99 from string: "47.99"
+[2026-01-05T04:41:11.050Z] [v0] ✅ Extracted price from HTML: 47.99 (preserved decimals)
+[2026-01-05T04:41:11.051Z] [v0] 🔍 Checking price extraction conditions - htmlContent: true, length: 1476619, hostname: macys.com, isAmazon: false, isMacy: true, isTommy: false
+[2026-01-05T04:41:11.051Z] [v0] 🔍 Starting price extraction, htmlContent length: 1476619
+[2026-01-05T04:41:11.051Z] [v0] 🔍 Searching for Macy's specific price values (27.80 and 69.50)...
+[2026-01-05T04:41:11.051Z] [v0] HTML content length: 1476619
+[2026-01-05T04:41:11.051Z] [v0] Checking if HTML contains '27.80': false
+[2026-01-05T04:41:11.051Z] [v0] Pattern 0 matches: 0, pattern: /(?:27\.80|27\.8)[^\d]{0,200}(?:69\.50|69\.5)/gi
+[2026-01-05T04:41:11.052Z] [v0] Pattern 1 matches: 0, pattern: /(?:69\.50|69\.5)[^\d]{0,200}(?:27\.80|27\.8)/gi
+[2026-01-05T04:41:11.052Z] [v0] Pattern 2 matches: 0, pattern: /\$27\.80[^\d]{0,200}\$69\.50/gi
+[2026-01-05T04:41:11.052Z] [v0] Pattern 3 matches: 0, pattern: /\$69\.50[^\d]{0,200}\$27\.80/gi
+[2026-01-05T04:41:11.052Z] [v0] Pattern 4 matches: 0, pattern: /\$27\.80\s+\(60%\s+off\)\s*\$69\.50/gi
+[2026-01-05T04:41:11.052Z] [v0] Pattern 5 matches: 0, pattern: /27\.80\s+\(60%\s+off\)\s*69\.50/gi
+[2026-01-05T04:41:11.052Z] [v0] Pattern 6 matches: 0, pattern: /\$27\.80\s*\(60%\s*off\)\s*\$69\.50/gi
+[2026-01-05T04:41:11.052Z] [v0] Pattern 7 matches: 0, pattern: /27\.80[^\d]{0,100}60[^\d]{0,100}69\.50/gi
+[2026-01-05T04:41:11.052Z] [v0] Pattern 8 matches: 0, pattern: /\$27\.80[^\d]{0,100}60%[^\d]{0,100}\$69\.50/gi
+[2026-01-05T04:41:11.052Z] [v0] Pattern 9 matches: 0, pattern: /27\.8[0-9]?[^\d]{0,500}69\.5[0-9]?/gi
+[2026-01-05T04:41:11.052Z] [v0] Pattern 10 matches: 0, pattern: /69\.5[0-9]?[^\d]{0,500}27\.8[0-9]?/gi
+[2026-01-05T04:41:11.053Z] [v0] ⚠️ Macy's direct price search did not find 27.80 and 69.50 together
+[2026-01-05T04:41:11.053Z] [v0] Found 27.8x: not found
+[2026-01-05T04:41:11.053Z] [v0] Found 69.5x: not found
+[2026-01-05T04:41:11.053Z] [v0] 🔍 Trying fallback 1: searching for ANY Macy's format pattern...
+[2026-01-05T04:41:11.053Z] [v0] Extracted size from HTML: 5
+[2026-01-05T04:41:11.050Z] [v0] Hostname: macys.com, URL: https://www.macys.com/shop/product/lifestride-womens-teller-2-slingback-peep-toe-pumps?ID=17832715&s
+[2026-01-05T04:41:11.051Z] [v0] Checking if HTML contains '69.50': false
+[2026-01-05T04:41:11.053Z] [v0] 🔍 Trying fallback 2: searching for prices in data attributes...
+[2026-01-05T04:41:11.053Z] [v0] 🔍 Price extraction complete - originalPrice: null, salePrice: null, discountPercent: null
+[2026-01-05T04:41:11.053Z] [v0] 🚨 ABSOLUTE FINAL FIX: No salePrice found, using main price: 47.99
+[2026-01-05T04:41:11.572Z] [v0] === NON-AI EXTRACTION MODE ===
+[2026-01-05T04:41:11.572Z] [v0] Attempting to extract product name from URL: https://www.macys.com/shop/product/lifestride-womens-teller-2-slingback-peep-toe-pumps?ID=17832715&s
+[2026-01-05T04:41:11.572Z] [v0] ✅ Set imageUrl from structuredData: https://slimages.macysassets.com/is/image/MCY/products/6/optimized/27038506_fpx.tif?$filterlrg$&wid=
+[2026-01-05T04:41:11.572Z] [v0] ✅ Extracted price: 47.99 from string: "47.99"
+[2026-01-05T04:41:11.573Z] [v0] 🔍 Searching for Macy's specific price values (27.80 and 69.50)...
+[2026-01-05T04:41:11.573Z] [v0] Checking if HTML contains '69.50': false
+[2026-01-05T04:41:11.573Z] [v0] HTML content length: 1476619
+[2026-01-05T04:41:11.573Z] [v0] Checking if HTML contains '27.80': false
+[2026-01-05T04:41:11.573Z] [v0] Hostname: macys.com, URL: https://www.macys.com/shop/product/lifestride-womens-teller-2-slingback-peep-toe-pumps?ID=17832715&s
+[2026-01-05T04:41:11.573Z] [v0] Pattern 0 matches: 0, pattern: /(?:27\.80|27\.8)[^\d]{0,200}(?:69\.50|69\.5)/gi
+[2026-01-05T04:41:11.573Z] [v0] Pattern 1 matches: 0, pattern: /(?:69\.50|69\.5)[^\d]{0,200}(?:27\.80|27\.8)/gi
+[2026-01-05T04:41:11.573Z] [v0] Pattern 2 matches: 0, pattern: /\$27\.80[^\d]{0,200}\$69\.50/gi
+[2026-01-05T04:41:11.573Z] [v0] Pattern 3 matches: 0, pattern: /\$69\.50[^\d]{0,200}\$27\.80/gi
+[2026-01-05T04:41:11.573Z] [v0] Pattern 5 matches: 0, pattern: /27\.80\s+\(60%\s+off\)\s*69\.50/gi
+[2026-01-05T04:41:11.572Z] [v0] 🔍 Starting price extraction, htmlContent length: 1476619
+[2026-01-05T04:41:11.572Z] [v0] ✅ Extracted price from HTML: 47.99 (preserved decimals)
+[2026-01-05T04:41:11.572Z] [v0] 🔍 Checking price extraction conditions - htmlContent: true, length: 1476619, hostname: macys.com, isAmazon: false, isMacy: true, isTommy: false
+[2026-01-05T04:41:11.574Z] [v0] Pattern 8 matches: 0, pattern: /\$27\.80[^\d]{0,100}60%[^\d]{0,100}\$69\.50/gi
+[2026-01-05T04:41:11.574Z] [v0] Pattern 7 matches: 0, pattern: /27\.80[^\d]{0,100}60[^\d]{0,100}69\.50/gi
+[2026-01-05T04:41:11.574Z] [v0] Pattern 6 matches: 0, pattern: /\$27\.80\s*\(60%\s*off\)\s*\$69\.50/gi
+[2026-01-05T04:41:11.574Z] [v0] Pattern 4 matches: 0, pattern: /\$27\.80\s+\(60%\s+off\)\s*\$69\.50/gi
+[2026-01-05T04:41:11.574Z] [v0] Pattern 9 matches: 0, pattern: /27\.8[0-9]?[^\d]{0,500}69\.5[0-9]?/gi
+[2026-01-05T04:41:11.574Z] [v0] Pattern 10 matches: 0, pattern: /69\.5[0-9]?[^\d]{0,500}27\.8[0-9]?/gi
+[2026-01-05T04:41:11.574Z] [v0] ⚠️ Macy's direct price search did not find 27.80 and 69.50 together
+[2026-01-05T04:41:11.574Z] [v0] 🔍 Trying fallback 1: searching for ANY Macy's format pattern...
+[2026-01-05T04:41:11.574Z] [v0] Found 69.5x: not found
+[2026-01-05T04:41:11.575Z] [v0] Found 27.8x: not found
+[2026-01-05T04:41:11.575Z] [v0] 🔍 Trying fallback 2: searching for prices in data attributes...
+[2026-01-05T04:41:11.575Z] [v0] 🔍 Price extraction complete - originalPrice: null, salePrice: null, discountPercent: null
+[2026-01-05T04:41:11.575Z] [v0] Extracted size from HTML: 5
+[2026-01-05T04:41:11.575Z] [v0] 🚨 ABSOLUTE FINAL FIX: No salePrice found, using main price: 47.99
+[2026-01-05T04:59:53.244Z] [v0] Received product URL: https://www.amazon.com/dp/B0FQFWDL6Z/ref=twister_B0FQH8MTD1?_encoding=UTF8&th=1
+[2026-01-05T04:59:53.244Z] [v0] === Product extraction API called ===
+[2026-01-05T04:59:53.245Z] [v0] Received product URL: https://www.amazon.com/dp/B0FQFWDL6Z/ref=twister_B0FQH8MTD1?_encoding=UTF8&th=1
+[2026-01-05T04:59:53.246Z] [v0] === Product extraction API called ===
+[2026-01-05T04:59:55.563Z] [v0] Pattern 1 matched, raw URL: {}
+[2026-01-05T04:59:55.564Z] [v0] Found 0 URLs in JSON data
+[2026-01-05T04:59:55.564Z] [v0] 🔍 Searching for Amazon product image...
+[2026-01-05T04:59:55.564Z] [v0] ⚠️ Image URL doesn't contain media-amazon.com/images/I/: {}
+[2026-01-05T04:59:55.564Z] [v0] Pattern 7 matched, raw URL: {&quot;https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg&quot;:[522,522],&quot;https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX569_
+[2026-01-05T04:59:55.564Z] [v0] Found 7 URLs in JSON data
+[2026-01-05T04:59:55.565Z] [v0] ✅ Found Amazon product image candidate: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T04:59:55.564Z] [v0] ⚠️ Image URL doesn't contain media-amazon.com/images/I/: {}
+[2026-01-05T04:59:55.564Z] [v0] Found 0 URLs in JSON data
+[2026-01-05T04:59:55.564Z] [v0] Pattern 6 matched, raw URL: {}
+[2026-01-05T04:59:55.565Z] [v0] ✅ Set Amazon product image from landingImage/dynamic-image: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T04:59:55.565Z] [v0] === NON-AI EXTRACTION MODE ===
+[2026-01-05T04:59:55.565Z] [v0] Selected larger image: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T04:59:55.565Z] [v0] Hostname: amazon.com, URL: https://www.amazon.com/dp/B0FQFWDL6Z/ref=twister_B0FQH8MTD1?_encoding=UTF8&th=1
+[2026-01-05T04:59:55.565Z] [v0] ✅ Set imageUrl from structuredData: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T04:59:55.566Z] [v0] Extracting product name from HTML, length: 1599792
+[2026-01-05T04:59:55.566Z] [v0] ✅ Found Amazon product name: Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Li
+[2026-01-05T04:59:55.566Z] [v0] ✅ Extracted price: 451 from string: "451"
+[2026-01-05T04:59:55.566Z] [v0] ✅ Extracted price from HTML: 451 (preserved decimals)
+[2026-01-05T04:59:55.566Z] [v0] 🔍 Checking price extraction conditions - htmlContent: true, length: 1599792, hostname: amazon.com, isAmazon: true, isMacy: false, isTommy: false
+[2026-01-05T04:59:55.566Z] [v0] 🏪 Amazon URL detected - will use Amazon-specific price extraction
+[2026-01-05T04:59:55.567Z] [v0] 🔍 Starting Amazon price extraction, htmlContent length: 1599792
+[2026-01-05T04:59:55.567Z] [v0] ⚠️ Pattern 1 - No valid discount pattern found
+[2026-01-05T04:59:55.567Z] [v0] Pattern 1 - discountMatch: null, listPriceMatch: null
+[2026-01-05T04:59:55.567Z] [v0] 🔍 Pattern 4: Searching for specific Amazon price values (45.00 and 29.25)...
+[2026-01-05T04:59:55.567Z] [v0] ⚠️ Pattern 1 - No list price found
+[2026-01-05T04:59:55.567Z] [v0] HTML contains '45.00': false
+[2026-01-05T04:59:55.567Z] [v0] HTML contains '29.25': false
+[2026-01-05T04:59:55.567Z] [v0] 🔍 Amazon detected - extracting color from selected variant/HTML/product name
+[2026-01-05T04:59:55.567Z] [v0] Search text length: 461, contains 'Cranberry': false, contains 'Gloss': false
+[2026-01-05T04:59:55.567Z] [v0] Extracted description from HTML meta tag for color extraction: Buy Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Light Blush Sport 
+[2026-01-05T04:59:55.568Z] [v0] HTML contains 'List Price': true
+[2026-01-05T04:59:55.568Z] [v0] 🔍 Extracting material for Amazon product...
+[2026-01-05T04:59:55.568Z] [v0] ⚠️ Keeping better image from structuredData, rejecting bestImageUrl: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T04:59:55.568Z] [v0] Extracted size from HTML: l
+[2026-01-05T04:59:55.568Z] [v0] 🚨 ABSOLUTE FINAL FIX: No salePrice found, using main price: 451
+[2026-01-05T04:59:55.568Z] [v0] ✅ Extracted rating from aria-label: 4.4, review count: 92
+[2026-01-05T04:59:55.568Z] [v0] 📊 FINAL RATING VALUES - rating: 4.4, reviewCount: 92
+[2026-01-05T04:59:55.568Z] [v0] 🔍 Extracting Amazon rating and review count...
+[2026-01-05T04:59:55.568Z] [v0] 🔍 Checking for jewelry-specific attributes...
+[2026-01-05T04:59:55.568Z] [v0] ✅ Extracted material from product name: Rose Gold
+[2026-01-05T04:59:55.568Z] [v0] ✅ Extracted jewelry color: Rose Gold (overrode generic color)
+[2026-01-05T04:59:55.568Z] [v0] ⚠️ Skipping carat weight extraction - product appears to be metal-only jewelry (Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Light Blush Sport Band - M/L. Sleep Score, Fitness Tracker, Health Monitoring, Always-On Display, Water Resistant)
+[2026-01-05T04:59:56.037Z] [v0] 🔍 Searching for Amazon product image...
+[2026-01-05T04:59:56.037Z] [v0] Pattern 1 matched, raw URL: {}
+[2026-01-05T04:59:56.037Z] [v0] Found 0 URLs in JSON data
+[2026-01-05T04:59:56.037Z] [v0] ⚠️ Image URL doesn't contain media-amazon.com/images/I/: {}
+[2026-01-05T04:59:56.037Z] [v0] Pattern 6 matched, raw URL: {}
+[2026-01-05T04:59:56.037Z] [v0] ⚠️ Image URL doesn't contain media-amazon.com/images/I/: {}
+[2026-01-05T04:59:56.037Z] [v0] Found 7 URLs in JSON data
+[2026-01-05T04:59:56.038Z] [v0] Pattern 7 matched, raw URL: {&quot;https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg&quot;:[522,522],&quot;https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX569_
+[2026-01-05T04:59:56.038Z] [v0] Selected larger image: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T04:59:56.038Z] [v0] ✅ Found Amazon product image candidate: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T04:59:56.038Z] [v0] ✅ Set Amazon product image from landingImage/dynamic-image: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T04:59:56.038Z] [v0] Found 0 URLs in JSON data
+[2026-01-05T04:59:56.038Z] [v0] Hostname: amazon.com, URL: https://www.amazon.com/dp/B0FQFWDL6Z/ref=twister_B0FQH8MTD1?_encoding=UTF8&th=1
+[2026-01-05T04:59:56.038Z] [v0] ✅ Set imageUrl from structuredData: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T04:59:56.038Z] [v0] ✅ Found Amazon product name: Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Li
+[2026-01-05T04:59:56.038Z] [v0] Extracting product name from HTML, length: 1598620
+[2026-01-05T04:59:56.038Z] [v0] === NON-AI EXTRACTION MODE ===
+[2026-01-05T04:59:56.039Z] [v0] ✅ Extracted price: 451 from string: "451"
+[2026-01-05T04:59:56.039Z] [v0] ✅ Extracted price from HTML: 451 (preserved decimals)
+[2026-01-05T04:59:56.039Z] [v0] 🔍 Checking price extraction conditions - htmlContent: true, length: 1598620, hostname: amazon.com, isAmazon: true, isMacy: false, isTommy: false
+[2026-01-05T04:59:56.039Z] [v0] 🔍 Starting Amazon price extraction, htmlContent length: 1598620
+[2026-01-05T04:59:56.039Z] [v0] Pattern 1 - discountMatch: null, listPriceMatch: null
+[2026-01-05T04:59:56.039Z] [v0] ⚠️ Pattern 1 - No valid discount pattern found
+[2026-01-05T04:59:56.039Z] [v0] 🔍 Pattern 4: Searching for specific Amazon price values (45.00 and 29.25)...
+[2026-01-05T04:59:56.039Z] [v0] ⚠️ Pattern 1 - No list price found
+[2026-01-05T04:59:56.039Z] [v0] 🏪 Amazon URL detected - will use Amazon-specific price extraction
+[2026-01-05T04:59:56.039Z] [v0] HTML contains '45.00': false
+[2026-01-05T04:59:56.039Z] [v0] HTML contains '29.25': false
+[2026-01-05T04:59:56.040Z] [v0] HTML contains 'List Price': true
+[2026-01-05T04:59:56.040Z] [v0] Extracted description from HTML meta tag for color extraction: Buy Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Light Blush Sport 
+[2026-01-05T04:59:56.040Z] [v0] 🔍 Amazon detected - extracting color from selected variant/HTML/product name
+[2026-01-05T04:59:56.040Z] [v0] ⚠️ Keeping better image from structuredData, rejecting bestImageUrl: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T04:59:56.040Z] [v0] 🔍 Extracting material for Amazon product...
+[2026-01-05T04:59:56.040Z] [v0] Extracted size from HTML: l
+[2026-01-05T04:59:56.040Z] [v0] Search text length: 461, contains 'Cranberry': false, contains 'Gloss': false
+[2026-01-05T04:59:56.040Z] [v0] 🔍 Extracting Amazon rating and review count...
+[2026-01-05T04:59:56.040Z] [v0] ✅ Extracted rating from aria-label: 4.4, review count: 92
+[2026-01-05T04:59:56.040Z] [v0] 🚨 ABSOLUTE FINAL FIX: No salePrice found, using main price: 451
+[2026-01-05T04:59:56.040Z] [v0] 🔍 Checking for jewelry-specific attributes...
+[2026-01-05T04:59:56.041Z] [v0] 📊 FINAL RATING VALUES - rating: 4.4, reviewCount: 92
+[2026-01-05T04:59:56.041Z] [v0] ⚠️ Skipping carat weight extraction - product appears to be metal-only jewelry (Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Light Blush Sport Band - M/L. Sleep Score, Fitness Tracker, Health Monitoring, Always-On Display, Water Resistant)
+[2026-01-05T04:59:56.041Z] [v0] ✅ Extracted jewelry color: Rose Gold (overrode generic color)
+[2026-01-05T04:59:56.041Z] [v0] ✅ Extracted material from product name: Rose Gold
+[2026-01-05T05:13:05.341Z] [v0] === Product extraction API called ===
+[2026-01-05T05:13:05.342Z] [v0] Received product URL: https://www.amazon.com/dp/B0FQFWDL6Z/ref=twister_B0FQH8MTD1?_encoding=UTF8&th=1
+[2026-01-05T05:13:05.444Z] [v0] Received product URL: https://www.amazon.com/dp/B0FQFWDL6Z/ref=twister_B0FQH8MTD1?_encoding=UTF8&th=1
+[2026-01-05T05:13:05.444Z] [v0] === Product extraction API called ===
+[2026-01-05T05:13:07.564Z] [v0] Pattern 1 matched, raw URL: {}
+[2026-01-05T05:13:07.565Z] [v0] Pattern 6 matched, raw URL: {}
+[2026-01-05T05:13:07.564Z] [v0] Found 0 URLs in JSON data
+[2026-01-05T05:13:07.564Z] [v0] ⚠️ Image URL doesn't contain media-amazon.com/images/I/: {}
+[2026-01-05T05:13:07.565Z] [v0] Found 7 URLs in JSON data
+[2026-01-05T05:13:07.566Z] [v0] ✅ Found Amazon product image candidate: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:13:07.566Z] [v0] Selected larger image: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:13:07.565Z] [v0] Found 0 URLs in JSON data
+[2026-01-05T05:13:07.565Z] [v0] Pattern 7 matched, raw URL: {&quot;https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg&quot;:[522,522],&quot;https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX569_
+[2026-01-05T05:13:07.566Z] [v0] ✅ Set Amazon product image from landingImage/dynamic-image: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:13:07.565Z] [v0] ⚠️ Image URL doesn't contain media-amazon.com/images/I/: {}
+[2026-01-05T05:13:07.566Z] [v0] === NON-AI EXTRACTION MODE ===
+[2026-01-05T05:13:07.566Z] [v0] Hostname: amazon.com, URL: https://www.amazon.com/dp/B0FQFWDL6Z/ref=twister_B0FQH8MTD1?_encoding=UTF8&th=1
+[2026-01-05T05:13:07.566Z] [v0] ✅ Set imageUrl from structuredData: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:13:07.566Z] [v0] Extracting product name from HTML, length: 1601003
+[2026-01-05T05:13:07.566Z] [v0] ✅ Found Amazon product name: Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Li
+[2026-01-05T05:13:07.566Z] [v0] ✅ Extracted price: 451 from string: "451"
+[2026-01-05T05:13:07.567Z] [v0] ✅ Extracted price from HTML: 451 (preserved decimals)
+[2026-01-05T05:13:07.567Z] [v0] 🔍 Checking price extraction conditions - htmlContent: true, length: 1601003, hostname: amazon.com, isAmazon: true, isMacy: false, isTommy: false
+[2026-01-05T05:13:07.567Z] [v0] 🏪 Amazon URL detected - will use Amazon-specific price extraction
+[2026-01-05T05:13:07.567Z] [v0] 🔍 Starting Amazon price extraction, htmlContent length: 1601003
+[2026-01-05T05:13:07.567Z] [v0] Pattern 1 - discountMatch: null, listPriceMatch: null
+[2026-01-05T05:13:07.567Z] [v0] ⚠️ Pattern 1 - No list price found
+[2026-01-05T05:13:07.567Z] [v0] HTML contains '45.00': false
+[2026-01-05T05:13:07.568Z] [v0] HTML contains 'List Price': true
+[2026-01-05T05:13:07.568Z] [v0] 🔍 Amazon detected - extracting color from selected variant/HTML/product name
+[2026-01-05T05:13:07.568Z] [v0] Extracted description from HTML meta tag for color extraction: Buy Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Light Blush Sport 
+[2026-01-05T05:13:07.568Z] [v0] Search text length: 461, contains 'Cranberry': false, contains 'Gloss': false
+[2026-01-05T05:13:07.568Z] [v0] ⚠️ Keeping better image from structuredData, rejecting bestImageUrl: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:13:07.568Z] [v0] 🔍 Extracting material for Amazon product...
+[2026-01-05T05:13:07.568Z] [v0] Extracted size from HTML: l
+[2026-01-05T05:13:07.568Z] [v0] 🚨 ABSOLUTE FINAL FIX: No salePrice found, using main price: 451
+[2026-01-05T05:13:07.568Z] [v0] 🔍 Extracting Amazon rating and review count...
+[2026-01-05T05:13:07.568Z] [v0] ✅ Extracted rating from aria-label: 4.4, review count: 92
+[2026-01-05T05:13:07.569Z] [v0] 📊 FINAL RATING VALUES - rating: 4.4, reviewCount: 92
+[2026-01-05T05:13:07.569Z] [v0] 🔍 Checking for jewelry-specific attributes...
+[2026-01-05T05:13:07.569Z] [v0] ⚠️ Skipping carat weight extraction - product appears to be metal-only jewelry (Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Light Blush Sport Band - M/L. Sleep Score, Fitness Tracker, Health Monitoring, Always-On Display, Water Resistant)
+[2026-01-05T05:13:07.569Z] [v0] ✅ Extracted material from product name: Rose Gold
+[2026-01-05T05:13:07.569Z] [v0] ✅ Extracted jewelry color: Rose Gold (overrode generic color)
+[2026-01-05T05:13:07.570Z] [v0] HTML contains '29.25': false
+[2026-01-05T05:13:07.570Z] [v0] 🔍 Searching for Amazon product image...
+[2026-01-05T05:13:07.567Z] [v0] ⚠️ Pattern 1 - No valid discount pattern found
+[2026-01-05T05:13:07.567Z] [v0] 🔍 Pattern 4: Searching for specific Amazon price values (45.00 and 29.25)...
+[2026-01-05T05:13:08.152Z] [v0] 🔍 Searching for Amazon product image...
+[2026-01-05T05:13:08.152Z] [v0] Pattern 1 matched, raw URL: {}
+[2026-01-05T05:13:08.153Z] [v0] Found 0 URLs in JSON data
+[2026-01-05T05:13:08.153Z] [v0] ⚠️ Image URL doesn't contain media-amazon.com/images/I/: {}
+[2026-01-05T05:13:08.153Z] [v0] Pattern 6 matched, raw URL: {}
+[2026-01-05T05:13:08.153Z] [v0] Found 0 URLs in JSON data
+[2026-01-05T05:13:08.153Z] [v0] Pattern 7 matched, raw URL: {&quot;https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg&quot;:[522,522],&quot;https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX569_
+[2026-01-05T05:13:08.153Z] [v0] ⚠️ Image URL doesn't contain media-amazon.com/images/I/: {}
+[2026-01-05T05:13:08.153Z] [v0] Found 7 URLs in JSON data
+[2026-01-05T05:13:08.153Z] [v0] Selected larger image: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:13:08.153Z] [v0] ✅ Set Amazon product image from landingImage/dynamic-image: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:13:08.153Z] [v0] ✅ Found Amazon product image candidate: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:13:08.153Z] [v0] Hostname: amazon.com, URL: https://www.amazon.com/dp/B0FQFWDL6Z/ref=twister_B0FQH8MTD1?_encoding=UTF8&th=1
+[2026-01-05T05:13:08.153Z] [v0] === NON-AI EXTRACTION MODE ===
+[2026-01-05T05:13:08.154Z] [v0] ✅ Set imageUrl from structuredData: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:13:08.154Z] [v0] Extracting product name from HTML, length: 1950217
+[2026-01-05T05:13:08.154Z] [v0] ✅ Found Amazon product name: Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Li
+[2026-01-05T05:13:08.154Z] [v0] ✅ Extracted price: 451 from string: "451"
+[2026-01-05T05:13:08.154Z] [v0] 🔍 Checking price extraction conditions - htmlContent: true, length: 1950217, hostname: amazon.com, isAmazon: true, isMacy: false, isTommy: false
+[2026-01-05T05:13:08.154Z] [v0] ✅ Extracted price from HTML: 451 (preserved decimals)
+[2026-01-05T05:13:08.154Z] [v0] 🏪 Amazon URL detected - will use Amazon-specific price extraction
+[2026-01-05T05:13:08.154Z] [v0] 🔍 Starting Amazon price extraction, htmlContent length: 1950217
+[2026-01-05T05:13:08.154Z] [v0] Pattern 1 - discountMatch: null, listPriceMatch: null
+[2026-01-05T05:13:08.154Z] [v0] ⚠️ Pattern 1 - No valid discount pattern found
+[2026-01-05T05:13:08.154Z] [v0] 🔍 Pattern 4: Searching for specific Amazon price values (45.00 and 29.25)...
+[2026-01-05T05:13:08.154Z] [v0] ⚠️ Pattern 1 - No list price found
+[2026-01-05T05:13:08.154Z] [v0] HTML contains '45.00': false
+[2026-01-05T05:13:08.154Z] [v0] HTML contains '29.25': false
+[2026-01-05T05:13:08.155Z] [v0] HTML contains 'List Price': true
+[2026-01-05T05:13:08.155Z] [v0] 🔍 Amazon detected - extracting color from selected variant/HTML/product name
+[2026-01-05T05:13:08.155Z] [v0] Search text length: 461, contains 'Cranberry': false, contains 'Gloss': false
+[2026-01-05T05:13:08.155Z] [v0] Extracted description from HTML meta tag for color extraction: Buy Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Light Blush Sport 
+[2026-01-05T05:13:08.155Z] [v0] ⚠️ Keeping better image from structuredData, rejecting bestImageUrl: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:13:08.155Z] [v0] Extracted size from HTML: l
+[2026-01-05T05:13:08.155Z] [v0] 🚨 ABSOLUTE FINAL FIX: No salePrice found, using main price: 451
+[2026-01-05T05:13:08.155Z] [v0] 🔍 Extracting material for Amazon product...
+[2026-01-05T05:13:08.155Z] [v0] 🔍 Extracting Amazon rating and review count...
+[2026-01-05T05:13:08.155Z] [v0] ✅ Extracted rating from aria-label: 4.4, review count: 92
+[2026-01-05T05:13:08.155Z] [v0] 📊 FINAL RATING VALUES - rating: 4.4, reviewCount: 92
+[2026-01-05T05:13:08.155Z] [v0] 🔍 Checking for jewelry-specific attributes...
+[2026-01-05T05:13:08.155Z] [v0] ⚠️ Skipping carat weight extraction - product appears to be metal-only jewelry (Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Light Blush Sport Band - M/L. Sleep Score, Fitness Tracker, Health Monitoring, Always-On Display, Water Resistant)
+[2026-01-05T05:13:08.156Z] [v0] ✅ Extracted material from product name: Rose Gold
+[2026-01-05T05:13:08.156Z] [v0] ✅ Extracted jewelry color: Rose Gold (overrode generic color)
+[2026-01-05T05:17:11.060Z] [v0] Received product URL: https://www.amazon.com/dp/B0FQFWDL6Z/ref=twister_B0FQH8MTD1?_encoding=UTF8&th=1
+[2026-01-05T05:17:11.060Z] [v0] === Product extraction API called ===
+[2026-01-05T05:17:11.160Z] [v0] Received product URL: https://www.amazon.com/dp/B0FQFWDL6Z/ref=twister_B0FQH8MTD1?_encoding=UTF8&th=1
+[2026-01-05T05:17:11.160Z] [v0] === Product extraction API called ===
+[2026-01-05T05:17:13.915Z] [v0] 🔍 Searching for Amazon product image...
+[2026-01-05T05:17:13.915Z] [v0] Pattern 1 matched, raw URL: {}
+[2026-01-05T05:17:13.915Z] [v0] Found 0 URLs in JSON data
+[2026-01-05T05:17:13.915Z] [v0] ⚠️ Image URL doesn't contain media-amazon.com/images/I/: {}
+[2026-01-05T05:17:13.915Z] [v0] Pattern 6 matched, raw URL: {}
+[2026-01-05T05:17:13.916Z] [v0] Found 0 URLs in JSON data
+[2026-01-05T05:17:13.916Z] [v0] ⚠️ Image URL doesn't contain media-amazon.com/images/I/: {}
+[2026-01-05T05:17:13.916Z] [v0] Pattern 7 matched, raw URL: {&quot;https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg&quot;:[522,522],&quot;https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX569_
+[2026-01-05T05:17:13.916Z] [v0] Found 7 URLs in JSON data
+[2026-01-05T05:17:13.916Z] [v0] Selected larger image: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:17:13.916Z] [v0] ✅ Found Amazon product image candidate: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:17:13.917Z] [v0] === NON-AI EXTRACTION MODE ===
+[2026-01-05T05:17:13.917Z] [v0] Hostname: amazon.com, URL: https://www.amazon.com/dp/B0FQFWDL6Z/ref=twister_B0FQH8MTD1?_encoding=UTF8&th=1
+[2026-01-05T05:17:13.917Z] [v0] ✅ Set Amazon product image from landingImage/dynamic-image: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:17:13.917Z] [v0] ✅ Set imageUrl from structuredData: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:17:13.917Z] [v0] ✅ Found Amazon product name: Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Li
+[2026-01-05T05:17:13.918Z] [v0] ✅ Extracted price: 451 from string: "451"
+[2026-01-05T05:17:13.917Z] [v0] Extracting product name from HTML, length: 1950825
+[2026-01-05T05:17:13.918Z] [v0] 🔍 Checking price extraction conditions - htmlContent: true, length: 1950825, hostname: amazon.com, isAmazon: true, isMacy: false, isTommy: false
+[2026-01-05T05:17:13.918Z] [v0] ✅ Extracted price from HTML: 451 (preserved decimals)
+[2026-01-05T05:17:13.918Z] [v0] 🏪 Amazon URL detected - will use Amazon-specific price extraction
+[2026-01-05T05:17:13.918Z] [v0] 🔍 Starting Amazon price extraction, htmlContent length: 1950825
+[2026-01-05T05:17:13.918Z] [v0] Pattern 1 - discountMatch: null, listPriceMatch: null
+[2026-01-05T05:17:13.918Z] [v0] ⚠️ Pattern 1 - No valid discount pattern found
+[2026-01-05T05:17:13.918Z] [v0] ⚠️ Pattern 1 - No list price found
+[2026-01-05T05:17:13.919Z] [v0] 🔍 Pattern 4: Searching for specific Amazon price values (45.00 and 29.25)...
+[2026-01-05T05:17:13.919Z] [v0] HTML contains '45.00': false
+[2026-01-05T05:17:13.919Z] [v0] HTML contains '29.25': false
+[2026-01-05T05:17:13.919Z] [v0] ✅ Pattern 4 (0): Found price pair pattern: 4529
+[2026-01-05T05:17:13.919Z] [v0] HTML contains 'List Price': true
+[2026-01-05T05:17:13.919Z] [v0] ✅✅✅ SET AMAZON PRICES FROM PATTERN 4 (0) - original: $45.00, sale: $29.25, discount: 35% (fallback)
+[2026-01-05T05:17:13.919Z] [v0] 🔍 Amazon detected - extracting color from selected variant/HTML/product name
+[2026-01-05T05:17:13.919Z] [v0] Extracted description from HTML meta tag for color extraction: Buy Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Light Blush Sport 
+[2026-01-05T05:17:13.920Z] [v0] Search text length: 461, contains 'Cranberry': false, contains 'Gloss': false
+[2026-01-05T05:17:13.920Z] [v0] ⚠️ Keeping better image from structuredData, rejecting bestImageUrl: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:17:13.920Z] [v0] 🔍 Extracting material for Amazon product...
+[2026-01-05T05:17:13.920Z] [v0] Extracted size from HTML: l
+[2026-01-05T05:17:13.920Z] [v0] 🚨 ABSOLUTE FINAL FIX: salePrice 29.25 differs by 93.5% from main price 451 - correcting to main price
+[2026-01-05T05:17:13.920Z] [v0] 🔍 Extracting Amazon rating and review count...
+[2026-01-05T05:17:13.921Z] [v0] 📊 FINAL RATING VALUES - rating: 4.4, reviewCount: 92
+[2026-01-05T05:17:13.925Z] [v0] ✅ Extracted material from product name: Rose Gold
+[2026-01-05T05:17:13.925Z] [v0] ✅ Extracted jewelry color: Rose Gold (overrode generic color)
+[2026-01-05T05:17:13.924Z] [v0] 🔍 Checking for jewelry-specific attributes...
+[2026-01-05T05:17:13.925Z] [v0] ⚠️ Skipping carat weight extraction - product appears to be metal-only jewelry (Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Light Blush Sport Band - M/L. Sleep Score, Fitness Tracker, Health Monitoring, Always-On Display, Water Resistant)
+[2026-01-05T05:17:13.922Z] [v0] ✅ Extracted rating from aria-label: 4.4, review count: 92
+[2026-01-05T05:17:14.432Z] [v0] 🔍 Searching for Amazon product image...
+[2026-01-05T05:17:14.432Z] [v0] Pattern 1 matched, raw URL: {}
+[2026-01-05T05:17:14.432Z] [v0] Found 0 URLs in JSON data
+[2026-01-05T05:17:14.433Z] [v0] Pattern 6 matched, raw URL: {}
+[2026-01-05T05:17:14.433Z] [v0] Found 0 URLs in JSON data
+[2026-01-05T05:17:14.433Z] [v0] ⚠️ Image URL doesn't contain media-amazon.com/images/I/: {}
+[2026-01-05T05:17:14.433Z] [v0] Pattern 7 matched, raw URL: {&quot;https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg&quot;:[522,522],&quot;https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX569_
+[2026-01-05T05:17:14.433Z] [v0] Found 7 URLs in JSON data
+[2026-01-05T05:17:14.433Z] [v0] Selected larger image: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:17:14.433Z] [v0] ✅ Found Amazon product image candidate: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:17:14.433Z] [v0] ✅ Set Amazon product image from landingImage/dynamic-image: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:17:14.433Z] [v0] === NON-AI EXTRACTION MODE ===
+[2026-01-05T05:17:14.433Z] [v0] Hostname: amazon.com, URL: https://www.amazon.com/dp/B0FQFWDL6Z/ref=twister_B0FQH8MTD1?_encoding=UTF8&th=1
+[2026-01-05T05:17:14.434Z] [v0] ✅ Set imageUrl from structuredData: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:17:14.434Z] [v0] Extracting product name from HTML, length: 1598721
+[2026-01-05T05:17:14.434Z] [v0] ✅ Found Amazon product name: Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Li
+[2026-01-05T05:17:14.434Z] [v0] ✅ Extracted price: 451 from string: "451"
+[2026-01-05T05:17:14.434Z] [v0] ✅ Extracted price from HTML: 451 (preserved decimals)
+[2026-01-05T05:17:14.434Z] [v0] 🔍 Checking price extraction conditions - htmlContent: true, length: 1598721, hostname: amazon.com, isAmazon: true, isMacy: false, isTommy: false
+[2026-01-05T05:17:14.434Z] [v0] 🏪 Amazon URL detected - will use Amazon-specific price extraction
+[2026-01-05T05:17:14.434Z] [v0] 🔍 Starting Amazon price extraction, htmlContent length: 1598721
+[2026-01-05T05:17:14.434Z] [v0] Pattern 1 - discountMatch: null, listPriceMatch: null
+[2026-01-05T05:17:14.434Z] [v0] ⚠️ Pattern 1 - No valid discount pattern found
+[2026-01-05T05:17:14.435Z] [v0] ⚠️ Pattern 1 - No list price found
+[2026-01-05T05:17:14.435Z] [v0] 🔍 Pattern 4: Searching for specific Amazon price values (45.00 and 29.25)...
+[2026-01-05T05:17:14.435Z] [v0] HTML contains '29.25': false
+[2026-01-05T05:17:14.435Z] [v0] HTML contains 'List Price': true
+[2026-01-05T05:17:14.435Z] [v0] 🔍 Amazon detected - extracting color from selected variant/HTML/product name
+[2026-01-05T05:17:14.435Z] [v0] HTML contains '45.00': false
+[2026-01-05T05:17:14.435Z] [v0] Search text length: 461, contains 'Cranberry': false, contains 'Gloss': false
+[2026-01-05T05:17:14.435Z] [v0] ⚠️ Keeping better image from structuredData, rejecting bestImageUrl: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:17:14.435Z] [v0] Extracted size from HTML: l
+[2026-01-05T05:17:14.435Z] [v0] 🚨 ABSOLUTE FINAL FIX: No salePrice found, using main price: 451
+[2026-01-05T05:17:14.435Z] [v0] 🔍 Extracting Amazon rating and review count...
+[2026-01-05T05:17:14.435Z] [v0] ✅ Extracted rating from aria-label: 4.4, review count: 92
+[2026-01-05T05:17:14.436Z] [v0] 🔍 Extracting material for Amazon product...
+[2026-01-05T05:17:14.436Z] [v0] 📊 FINAL RATING VALUES - rating: 4.4, reviewCount: 92
+[2026-01-05T05:17:14.436Z] [v0] ⚠️ Skipping carat weight extraction - product appears to be metal-only jewelry (Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Light Blush Sport Band - M/L. Sleep Score, Fitness Tracker, Health Monitoring, Always-On Display, Water Resistant)
+[2026-01-05T05:17:14.436Z] [v0] 🔍 Checking for jewelry-specific attributes...
+[2026-01-05T05:17:14.436Z] [v0] ✅ Extracted material from product name: Rose Gold
+[2026-01-05T05:17:14.436Z] [v0] ✅ Extracted jewelry color: Rose Gold (overrode generic color)
+[2026-01-05T05:17:14.436Z] [v0] ⚠️ Image URL doesn't contain media-amazon.com/images/I/: {}
+[2026-01-05T05:17:14.436Z] [v0] Extracted description from HTML meta tag for color extraction: Buy Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Light Blush Sport 
+[2026-01-05T05:24:59.219Z] [v0] === Product extraction API called ===
+[2026-01-05T05:24:59.219Z] [v0] Received product URL: https://www.amazon.com/dp/B0FQFWDL6Z/ref=twister_B0FQH8MTD1?_encoding=UTF8&th=1
+[2026-01-05T05:24:59.318Z] [v0] === Product extraction API called ===
+[2026-01-05T05:24:59.319Z] [v0] Received product URL: https://www.amazon.com/dp/B0FQFWDL6Z/ref=twister_B0FQH8MTD1?_encoding=UTF8&th=1
+[2026-01-05T05:25:02.528Z] [v0] 🔍 Searching for Amazon product image...
+[2026-01-05T05:25:02.528Z] [v0] Found 0 URLs in JSON data
+[2026-01-05T05:25:02.528Z] [v0] ⚠️ Image URL doesn't contain media-amazon.com/images/I/: {}
+[2026-01-05T05:25:02.528Z] [v0] Pattern 6 matched, raw URL: {}
+[2026-01-05T05:25:02.528Z] [v0] Found 0 URLs in JSON data
+[2026-01-05T05:25:02.528Z] [v0] ⚠️ Image URL doesn't contain media-amazon.com/images/I/: {}
+[2026-01-05T05:25:02.529Z] [v0] Pattern 7 matched, raw URL: {&quot;https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg&quot;:[522,522],&quot;https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX569_
+[2026-01-05T05:25:02.529Z] [v0] Selected larger image: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:25:02.529Z] [v0] ✅ Found Amazon product image candidate: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:25:02.529Z] [v0] ✅ Set Amazon product image from landingImage/dynamic-image: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:25:02.529Z] [v0] === NON-AI EXTRACTION MODE ===
+[2026-01-05T05:25:02.529Z] [v0] Found 7 URLs in JSON data
+[2026-01-05T05:25:02.529Z] [v0] Hostname: amazon.com, URL: https://www.amazon.com/dp/B0FQFWDL6Z/ref=twister_B0FQH8MTD1?_encoding=UTF8&th=1
+[2026-01-05T05:25:02.530Z] [v0] ✅ Set imageUrl from structuredData: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:25:02.530Z] [v0] ✅ Found Amazon product name: Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Li
+[2026-01-05T05:25:02.530Z] [v0] ✅ Extracted price: 451 from string: "451"
+[2026-01-05T05:25:02.530Z] [v0] ✅ Extracted price from HTML: 451 (preserved decimals)
+[2026-01-05T05:25:02.530Z] [v0] 🔍 Checking price extraction conditions - htmlContent: true, length: 1950849, hostname: amazon.com, isAmazon: true, isMacy: false, isTommy: false
+[2026-01-05T05:25:02.530Z] [v0] 🏪 Amazon URL detected - will use Amazon-specific price extraction
+[2026-01-05T05:25:02.530Z] [v0] 🔍 Starting Amazon price extraction, htmlContent length: 1950849
+[2026-01-05T05:25:02.530Z] [v0] ⚠️ Pattern 1 - No valid discount pattern found
+[2026-01-05T05:25:02.530Z] [v0] Pattern 1 - discountMatch: null, listPriceMatch: null
+[2026-01-05T05:25:02.530Z] [v0] Extracting product name from HTML, length: 1950849
+[2026-01-05T05:25:02.530Z] [v0] ⚠️ Pattern 1 - No list price found
+[2026-01-05T05:25:02.531Z] [v0] Pattern 1 matched, raw URL: {}
+[2026-01-05T05:25:02.531Z] [v0] HTML contains 'List Price': true
+[2026-01-05T05:25:02.531Z] [v0] 🔍 Amazon detected - extracting color from selected variant/HTML/product name
+[2026-01-05T05:25:02.531Z] [v0] HTML contains '45.00': false
+[2026-01-05T05:25:02.531Z] [v0] Extracted description from HTML meta tag for color extraction: Buy Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Light Blush Sport 
+[2026-01-05T05:25:02.531Z] [v0] Search text length: 461, contains 'Cranberry': false, contains 'Gloss': false
+[2026-01-05T05:25:02.531Z] [v0] ⚠️ Keeping better image from structuredData, rejecting bestImageUrl: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:25:02.532Z] [v0] 🔍 Extracting material for Amazon product...
+[2026-01-05T05:25:02.532Z] [v0] Extracted size from HTML: l
+[2026-01-05T05:25:02.532Z] [v0] 🚨 ABSOLUTE FINAL FIX: No salePrice found, using main price: 451
+[2026-01-05T05:25:02.532Z] [v0] 🔍 Extracting Amazon rating and review count...
+[2026-01-05T05:25:02.532Z] [v0] ✅ Extracted rating from aria-label: 4.4, review count: 92
+[2026-01-05T05:25:02.532Z] [v0] 📊 FINAL RATING VALUES - rating: 4.4, reviewCount: 92
+[2026-01-05T05:25:02.532Z] [v0] 🔍 Checking for jewelry-specific attributes...
+[2026-01-05T05:25:02.533Z] [v0] ✅ Extracted material from product name: Rose Gold
+[2026-01-05T05:25:02.533Z] [v0] HTML contains '29.25': false
+[2026-01-05T05:25:02.533Z] [v0] ⚠️ Skipping carat weight extraction - product appears to be metal-only jewelry (Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Light Blush Sport Band - M/L. Sleep Score, Fitness Tracker, Health Monitoring, Always-On Display, Water Resistant)
+[2026-01-05T05:25:02.533Z] [v0] 🔍 Pattern 4: Searching for specific Amazon price values (45.00 and 29.25)...
+[2026-01-05T05:25:02.533Z] [v0] ✅ Extracted jewelry color: Rose Gold (overrode generic color)
+[2026-01-05T05:25:02.983Z] [v0] Pattern 1 matched, raw URL: {}
+[2026-01-05T05:25:02.983Z] [v0] Found 0 URLs in JSON data
+[2026-01-05T05:25:02.983Z] [v0] 🔍 Searching for Amazon product image...
+[2026-01-05T05:25:02.983Z] [v0] ⚠️ Image URL doesn't contain media-amazon.com/images/I/: {}
+[2026-01-05T05:25:02.983Z] [v0] Pattern 6 matched, raw URL: {}
+[2026-01-05T05:25:02.984Z] [v0] Found 0 URLs in JSON data
+[2026-01-05T05:25:02.984Z] [v0] ⚠️ Image URL doesn't contain media-amazon.com/images/I/: {}
+[2026-01-05T05:25:02.984Z] [v0] Pattern 7 matched, raw URL: {&quot;https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg&quot;:[522,522],&quot;https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX569_
+[2026-01-05T05:25:02.984Z] [v0] Found 7 URLs in JSON data
+[2026-01-05T05:25:02.984Z] [v0] Selected larger image: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:25:02.984Z] [v0] ✅ Found Amazon product image candidate: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:25:02.984Z] [v0] ✅ Set Amazon product image from landingImage/dynamic-image: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:25:02.984Z] [v0] === NON-AI EXTRACTION MODE ===
+[2026-01-05T05:25:02.984Z] [v0] Hostname: amazon.com, URL: https://www.amazon.com/dp/B0FQFWDL6Z/ref=twister_B0FQH8MTD1?_encoding=UTF8&th=1
+[2026-01-05T05:25:02.985Z] [v0] ✅ Set imageUrl from structuredData: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:25:02.985Z] [v0] Extracting product name from HTML, length: 1950856
+[2026-01-05T05:25:02.985Z] [v0] ✅ Found Amazon product name: Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Li
+[2026-01-05T05:25:02.985Z] [v0] ✅ Extracted price: 451 from string: "451"
+[2026-01-05T05:25:02.985Z] [v0] ✅ Extracted price from HTML: 451 (preserved decimals)
+[2026-01-05T05:25:02.985Z] [v0] 🔍 Checking price extraction conditions - htmlContent: true, length: 1950856, hostname: amazon.com, isAmazon: true, isMacy: false, isTommy: false
+[2026-01-05T05:25:02.985Z] [v0] 🏪 Amazon URL detected - will use Amazon-specific price extraction
+[2026-01-05T05:25:02.985Z] [v0] 🔍 Starting Amazon price extraction, htmlContent length: 1950856
+[2026-01-05T05:25:02.985Z] [v0] Pattern 1 - discountMatch: null, listPriceMatch: null
+[2026-01-05T05:25:02.986Z] [v0] ⚠️ Pattern 1 - No valid discount pattern found
+[2026-01-05T05:25:02.986Z] [v0] ⚠️ Pattern 1 - No list price found
+[2026-01-05T05:25:02.986Z] [v0] HTML contains '45.00': false
+[2026-01-05T05:25:02.986Z] [v0] 🔍 Pattern 4: Searching for specific Amazon price values (45.00 and 29.25)...
+[2026-01-05T05:25:02.986Z] [v0] HTML contains '29.25': false
+[2026-01-05T05:25:02.986Z] [v0] HTML contains 'List Price': true
+[2026-01-05T05:25:02.986Z] [v0] 🔍 Amazon detected - extracting color from selected variant/HTML/product name
+[2026-01-05T05:25:02.988Z] [v0] Extracted description from HTML meta tag for color extraction: Buy Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Light Blush Sport 
+[2026-01-05T05:25:02.988Z] [v0] Search text length: 461, contains 'Cranberry': false, contains 'Gloss': false
+[2026-01-05T05:25:02.988Z] [v0] ⚠️ Keeping better image from structuredData, rejecting bestImageUrl: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:25:02.988Z] [v0] 🔍 Extracting material for Amazon product...
+[2026-01-05T05:25:02.989Z] [v0] Extracted size from HTML: l
+[2026-01-05T05:25:02.989Z] [v0] 🚨 ABSOLUTE FINAL FIX: No salePrice found, using main price: 451
+[2026-01-05T05:25:02.989Z] [v0] 🔍 Extracting Amazon rating and review count...
+[2026-01-05T05:25:02.989Z] [v0] ✅ Extracted rating from aria-label: 4.4, review count: 92
+[2026-01-05T05:25:02.989Z] [v0] 📊 FINAL RATING VALUES - rating: 4.4, reviewCount: 92
+[2026-01-05T05:25:02.989Z] [v0] 🔍 Checking for jewelry-specific attributes...
+[2026-01-05T05:25:02.989Z] [v0] ⚠️ Skipping carat weight extraction - product appears to be metal-only jewelry (Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Light Blush Sport Band - M/L. Sleep Score, Fitness Tracker, Health Monitoring, Always-On Display, Water Resistant)
+[2026-01-05T05:25:02.989Z] [v0] ✅ Extracted material from product name: Rose Gold
+[2026-01-05T05:25:02.990Z] [v0] ✅ Extracted jewelry color: Rose Gold (overrode generic color)
+[2026-01-05T05:27:43.299Z] [v0] === Product extraction API called ===
+[2026-01-05T05:27:43.299Z] [v0] Received product URL: https://www.amazon.com/dp/B0FQFWDL6Z/ref=twister_B0FQH8MTD1?_encoding=UTF8&th=1
+[2026-01-05T05:27:43.405Z] [v0] Received product URL: https://www.amazon.com/dp/B0FQFWDL6Z/ref=twister_B0FQH8MTD1?_encoding=UTF8&th=1
+[2026-01-05T05:27:43.405Z] [v0] === Product extraction API called ===
+[2026-01-05T05:27:45.544Z] [v0] 🔍 Searching for Amazon product image...
+[2026-01-05T05:27:45.544Z] [v0] Pattern 1 matched, raw URL: {}
+[2026-01-05T05:27:45.544Z] [v0] Found 0 URLs in JSON data
+[2026-01-05T05:27:45.545Z] [v0] Pattern 6 matched, raw URL: {}
+[2026-01-05T05:27:45.545Z] [v0] Found 0 URLs in JSON data
+[2026-01-05T05:27:45.546Z] [v0] ⚠️ Image URL doesn't contain media-amazon.com/images/I/: {}
+[2026-01-05T05:27:45.546Z] [v0] Pattern 7 matched, raw URL: {&quot;https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg&quot;:[522,522],&quot;https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX569_
+[2026-01-05T05:27:45.546Z] [v0] Selected larger image: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:27:45.546Z] [v0] ✅ Found Amazon product image candidate: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:27:45.546Z] [v0] ✅ Set Amazon product image from landingImage/dynamic-image: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:27:45.547Z] [v0] === NON-AI EXTRACTION MODE ===
+[2026-01-05T05:27:45.547Z] [v0] Hostname: amazon.com, URL: https://www.amazon.com/dp/B0FQFWDL6Z/ref=twister_B0FQH8MTD1?_encoding=UTF8&th=1
+[2026-01-05T05:27:45.547Z] [v0] ✅ Set imageUrl from structuredData: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:27:45.547Z] [v0] Extracting product name from HTML, length: 1599234
+[2026-01-05T05:27:45.547Z] [v0] ✅ Found Amazon product name: Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Li
+[2026-01-05T05:27:45.547Z] [v0] ✅ Extracted price: 451 from string: "451"
+[2026-01-05T05:27:45.547Z] [v0] ✅ Extracted price from HTML: 451 (preserved decimals)
+[2026-01-05T05:27:45.547Z] [v0] 🔍 Checking price extraction conditions - htmlContent: true, length: 1599234, hostname: amazon.com, isAmazon: true, isMacy: false, isTommy: false
+[2026-01-05T05:27:45.547Z] [v0] 🏪 Amazon URL detected - will use Amazon-specific price extraction
+[2026-01-05T05:27:45.548Z] [v0] 🔍 Starting Amazon price extraction, htmlContent length: 1599234
+[2026-01-05T05:27:45.546Z] [v0] Found 7 URLs in JSON data
+[2026-01-05T05:27:45.548Z] [v0] ⚠️ Pattern 1 - No valid discount pattern found
+[2026-01-05T05:27:45.549Z] [v0] HTML contains '45.00': false
+[2026-01-05T05:27:45.549Z] [v0] HTML contains 'List Price': true
+[2026-01-05T05:27:45.550Z] [v0] HTML contains '29.25': false
+[2026-01-05T05:27:45.550Z] [v0] Extracted description from HTML meta tag for color extraction: Buy Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Light Blush Sport 
+[2026-01-05T05:27:45.551Z] [v0] 🔍 Amazon detected - extracting color from selected variant/HTML/product name
+[2026-01-05T05:27:45.551Z] [v0] ⚠️ Keeping better image from structuredData, rejecting bestImageUrl: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:27:45.551Z] [v0] Search text length: 461, contains 'Cranberry': false, contains 'Gloss': false
+[2026-01-05T05:27:45.548Z] [v0] Pattern 1 - discountMatch: null, listPriceMatch: null
+[2026-01-05T05:27:45.551Z] [v0] 🔍 Extracting material for Amazon product...
+[2026-01-05T05:27:45.548Z] [v0] ⚠️ Pattern 1 - No list price found
+[2026-01-05T05:27:45.548Z] [v0] 🔍 Pattern 4: Searching for specific Amazon price values (45.00 and 29.25)...
+[2026-01-05T05:27:45.551Z] [v0] Extracted size from HTML: l
+[2026-01-05T05:27:45.551Z] [v0] 🚨 ABSOLUTE FINAL FIX: No salePrice found, using main price: 451
+[2026-01-05T05:27:45.551Z] [v0] 🔍 Extracting Amazon rating and review count...
+[2026-01-05T05:27:45.551Z] [v0] ✅ Extracted rating from aria-label: 4.4, review count: 92
+[2026-01-05T05:27:45.552Z] [v0] 📊 FINAL RATING VALUES - rating: 4.4, reviewCount: 92
+[2026-01-05T05:27:45.552Z] [v0] 🔍 Checking for jewelry-specific attributes...
+[2026-01-05T05:27:45.552Z] [v0] ⚠️ Skipping carat weight extraction - product appears to be metal-only jewelry (Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Light Blush Sport Band - M/L. Sleep Score, Fitness Tracker, Health Monitoring, Always-On Display, Water Resistant)
+[2026-01-05T05:27:45.552Z] [v0] ✅ Extracted material from product name: Rose Gold
+[2026-01-05T05:27:45.552Z] [v0] ✅ Extracted jewelry color: Rose Gold (overrode generic color)
+[2026-01-05T05:27:45.553Z] [v0] ⚠️ Image URL doesn't contain media-amazon.com/images/I/: {}
+[2026-01-05T05:27:46.053Z] [v0] Pattern 1 matched, raw URL: {}
+[2026-01-05T05:27:46.053Z] [v0] 🔍 Searching for Amazon product image...
+[2026-01-05T05:27:46.053Z] [v0] ⚠️ Image URL doesn't contain media-amazon.com/images/I/: {}
+[2026-01-05T05:27:46.053Z] [v0] Found 0 URLs in JSON data
+[2026-01-05T05:27:46.054Z] [v0] Pattern 6 matched, raw URL: {}
+[2026-01-05T05:27:46.054Z] [v0] ⚠️ Image URL doesn't contain media-amazon.com/images/I/: {}
+[2026-01-05T05:27:46.054Z] [v0] Found 0 URLs in JSON data
+[2026-01-05T05:27:46.054Z] [v0] Pattern 7 matched, raw URL: {&quot;https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg&quot;:[522,522],&quot;https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX569_
+[2026-01-05T05:27:46.054Z] [v0] Found 7 URLs in JSON data
+[2026-01-05T05:27:46.054Z] [v0] Selected larger image: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:27:46.054Z] [v0] ✅ Set Amazon product image from landingImage/dynamic-image: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:27:46.054Z] [v0] ✅ Found Amazon product image candidate: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:27:46.054Z] [v0] Hostname: amazon.com, URL: https://www.amazon.com/dp/B0FQFWDL6Z/ref=twister_B0FQH8MTD1?_encoding=UTF8&th=1
+[2026-01-05T05:27:46.055Z] [v0] === NON-AI EXTRACTION MODE ===
+[2026-01-05T05:27:46.055Z] [v0] ✅ Set imageUrl from structuredData: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:27:46.055Z] [v0] Extracting product name from HTML, length: 1598916
+[2026-01-05T05:27:46.055Z] [v0] ✅ Extracted price: 451 from string: "451"
+[2026-01-05T05:27:46.055Z] [v0] ✅ Found Amazon product name: Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Li
+[2026-01-05T05:27:46.055Z] [v0] ✅ Extracted price from HTML: 451 (preserved decimals)
+[2026-01-05T05:27:46.055Z] [v0] 🔍 Checking price extraction conditions - htmlContent: true, length: 1598916, hostname: amazon.com, isAmazon: true, isMacy: false, isTommy: false
+[2026-01-05T05:27:46.055Z] [v0] 🏪 Amazon URL detected - will use Amazon-specific price extraction
+[2026-01-05T05:27:46.055Z] [v0] 🔍 Starting Amazon price extraction, htmlContent length: 1598916
+[2026-01-05T05:27:46.055Z] [v0] Pattern 1 - discountMatch: null, listPriceMatch: null
+[2026-01-05T05:27:46.055Z] [v0] ⚠️ Pattern 1 - No valid discount pattern found
+[2026-01-05T05:27:46.055Z] [v0] 🔍 Pattern 4: Searching for specific Amazon price values (45.00 and 29.25)...
+[2026-01-05T05:27:46.056Z] [v0] ⚠️ Pattern 1 - No list price found
+[2026-01-05T05:27:46.056Z] [v0] HTML contains '45.00': false
+[2026-01-05T05:27:46.056Z] [v0] HTML contains 'List Price': true
+[2026-01-05T05:27:46.056Z] [v0] HTML contains '29.25': false
+[2026-01-05T05:27:46.056Z] [v0] Search text length: 461, contains 'Cranberry': false, contains 'Gloss': false
+[2026-01-05T05:27:46.056Z] [v0] 🔍 Amazon detected - extracting color from selected variant/HTML/product name
+[2026-01-05T05:27:46.056Z] [v0] ⚠️ Keeping better image from structuredData, rejecting bestImageUrl: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:27:46.056Z] [v0] Extracted description from HTML meta tag for color extraction: Buy Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Light Blush Sport 
+[2026-01-05T05:27:46.056Z] [v0] Extracted size from HTML: l
+[2026-01-05T05:27:46.056Z] [v0] 🔍 Extracting material for Amazon product...
+[2026-01-05T05:27:46.056Z] [v0] 🚨 ABSOLUTE FINAL FIX: No salePrice found, using main price: 451
+[2026-01-05T05:27:46.057Z] [v0] 🔍 Extracting Amazon rating and review count...
+[2026-01-05T05:27:46.057Z] [v0] ✅ Extracted rating from aria-label: 4.4, review count: 92
+[2026-01-05T05:27:46.057Z] [v0] 📊 FINAL RATING VALUES - rating: 4.4, reviewCount: 92
+[2026-01-05T05:27:46.057Z] [v0] 🔍 Checking for jewelry-specific attributes...
+[2026-01-05T05:27:46.057Z] [v0] ⚠️ Skipping carat weight extraction - product appears to be metal-only jewelry (Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Light Blush Sport Band - M/L. Sleep Score, Fitness Tracker, Health Monitoring, Always-On Display, Water Resistant)
+[2026-01-05T05:27:46.057Z] [v0] ✅ Extracted material from product name: Rose Gold
+[2026-01-05T05:27:46.057Z] [v0] ✅ Extracted jewelry color: Rose Gold (overrode generic color)
+[2026-01-05T05:35:30.923Z] [v0] === Product extraction API called ===
+[2026-01-05T05:35:30.923Z] [v0] Received product URL: https://www.amazon.com/dp/B0FQFWDL6Z/ref=twister_B0FQH8MTD1?_encoding=UTF8&th=1
+[2026-01-05T05:35:31.036Z] [v0] === Product extraction API called ===
+[2026-01-05T05:35:31.037Z] [v0] Received product URL: https://www.amazon.com/dp/B0FQFWDL6Z/ref=twister_B0FQH8MTD1?_encoding=UTF8&th=1
+[2026-01-05T05:35:33.367Z] [v0] 🔍 Searching for Amazon product image...
+[2026-01-05T05:35:33.367Z] [v0] Pattern 1 matched, raw URL: {}
+[2026-01-05T05:35:33.368Z] [v0] ⚠️ Image URL doesn't contain media-amazon.com/images/I/: {}
+[2026-01-05T05:35:33.368Z] [v0] Pattern 6 matched, raw URL: {}
+[2026-01-05T05:35:33.367Z] [v0] Found 0 URLs in JSON data
+[2026-01-05T05:35:33.368Z] [v0] Found 0 URLs in JSON data
+[2026-01-05T05:35:33.368Z] [v0] ⚠️ Image URL doesn't contain media-amazon.com/images/I/: {}
+[2026-01-05T05:35:33.368Z] [v0] Pattern 7 matched, raw URL: {&quot;https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg&quot;:[522,522],&quot;https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX569_
+[2026-01-05T05:35:33.368Z] [v0] Found 7 URLs in JSON data
+[2026-01-05T05:35:33.368Z] [v0] Selected larger image: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:35:33.368Z] [v0] ✅ Found Amazon product image candidate: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:35:33.368Z] [v0] ✅ Set Amazon product image from landingImage/dynamic-image: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:35:33.368Z] [v0] === NON-AI EXTRACTION MODE ===
+[2026-01-05T05:35:33.368Z] [v0] Hostname: amazon.com, URL: https://www.amazon.com/dp/B0FQFWDL6Z/ref=twister_B0FQH8MTD1?_encoding=UTF8&th=1
+[2026-01-05T05:35:33.368Z] [v0] ✅ Set imageUrl from structuredData: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:35:33.369Z] [v0] Extracting product name from HTML, length: 1599752
+[2026-01-05T05:35:33.369Z] [v0] ✅ Found Amazon product name: Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Li
+[2026-01-05T05:35:33.369Z] [v0] ✅ Extracted price: 451 from string: "451"
+[2026-01-05T05:35:33.369Z] [v0] ✅ Extracted price from HTML: 451 (preserved decimals)
+[2026-01-05T05:35:33.369Z] [v0] 🔍 Checking price extraction conditions - htmlContent: true, length: 1599752, hostname: amazon.com, isAmazon: true, isMacy: false, isTommy: false
+[2026-01-05T05:35:33.369Z] [v0] 🏪 Amazon URL detected - will use Amazon-specific price extraction
+[2026-01-05T05:35:33.369Z] [v0] 🔍 Starting Amazon price extraction, htmlContent length: 1599752
+[2026-01-05T05:35:33.369Z] [v0] Pattern 1 - discountMatch: null, listPriceMatch: null
+[2026-01-05T05:35:33.370Z] [v0] ⚠️ Pattern 1 - No valid discount pattern found
+[2026-01-05T05:35:33.370Z] [v0] ⚠️ Pattern 1 - No list price found
+[2026-01-05T05:35:33.370Z] [v0] HTML contains '45.00': false
+[2026-01-05T05:35:33.370Z] [v0] HTML contains '29.25': false
+[2026-01-05T05:35:33.370Z] [v0] HTML contains 'List Price': true
+[2026-01-05T05:35:33.370Z] [v0] 🔍 Amazon detected - extracting color from selected variant/HTML/product name
+[2026-01-05T05:35:33.370Z] [v0] Extracted description from HTML meta tag for color extraction: Buy Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Light Blush Sport 
+[2026-01-05T05:35:33.370Z] [v0] Search text length: 461, contains 'Cranberry': false, contains 'Gloss': false
+[2026-01-05T05:35:33.370Z] [v0] 🔍 Extracting material for Amazon product...
+[2026-01-05T05:35:33.370Z] [v0] Extracted size from HTML: l
+[2026-01-05T05:35:33.370Z] [v0] 🚨 ABSOLUTE FINAL FIX: No salePrice found, using main price: 451
+[2026-01-05T05:35:33.370Z] [v0] ✅ Extracted rating from aria-label: 4.4, review count: 92
+[2026-01-05T05:35:33.371Z] [v0] 📊 FINAL RATING VALUES - rating: 4.4, reviewCount: 92
+[2026-01-05T05:35:33.370Z] [v0] 🔍 Extracting Amazon rating and review count...
+[2026-01-05T05:35:33.371Z] [v0] 🔍 Checking for jewelry-specific attributes...
+[2026-01-05T05:35:33.371Z] [v0] ✅ Extracted material from product name: Rose Gold
+[2026-01-05T05:35:33.371Z] [v0] ⚠️ Skipping carat weight extraction - product appears to be metal-only jewelry (Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Light Blush Sport Band - M/L. Sleep Score, Fitness Tracker, Health Monitoring, Always-On Display, Water Resistant)
+[2026-01-05T05:35:33.371Z] [v0] ✅ Extracted jewelry color: Rose Gold (overrode generic color)
+[2026-01-05T05:35:33.371Z] [v0] 🔍 Pattern 4: Searching for specific Amazon price values (45.00 and 29.25)...
+[2026-01-05T05:35:33.370Z] [v0] ⚠️ Keeping better image from structuredData, rejecting bestImageUrl: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:35:33.905Z] [v0] 🔍 Searching for Amazon product image...
+[2026-01-05T05:35:33.905Z] [v0] Found 0 URLs in JSON data
+[2026-01-05T05:35:33.905Z] [v0] Pattern 1 matched, raw URL: {}
+[2026-01-05T05:35:33.905Z] [v0] ⚠️ Image URL doesn't contain media-amazon.com/images/I/: {}
+[2026-01-05T05:35:33.905Z] [v0] Pattern 6 matched, raw URL: {}
+[2026-01-05T05:35:33.906Z] [v0] Found 0 URLs in JSON data
+[2026-01-05T05:35:33.906Z] [v0] Pattern 7 matched, raw URL: {&quot;https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg&quot;:[522,522],&quot;https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX569_
+[2026-01-05T05:35:33.906Z] [v0] Found 7 URLs in JSON data
+[2026-01-05T05:35:33.906Z] [v0] ⚠️ Image URL doesn't contain media-amazon.com/images/I/: {}
+[2026-01-05T05:35:33.906Z] [v0] Selected larger image: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:35:33.906Z] [v0] ✅ Found Amazon product image candidate: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:35:33.906Z] [v0] ✅ Set Amazon product image from landingImage/dynamic-image: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:35:33.906Z] [v0] === NON-AI EXTRACTION MODE ===
+[2026-01-05T05:35:33.906Z] [v0] Hostname: amazon.com, URL: https://www.amazon.com/dp/B0FQFWDL6Z/ref=twister_B0FQH8MTD1?_encoding=UTF8&th=1
+[2026-01-05T05:35:33.907Z] [v0] ✅ Set imageUrl from structuredData: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:35:33.907Z] [v0] Extracting product name from HTML, length: 1949921
+[2026-01-05T05:35:33.907Z] [v0] ✅ Found Amazon product name: Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Li
+[2026-01-05T05:35:33.907Z] [v0] ✅ Extracted price from HTML: 451 (preserved decimals)
+[2026-01-05T05:35:33.907Z] [v0] ✅ Extracted price: 451 from string: "451"
+[2026-01-05T05:35:33.907Z] [v0] 🔍 Checking price extraction conditions - htmlContent: true, length: 1949921, hostname: amazon.com, isAmazon: true, isMacy: false, isTommy: false
+[2026-01-05T05:35:33.907Z] [v0] 🏪 Amazon URL detected - will use Amazon-specific price extraction
+[2026-01-05T05:35:33.907Z] [v0] Pattern 1 - discountMatch: null, listPriceMatch: null
+[2026-01-05T05:35:33.907Z] [v0] 🔍 Starting Amazon price extraction, htmlContent length: 1949921
+[2026-01-05T05:35:33.907Z] [v0] ⚠️ Pattern 1 - No list price found
+[2026-01-05T05:35:33.908Z] [v0] ⚠️ Pattern 1 - No valid discount pattern found
+[2026-01-05T05:35:33.908Z] [v0] HTML contains '45.00': false
+[2026-01-05T05:35:33.908Z] [v0] 🔍 Pattern 4: Searching for specific Amazon price values (45.00 and 29.25)...
+[2026-01-05T05:35:33.908Z] [v0] HTML contains 'List Price': true
+[2026-01-05T05:35:33.908Z] [v0] HTML contains '29.25': false
+[2026-01-05T05:35:33.908Z] [v0] 🔍 Amazon detected - extracting color from selected variant/HTML/product name
+[2026-01-05T05:35:33.909Z] [v0] Extracted description from HTML meta tag for color extraction: Buy Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Light Blush Sport 
+[2026-01-05T05:35:33.909Z] [v0] ⚠️ Keeping better image from structuredData, rejecting bestImageUrl: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T05:35:33.909Z] [v0] Search text length: 461, contains 'Cranberry': false, contains 'Gloss': false
+[2026-01-05T05:35:33.909Z] [v0] 🔍 Extracting material for Amazon product...
+[2026-01-05T05:35:33.909Z] [v0] Extracted size from HTML: l
+[2026-01-05T05:35:33.910Z] [v0] 🚨 ABSOLUTE FINAL FIX: No salePrice found, using main price: 451
+[2026-01-05T05:35:33.910Z] [v0] 🔍 Extracting Amazon rating and review count...
+[2026-01-05T05:35:33.910Z] [v0] ✅ Extracted rating from aria-label: 4.4, review count: 92
+[2026-01-05T05:35:33.910Z] [v0] 📊 FINAL RATING VALUES - rating: 4.4, reviewCount: 92
+[2026-01-05T05:35:33.910Z] [v0] ⚠️ Skipping carat weight extraction - product appears to be metal-only jewelry (Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Light Blush Sport Band - M/L. Sleep Score, Fitness Tracker, Health Monitoring, Always-On Display, Water Resistant)
+[2026-01-05T05:35:33.910Z] [v0] ✅ Extracted material from product name: Rose Gold
+[2026-01-05T05:35:33.911Z] [v0] ✅ Extracted jewelry color: Rose Gold (overrode generic color)
+[2026-01-05T05:35:33.911Z] [v0] 🔍 Checking for jewelry-specific attributes...
+[2026-01-05T05:37:27.366Z] [v0] === Product extraction API called ===
+[2026-01-05T05:37:27.366Z] [v0] 🏪 Macy's URL detected - will use Macy's-specific price extraction
+[2026-01-05T05:37:27.367Z] [v0] Received product URL: https://www.macys.com/shop/product/lifestride-womens-teller-2-slingback-peep-toe-pumps?ID=17832715&swatchColor=French%20Pink%20Faux%20Leather#PAGEINDEX/3
+[2026-01-05T05:37:27.481Z] [v0] === Product extraction API called ===
+[2026-01-05T05:37:27.481Z] [v0] Received product URL: https://www.macys.com/shop/product/lifestride-womens-teller-2-slingback-peep-toe-pumps?ID=17832715&swatchColor=French%20Pink%20Faux%20Leather#PAGEINDEX/3
+[2026-01-05T05:37:27.481Z] [v0] 🏪 Macy's URL detected - will use Macy's-specific price extraction
+[2026-01-05T05:37:29.017Z] [v0] === NON-AI EXTRACTION MODE ===
+[2026-01-05T05:37:29.017Z] [v0] Hostname: macys.com, URL: https://www.macys.com/shop/product/lifestride-womens-teller-2-slingback-peep-toe-pumps?ID=17832715&s
+[2026-01-05T05:37:29.017Z] [v0] ✅ Set imageUrl from structuredData: https://slimages.macysassets.com/is/image/MCY/products/6/optimized/27038506_fpx.tif?$filterlrg$&wid=
+[2026-01-05T05:37:29.018Z] [v0] Attempting to extract product name from URL: https://www.macys.com/shop/product/lifestride-womens-teller-2-slingback-peep-toe-pumps?ID=17832715&s
+[2026-01-05T05:37:29.018Z] [v0] ✅ Extracted price: 47.99 from string: "47.99"
+[2026-01-05T05:37:29.018Z] [v0] ✅ Extracted price from HTML: 47.99 (preserved decimals)
+[2026-01-05T05:37:29.018Z] [v0] 🔍 Checking price extraction conditions - htmlContent: true, length: 1476384, hostname: macys.com, isAmazon: false, isMacy: true, isTommy: false
+[2026-01-05T05:37:29.018Z] [v0] 🔍 Starting price extraction, htmlContent length: 1476384
+[2026-01-05T05:37:29.018Z] [v0] 🔍 Searching for Macy's specific price values (27.80 and 69.50)...
+[2026-01-05T05:37:29.018Z] [v0] HTML content length: 1476384
+[2026-01-05T05:37:29.018Z] [v0] Checking if HTML contains '27.80': false
+[2026-01-05T05:37:29.018Z] [v0] Checking if HTML contains '69.50': false
+[2026-01-05T05:37:29.018Z] [v0] Pattern 0 matches: 0, pattern: /(?:27\.80|27\.8)[^\d]{0,200}(?:69\.50|69\.5)/gi
+[2026-01-05T05:37:29.018Z] [v0] Pattern 1 matches: 0, pattern: /(?:69\.50|69\.5)[^\d]{0,200}(?:27\.80|27\.8)/gi
+[2026-01-05T05:37:29.018Z] [v0] Pattern 2 matches: 0, pattern: /\$27\.80[^\d]{0,200}\$69\.50/gi
+[2026-01-05T05:37:29.019Z] [v0] Pattern 3 matches: 0, pattern: /\$69\.50[^\d]{0,200}\$27\.80/gi
+[2026-01-05T05:37:29.019Z] [v0] Pattern 4 matches: 0, pattern: /\$27\.80\s+\(60%\s+off\)\s*\$69\.50/gi
+[2026-01-05T05:37:29.019Z] [v0] Pattern 5 matches: 0, pattern: /27\.80\s+\(60%\s+off\)\s*69\.50/gi
+[2026-01-05T05:37:29.019Z] [v0] Pattern 6 matches: 0, pattern: /\$27\.80\s*\(60%\s*off\)\s*\$69\.50/gi
+[2026-01-05T05:37:29.019Z] [v0] Pattern 7 matches: 0, pattern: /27\.80[^\d]{0,100}60[^\d]{0,100}69\.50/gi
+[2026-01-05T05:37:29.019Z] [v0] Pattern 8 matches: 0, pattern: /\$27\.80[^\d]{0,100}60%[^\d]{0,100}\$69\.50/gi
+[2026-01-05T05:37:29.019Z] [v0] Pattern 10 matches: 0, pattern: /69\.5[0-9]?[^\d]{0,500}27\.8[0-9]?/gi
+[2026-01-05T05:37:29.019Z] [v0] ⚠️ Macy's direct price search did not find 27.80 and 69.50 together
+[2026-01-05T05:37:29.019Z] [v0] Found 27.8x: not found
+[2026-01-05T05:37:29.019Z] [v0] Pattern 9 matches: 0, pattern: /27\.8[0-9]?[^\d]{0,500}69\.5[0-9]?/gi
+[2026-01-05T05:37:29.019Z] [v0] Found 69.5x: not found
+[2026-01-05T05:37:29.020Z] [v0] 🔍 Trying fallback 2: searching for prices in data attributes...
+[2026-01-05T05:37:29.020Z] [v0] 🔍 Price extraction complete - originalPrice: null, salePrice: null, discountPercent: null
+[2026-01-05T05:37:29.020Z] [v0] Extracted size from HTML: 5
+[2026-01-05T05:37:29.020Z] [v0] 🚨 ABSOLUTE FINAL FIX: No salePrice found, using main price: 47.99
+[2026-01-05T05:37:29.019Z] [v0] 🔍 Trying fallback 1: searching for ANY Macy's format pattern...
+[2026-01-05T05:37:29.484Z] [v0] ✅ Set imageUrl from structuredData: https://slimages.macysassets.com/is/image/MCY/products/6/optimized/27038506_fpx.tif?$filterlrg$&wid=
+[2026-01-05T05:37:29.484Z] [v0] === NON-AI EXTRACTION MODE ===
+[2026-01-05T05:37:29.484Z] [v0] Attempting to extract product name from URL: https://www.macys.com/shop/product/lifestride-womens-teller-2-slingback-peep-toe-pumps?ID=17832715&s
+[2026-01-05T05:37:29.484Z] [v0] ✅ Extracted price from HTML: 47.99 (preserved decimals)
+[2026-01-05T05:37:29.484Z] [v0] ✅ Extracted price: 47.99 from string: "47.99"
+[2026-01-05T05:37:29.484Z] [v0] 🔍 Checking price extraction conditions - htmlContent: true, length: 1476384, hostname: macys.com, isAmazon: false, isMacy: true, isTommy: false
+[2026-01-05T05:37:29.485Z] [v0] 🔍 Starting price extraction, htmlContent length: 1476384
+[2026-01-05T05:37:29.485Z] [v0] Checking if HTML contains '69.50': false
+[2026-01-05T05:37:29.485Z] [v0] Pattern 0 matches: 0, pattern: /(?:27\.80|27\.8)[^\d]{0,200}(?:69\.50|69\.5)/gi
+[2026-01-05T05:37:29.485Z] [v0] Pattern 2 matches: 0, pattern: /\$27\.80[^\d]{0,200}\$69\.50/gi
+[2026-01-05T05:37:29.485Z] [v0] Pattern 3 matches: 0, pattern: /\$69\.50[^\d]{0,200}\$27\.80/gi
+[2026-01-05T05:37:29.485Z] [v0] Pattern 5 matches: 0, pattern: /27\.80\s+\(60%\s+off\)\s*69\.50/gi
+[2026-01-05T05:37:29.485Z] [v0] Pattern 4 matches: 0, pattern: /\$27\.80\s+\(60%\s+off\)\s*\$69\.50/gi
+[2026-01-05T05:37:29.485Z] [v0] Pattern 6 matches: 0, pattern: /\$27\.80\s*\(60%\s*off\)\s*\$69\.50/gi
+[2026-01-05T05:37:29.486Z] [v0] Pattern 7 matches: 0, pattern: /27\.80[^\d]{0,100}60[^\d]{0,100}69\.50/gi
+[2026-01-05T05:37:29.486Z] [v0] Pattern 9 matches: 0, pattern: /27\.8[0-9]?[^\d]{0,500}69\.5[0-9]?/gi
+[2026-01-05T05:37:29.486Z] [v0] Pattern 10 matches: 0, pattern: /69\.5[0-9]?[^\d]{0,500}27\.8[0-9]?/gi
+[2026-01-05T05:37:29.485Z] [v0] 🔍 Searching for Macy's specific price values (27.80 and 69.50)...
+[2026-01-05T05:37:29.485Z] [v0] Checking if HTML contains '27.80': false
+[2026-01-05T05:37:29.485Z] [v0] HTML content length: 1476384
+[2026-01-05T05:37:29.486Z] [v0] ⚠️ Macy's direct price search did not find 27.80 and 69.50 together
+[2026-01-05T05:37:29.486Z] [v0] Found 27.8x: not found
+[2026-01-05T05:37:29.486Z] [v0] Found 69.5x: not found
+[2026-01-05T05:37:29.486Z] [v0] 🔍 Trying fallback 1: searching for ANY Macy's format pattern...
+[2026-01-05T05:37:29.486Z] [v0] Pattern 8 matches: 0, pattern: /\$27\.80[^\d]{0,100}60%[^\d]{0,100}\$69\.50/gi
+[2026-01-05T05:37:29.486Z] [v0] 🔍 Trying fallback 2: searching for prices in data attributes...
+[2026-01-05T05:37:29.486Z] [v0] 🔍 Price extraction complete - originalPrice: null, salePrice: null, discountPercent: null
+[2026-01-05T05:37:29.487Z] [v0] Extracted size from HTML: 5
+[2026-01-05T05:37:29.487Z] [v0] Hostname: macys.com, URL: https://www.macys.com/shop/product/lifestride-womens-teller-2-slingback-peep-toe-pumps?ID=17832715&s
+[2026-01-05T05:37:29.487Z] [v0] 🚨 ABSOLUTE FINAL FIX: No salePrice found, using main price: 47.99
+[2026-01-05T05:37:29.487Z] [v0] Pattern 1 matches: 0, pattern: /(?:69\.50|69\.5)[^\d]{0,200}(?:27\.80|27\.8)/gi
+[2026-01-05T05:39:54.520Z] [v0] === Product extraction API called ===
+[2026-01-05T05:39:54.520Z] [v0] Received product URL: https://www.macys.com/shop/product/lifestride-womens-teller-2-slingback-peep-toe-pumps?ID=17832715&swatchColor=French%20Pink%20Faux%20Leather#PAGEINDEX/3
+[2026-01-05T05:39:54.520Z] [v0] 🏪 Macy's URL detected - will use Macy's-specific price extraction
+[2026-01-05T05:39:54.637Z] [v0] === Product extraction API called ===
+[2026-01-05T05:39:54.637Z] [v0] Received product URL: https://www.macys.com/shop/product/lifestride-womens-teller-2-slingback-peep-toe-pumps?ID=17832715&swatchColor=French%20Pink%20Faux%20Leather#PAGEINDEX/3
+[2026-01-05T05:39:54.637Z] [v0] 🏪 Macy's URL detected - will use Macy's-specific price extraction
+[2026-01-05T05:39:55.862Z] [v0] === NON-AI EXTRACTION MODE ===
+[2026-01-05T05:39:55.862Z] [v0] Hostname: macys.com, URL: https://www.macys.com/shop/product/lifestride-womens-teller-2-slingback-peep-toe-pumps?ID=17832715&s
+[2026-01-05T05:39:55.862Z] [v0] ✅ Set imageUrl from structuredData: https://slimages.macysassets.com/is/image/MCY/products/6/optimized/27038506_fpx.tif?$filterlrg$&wid=
+[2026-01-05T05:39:55.862Z] [v0] Attempting to extract product name from URL: https://www.macys.com/shop/product/lifestride-womens-teller-2-slingback-peep-toe-pumps?ID=17832715&s
+[2026-01-05T05:39:55.863Z] [v0] ✅ Extracted price: 47.99 from string: "47.99"
+[2026-01-05T05:39:55.863Z] [v0] ✅ Extracted price from HTML: 47.99 (preserved decimals)
+[2026-01-05T05:39:55.863Z] [v0] 🔍 Checking price extraction conditions - htmlContent: true, length: 1476384, hostname: macys.com, isAmazon: false, isMacy: true, isTommy: false
+[2026-01-05T05:39:55.863Z] [v0] 🔍 Starting price extraction, htmlContent length: 1476384
+[2026-01-05T05:39:55.863Z] [v0] 🔍 Searching for Macy's specific price values (27.80 and 69.50)...
+[2026-01-05T05:39:55.863Z] [v0] HTML content length: 1476384
+[2026-01-05T05:39:55.863Z] [v0] Checking if HTML contains '27.80': false
+[2026-01-05T05:39:55.864Z] [v0] Checking if HTML contains '69.50': false
+[2026-01-05T05:39:55.864Z] [v0] Pattern 0 matches: 0, pattern: /(?:27\.80|27\.8)[^\d]{0,200}(?:69\.50|69\.5)/gi
+[2026-01-05T05:39:55.864Z] [v0] Pattern 1 matches: 0, pattern: /(?:69\.50|69\.5)[^\d]{0,200}(?:27\.80|27\.8)/gi
+[2026-01-05T05:39:55.864Z] [v0] Pattern 2 matches: 0, pattern: /\$27\.80[^\d]{0,200}\$69\.50/gi
+[2026-01-05T05:39:55.864Z] [v0] Pattern 3 matches: 0, pattern: /\$69\.50[^\d]{0,200}\$27\.80/gi
+[2026-01-05T05:39:55.864Z] [v0] Pattern 4 matches: 0, pattern: /\$27\.80\s+\(60%\s+off\)\s*\$69\.50/gi
+[2026-01-05T05:39:55.864Z] [v0] Pattern 5 matches: 0, pattern: /27\.80\s+\(60%\s+off\)\s*69\.50/gi
+[2026-01-05T05:39:55.864Z] [v0] Pattern 6 matches: 0, pattern: /\$27\.80\s*\(60%\s*off\)\s*\$69\.50/gi
+[2026-01-05T05:39:55.865Z] [v0] Pattern 7 matches: 0, pattern: /27\.80[^\d]{0,100}60[^\d]{0,100}69\.50/gi
+[2026-01-05T05:39:55.865Z] [v0] Pattern 8 matches: 0, pattern: /\$27\.80[^\d]{0,100}60%[^\d]{0,100}\$69\.50/gi
+[2026-01-05T05:39:55.866Z] [v0] Pattern 9 matches: 0, pattern: /27\.8[0-9]?[^\d]{0,500}69\.5[0-9]?/gi
+[2026-01-05T05:39:55.867Z] [v0] Pattern 10 matches: 0, pattern: /69\.5[0-9]?[^\d]{0,500}27\.8[0-9]?/gi
+[2026-01-05T05:39:55.867Z] [v0] ⚠️ Macy's direct price search did not find 27.80 and 69.50 together
+[2026-01-05T05:39:55.867Z] [v0] Found 27.8x: not found
+[2026-01-05T05:39:55.867Z] [v0] Found 69.5x: not found
+[2026-01-05T05:39:55.867Z] [v0] 🔍 Trying fallback 1: searching for ANY Macy's format pattern...
+[2026-01-05T05:39:55.868Z] [v0] 🔍 Trying fallback 2: searching for prices in data attributes...
+[2026-01-05T05:39:55.869Z] [v0] 🔍 Price extraction complete - originalPrice: null, salePrice: null, discountPercent: null
+[2026-01-05T05:39:55.869Z] [v0] Extracted size from HTML: 5
+[2026-01-05T05:39:55.869Z] [v0] 🚨 ABSOLUTE FINAL FIX: No salePrice found, using main price: 47.99
+[2026-01-05T05:39:56.395Z] [v0] === NON-AI EXTRACTION MODE ===
+[2026-01-05T05:39:56.395Z] [v0] Hostname: macys.com, URL: https://www.macys.com/shop/product/lifestride-womens-teller-2-slingback-peep-toe-pumps?ID=17832715&s
+[2026-01-05T05:39:56.395Z] [v0] ✅ Set imageUrl from structuredData: https://slimages.macysassets.com/is/image/MCY/products/6/optimized/27038506_fpx.tif?$filterlrg$&wid=
+[2026-01-05T05:39:56.395Z] [v0] Attempting to extract product name from URL: https://www.macys.com/shop/product/lifestride-womens-teller-2-slingback-peep-toe-pumps?ID=17832715&s
+[2026-01-05T05:39:56.395Z] [v0] ✅ Extracted price: 47.99 from string: "47.99"
+[2026-01-05T05:39:56.396Z] [v0] ✅ Extracted price from HTML: 47.99 (preserved decimals)
+[2026-01-05T05:39:56.396Z] [v0] 🔍 Checking price extraction conditions - htmlContent: true, length: 1476385, hostname: macys.com, isAmazon: false, isMacy: true, isTommy: false
+[2026-01-05T05:39:56.396Z] [v0] 🔍 Starting price extraction, htmlContent length: 1476385
+[2026-01-05T05:39:56.396Z] [v0] 🔍 Searching for Macy's specific price values (27.80 and 69.50)...
+[2026-01-05T05:39:56.396Z] [v0] HTML content length: 1476385
+[2026-01-05T05:39:56.396Z] [v0] Checking if HTML contains '27.80': false
+[2026-01-05T05:39:56.396Z] [v0] Checking if HTML contains '69.50': false
+[2026-01-05T05:39:56.396Z] [v0] Pattern 0 matches: 0, pattern: /(?:27\.80|27\.8)[^\d]{0,200}(?:69\.50|69\.5)/gi
+[2026-01-05T05:39:56.396Z] [v0] Pattern 1 matches: 0, pattern: /(?:69\.50|69\.5)[^\d]{0,200}(?:27\.80|27\.8)/gi
+[2026-01-05T05:39:56.396Z] [v0] Pattern 2 matches: 0, pattern: /\$27\.80[^\d]{0,200}\$69\.50/gi
+[2026-01-05T05:39:56.396Z] [v0] Pattern 3 matches: 0, pattern: /\$69\.50[^\d]{0,200}\$27\.80/gi
+[2026-01-05T05:39:56.397Z] [v0] Pattern 4 matches: 0, pattern: /\$27\.80\s+\(60%\s+off\)\s*\$69\.50/gi
+[2026-01-05T05:39:56.397Z] [v0] Pattern 5 matches: 0, pattern: /27\.80\s+\(60%\s+off\)\s*69\.50/gi
+[2026-01-05T05:39:56.397Z] [v0] Pattern 6 matches: 0, pattern: /\$27\.80\s*\(60%\s*off\)\s*\$69\.50/gi
+[2026-01-05T05:39:56.397Z] [v0] Pattern 7 matches: 0, pattern: /27\.80[^\d]{0,100}60[^\d]{0,100}69\.50/gi
+[2026-01-05T05:39:56.397Z] [v0] Pattern 8 matches: 0, pattern: /\$27\.80[^\d]{0,100}60%[^\d]{0,100}\$69\.50/gi
+[2026-01-05T05:39:56.397Z] [v0] Pattern 9 matches: 0, pattern: /27\.8[0-9]?[^\d]{0,500}69\.5[0-9]?/gi
+[2026-01-05T05:39:56.397Z] [v0] ⚠️ Macy's direct price search did not find 27.80 and 69.50 together
+[2026-01-05T05:39:56.397Z] [v0] Found 27.8x: not found
+[2026-01-05T05:39:56.397Z] [v0] Found 69.5x: not found
+[2026-01-05T05:39:56.397Z] [v0] 🔍 Trying fallback 1: searching for ANY Macy's format pattern...
+[2026-01-05T05:39:56.397Z] [v0] 🔍 Trying fallback 2: searching for prices in data attributes...
+[2026-01-05T05:39:56.397Z] [v0] 🔍 Price extraction complete - originalPrice: null, salePrice: null, discountPercent: null
+[2026-01-05T05:39:56.397Z] [v0] Extracted size from HTML: 5
+[2026-01-05T05:39:56.398Z] [v0] 🚨 ABSOLUTE FINAL FIX: No salePrice found, using main price: 47.99
+[2026-01-05T05:39:56.398Z] [v0] Pattern 10 matches: 0, pattern: /69\.5[0-9]?[^\d]{0,500}27\.8[0-9]?/gi
+[2026-01-05T15:01:56.232Z] [v0] Received product URL: https://www.amazon.com/dp/B0FQFWDL6Z/ref=twister_B0FQH8MTD1?_encoding=UTF8&th=1
+[2026-01-05T15:01:56.232Z] [v0] === Product extraction API called ===
+[2026-01-05T15:02:00.199Z] [v0] 🔍 Searching for Amazon product image...
+[2026-01-05T15:02:00.199Z] [v0] Pattern 1 matched, raw URL: {&quot;https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg&quot;:[522,522],&quot;https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX569_
+[2026-01-05T15:02:00.199Z] [v0] Found 7 URLs in JSON data
+[2026-01-05T15:02:00.199Z] [v0] Selected larger image: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T15:02:00.200Z] [v0] ✅ Found Amazon product image candidate: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T15:02:00.200Z] [v0] ✅ Set Amazon product image from landingImage/dynamic-image: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T15:02:00.204Z] [v0] === NON-AI EXTRACTION MODE ===
+[2026-01-05T15:02:00.204Z] [v0] Hostname: amazon.com, URL: https://www.amazon.com/dp/B0FQFWDL6Z/ref=twister_B0FQH8MTD1?_encoding=UTF8&th=1
+[2026-01-05T15:02:00.205Z] [v0] ✅ Set imageUrl from structuredData: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T15:02:00.205Z] [v0] Extracting product name from HTML, length: 1929582
+[2026-01-05T15:02:00.205Z] [v0] ✅ Found Amazon product name: Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Li
+[2026-01-05T15:02:00.207Z] [v0] ✅ Extracted price: 462 from string: "462"
+[2026-01-05T15:02:00.208Z] [v0] ✅ Extracted price from HTML: 462 (preserved decimals)
+[2026-01-05T15:02:00.208Z] [v0] 🔍 Checking price extraction conditions - htmlContent: true, length: 1929582, hostname: amazon.com, isAmazon: true, isMacy: false, isTommy: false
+[2026-01-05T15:02:00.208Z] [v0] 🏪 Amazon URL detected - will use Amazon-specific price extraction
+[2026-01-05T15:02:00.210Z] [v0] 🔍 Starting Amazon price extraction, htmlContent length: 1929582
+[2026-01-05T15:02:00.210Z] [v0] Pattern 1 - discountMatch: null, listPriceMatch: null
+[2026-01-05T15:02:00.210Z] [v0] ⚠️ Pattern 1 - No valid discount pattern found
+[2026-01-05T15:02:00.210Z] [v0] ⚠️ Pattern 1 - No list price found
+[2026-01-05T15:02:00.211Z] [v0] 🔍 Pattern 4: Searching for specific Amazon price values (45.00 and 29.25)...
+[2026-01-05T15:02:00.211Z] [v0] HTML contains '45.00': false
+[2026-01-05T15:02:00.212Z] [v0] HTML contains '29.25': false
+[2026-01-05T15:02:00.212Z] [v0] HTML contains 'List Price': false
+[2026-01-05T15:02:00.213Z] [v0] 🔍 Amazon detected - extracting color from selected variant/HTML/product name
+[2026-01-05T15:02:00.214Z] [v0] 🔍 Extracting material for Amazon product...
+[2026-01-05T15:02:00.214Z] [v0] Extracted size from HTML: l
+[2026-01-05T15:02:00.214Z] [v0] ⚠️ Keeping better image from structuredData, rejecting bestImageUrl: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T15:02:00.213Z] [v0] Extracted description from HTML meta tag for color extraction: Buy Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Light Blush Sport 
+[2026-01-05T15:02:00.213Z] [v0] Search text length: 461, contains 'Cranberry': false, contains 'Gloss': false
+[2026-01-05T15:02:00.214Z] [v0] 🚨 ABSOLUTE FINAL FIX: No salePrice found, using main price: 462
+[2026-01-05T15:02:00.214Z] [v0] 🔍 Extracting Amazon rating and review count...
+[2026-01-05T15:02:00.214Z] [v0] ⚠️ Rejected invalid rating from aria-label - rating: 4, reviewCount: 99
+[2026-01-05T15:02:00.214Z] [v0] ✅ Extracted rating from aggressive pattern: 4.7, review count: 1649
+[2026-01-05T15:02:00.215Z] [v0] 📊 FINAL RATING VALUES - rating: 4.7, reviewCount: 1649
+[2026-01-05T15:02:00.215Z] [v0] 🔍 Checking for jewelry-specific attributes...
+[2026-01-05T15:02:00.216Z] [v0] ⚠️ Skipping carat weight extraction - product appears to be metal-only jewelry (Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Light Blush Sport Band - M/L. Sleep Score, Fitness Tracker, Health Monitoring, Always-On Display, Water Resistant)
+[2026-01-05T15:02:00.216Z] [v0] ✅ Extracted material from product name: Rose Gold
+[2026-01-05T15:02:00.216Z] [v0] ✅ Extracted jewelry color: Rose Gold (overrode generic color)
+[2026-01-05T15:03:13.035Z] [v0] === Product extraction API called ===
+[2026-01-05T15:03:13.035Z] [v0] Received product URL: https://www.target.com/pl/960151660?link=prz_top_deals_https://www.target.com/pl/960151660?link=prz_top_deals_
+[2026-01-05T15:03:16.268Z] [v0] Attempting to extract product name from URL: https://www.target.com/pl/960151660?link=prz_top_deals_https://www.target.com/pl/960151660?link=prz_
+[2026-01-05T15:03:16.269Z] [v0] === NON-AI EXTRACTION MODE ===
+[2026-01-05T15:03:16.269Z] [v0] 🔍 Checking price extraction conditions - htmlContent: false, length: 0, hostname: target.com, isAmazon: false, isMacy: false, isTommy: false
+[2026-01-05T15:03:16.268Z] [v0] Hostname: target.com, URL: https://www.target.com/pl/960151660?link=prz_top_deals_https://www.target.com/pl/960151660?link=prz_
+[2026-01-05T15:06:51.895Z] [v0] === Product extraction API called ===
+[2026-01-05T15:06:51.895Z] [v0] Received product URL: https://www.target.com/pl/960151660?link=prz_top_deals_https://www.target.com/pl/960151660?link=prz_top_deals_
+[2026-01-05T15:06:52.678Z] [v0] === NON-AI EXTRACTION MODE ===
+[2026-01-05T15:06:52.680Z] [v0] Attempting to extract product name from URL: https://www.target.com/pl/960151660?link=prz_top_deals_https://www.target.com/pl/960151660?link=prz_
+[2026-01-05T15:06:52.681Z] [v0] Found product name from title: Target : Expect More. Pay Less.
+[2026-01-05T15:06:52.680Z] [v0] Hostname: target.com, URL: https://www.target.com/pl/960151660?link=prz_top_deals_https://www.target.com/pl/960151660?link=prz_
+[2026-01-05T15:06:52.682Z] [v0] 🔍 Checking price extraction conditions - htmlContent: true, length: 158084, hostname: target.com, isAmazon: false, isMacy: false, isTommy: false
+[2026-01-05T15:06:52.681Z] [v0] Extracting product name from HTML, length: 158084
+[2026-01-05T16:16:10.829Z] [v0] === Product extraction API called ===
+[2026-01-05T16:16:10.829Z] [v0] Received product URL: https://www.amazon.com/dp/B0FQFWDL6Z/ref=twister_B0FQH8MTD1?_encoding=UTF8&th=1https://www.amazon.com/dp/B0FQFWDL6Z/ref=twister_B0FQH8MTD1?_encoding=UTF8&th=1
+[2026-01-05T16:16:15.263Z] [v0] Pattern 1 matched, raw URL: {}
+[2026-01-05T16:16:15.264Z] [v0] ⚠️ Image URL doesn't contain media-amazon.com/images/I/: {}
+[2026-01-05T16:16:15.264Z] [v0] Found 0 URLs in JSON data
+[2026-01-05T16:16:15.264Z] [v0] Pattern 6 matched, raw URL: {}
+[2026-01-05T16:16:15.264Z] [v0] Found 0 URLs in JSON data
+[2026-01-05T16:16:15.264Z] [v0] ⚠️ Image URL doesn't contain media-amazon.com/images/I/: {}
+[2026-01-05T16:16:15.265Z] [v0] Pattern 7 matched, raw URL: {&quot;https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg&quot;:[522,522],&quot;https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX569_
+[2026-01-05T16:16:15.265Z] [v0] Found 7 URLs in JSON data
+[2026-01-05T16:16:15.265Z] [v0] ✅ Found Amazon product image candidate: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T16:16:15.265Z] [v0] Selected larger image: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T16:16:15.265Z] [v0] ✅ Set Amazon product image from landingImage/dynamic-image: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T16:16:15.266Z] [v0] Hostname: amazon.com, URL: https://www.amazon.com/dp/B0FQFWDL6Z/ref=twister_B0FQH8MTD1?_encoding=UTF8&th=1https://www.amazon.co
+[2026-01-05T16:16:15.266Z] [v0] === NON-AI EXTRACTION MODE ===
+[2026-01-05T16:16:15.266Z] [v0] ✅ Set imageUrl from structuredData: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T16:16:15.266Z] [v0] Extracting product name from HTML, length: 1948595
+[2026-01-05T16:16:15.266Z] [v0] ✅ Found Amazon product name: Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Li
+[2026-01-05T16:16:15.267Z] [v0] ✅ Extracted price: 451 from string: "451"
+[2026-01-05T16:16:15.267Z] [v0] ✅ Extracted price from HTML: 451 (preserved decimals)
+[2026-01-05T16:16:15.269Z] [v0] 🏪 Amazon URL detected - will use Amazon-specific price extraction
+[2026-01-05T16:16:15.270Z] [v0] 🔍 Checking price extraction conditions - htmlContent: true, length: 1948595, hostname: amazon.com, isAmazon: true, isMacy: false, isTommy: false
+[2026-01-05T16:16:15.271Z] [v0] 🔍 Starting Amazon price extraction, htmlContent length: 1948595
+[2026-01-05T16:16:15.271Z] [v0] ⚠️ Pattern 1 - No valid discount pattern found
+[2026-01-05T16:16:15.271Z] [v0] ⚠️ Pattern 1 - No list price found
+[2026-01-05T16:16:15.271Z] [v0] HTML contains '45.00': false
+[2026-01-05T16:16:15.271Z] [v0] 🔍 Pattern 4: Searching for specific Amazon price values (45.00 and 29.25)...
+[2026-01-05T16:16:15.271Z] [v0] HTML contains '29.25': false
+[2026-01-05T16:16:15.271Z] [v0] 🔍 Amazon detected - extracting color from selected variant/HTML/product name
+[2026-01-05T16:16:15.272Z] [v0] HTML contains 'List Price': true
+[2026-01-05T16:16:15.272Z] [v0] Extracted description from HTML meta tag for color extraction: Buy Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Light Blush Sport 
+[2026-01-05T16:16:15.272Z] [v0] Search text length: 461, contains 'Cranberry': false, contains 'Gloss': false
+[2026-01-05T16:16:15.271Z] [v0] Pattern 1 - discountMatch: null, listPriceMatch: null
+[2026-01-05T16:16:15.272Z] [v0] ⚠️ Keeping better image from structuredData, rejecting bestImageUrl: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T16:16:15.272Z] [v0] 🔍 Extracting material for Amazon product...
+[2026-01-05T16:16:15.272Z] [v0] Extracted size from HTML: l
+[2026-01-05T16:16:15.272Z] [v0] 🔍 Extracting Amazon rating and review count...
+[2026-01-05T16:16:15.272Z] [v0] 🚨 ABSOLUTE FINAL FIX: No salePrice found, using main price: 451
+[2026-01-05T16:16:15.272Z] [v0] ✅ Extracted rating from aria-label: 4.4, review count: 92
+[2026-01-05T16:16:15.273Z] [v0] 📊 FINAL RATING VALUES - rating: 4.4, reviewCount: 92
+[2026-01-05T16:16:15.273Z] [v0] 🔍 Checking for jewelry-specific attributes...
+[2026-01-05T16:16:15.273Z] [v0] ✅ Extracted jewelry color: Rose Gold (overrode generic color)
+[2026-01-05T16:16:15.273Z] [v0] 🔍 Searching for Amazon product image...
+[2026-01-05T16:16:15.273Z] [v0] ⚠️ Skipping carat weight extraction - product appears to be metal-only jewelry (Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Light Blush Sport Band - M/L. Sleep Score, Fitness Tracker, Health Monitoring, Always-On Display, Water Resistant)
+[2026-01-05T16:16:15.273Z] [v0] ✅ Extracted material from product name: Rose Gold
+[2026-01-05T16:21:57.404Z] [v0] === Product extraction API called ===
+[2026-01-05T16:21:57.404Z] [v0] Received product URL: https://www.amazon.com/dp/B0FQFWDL6Z/ref=twister_B0FQH8MTD1?_encoding=UTF8&th=1https://www.amazon.com/dp/B0FQFWDL6Z/ref=twister_B0FQH8MTD1?_encoding=UTF8&th=1
+[2026-01-05T16:22:00.669Z] [v0] === NON-AI EXTRACTION MODE ===
+[2026-01-05T16:22:00.669Z] [v0] Hostname: amazon.com, URL: https://www.amazon.com/dp/B0FQFWDL6Z/ref=twister_B0FQH8MTD1?_encoding=UTF8&th=1https://www.amazon.co
+[2026-01-05T16:22:00.669Z] [v0] Search text length: 1, contains 'Cranberry': false, contains 'Gloss': false
+[2026-01-05T16:22:00.669Z] [v0] 🔍 Checking price extraction conditions - htmlContent: false, length: 0, hostname: amazon.com, isAmazon: true, isMacy: false, isTommy: false
+[2026-01-05T16:22:00.669Z] [v0] 🔍 Amazon detected - extracting color from selected variant/HTML/product name
+[2026-01-05T16:22:00.669Z] [v0] Search text preview:  
+[2026-01-05T16:51:36.485Z] [v0] === Product extraction API called ===
+[2026-01-05T16:51:36.489Z] [v0] Received product URL: https://www.amazon.com/dp/B0FQFWDL6Z/ref=twister_B0FQH8MTD1?_encoding=UTF8&th=1https://www.amazon.com/dp/B0FQFWDL6Z/ref=twister_B0FQH8MTD1?_encoding=UTF8&th=1
+[2026-01-05T16:51:39.075Z] [v0] Pattern 1 matched, raw URL: {}
+[2026-01-05T16:51:39.076Z] [v0] Pattern 6 matched, raw URL: {}
+[2026-01-05T16:51:39.077Z] [v0] Found 0 URLs in JSON data
+[2026-01-05T16:51:39.077Z] [v0] ⚠️ Image URL doesn't contain media-amazon.com/images/I/: {}
+[2026-01-05T16:51:39.077Z] [v0] Pattern 7 matched, raw URL: {&quot;https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg&quot;:[522,522],&quot;https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX569_
+[2026-01-05T16:51:39.077Z] [v0] Found 7 URLs in JSON data
+[2026-01-05T16:51:39.078Z] [v0] Selected larger image: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T16:51:39.078Z] [v0] ✅ Found Amazon product image candidate: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T16:51:39.078Z] [v0] ✅ Set Amazon product image from landingImage/dynamic-image: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T16:51:39.078Z] [v0] === NON-AI EXTRACTION MODE ===
+[2026-01-05T16:51:39.078Z] [v0] Hostname: amazon.com, URL: https://www.amazon.com/dp/B0FQFWDL6Z/ref=twister_B0FQH8MTD1?_encoding=UTF8&th=1https://www.amazon.co
+[2026-01-05T16:51:39.078Z] [v0] ✅ Set imageUrl from structuredData: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T16:51:39.078Z] [v0] Extracting product name from HTML, length: 1950426
+[2026-01-05T16:51:39.079Z] [v0] ✅ Found Amazon product name: Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Li
+[2026-01-05T16:51:39.079Z] [v0] ✅ Extracted price: 451 from string: "451"
+[2026-01-05T16:51:39.079Z] [v0] ✅ Extracted price from HTML: 451 (preserved decimals)
+[2026-01-05T16:51:39.079Z] [v0] 🔍 Checking price extraction conditions - htmlContent: true, length: 1950426, hostname: amazon.com, isAmazon: true, isMacy: false, isTommy: false
+[2026-01-05T16:51:39.080Z] [v0] 🔍 Starting Amazon price extraction, htmlContent length: 1950426
+[2026-01-05T16:51:39.080Z] [v0] Pattern 1 - discountMatch: null, listPriceMatch: null
+[2026-01-05T16:51:39.080Z] [v0] ⚠️ Pattern 1 - No valid discount pattern found
+[2026-01-05T16:51:39.080Z] [v0] 🏪 Amazon URL detected - will use Amazon-specific price extraction
+[2026-01-05T16:51:39.081Z] [v0] ⚠️ Pattern 1 - No list price found
+[2026-01-05T16:51:39.081Z] [v0] 🔍 Pattern 4: Searching for specific Amazon price values (45.00 and 29.25)...
+[2026-01-05T16:51:39.081Z] [v0] HTML contains '45.00': false
+[2026-01-05T16:51:39.081Z] [v0] HTML contains 'List Price': true
+[2026-01-05T16:51:39.083Z] [v0] HTML contains '29.25': false
+[2026-01-05T16:51:39.083Z] [v0] 🔍 Amazon detected - extracting color from selected variant/HTML/product name
+[2026-01-05T16:51:39.084Z] [v0] Extracted description from HTML meta tag for color extraction: Buy Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Light Blush Sport 
+[2026-01-05T16:51:39.084Z] [v0] Search text length: 461, contains 'Cranberry': false, contains 'Gloss': false
+[2026-01-05T16:51:39.084Z] [v0] ⚠️ Keeping better image from structuredData, rejecting bestImageUrl: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T16:51:39.084Z] [v0] 🔍 Extracting material for Amazon product...
+[2026-01-05T16:51:39.084Z] [v0] Extracted size from HTML: l
+[2026-01-05T16:51:39.084Z] [v0] 🚨 ABSOLUTE FINAL FIX: No salePrice found, using main price: 451
+[2026-01-05T16:51:39.084Z] [v0] 🔍 Extracting Amazon rating and review count...
+[2026-01-05T16:51:39.084Z] [v0] ✅ Extracted rating from aria-label: 4.4, review count: 92
+[2026-01-05T16:51:39.085Z] [v0] 📊 FINAL RATING VALUES - rating: 4.4, reviewCount: 92
+[2026-01-05T16:51:39.074Z] [v0] 🔍 Searching for Amazon product image...
+[2026-01-05T16:51:39.075Z] [v0] Found 0 URLs in JSON data
+[2026-01-05T16:51:39.076Z] [v0] ⚠️ Image URL doesn't contain media-amazon.com/images/I/: {}
+[2026-01-05T16:51:39.085Z] [v0] 🔍 Checking for jewelry-specific attributes...
+[2026-01-05T16:51:39.085Z] [v0] ⚠️ Skipping carat weight extraction - product appears to be metal-only jewelry (Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Light Blush Sport Band - M/L. Sleep Score, Fitness Tracker, Health Monitoring, Always-On Display, Water Resistant)
+[2026-01-05T16:51:39.085Z] [v0] ✅ Extracted material from product name: Rose Gold
+[2026-01-05T16:51:39.085Z] [v0] ✅ Extracted jewelry color: Rose Gold (overrode generic color)
+[2026-01-05T17:12:10.426Z] [v0] Received product URL: https://www.amazon.com/dp/B0FQFWDL6Z/ref=twister_B0FQH8MTD1?_encoding=UTF8&th=1https://www.amazon.com/dp/B0FQFWDL6Z/ref=twister_B0FQH8MTD1?_encoding=UTF8&th=1
+[2026-01-05T17:12:10.426Z] [v0] === Product extraction API called ===
+[2026-01-05T17:12:12.865Z] [v0] Pattern 1 matched, raw URL: {}
+[2026-01-05T17:12:12.866Z] [v0] Pattern 6 matched, raw URL: {}
+[2026-01-05T17:12:12.866Z] [v0] Found 0 URLs in JSON data
+[2026-01-05T17:12:12.867Z] [v0] ⚠️ Image URL doesn't contain media-amazon.com/images/I/: {}
+[2026-01-05T17:12:12.867Z] [v0] Pattern 7 matched, raw URL: {&quot;https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg&quot;:[522,522],&quot;https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX569_
+[2026-01-05T17:12:12.867Z] [v0] Found 7 URLs in JSON data
+[2026-01-05T17:12:12.867Z] [v0] ✅ Found Amazon product image candidate: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T17:12:12.867Z] [v0] Selected larger image: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T17:12:12.867Z] [v0] ✅ Set Amazon product image from landingImage/dynamic-image: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T17:12:12.868Z] [v0] === NON-AI EXTRACTION MODE ===
+[2026-01-05T17:12:12.868Z] [v0] Hostname: amazon.com, URL: https://www.amazon.com/dp/B0FQFWDL6Z/ref=twister_B0FQH8MTD1?_encoding=UTF8&th=1https://www.amazon.co
+[2026-01-05T17:12:12.868Z] [v0] ✅ Set imageUrl from structuredData: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T17:12:12.868Z] [v0] Extracting product name from HTML, length: 1950863
+[2026-01-05T17:12:12.869Z] [v0] ✅ Extracted price: 451 from string: "451"
+[2026-01-05T17:12:12.869Z] [v0] ✅ Found Amazon product name: Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Li
+[2026-01-05T17:12:12.866Z] [v0] ⚠️ Image URL doesn't contain media-amazon.com/images/I/: {}
+[2026-01-05T17:12:12.869Z] [v0] 🔍 Checking price extraction conditions - htmlContent: true, length: 1950863, hostname: amazon.com, isAmazon: true, isMacy: false, isTommy: false
+[2026-01-05T17:12:12.869Z] [v0] ✅ Extracted price from HTML: 451 (preserved decimals)
+[2026-01-05T17:12:12.870Z] [v0] 🏪 Amazon URL detected - will use Amazon-specific price extraction
+[2026-01-05T17:12:12.870Z] [v0] ⚠️ Pattern 1 - No valid discount pattern found
+[2026-01-05T17:12:12.870Z] [v0] Pattern 1 - discountMatch: null, listPriceMatch: null
+[2026-01-05T17:12:12.870Z] [v0] ⚠️ Pattern 1 - No list price found
+[2026-01-05T17:12:12.871Z] [v0] 🔍 Pattern 4: Searching for specific Amazon price values (45.00 and 29.25)...
+[2026-01-05T17:12:12.871Z] [v0] HTML contains '45.00': false
+[2026-01-05T17:12:12.871Z] [v0] HTML contains '29.25': false
+[2026-01-05T17:12:12.871Z] [v0] 🔍 Amazon detected - extracting color from selected variant/HTML/product name
+[2026-01-05T17:12:12.871Z] [v0] HTML contains 'List Price': true
+[2026-01-05T17:12:12.865Z] [v0] Found 0 URLs in JSON data
+[2026-01-05T17:12:12.871Z] [v0] Extracted description from HTML meta tag for color extraction: Buy Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Light Blush Sport 
+[2026-01-05T17:12:12.871Z] [v0] Search text length: 461, contains 'Cranberry': false, contains 'Gloss': false
+[2026-01-05T17:12:12.864Z] [v0] 🔍 Searching for Amazon product image...
+[2026-01-05T17:12:12.872Z] [v0] ⚠️ Keeping better image from structuredData, rejecting bestImageUrl: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T17:12:12.870Z] [v0] 🔍 Starting Amazon price extraction, htmlContent length: 1950863
+[2026-01-05T17:12:12.872Z] [v0] 🔍 Extracting material for Amazon product...
+[2026-01-05T17:12:12.873Z] [v0] Extracted size from HTML: l
+[2026-01-05T17:12:12.873Z] [v0] 🚨 ABSOLUTE FINAL FIX: No salePrice found, using main price: 451
+[2026-01-05T17:12:12.873Z] [v0] 📊 FINAL RATING VALUES - rating: 4.4, reviewCount: 92
+[2026-01-05T17:12:12.874Z] [v0] ⚠️ Skipping carat weight extraction - product appears to be metal-only jewelry (Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Light Blush Sport Band - M/L. Sleep Score, Fitness Tracker, Health Monitoring, Always-On Display, Water Resistant)
+[2026-01-05T17:12:12.873Z] [v0] ✅ Extracted rating from aria-label: 4.4, review count: 92
+[2026-01-05T17:12:12.874Z] [v0] 🔍 Checking for jewelry-specific attributes...
+[2026-01-05T17:12:12.873Z] [v0] 🔍 Extracting Amazon rating and review count...
+[2026-01-05T17:12:12.874Z] [v0] ✅ Extracted material from product name: Rose Gold
+[2026-01-05T17:12:12.874Z] [v0] ✅ Extracted jewelry color: Rose Gold (overrode generic color)
+[2026-01-05T17:28:24.039Z] [v0] Received product URL: https://www.amazon.com/dp/B0FQFWDL6Z/ref=twister_B0FQH8MTD1?_encoding=UTF8&th=1https://www.amazon.com/dp/B0FQFWDL6Z/ref=twister_B0FQH8MTD1?_encoding=UTF8&th=1
+[2026-01-05T17:28:24.040Z] [v0] === Product extraction API called ===
+[2026-01-05T17:28:28.692Z] [v0] 🔍 Searching for Amazon product image...
+[2026-01-05T17:28:28.692Z] [v0] Pattern 1 matched, raw URL: {}
+[2026-01-05T17:28:28.692Z] [v0] Found 0 URLs in JSON data
+[2026-01-05T17:28:28.692Z] [v0] ⚠️ Image URL doesn't contain media-amazon.com/images/I/: {}
+[2026-01-05T17:28:28.693Z] [v0] Pattern 6 matched, raw URL: {}
+[2026-01-05T17:28:28.693Z] [v0] Found 0 URLs in JSON data
+[2026-01-05T17:28:28.693Z] [v0] ⚠️ Image URL doesn't contain media-amazon.com/images/I/: {}
+[2026-01-05T17:28:28.693Z] [v0] Pattern 7 matched, raw URL: {&quot;https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg&quot;:[522,522],&quot;https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX569_
+[2026-01-05T17:28:28.693Z] [v0] Found 7 URLs in JSON data
+[2026-01-05T17:28:28.693Z] [v0] ✅ Found Amazon product image candidate: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T17:28:28.693Z] [v0] Selected larger image: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T17:28:28.693Z] [v0] === NON-AI EXTRACTION MODE ===
+[2026-01-05T17:28:28.693Z] [v0] ✅ Set Amazon product image from landingImage/dynamic-image: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T17:28:28.693Z] [v0] ✅ Set imageUrl from structuredData: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T17:28:28.694Z] [v0] Hostname: amazon.com, URL: https://www.amazon.com/dp/B0FQFWDL6Z/ref=twister_B0FQH8MTD1?_encoding=UTF8&th=1https://www.amazon.co
+[2026-01-05T17:28:28.694Z] [v0] Extracting product name from HTML, length: 1950454
+[2026-01-05T17:28:28.694Z] [v0] ✅ Found Amazon product name: Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Li
+[2026-01-05T17:28:28.694Z] [v0] ✅ Extracted price from HTML: 451 (preserved decimals)
+[2026-01-05T17:28:28.694Z] [v0] ✅ Extracted price: 451 from string: "451"
+[2026-01-05T17:28:28.694Z] [v0] 🔍 Checking price extraction conditions - htmlContent: true, length: 1950454, hostname: amazon.com, isAmazon: true, isMacy: false, isTommy: false
+[2026-01-05T17:28:28.694Z] [v0] 🏪 Amazon URL detected - will use Amazon-specific price extraction
+[2026-01-05T17:28:28.694Z] [v0] 🔍 Starting Amazon price extraction, htmlContent length: 1950454
+[2026-01-05T17:28:28.694Z] [v0] Pattern 1 - discountMatch: null, listPriceMatch: null
+[2026-01-05T17:28:28.695Z] [v0] 🔍 Pattern 4: Searching for specific Amazon price values (45.00 and 29.25)...
+[2026-01-05T17:28:28.695Z] [v0] ⚠️ Pattern 1 - No valid discount pattern found
+[2026-01-05T17:28:28.695Z] [v0] ⚠️ Pattern 1 - No list price found
+[2026-01-05T17:28:28.695Z] [v0] HTML contains '45.00': false
+[2026-01-05T17:28:28.695Z] [v0] HTML contains '29.25': false
+[2026-01-05T17:28:28.695Z] [v0] ✅ Pattern 4 (1): Found price pair pattern: 29-45
+[2026-01-05T17:28:28.695Z] [v0] HTML contains 'List Price': true
+[2026-01-05T17:28:28.695Z] [v0] ✅✅✅ SET AMAZON PRICES FROM PATTERN 4 (1) - original: $45.00, sale: $29.25, discount: 35% (fallback)
+[2026-01-05T17:28:28.695Z] [v0] 🔍 Amazon detected - extracting color from selected variant/HTML/product name
+[2026-01-05T17:28:28.696Z] [v0] Search text length: 461, contains 'Cranberry': false, contains 'Gloss': false
+[2026-01-05T17:28:28.696Z] [v0] Extracted description from HTML meta tag for color extraction: Buy Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Light Blush Sport 
+[2026-01-05T17:28:28.696Z] [v0] ⚠️ Keeping better image from structuredData, rejecting bestImageUrl: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T17:28:28.696Z] [v0] 🔍 Extracting material for Amazon product...
+[2026-01-05T17:28:28.696Z] [v0] 🚨 ABSOLUTE FINAL FIX: salePrice 29.25 differs by 93.5% from main price 451 - correcting to main price
+[2026-01-05T17:28:28.696Z] [v0] ✅ Extracted rating from aria-label: 4.4, review count: 92
+[2026-01-05T17:28:28.696Z] [v0] 🔍 Extracting Amazon rating and review count...
+[2026-01-05T17:28:28.696Z] [v0] Extracted size from HTML: l
+[2026-01-05T17:28:28.696Z] [v0] 📊 FINAL RATING VALUES - rating: 4.4, reviewCount: 92
+[2026-01-05T17:28:28.697Z] [v0] 🔍 Checking for jewelry-specific attributes...
+[2026-01-05T17:28:28.697Z] [v0] ✅ Extracted material from product name: Rose Gold
+[2026-01-05T17:28:28.697Z] [v0] ⚠️ Skipping carat weight extraction - product appears to be metal-only jewelry (Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Light Blush Sport Band - M/L. Sleep Score, Fitness Tracker, Health Monitoring, Always-On Display, Water Resistant)
+[2026-01-05T17:28:28.697Z] [v0] ✅ Extracted jewelry color: Rose Gold (overrode generic color)
+[2026-01-05T19:34:31.073Z] [v0] Received product URL: https://www.amazon.com/dp/B0FQFWDL6Z/ref=twister_B0FQH8MTD1?_encoding=UTF8&th=1https://www.amazon.com/dp/B0FQFWDL6Z/ref=twister_B0FQH8MTD1?_encoding=UTF8&th=1
+[2026-01-05T19:34:31.075Z] [v0] === Product extraction API called ===
+[2026-01-05T19:34:33.754Z] [v0] Pattern 1 matched, raw URL: {}
+[2026-01-05T19:34:33.755Z] [v0] 🔍 Searching for Amazon product image...
+[2026-01-05T19:34:33.755Z] [v0] ⚠️ Image URL doesn't contain media-amazon.com/images/I/: {}
+[2026-01-05T19:34:33.756Z] [v0] Pattern 7 matched, raw URL: {&quot;https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg&quot;:[522,522],&quot;https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX569_
+[2026-01-05T19:34:33.756Z] [v0] Found 7 URLs in JSON data
+[2026-01-05T19:34:33.756Z] [v0] ✅ Found Amazon product image candidate: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T19:34:33.756Z] [v0] Selected larger image: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T19:34:33.755Z] [v0] ⚠️ Image URL doesn't contain media-amazon.com/images/I/: {}
+[2026-01-05T19:34:33.756Z] [v0] ✅ Set Amazon product image from landingImage/dynamic-image: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T19:34:33.755Z] [v0] Found 0 URLs in JSON data
+[2026-01-05T19:34:33.756Z] [v0] === NON-AI EXTRACTION MODE ===
+[2026-01-05T19:34:33.755Z] [v0] Found 0 URLs in JSON data
+[2026-01-05T19:34:33.757Z] [v0] Hostname: amazon.com, URL: https://www.amazon.com/dp/B0FQFWDL6Z/ref=twister_B0FQH8MTD1?_encoding=UTF8&th=1https://www.amazon.co
+[2026-01-05T19:34:33.757Z] [v0] ✅ Set imageUrl from structuredData: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T19:34:33.757Z] [v0] Extracting product name from HTML, length: 1952679
+[2026-01-05T19:34:33.757Z] [v0] ✅ Found Amazon product name: Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Li
+[2026-01-05T19:34:33.757Z] [v0] ✅ Extracted price: 451 from string: "451"
+[2026-01-05T19:34:33.758Z] [v0] ✅ Extracted price from HTML: 451 (preserved decimals)
+[2026-01-05T19:34:33.758Z] [v0] 🔍 Checking price extraction conditions - htmlContent: true, length: 1952679, hostname: amazon.com, isAmazon: true, isMacy: false, isTommy: false
+[2026-01-05T19:34:33.758Z] [v0] 🔍 Starting Amazon price extraction, htmlContent length: 1952679
+[2026-01-05T19:34:33.758Z] [v0] 🏪 Amazon URL detected - will use Amazon-specific price extraction
+[2026-01-05T19:34:33.758Z] [v0] Pattern 1 - discountMatch: null, listPriceMatch: null
+[2026-01-05T19:34:33.759Z] [v0] ⚠️ Pattern 1 - No valid discount pattern found
+[2026-01-05T19:34:33.759Z] [v0] ⚠️ Pattern 1 - No list price found
+[2026-01-05T19:34:33.759Z] [v0] 🔍 Pattern 4: Searching for specific Amazon price values (45.00 and 29.25)...
+[2026-01-05T19:34:33.759Z] [v0] HTML contains '29.25': false
+[2026-01-05T19:34:33.759Z] [v0] HTML contains '45.00': false
+[2026-01-05T19:34:33.759Z] [v0] HTML contains 'List Price': true
+[2026-01-05T19:34:33.759Z] [v0] Extracted description from HTML meta tag for color extraction: Buy Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Light Blush Sport 
+[2026-01-05T19:34:33.759Z] [v0] Search text length: 461, contains 'Cranberry': false, contains 'Gloss': false
+[2026-01-05T19:34:33.759Z] [v0] 🔍 Amazon detected - extracting color from selected variant/HTML/product name
+[2026-01-05T19:34:33.760Z] [v0] ⚠️ Keeping better image from structuredData, rejecting bestImageUrl: https://m.media-amazon.com/images/I/61Jbp0NvVQL._AC_SX522_.jpg
+[2026-01-05T19:34:33.760Z] [v0] 🔍 Extracting material for Amazon product...
+[2026-01-05T19:34:33.760Z] [v0] Extracted size from HTML: l
+[2026-01-05T19:34:33.760Z] [v0] 🚨 ABSOLUTE FINAL FIX: No salePrice found, using main price: 451
+[2026-01-05T19:34:33.760Z] [v0] 🔍 Extracting Amazon rating and review count...
+[2026-01-05T19:34:33.760Z] [v0] ✅ Extracted rating from aria-label: 4.4, review count: 92
+[2026-01-05T19:34:33.760Z] [v0] 📊 FINAL RATING VALUES - rating: 4.4, reviewCount: 92
+[2026-01-05T19:34:33.761Z] [v0] 🔍 Checking for jewelry-specific attributes...
+[2026-01-05T19:34:33.761Z] [v0] ⚠️ Skipping carat weight extraction - product appears to be metal-only jewelry (Apple Watch Series 11 [GPS 46mm] Smartwatch with Rose Gold Aluminum Case with Light Blush Sport Band - M/L. Sleep Score, Fitness Tracker, Health Monitoring, Always-On Display, Water Resistant)
+[2026-01-05T19:34:33.761Z] [v0] Pattern 6 matched, raw URL: {}
+[2026-01-05T19:34:33.761Z] [v0] ✅ Extracted jewelry color: Rose Gold (overrode generic color)
+[2026-01-05T19:34:33.762Z] [v0] ✅ Extracted material from product name: Rose Gold

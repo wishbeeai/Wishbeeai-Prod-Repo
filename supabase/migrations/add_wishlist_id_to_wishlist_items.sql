@@ -15,3 +15,4 @@ CREATE INDEX IF NOT EXISTS idx_wishlist_items_wishlist_id ON wishlist_items(wish
 -- Example: UPDATE wishlist_items SET wishlist_id = (SELECT id FROM wishlists WHERE user_id = ... LIMIT 1);
 
 
+

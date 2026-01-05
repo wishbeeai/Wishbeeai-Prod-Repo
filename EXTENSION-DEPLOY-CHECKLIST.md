@@ -56,3 +56,4 @@
 - Items should appear in the "My Wishlist" page
 - No more 500 errors from `/api/extension/add-item`
 
+

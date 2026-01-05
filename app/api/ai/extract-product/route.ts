@@ -5450,19 +5450,12 @@ export async function POST(request: Request) {
   try {
     log("[v0] === Product extraction API called ===")
     
-    // Check if OPENAI_API_KEY is configured
+    // Check if OPENAI_API_KEY is configured (warn but don't fail - non-AI extraction can work without it)
     if (!process.env.OPENAI_API_KEY) {
-      console.error("[v0] CRITICAL: OPENAI_API_KEY is missing!")
-      return NextResponse.json(
-        { 
-          error: "OPENAI_API_KEY not configured",
-          details: "Please add OPENAI_API_KEY to your environment variables",
-        },
-        { status: 500 }
-      )
+      console.warn("[v0] WARNING: OPENAI_API_KEY is missing - will use non-AI extraction only")
+    } else {
+      log(`[v0] OPENAI_API_KEY is configured: ${!!process.env.OPENAI_API_KEY}`)
     }
-    
-    log(`[v0] OPENAI_API_KEY is configured: ${!!process.env.OPENAI_API_KEY}`)
 
     const body = await request.json()
     const { productUrl, url } = body
@@ -5589,6 +5582,8 @@ Return ONLY valid JSON, no markdown, no explanation.`
 
         // Determine if JavaScript rendering is needed
         const needsJavaScriptRendering =
+          hostname.includes("amazon.com") ||
+          hostname.includes("amazon.") ||
           hostname.includes("tommy.com") ||
           hostname.includes("homedepot") ||
           hostname.includes("lowes") ||
@@ -7448,14 +7443,30 @@ Return ONLY valid JSON, no markdown, no explanation.`
     console.error("[v0] Error object:", error)
     console.error("[v0] Error message:", error instanceof Error ? error.message : String(error))
     console.error("[v0] Error stack:", error instanceof Error ? error.stack : "No stack trace")
+    
+    // Enhanced error details for debugging
+    const errorDetails: any = {
+      error: "Failed to extract product information",
+      message: error instanceof Error ? error.message : String(error),
+    }
+    
+    // Add stack trace in development
+    if (process.env.NODE_ENV === 'development' && error instanceof Error) {
+      errorDetails.stack = error.stack
+    }
+    
+    // Add common error context
+    if (error instanceof Error) {
+      if (error.message.includes('API key') || error.message.includes('OPENAI')) {
+        errorDetails.suggestion = "Check that OPENAI_API_KEY is set in .env.local"
+      } else if (error.message.includes('fetch') || error.message.includes('network')) {
+        errorDetails.suggestion = "Network error - check internet connection or API service status"
+      } else if (error.message.includes('JSON') || error.message.includes('parse')) {
+        errorDetails.suggestion = "JSON parsing error - check API response format"
+      }
+    }
 
-    return NextResponse.json(
-      {
-        error: "Failed to extract product information",
-        details: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 },
-    )
+    return NextResponse.json(errorDetails, { status: 500 })
   }
 }
 
