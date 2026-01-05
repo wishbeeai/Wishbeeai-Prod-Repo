@@ -178,4 +178,31 @@
     animation: gradient 6s ease infinite;
     background-size: 200% 200%;
   }
+
+  @keyframes beeFloat {
+    0%, 100% {
+      transform: scaleX(-1) translateY(0px) rotate(0deg);
+    }
+    50% {
+      transform: scaleX(-1) translateY(-8px) rotate(-3deg);
+    }
+  }
+
+  @keyframes giftSway {
+    0%, 100% {
+      transform: translateX(-3px) translateY(4px) rotate(-10deg);
+    }
+    50% {
+      transform: translateX(-5px) translateY(0px) rotate(-15deg);
+    }
+  }
+
+  .animate-bee-float {
+    animation: beeFloat 3s ease-in-out infinite;
+  }
+
+  .animate-gift-sway {
+    animation: giftSway 2.5s ease-in-out infinite;
+    animation-delay: 0.3s;
+  }
 }

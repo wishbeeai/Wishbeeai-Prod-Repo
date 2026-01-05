@@ -116,7 +116,7 @@ export function Header() {
           <div className="flex items-center justify-between h-14 sm:h-16 md:h-20 lg:h-24 gap-2 sm:gap-4 md:gap-8">
             <Link
               href="/"
-              className="flex items-center gap-1.5 sm:gap-2 md:gap-3 hover:opacity-100 transition-all duration-300 group flex-shrink-0"
+              className="flex items-center gap-0 hover:opacity-100 transition-all duration-300 group flex-shrink-0"
               onClick={() => {
                 toast({
                   title: "Going Home",
@@ -124,22 +124,29 @@ export function Header() {
                 })
               }}
             >
-              <div className="relative text-2xl sm:text-3xl md:text-4xl lg:text-5xl scale-x-[-1] hover:scale-x-[-1.1] hover:scale-y-110 transition-transform duration-300 group-hover:rotate-12 drop-shadow-[0_0_15px_rgba(218,165,32,0.6)] group-hover:drop-shadow-[0_0_25px_rgba(218,165,32,0.9)]">
-                🐝
+              <div className="relative h-14 w-auto sm:h-16 sm:w-auto md:h-20 md:w-auto lg:h-24 lg:w-auto xl:h-28 xl:w-auto flex-shrink-0 transition-transform duration-300 group-hover:scale-105">
+                <Image
+                  src="/images/LogoBee-V1.png"
+                  alt="Wishbee.ai Logo"
+                  width={1024}
+                  height={1024}
+                  className="h-full w-auto object-contain transition-all duration-300"
+                  priority
+                />
               </div>
-              <div className="flex flex-col gap-0.5">
-                <span className="text-[#F5DEB3] font-bold text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl leading-tight tracking-tight group-hover:opacity-90 transition-all duration-300">
+              <div className="flex flex-col gap-0.5 items-end -ml-3">
+                <span className="text-[#F5DEB3] font-bold text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl leading-tight tracking-tight group-hover:text-[#DAA520] transition-all duration-300 drop-shadow-[0_2px_4px_rgba(0,0,0,0.2)]">
                   Wishbee.ai
                 </span>
-                <span className="text-[#DAA520] text-[10px] sm:text-xs md:text-sm lg:text-base font-bold tracking-normal italic group-hover:tracking-wide transition-all duration-300 font-[family-name:var(--font-dancing)] text-center">
-                  Gift Together
+                <span className="text-[#F4C430] text-[10px] sm:text-xs md:text-sm lg:text-base font-bold tracking-normal italic group-hover:text-[#FFD700] group-hover:tracking-wide transition-all duration-300 font-[family-name:var(--font-shadows)] text-right drop-shadow-[0_1px_2px_rgba(0,0,0,0.15)]">
+                  Gift What They Love
                 </span>
               </div>
             </Link>
 
             {user ? (
               <>
-                <div className="hidden lg:flex items-center gap-1 flex-wrap">
+                <div className="hidden lg:flex items-center justify-end gap-1 flex-wrap">
                   {menuItems.map((item) => (
                     <div
                       key={item.title}

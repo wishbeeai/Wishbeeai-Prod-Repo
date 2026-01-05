@@ -1,6 +1,6 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { Poppins, Inter, Shadows_Into_Light, Kalam, Dancing_Script } from "next/font/google"
+import { Poppins, Inter, Shadows_Into_Light, Kalam, Dancing_Script, Pacifico } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import { Toaster } from "@/components/ui/toaster"
 import { AuthProvider } from "@/lib/auth-context"
@@ -35,6 +35,12 @@ const dancingScript = Dancing_Script({
   variable: "--font-dancing",
 })
 
+const pacifico = Pacifico({
+  subsets: ["latin"],
+  weight: ["400"],
+  variable: "--font-pacifico",
+})
+
 export const metadata: Metadata = {
   title: "Wishbee.ai - Gift Together. Give Better.",
   description: "The modern wishlist that pools money for the perfect group gift",
@@ -66,7 +72,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${inter.variable} ${poppins.variable} ${shadowsIntoLight.variable} ${kalam.variable} ${dancingScript.variable} font-sans antialiased`}
+        className={`${inter.variable} ${poppins.variable} ${shadowsIntoLight.variable} ${kalam.variable} ${dancingScript.variable} ${pacifico.variable} font-sans antialiased`}
       >
         <AuthProvider>
           {children}
