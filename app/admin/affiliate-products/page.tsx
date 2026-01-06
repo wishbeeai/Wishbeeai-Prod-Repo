@@ -82,6 +82,11 @@ export default function AdminAffiliateProductsPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [isExtracting, setIsExtracting] = useState(false)
   const [extractedProduct, setExtractedProduct] = useState<any>(null)
+  // Temporary string values to preserve decimal points while typing
+  const [tempPriceValue, setTempPriceValue] = useState<string>("")
+  const [tempOriginalPriceValue, setTempOriginalPriceValue] = useState<string>("")
+  const [tempRatingValue, setTempRatingValue] = useState<string>("")
+  const [tempReviewCountValue, setTempReviewCountValue] = useState<string>("")
   const [addingToWishlist, setAddingToWishlist] = useState<string | null>(null)
   const [isOptionModalOpen, setIsOptionModalOpen] = useState(false)
   const [selectedProductForWishlist, setSelectedProductForWishlist] = useState<AffiliateProduct | null>(null)
@@ -93,6 +98,37 @@ export default function AdminAffiliateProductsPage() {
     quantity?: number
     [key: string]: any
   }>({ quantity: 1 })
+  
+  // Map of attribute labels for better display
+  const attributeLabels: { [key: string]: string } = {
+    size: "Size",
+    color: "Color",
+    material: "Material",
+    type: "Type",
+    width: "Width",
+    capacity: "Capacity",
+    fitType: "Fit Type",
+    heelHeight: "Heel Height",
+    model: "Model",
+    offerType: "Offer Type",
+    kindleUnlimited: "Kindle Unlimited",
+    energyRating: "Energy Rating",
+    ageRange: "Age Range",
+    author: "Author",
+    publisher: "Publisher",
+    pageCount: "Page Count",
+    isbn: "ISBN",
+    gemstone: "Gemstone",
+    caratWeight: "Carat Weight",
+    dimensions: "Dimensions",
+    weight: "Weight",
+    assembly: "Assembly Required",
+    seatDepth: "Seat Depth",
+    seatHeight: "Seat Height",
+    weightLimit: "Weight Limit",
+    seatingCapacity: "Seating Capacity",
+    style: "Style",
+  }
   const [formData, setFormData] = useState({
     productName: "",
     image: "",
@@ -135,7 +171,9 @@ export default function AdminAffiliateProductsPage() {
       const response = await fetch("/api/admin/affiliate-products")
       if (response.ok) {
         const data = await response.json()
-        setProducts(data.products || [])
+        const fetchedProducts = data.products || []
+        console.log(`[fetchProducts] Fetched ${fetchedProducts.length} products`)
+        setProducts(fetchedProducts)
       } else {
         toast.error("Failed to load affiliate products")
       }
@@ -203,6 +241,19 @@ export default function AdminAffiliateProductsPage() {
       productLink: product.productLink || "",
       amazonChoice: product.amazonChoice || false,
       bestSeller: product.bestSeller || false,
+    })
+    // Populate extractedProduct with existing product data for editing
+    setExtractedProduct({
+      productName: product.productName || "",
+      image: product.image || "",
+      category: product.category || "",
+      source: product.source || "",
+      rating: product.rating || null,
+      reviewCount: product.reviewCount || null,
+      price: product.price || null,
+      originalPrice: product.originalPrice || null,
+      productLink: product.productLink || "",
+      brand: null, // Will be extracted if needed
     })
     setIsEditModalOpen(true)
   }
@@ -400,20 +451,61 @@ export default function AdminAffiliateProductsPage() {
         const data = await response.json()
         const extracted = data.productData || data
         
-        // Extract available options (size, color, quantity, etc.)
-        const options: any = {
-          sizes: extracted.attributes?.size ? [extracted.attributes.size] : extracted.sizes || [],
-          colors: extracted.attributes?.color ? [extracted.attributes.color] : extracted.colors || [],
-          quantity: 1,
+        // Extract all available attributes from the product
+        const attributes: { [key: string]: any } = {}
+        
+        // Get all attributes from the extracted data
+        if (extracted.attributes) {
+          // Filter out null/undefined/empty values and collect all available attributes
+          Object.keys(extracted.attributes).forEach((key) => {
+            const value = extracted.attributes[key]
+            if (value !== null && value !== undefined && value !== '') {
+              // For attributes that might be arrays or single values
+              if (Array.isArray(value) && value.length > 0) {
+                // Convert array items to strings if they're objects
+                attributes[key] = value.map((item: any) => {
+                  if (typeof item === 'object' && item !== null) {
+                    // If it's an object, try to extract a meaningful string representation
+                    return item.label || item.name || item.value || JSON.stringify(item)
+                  }
+                  return String(item)
+                })
+              } else if (typeof value === 'string' && value.trim() !== '') {
+                attributes[key] = [value] // Convert single value to array for consistency
+              } else if (typeof value === 'number') {
+                attributes[key] = [value.toString()]
+              } else if (typeof value === 'object' && value !== null) {
+                // Handle object values (e.g., {label: "Small", value: "S"})
+                const objValue = value.label || value.name || value.value || JSON.stringify(value)
+                if (objValue) {
+                  attributes[key] = [String(objValue)]
+                }
+              }
+            }
+          })
+        }
+        
+        // Also check for legacy size/color arrays
+        if (extracted.sizes && extracted.sizes.length > 0) {
+          attributes.size = extracted.sizes
+        }
+        if (extracted.colors && extracted.colors.length > 0) {
+          attributes.color = extracted.colors
         }
         
         // If we have variants, extract them
-        if (extracted.variants) {
-          options.sizes = extracted.variants.map((v: any) => v.size).filter(Boolean)
-          options.colors = extracted.variants.map((v: any) => v.color).filter(Boolean)
+        if (extracted.variants && Array.isArray(extracted.variants)) {
+          const variantSizes = extracted.variants.map((v: any) => v.size).filter(Boolean)
+          const variantColors = extracted.variants.map((v: any) => v.color).filter(Boolean)
+          if (variantSizes.length > 0) {
+            attributes.size = [...new Set([...(attributes.size || []), ...variantSizes])]
+          }
+          if (variantColors.length > 0) {
+            attributes.color = [...new Set([...(attributes.color || []), ...variantColors])]
+          }
         }
         
-        setProductOptions(options)
+        setProductOptions(attributes)
         setSelectedOptions({ quantity: 1 })
       }
     } catch (error) {
@@ -425,13 +517,6 @@ export default function AdminAffiliateProductsPage() {
     }
   }
 
-  const handleBuyOnStore = (product: AffiliateProduct) => {
-    if (product.productLink) {
-      window.open(product.productLink, "_blank", "noopener,noreferrer")
-    } else {
-      toast.error("Product link not available")
-    }
-  }
 
   const handleConfirmAddToWishlist = async () => {
     if (!selectedProductForWishlist) return
@@ -440,13 +525,26 @@ export default function AdminAffiliateProductsPage() {
     try {
       // Build product link with selected options
       let productLink = selectedProductForWishlist.productLink
-      if (selectedOptions.size || selectedOptions.color) {
-        // Append options to URL if needed
-        const url = new URL(productLink)
-        if (selectedOptions.size) url.searchParams.set('size', selectedOptions.size)
-        if (selectedOptions.color) url.searchParams.set('color', selectedOptions.color)
-        productLink = url.toString()
-      }
+      const url = new URL(productLink)
+      
+      // Add all selected attributes to URL parameters
+      Object.keys(selectedOptions).forEach((key) => {
+        if (key !== 'quantity' && selectedOptions[key]) {
+          url.searchParams.set(key, String(selectedOptions[key]))
+        }
+      })
+      productLink = url.toString()
+
+      // Build description with all selected attributes
+      const attributeDescriptions: string[] = []
+      Object.keys(selectedOptions).forEach((key) => {
+        if (key !== 'quantity' && selectedOptions[key]) {
+          const label = attributeLabels[key] || key.charAt(0).toUpperCase() + key.slice(1)
+          attributeDescriptions.push(`${label}: ${selectedOptions[key]}`)
+        }
+      })
+      
+      const description = `${selectedProductForWishlist.productName} from ${selectedProductForWishlist.source}${attributeDescriptions.length > 0 ? ` - ${attributeDescriptions.join(', ')}` : ''}${selectedOptions.quantity ? ` - Quantity: ${selectedOptions.quantity}` : ''}`
 
       const response = await fetch("/api/wishlist", {
         method: "POST",
@@ -456,7 +554,7 @@ export default function AdminAffiliateProductsPage() {
         body: JSON.stringify({
           giftName: selectedProductForWishlist.productName,
           currentPrice: selectedProductForWishlist.price,
-          description: `${selectedProductForWishlist.productName} from ${selectedProductForWishlist.source}${selectedOptions.size ? ` - Size: ${selectedOptions.size}` : ''}${selectedOptions.color ? ` - Color: ${selectedOptions.color}` : ''}${selectedOptions.quantity ? ` - Quantity: ${selectedOptions.quantity}` : ''}`,
+          description: description,
           productImageUrl: selectedProductForWishlist.image,
           storeName: selectedProductForWishlist.source,
           productLink: productLink,
@@ -504,11 +602,21 @@ export default function AdminAffiliateProductsPage() {
 
     setIsSaving(true)
     try {
+      // Ensure we have a valid product ID when editing
+      if (isEditModalOpen && !editingProduct?.id) {
+        toast.error("Product ID is missing. Please refresh and try again.")
+        setIsSaving(false)
+        return
+      }
+
       const url = isEditModalOpen && editingProduct
         ? `/api/admin/affiliate-products/${editingProduct.id}`
         : "/api/admin/affiliate-products"
 
       const method = isEditModalOpen ? "PUT" : "POST"
+      
+      console.log(`[handleSave] ${method} request to: ${url}`)
+      console.log(`[handleSave] Editing product ID:`, editingProduct?.id)
 
       const payload: any = {
         productName: extractedProduct.productName.trim(),
@@ -516,14 +624,20 @@ export default function AdminAffiliateProductsPage() {
         category: extractedProduct.category.trim(),
         source: extractedProduct.source.trim(),
         rating: extractedProduct.rating !== null && extractedProduct.rating !== undefined ? parseFloat(extractedProduct.rating.toString()) : 0,
-        reviewCount: extractedProduct.reviewCount !== null && extractedProduct.reviewCount !== undefined ? parseInt(extractedProduct.reviewCount.toString(), 10) : 0,
+        reviewCount: extractedProduct.reviewCount !== null && extractedProduct.reviewCount !== undefined ? parseFloat(extractedProduct.reviewCount.toString()) : 0,
         price: parseFloat(extractedProduct.price.toString()),
         originalPrice: extractedProduct.originalPrice !== null && extractedProduct.originalPrice !== undefined ? parseFloat(extractedProduct.originalPrice.toString()) : undefined,
-        productLink: formData.productLink.trim() || undefined, // Use formData.productLink as it's the URL input
+        productLink: isEditModalOpen && editingProduct 
+          ? (editingProduct.productLink || extractedProduct.productLink || formData.productLink || "").trim() || undefined
+          : (formData.productLink || extractedProduct.productLink || "").trim() || undefined,
         amazonChoice: formData.amazonChoice,
         bestSeller: formData.bestSeller,
       }
 
+      console.log(`[handleSave] ${method} request to: ${url}`)
+      console.log(`[handleSave] Editing product ID:`, editingProduct?.id)
+      console.log(`[handleSave] Payload:`, JSON.stringify(payload, null, 2))
+      
       const response = await fetch(url, {
         method,
         headers: {
@@ -532,16 +646,107 @@ export default function AdminAffiliateProductsPage() {
         body: JSON.stringify(payload),
       })
 
+      console.log(`[handleSave] Response status: ${response.status} ${response.statusText}`)
+      
       if (response.ok) {
+        const result = await response.json()
+        console.log(`[handleSave] Success:`, result)
+        
         toast.success(isEditModalOpen ? "Product updated successfully" : "Product added successfully")
+        
+        // Update local state immediately for instant UI feedback
+        if (isEditModalOpen && result.product && editingProduct?.id) {
+          const productId = String(editingProduct.id)
+          console.log(`[handleSave] Updating local state for product ID: ${productId}`)
+          console.log(`[handleSave] Updated product data:`, result.product)
+          
+          setProducts((prevProducts) => {
+            // Create a new array to ensure React detects the change
+            const updatedProducts = prevProducts.map((p) => {
+              const pId = String(p.id)
+              if (pId === productId) {
+                // Create a completely new object with all updated fields
+                const updated: AffiliateProduct = {
+                  ...p,
+                  productName: result.product.productName ?? p.productName,
+                  image: result.product.image ?? p.image,
+                  category: result.product.category ?? p.category,
+                  source: result.product.source ?? p.source,
+                  rating: result.product.rating ?? p.rating,
+                  reviewCount: result.product.reviewCount ?? p.reviewCount,
+                  price: result.product.price ?? p.price,
+                  originalPrice: result.product.originalPrice ?? p.originalPrice,
+                  productLink: result.product.productLink ?? p.productLink,
+                  amazonChoice: result.product.amazonChoice ?? p.amazonChoice,
+                  bestSeller: result.product.bestSeller ?? p.bestSeller,
+                  id: p.id, // Preserve original ID
+                }
+                console.log(`[handleSave] Found and updated product:`, updated)
+                return updated
+              }
+              // Return new object reference for unchanged products too
+              return { ...p }
+            })
+            
+            // If product wasn't found in the list, add it
+            const productExists = updatedProducts.some((p) => String(p.id) === productId)
+            if (!productExists && result.product) {
+              console.log(`[handleSave] Product not found in list, adding it`)
+              updatedProducts.push({ ...result.product, id: editingProduct.id } as AffiliateProduct)
+            }
+            
+            console.log(`[handleSave] Final products count: ${updatedProducts.length}`)
+            // Return new array reference
+            return [...updatedProducts]
+          })
+        }
+        
         setIsAddModalOpen(false)
         setIsEditModalOpen(false)
         setEditingProduct(null)
         resetForm()
-        fetchProducts()
+        
+        // For edit mode, skip fetchProducts to preserve the immediate update
+        // For add mode, fetchProducts to get the new product with its ID
+        if (!isEditModalOpen) {
+          await fetchProducts()
+        } else {
+          // Small delay to ensure state update is processed
+          setTimeout(() => {
+            console.log(`[handleSave] State update complete, current products:`, products.length)
+          }, 100)
+        }
       } else {
-        const error = await response.json()
-        toast.error(error.error || "Failed to save product")
+        let error: any = {}
+        try {
+          const text = await response.text()
+          console.log(`[handleSave] Error response text:`, text)
+          if (text) {
+            try {
+              error = JSON.parse(text)
+            } catch {
+              error = { error: text || `HTTP ${response.status}: ${response.statusText}` }
+            }
+          } else {
+            error = { error: `HTTP ${response.status}: ${response.statusText}` }
+          }
+        } catch (parseError) {
+          console.error(`[handleSave] Failed to parse error response:`, parseError)
+          error = { error: `HTTP ${response.status}: ${response.statusText}` }
+        }
+        
+        console.error(`[handleSave] Error response:`, error)
+        const errorMessage = error.error || error.message || `Failed to save product (${response.status})`
+        toast.error(errorMessage)
+        
+        if (error.availableIds) {
+          console.error(`[handleSave] Available product IDs:`, error.availableIds)
+        }
+        
+        // Log additional debugging info
+        console.error(`[handleSave] Request URL: ${url}`)
+        console.error(`[handleSave] Request method: ${method}`)
+        console.error(`[handleSave] Product ID being updated:`, editingProduct?.id)
       }
     } catch (error) {
       console.error("Error saving product:", error)
@@ -798,16 +1003,34 @@ export default function AdminAffiliateProductsPage() {
                     <td className="py-5 px-4">
                       <div className="flex flex-col items-start gap-1.5">
                         <div className="flex items-center gap-1">
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <Star
-                              key={star}
-                              className={`w-4 h-4 sm:w-5 sm:h-5 ${
-                                star <= Math.round(product.rating)
-                                  ? "fill-[#F4C430] text-[#F4C430]"
-                                  : "fill-gray-200 text-gray-300"
-                              }`}
-                            />
-                          ))}
+                          {[1, 2, 3, 4, 5].map((star) => {
+                            // Calculate fill percentage for each star based on rating
+                            const starValue = product.rating - star
+                            let fillPercent = 0
+                            
+                            if (starValue >= 1) {
+                              fillPercent = 100 // Fully filled
+                            } else if (starValue <= 0) {
+                              fillPercent = 0 // Empty
+                            } else {
+                              // Fractional part: 0.1 → 10%, 0.9 → 90%
+                              fillPercent = Math.round(starValue * 100)
+                            }
+                            
+                            // For full star icons, show as filled if >= 50%, empty if < 50%
+                            const isFilled = fillPercent >= 50
+                            
+                            return (
+                              <Star
+                                key={star}
+                                className={`w-4 h-4 sm:w-5 sm:h-5 ${
+                                  isFilled
+                                    ? "fill-[#F4C430] text-[#F4C430]"
+                                    : "fill-gray-200 text-gray-300"
+                                }`}
+                              />
+                            )
+                          })}
                         </div>
                         <span className="text-sm font-bold text-[#654321]">{product.rating.toFixed(1)}</span>
                       </div>
@@ -869,14 +1092,8 @@ export default function AdminAffiliateProductsPage() {
                               Adding...
                             </>
                           ) : (
-                            "Add to My Wishlist"
+                            "Add to Trending Gifts"
                           )}
-                        </Button>
-                        <Button
-                          onClick={() => handleBuyOnStore(product)}
-                          className="w-full h-9 px-3 rounded-full bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] text-xs font-semibold transition-all duration-200 hover:scale-105 hover:from-[#F4C430] hover:to-[#DAA520] active:scale-95 shadow-md hover:shadow-lg"
-                        >
-                          Buy on {product.source}
                         </Button>
                       </div>
                     </td>
@@ -983,7 +1200,7 @@ export default function AdminAffiliateProductsPage() {
           resetForm()
         }
       }}>
-              <DialogContent className="max-w-4xl lg:max-w-5xl max-h-[90vh] overflow-y-auto bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 [&>button]:top-6 [&>button]:right-6 [&>button]:z-10">
+              <DialogContent className="max-w-4xl lg:max-w-5xl max-h-[90vh] overflow-y-auto bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 [&>button[data-slot='dialog-close']]:top-4 [&>button[data-slot='dialog-close']]:right-4 [&>button[data-slot='dialog-close']]:z-50">
                 <DialogHeader>
                   <div className="bg-card border border-border rounded-lg p-6 mb-6">
                     <div className="flex flex-row items-center justify-center gap-2">
@@ -1003,94 +1220,99 @@ export default function AdminAffiliateProductsPage() {
                   </DialogDescription>
                 </DialogHeader>
           <div className="pt-2 pb-4 space-y-4">
-            {/* Product Link */}
-            <div className="mb-8">
-              <label htmlFor="productLink" className="block text-sm font-semibold text-gray-700 mb-2">
-                Product URL <span className="text-red-500">*</span>
-              </label>
-              <div className="flex flex-col sm:flex-row gap-3">
-                <div className="relative flex-1">
-                  <Input
-                    id="productLink"
-                    type="text"
-                    value={formData.productLink}
-                    onChange={(e) => handleProductLinkChange(e.target.value)}
-                    onPaste={(e) => {
-                      const pastedText = e.clipboardData.getData("text")
-                      if (pastedText.startsWith("http")) {
-                        handleProductLinkChange(pastedText)
-                      }
-                    }}
-                    placeholder="Paste product link to extract product details"
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-200 text-xs sm:text-sm md:text-base"
-                    disabled={isExtracting}
-                  />
-                </div>
-                <Button
-                  type="button"
-                  onClick={handleExtractProduct}
-                  disabled={isExtracting || !formData.productLink.trim()}
-                  className="bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 text-white hover:from-amber-600 hover:via-orange-600 hover:to-rose-600 whitespace-nowrap"
-                >
-                  {isExtracting ? (
-                    <>
-                      <Loader2 className="mr-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
-                      Extracting...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                      AI Extract
-                    </>
-                  )}
-                </Button>
-              </div>
-              
-              {/* Cancel and Close Window Buttons - Only show before extraction */}
-              {!extractedProduct && (
-                <div className="flex justify-center gap-3 mt-8">
-                  <Button
-                    onClick={() => {
-                      setIsAddModalOpen(false)
-                      setIsEditModalOpen(false)
-                      setEditingProduct(null)
-                      resetForm()
-                    }}
-                    className="bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] hover:from-[#F4C430] hover:to-[#DAA520]"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      setIsAddModalOpen(false)
-                      setIsEditModalOpen(false)
-                      setEditingProduct(null)
-                      resetForm()
-                    }}
-                    className="bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] hover:from-[#F4C430] hover:to-[#DAA520]"
-                  >
-                    Close Window
-                  </Button>
-                </div>
-              )}
-            </div>
-
-            {/* Product Extract Details Widget */}
-            {extractedProduct && (
-              <div className="mt-6">
-                <div className="bg-card border border-border rounded-lg p-6 mb-6">
-                  <div className="flex flex-row items-center justify-center gap-2">
-                    <Sparkles className="w-5 h-5 sm:w-8 sm:h-8 md:w-10 md:h-10 text-[#DAA520] flex-shrink-0" />
-                    <h3 className="text-xl sm:text-3xl md:text-4xl font-bold text-foreground whitespace-nowrap">
-                      Extracted Product
-                    </h3>
+            {/* Product Link - Only show when adding, not when editing */}
+            {!isEditModalOpen && (
+              <div className="mb-8">
+                <label htmlFor="productLink" className="block text-sm font-semibold text-gray-700 mb-2">
+                  Product URL <span className="text-red-500">*</span>
+                </label>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="relative flex-1">
+                    <Input
+                      id="productLink"
+                      type="text"
+                      value={formData.productLink}
+                      onChange={(e) => handleProductLinkChange(e.target.value)}
+                      onPaste={(e) => {
+                        const pastedText = e.clipboardData.getData("text")
+                        if (pastedText.startsWith("http")) {
+                          handleProductLinkChange(pastedText)
+                        }
+                      }}
+                      placeholder="Paste product link to extract product details"
+                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-200 text-xs sm:text-sm md:text-base"
+                      disabled={isExtracting}
+                    />
                   </div>
-                  <p className="text-xs sm:text-sm text-muted-foreground text-center mt-2">
-                    Review and edit the extracted product details before adding to your catalog
-                  </p>
+                  <Button
+                    type="button"
+                    onClick={handleExtractProduct}
+                    disabled={isExtracting || !formData.productLink.trim()}
+                    className="bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 text-white hover:from-amber-600 hover:via-orange-600 hover:to-rose-600 whitespace-nowrap"
+                  >
+                    {isExtracting ? (
+                      <>
+                        <Loader2 className="mr-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
+                        Extracting...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                        AI Extract
+                      </>
+                    )}
+                  </Button>
                 </div>
                 
+                {/* Cancel and Close Window Buttons - Only show before extraction */}
+                {!extractedProduct && (
+                  <div className="flex justify-center gap-3 mt-8">
+                    <Button
+                      onClick={() => {
+                        setIsAddModalOpen(false)
+                        setIsEditModalOpen(false)
+                        setEditingProduct(null)
+                        resetForm()
+                      }}
+                      className="bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] hover:from-[#F4C430] hover:to-[#DAA520]"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setIsAddModalOpen(false)
+                        setIsEditModalOpen(false)
+                        setEditingProduct(null)
+                        resetForm()
+                      }}
+                      className="bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] hover:from-[#F4C430] hover:to-[#DAA520]"
+                    >
+                      Close Window
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Product Extract Details Widget - Show when extracted or when editing */}
+            {(extractedProduct || isEditModalOpen) && (
+              <div className="mt-6">
                 <div className="bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 border-2 border-[#F4C430] rounded-xl p-6 shadow-xl">
+                  {/* Header section - Only show when adding (not editing) */}
+                  {!isEditModalOpen && (
+                    <div className="bg-card border border-border rounded-lg p-4 sm:p-5 mb-4 sm:mb-5">
+                      <div className="flex flex-row items-center justify-center gap-2">
+                        <Sparkles className="w-4 h-4 sm:w-6 sm:h-6 md:w-8 md:h-8 text-[#DAA520] flex-shrink-0" />
+                        <h3 className="text-lg sm:text-xl md:text-2xl font-bold text-foreground whitespace-nowrap">
+                          Extracted Product
+                        </h3>
+                      </div>
+                      <p className="text-xs text-muted-foreground text-center mt-2">
+                        Review and edit the extracted product details before adding to your catalog
+                      </p>
+                    </div>
+                  )}
+                  
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Left Column */}
                   <div className="space-y-5">
@@ -1187,18 +1409,47 @@ export default function AdminAffiliateProductsPage() {
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#654321] font-bold text-lg">$</span>
                         <Input
                           required
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={extractedProduct.price ? parseFloat(extractedProduct.price.toString()).toFixed(2) : ""}
+                          type="text"
+                          inputMode="decimal"
+                          value={tempPriceValue !== "" ? tempPriceValue : (extractedProduct.price !== null && extractedProduct.price !== undefined 
+                            ? (typeof extractedProduct.price === 'number' 
+                                ? extractedProduct.price.toString() 
+                                : extractedProduct.price.toString())
+                            : "")}
                           onChange={(e) => {
-                            const value = parseFloat(e.target.value) || null
-                            setExtractedProduct({ ...extractedProduct, price: value })
+                            const inputValue = e.target.value
+                            // Allow empty string, digits, and single decimal point
+                            const validDecimalPattern = /^\d*\.?\d*$/
+                            if (inputValue === "" || validDecimalPattern.test(inputValue)) {
+                              setTempPriceValue(inputValue)
+                              if (inputValue === "" || inputValue === null) {
+                                setExtractedProduct({ ...extractedProduct, price: null })
+                              } else if (inputValue !== "." && !inputValue.endsWith(".")) {
+                                // Only update extractedProduct if it's a complete number (not ending with ".")
+                                const numValue = parseFloat(inputValue)
+                                if (!isNaN(numValue) && isFinite(numValue) && numValue >= 0) {
+                                  setExtractedProduct({ ...extractedProduct, price: numValue })
+                                }
+                              }
+                            }
                           }}
                           onBlur={(e) => {
-                            if (e.target.value) {
-                              const value = parseFloat(e.target.value) || 0
-                              setExtractedProduct({ ...extractedProduct, price: parseFloat(value.toFixed(2)) })
+                            const inputValue = e.target.value.trim()
+                            setTempPriceValue("")
+                            if (inputValue === "" || inputValue === null || inputValue === ".") {
+                              setExtractedProduct({ ...extractedProduct, price: null })
+                            } else {
+                              const value = parseFloat(inputValue)
+                              if (!isNaN(value) && isFinite(value) && value >= 0) {
+                                // Format to 2 decimal places on blur
+                                setExtractedProduct({ ...extractedProduct, price: Number(value.toFixed(2)) })
+                              }
+                            }
+                          }}
+                          onFocus={(e) => {
+                            // Initialize temp value when focusing
+                            if (extractedProduct.price !== null && extractedProduct.price !== undefined) {
+                              setTempPriceValue(extractedProduct.price.toString())
                             }
                           }}
                           placeholder="0.00"
@@ -1214,18 +1465,47 @@ export default function AdminAffiliateProductsPage() {
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600 font-semibold">$</span>
                         <Input
                           required
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={extractedProduct.originalPrice ? parseFloat(extractedProduct.originalPrice.toString()).toFixed(2) : ""}
+                          type="text"
+                          inputMode="decimal"
+                          value={tempOriginalPriceValue !== "" ? tempOriginalPriceValue : (extractedProduct.originalPrice !== null && extractedProduct.originalPrice !== undefined 
+                            ? (typeof extractedProduct.originalPrice === 'number' 
+                                ? extractedProduct.originalPrice.toString() 
+                                : extractedProduct.originalPrice.toString())
+                            : "")}
                           onChange={(e) => {
-                            const value = parseFloat(e.target.value) || null
-                            setExtractedProduct({ ...extractedProduct, originalPrice: value })
+                            const inputValue = e.target.value
+                            // Allow empty string, digits, and single decimal point
+                            const validDecimalPattern = /^\d*\.?\d*$/
+                            if (inputValue === "" || validDecimalPattern.test(inputValue)) {
+                              setTempOriginalPriceValue(inputValue)
+                              if (inputValue === "" || inputValue === null) {
+                                setExtractedProduct({ ...extractedProduct, originalPrice: null })
+                              } else if (inputValue !== "." && !inputValue.endsWith(".")) {
+                                // Only update extractedProduct if it's a complete number (not ending with ".")
+                                const numValue = parseFloat(inputValue)
+                                if (!isNaN(numValue) && isFinite(numValue) && numValue >= 0) {
+                                  setExtractedProduct({ ...extractedProduct, originalPrice: numValue })
+                                }
+                              }
+                            }
                           }}
                           onBlur={(e) => {
-                            if (e.target.value) {
-                              const value = parseFloat(e.target.value) || 0
-                              setExtractedProduct({ ...extractedProduct, originalPrice: parseFloat(value.toFixed(2)) })
+                            const inputValue = e.target.value.trim()
+                            setTempOriginalPriceValue("")
+                            if (inputValue === "" || inputValue === null || inputValue === ".") {
+                              setExtractedProduct({ ...extractedProduct, originalPrice: null })
+                            } else {
+                              const value = parseFloat(inputValue)
+                              if (!isNaN(value) && isFinite(value) && value >= 0) {
+                                // Format to 2 decimal places on blur
+                                setExtractedProduct({ ...extractedProduct, originalPrice: Number(value.toFixed(2)) })
+                              }
+                            }
+                          }}
+                          onFocus={(e) => {
+                            // Initialize temp value when focusing
+                            if (extractedProduct.originalPrice !== null && extractedProduct.originalPrice !== undefined) {
+                              setTempOriginalPriceValue(extractedProduct.originalPrice.toString())
                             }
                           }}
                           placeholder="0.00"
@@ -1239,12 +1519,49 @@ export default function AdminAffiliateProductsPage() {
                       <label className="block text-sm font-bold text-[#654321] mb-2">Rating (0-5) <span className="text-red-500">*</span></label>
                       <Input
                         required
-                        type="number"
-                        step="0.1"
-                        min="0"
-                        max="5"
-                        value={extractedProduct.rating || ""}
-                        onChange={(e) => setExtractedProduct({ ...extractedProduct, rating: parseFloat(e.target.value) || null })}
+                        type="text"
+                        inputMode="decimal"
+                        value={tempRatingValue !== "" ? tempRatingValue : (extractedProduct.rating !== null && extractedProduct.rating !== undefined 
+                          ? (typeof extractedProduct.rating === 'number' 
+                              ? extractedProduct.rating.toString() 
+                              : extractedProduct.rating.toString())
+                          : "")}
+                        onChange={(e) => {
+                          const inputValue = e.target.value
+                          // Allow empty string, digits, and single decimal point
+                          const validDecimalPattern = /^\d*\.?\d*$/
+                          if (inputValue === "" || validDecimalPattern.test(inputValue)) {
+                            setTempRatingValue(inputValue)
+                            if (inputValue === "" || inputValue === null) {
+                              setExtractedProduct({ ...extractedProduct, rating: null })
+                            } else if (inputValue !== "." && !inputValue.endsWith(".")) {
+                              // Only update extractedProduct if it's a complete number (not ending with ".")
+                              const numValue = parseFloat(inputValue)
+                              if (!isNaN(numValue) && isFinite(numValue) && numValue >= 0 && numValue <= 5) {
+                                setExtractedProduct({ ...extractedProduct, rating: numValue })
+                              }
+                            }
+                          }
+                        }}
+                        onBlur={(e) => {
+                          const inputValue = e.target.value.trim()
+                          setTempRatingValue("")
+                          if (inputValue === "" || inputValue === null || inputValue === ".") {
+                            setExtractedProduct({ ...extractedProduct, rating: null })
+                          } else {
+                            const value = parseFloat(inputValue)
+                            if (!isNaN(value) && isFinite(value) && value >= 0 && value <= 5) {
+                              // Preserve up to 1 decimal place for rating
+                              setExtractedProduct({ ...extractedProduct, rating: Number(value.toFixed(1)) })
+                            }
+                          }
+                        }}
+                        onFocus={(e) => {
+                          // Initialize temp value when focusing
+                          if (extractedProduct.rating !== null && extractedProduct.rating !== undefined) {
+                            setTempRatingValue(extractedProduct.rating.toString())
+                          }
+                        }}
                         placeholder="0.0"
                         className="text-sm border-2 border-gray-300 focus:border-[#DAA520] focus:ring-2 focus:ring-amber-200 rounded-lg"
                       />
@@ -1255,10 +1572,53 @@ export default function AdminAffiliateProductsPage() {
                       <label className="block text-sm font-bold text-[#654321] mb-2">Review Count <span className="text-red-500">*</span></label>
                       <Input
                         required
-                        type="number"
-                        min="0"
-                        value={extractedProduct.reviewCount || ""}
-                        onChange={(e) => setExtractedProduct({ ...extractedProduct, reviewCount: parseInt(e.target.value, 10) || null })}
+                        type="text"
+                        inputMode="decimal"
+                        value={tempReviewCountValue !== "" ? tempReviewCountValue : (extractedProduct.reviewCount !== null && extractedProduct.reviewCount !== undefined 
+                          ? (typeof extractedProduct.reviewCount === 'number' 
+                              ? extractedProduct.reviewCount.toString() 
+                              : extractedProduct.reviewCount.toString())
+                          : "")}
+                        onChange={(e) => {
+                          const inputValue = e.target.value
+                          // Allow empty string, digits, and single decimal point
+                          const validDecimalPattern = /^\d*\.?\d*$/
+                          if (inputValue === "" || validDecimalPattern.test(inputValue)) {
+                            setTempReviewCountValue(inputValue)
+                            if (inputValue === "" || inputValue === null) {
+                              setExtractedProduct({ ...extractedProduct, reviewCount: null })
+                            } else if (inputValue !== "." && !inputValue.endsWith(".")) {
+                              // Only update extractedProduct if it's a complete number (not ending with ".")
+                              const numValue = parseFloat(inputValue)
+                              if (!isNaN(numValue) && isFinite(numValue) && numValue >= 0) {
+                                setExtractedProduct({ ...extractedProduct, reviewCount: numValue })
+                              }
+                            }
+                          }
+                        }}
+                        onBlur={(e) => {
+                          const inputValue = e.target.value.trim()
+                          setTempReviewCountValue("")
+                          if (inputValue === "" || inputValue === null || inputValue === ".") {
+                            setExtractedProduct({ ...extractedProduct, reviewCount: null })
+                          } else {
+                            const value = parseFloat(inputValue)
+                            if (!isNaN(value) && isFinite(value) && value >= 0) {
+                              // Format to integer if no decimal, otherwise preserve decimals
+                              if (value % 1 === 0) {
+                                setExtractedProduct({ ...extractedProduct, reviewCount: parseInt(value.toString(), 10) })
+                              } else {
+                                setExtractedProduct({ ...extractedProduct, reviewCount: value })
+                              }
+                            }
+                          }
+                        }}
+                        onFocus={(e) => {
+                          // Initialize temp value when focusing
+                          if (extractedProduct.reviewCount !== null && extractedProduct.reviewCount !== undefined) {
+                            setTempReviewCountValue(extractedProduct.reviewCount.toString())
+                          }
+                        }}
                         placeholder="0"
                         className="text-sm border-2 border-gray-300 focus:border-[#DAA520] focus:ring-2 focus:ring-amber-200 rounded-lg"
                       />
@@ -1307,13 +1667,21 @@ export default function AdminAffiliateProductsPage() {
               setSelectedOptions({ quantity: 1 })
             }
           }}>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-4xl lg:max-w-5xl max-h-[90vh] overflow-y-auto bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 [&>button[data-slot='dialog-close']]:top-4 [&>button[data-slot='dialog-close']]:right-4 [&>button[data-slot='dialog-close']]:z-50">
               <DialogHeader>
-                <DialogTitle className="text-xl sm:text-2xl font-bold text-[#654321]">
-                  Select Your Options
-                </DialogTitle>
-                <DialogDescription className="text-sm text-gray-600">
-                  Choose the right options for your gift
+                <div className="bg-card border border-border rounded-lg p-6 mb-6">
+                  <div className="flex flex-row items-center justify-center gap-2">
+                    <ShoppingBag className="w-5 h-5 sm:w-8 sm:h-8 md:w-10 md:h-10 text-[#DAA520] flex-shrink-0" />
+                    <DialogTitle className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground whitespace-nowrap">
+                      Select Your Options
+                    </DialogTitle>
+                  </div>
+                  <p className="text-xs sm:text-sm text-muted-foreground text-center mt-2">
+                    Choose the right options for your gift
+                  </p>
+                </div>
+                <DialogDescription className="sr-only">
+                  Select product options such as size, color, and other attributes
                 </DialogDescription>
               </DialogHeader>
               
@@ -1345,55 +1713,45 @@ export default function AdminAffiliateProductsPage() {
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {/* Size Selection */}
-                      {productOptions?.sizes && productOptions.sizes.length > 0 && (
-                        <div className="space-y-2">
-                          <Label htmlFor="size" className="text-sm font-semibold text-[#654321]">
-                            Size <span className="text-red-500">*</span>
-                          </Label>
-                          <Select
-                            value={selectedOptions.size || ""}
-                            onValueChange={(value) => setSelectedOptions({ ...selectedOptions, size: value })}
-                          >
-                            <SelectTrigger id="size" className="border-2 border-gray-300 focus:border-[#DAA520]">
-                              <SelectValue placeholder="Select size" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {productOptions.sizes.map((size: string, index: number) => (
-                                <SelectItem key={index} value={size}>
-                                  {size}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                      {/* Dynamically render all available product attributes */}
+                      {productOptions && Object.keys(productOptions).length > 0 ? (
+                        Object.keys(productOptions).map((attrKey) => {
+                          const attrValues = productOptions[attrKey]
+                          if (!attrValues || !Array.isArray(attrValues) || attrValues.length === 0) return null
+                          
+                          const attrLabel = attributeLabels[attrKey] || attrKey.charAt(0).toUpperCase() + attrKey.slice(1)
+                          const isRequired = attrKey === 'size' || attrKey === 'color' || attrKey === 'offerType' || attrKey === 'kindleUnlimited'
+                          
+                          return (
+                            <div key={attrKey} className="space-y-2">
+                              <Label htmlFor={attrKey} className="text-sm font-semibold text-[#654321]">
+                                {attrLabel} {isRequired && <span className="text-red-500">*</span>}
+                              </Label>
+                              <Select
+                                value={selectedOptions[attrKey] || ""}
+                                onValueChange={(value) => setSelectedOptions({ ...selectedOptions, [attrKey]: value })}
+                              >
+                                <SelectTrigger id={attrKey} className="border-2 border-gray-300 focus:border-[#DAA520]">
+                                  <SelectValue placeholder={`Select ${attrLabel.toLowerCase()}`} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {attrValues.map((value: string, index: number) => (
+                                    <SelectItem key={index} value={String(value)}>
+                                      {String(value)}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )
+                        })
+                      ) : (
+                        <div className="text-center py-4 text-sm text-gray-500">
+                          No additional options available for this product.
                         </div>
                       )}
 
-                      {/* Color Selection */}
-                      {productOptions?.colors && productOptions.colors.length > 0 && (
-                        <div className="space-y-2">
-                          <Label htmlFor="color" className="text-sm font-semibold text-[#654321]">
-                            Color <span className="text-red-500">*</span>
-                          </Label>
-                          <Select
-                            value={selectedOptions.color || ""}
-                            onValueChange={(value) => setSelectedOptions({ ...selectedOptions, color: value })}
-                          >
-                            <SelectTrigger id="color" className="border-2 border-gray-300 focus:border-[#DAA520]">
-                              <SelectValue placeholder="Select color" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {productOptions.colors.map((color: string, index: number) => (
-                                <SelectItem key={index} value={color}>
-                                  {color}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
-
-                      {/* Quantity Selection */}
+                      {/* Quantity Selection - Always show */}
                       <div className="space-y-2">
                         <Label htmlFor="quantity" className="text-sm font-semibold text-[#654321]">
                           Quantity
@@ -1455,13 +1813,21 @@ export default function AdminAffiliateProductsPage() {
               setSelectedOptions({ quantity: 1 })
             }
           }}>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-4xl lg:max-w-5xl max-h-[90vh] overflow-y-auto bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 [&>button[data-slot='dialog-close']]:top-4 [&>button[data-slot='dialog-close']]:right-4 [&>button[data-slot='dialog-close']]:z-50">
               <DialogHeader>
-                <DialogTitle className="text-xl sm:text-2xl font-bold text-[#654321]">
-                  Select Your Options
-                </DialogTitle>
-                <DialogDescription className="text-sm text-gray-600">
-                  Choose the right options for your gift
+                <div className="bg-card border border-border rounded-lg p-6 mb-6">
+                  <div className="flex flex-row items-center justify-center gap-2">
+                    <ShoppingBag className="w-5 h-5 sm:w-8 sm:h-8 md:w-10 md:h-10 text-[#DAA520] flex-shrink-0" />
+                    <DialogTitle className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground whitespace-nowrap">
+                      Select Your Options
+                    </DialogTitle>
+                  </div>
+                  <p className="text-xs sm:text-sm text-muted-foreground text-center mt-2">
+                    Choose the right options for your gift
+                  </p>
+                </div>
+                <DialogDescription className="sr-only">
+                  Select product options such as size, color, and other attributes
                 </DialogDescription>
               </DialogHeader>
               
@@ -1493,55 +1859,45 @@ export default function AdminAffiliateProductsPage() {
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {/* Size Selection */}
-                      {productOptions?.sizes && productOptions.sizes.length > 0 && (
-                        <div className="space-y-2">
-                          <Label htmlFor="size" className="text-sm font-semibold text-[#654321]">
-                            Size <span className="text-red-500">*</span>
-                          </Label>
-                          <Select
-                            value={selectedOptions.size || ""}
-                            onValueChange={(value: string) => setSelectedOptions({ ...selectedOptions, size: value })}
-                          >
-                            <SelectTrigger id="size" className="border-2 border-gray-300 focus:border-[#DAA520] w-full">
-                              <SelectValue placeholder="Select size" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {productOptions.sizes.map((size: string, index: number) => (
-                                <SelectItem key={index} value={size}>
-                                  {size}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                      {/* Dynamically render all available product attributes */}
+                      {productOptions && Object.keys(productOptions).length > 0 ? (
+                        Object.keys(productOptions).map((attrKey) => {
+                          const attrValues = productOptions[attrKey]
+                          if (!attrValues || !Array.isArray(attrValues) || attrValues.length === 0) return null
+                          
+                          const attrLabel = attributeLabels[attrKey] || attrKey.charAt(0).toUpperCase() + attrKey.slice(1)
+                          const isRequired = attrKey === 'size' || attrKey === 'color' || attrKey === 'offerType' || attrKey === 'kindleUnlimited'
+                          
+                          return (
+                            <div key={attrKey} className="space-y-2">
+                              <Label htmlFor={attrKey} className="text-sm font-semibold text-[#654321]">
+                                {attrLabel} {isRequired && <span className="text-red-500">*</span>}
+                              </Label>
+                              <Select
+                                value={selectedOptions[attrKey] || ""}
+                                onValueChange={(value) => setSelectedOptions({ ...selectedOptions, [attrKey]: value })}
+                              >
+                                <SelectTrigger id={attrKey} className="border-2 border-gray-300 focus:border-[#DAA520] w-full">
+                                  <SelectValue placeholder={`Select ${attrLabel.toLowerCase()}`} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {attrValues.map((value: string, index: number) => (
+                                    <SelectItem key={index} value={String(value)}>
+                                      {String(value)}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )
+                        })
+                      ) : (
+                        <div className="text-center py-4 text-sm text-gray-500">
+                          No additional options available for this product.
                         </div>
                       )}
 
-                      {/* Color Selection */}
-                      {productOptions?.colors && productOptions.colors.length > 0 && (
-                        <div className="space-y-2">
-                          <Label htmlFor="color" className="text-sm font-semibold text-[#654321]">
-                            Color <span className="text-red-500">*</span>
-                          </Label>
-                          <Select
-                            value={selectedOptions.color || ""}
-                            onValueChange={(value: string) => setSelectedOptions({ ...selectedOptions, color: value })}
-                          >
-                            <SelectTrigger id="color" className="border-2 border-gray-300 focus:border-[#DAA520] w-full">
-                              <SelectValue placeholder="Select color" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {productOptions.colors.map((color: string, index: number) => (
-                                <SelectItem key={index} value={color}>
-                                  {color}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
-
-                      {/* Quantity Selection */}
+                      {/* Quantity Selection - Always show */}
                       <div className="space-y-2">
                         <Label htmlFor="quantity" className="text-sm font-semibold text-[#654321]">
                           Quantity

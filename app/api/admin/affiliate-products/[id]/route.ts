@@ -167,7 +167,7 @@ export async function PUT(
     const resolvedParams = params instanceof Promise ? await params : params
     const productId = resolvedParams.id
 
-    console.log(`[PUT API] Received product ID: ${productId}`)
+    console.log(`[PUT API] Received product ID: ${productId} (type: ${typeof productId})`)
 
     if (!productId) {
       console.log(`[PUT API] No product ID provided`)
@@ -180,7 +180,8 @@ export async function PUT(
     // Import getProducts to check what products exist
     const { getProducts } = await import("../store")
     const allProducts = getProducts()
-    console.log(`[PUT API] Available product IDs:`, allProducts.map(p => p.id))
+    console.log(`[PUT API] Total products in store: ${allProducts.length}`)
+    console.log(`[PUT API] Available product IDs:`, allProducts.map(p => ({ id: p.id, idType: typeof p.id, idStr: String(p.id) })))
 
     const body = await req.json()
     
@@ -219,7 +220,7 @@ export async function PUT(
       updateData.rating = (!isNaN(rating) && rating >= 0 && rating <= 5) ? rating : 0
     }
     if (body.reviewCount !== undefined) {
-      const reviewCount = parseInt(body.reviewCount, 10)
+      const reviewCount = parseFloat(body.reviewCount)
       updateData.reviewCount = (!isNaN(reviewCount) && reviewCount >= 0) ? reviewCount : 0
     }
     if (body.price !== undefined) {
@@ -271,14 +272,68 @@ export async function PUT(
 
     console.log(`[PUT] Prepared update data:`, JSON.stringify(updateData, null, 2))
 
+    // Check if product exists before updating
+    const existingProduct = allProducts.find(p => String(p.id) === String(productId))
+    if (!existingProduct) {
+      console.log(`[PUT API] Product not found in store: ${productId}`)
+      console.log(`[PUT API] Available product IDs:`, allProducts.map(p => ({ id: p.id, type: typeof p.id, idStr: String(p.id) })))
+      console.log(`[PUT API] Searching for ID: "${productId}" (type: ${typeof productId})`)
+      
+      // If product doesn't exist, create it (upsert behavior for in-memory store)
+      // This handles the case where the server restarted and the store was cleared
+      console.log(`[PUT API] Product not found - creating new product with provided data (upsert)`)
+      const { addProduct } = await import("../store")
+      
+      // Create product from update data
+      const newProduct = {
+        id: productId,
+        productName: updateData.productName || body.productName || "Unknown Product",
+        image: updateData.image || body.image || "/placeholder.svg",
+        category: updateData.category || body.category || "General",
+        source: updateData.source || body.source || "Unknown",
+        rating: updateData.rating !== undefined ? updateData.rating : (body.rating || 0),
+        reviewCount: updateData.reviewCount !== undefined ? updateData.reviewCount : (body.reviewCount || 0),
+        price: updateData.price !== undefined ? updateData.price : parseFloat(body.price || 0),
+        originalPrice: updateData.originalPrice !== undefined ? updateData.originalPrice : (body.originalPrice ? parseFloat(body.originalPrice) : undefined),
+        productLink: updateData.productLink || body.productLink || "",
+        amazonChoice: updateData.amazonChoice !== undefined ? updateData.amazonChoice : (body.amazonChoice || false),
+        bestSeller: updateData.bestSeller !== undefined ? updateData.bestSeller : (body.bestSeller || false),
+        attributes: body.attributes || undefined,
+        tags: body.tags || undefined,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }
+      
+      const createdProduct = addProduct(newProduct)
+      console.log(`[PUT API] Created new product:`, createdProduct)
+      
+      // Now update it with the full update data
+      const updatedProduct = updateProduct(productId, updateData)
+      if (updatedProduct) {
+        console.log(`[PUT] Product created and updated successfully: ${productId}`)
+        return NextResponse.json({
+          success: true,
+          message: "Product created and updated successfully",
+          product: updatedProduct,
+        })
+      }
+      
+      // Fallback: return the created product
+      return NextResponse.json({
+        success: true,
+        message: "Product created successfully (update data applied)",
+        product: createdProduct,
+      })
+    }
+
     // Update product (in production, update database)
     const updatedProduct = updateProduct(productId, updateData)
 
     if (!updatedProduct) {
-      console.log(`[PUT API] Product not found in store: ${productId}`)
+      console.log(`[PUT API] Update function returned null for product ID: ${productId}`)
       return NextResponse.json(
-        { error: `Product not found. Available IDs: ${allProducts.map(p => p.id).join(", ")}` },
-        { status: 404 }
+        { error: `Failed to update product. Product may have been deleted.` },
+        { status: 500 }
       )
     }
 

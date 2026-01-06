@@ -6,7 +6,7 @@ import { useState, useEffect } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { LoginModal } from "./login-modal"
 import { SignUpModal } from "./signup-modal"
-import { ChevronDown, User, Settings, LogOut, Gift, Users, Heart, BarChart3, Menu, X, Shield } from "lucide-react"
+import { ChevronDown, User, Settings, LogOut, Gift, Users, Heart, BarChart3, Menu, X, Shield, TrendingUp } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 
 export function Header() {
@@ -62,7 +62,6 @@ export function Header() {
       submenu: [
         { title: "Active Gifts", href: "/gifts/active", description: "View and manage your ongoing gift collections" },
         { title: "Past Gifts", href: "/gifts/past", description: "Browse your completed gift history" },
-        { title: "Browse Gifts", href: "/gifts/browse", description: "Discover gifts from affiliated stores" },
         { title: "Create New Gift", href: "/gifts/create", description: "Start a new group gift collection" },
       ],
     },
@@ -94,6 +93,12 @@ export function Header() {
           },
         ]
       : []),
+    {
+      title: "Trending Gifts",
+      icon: TrendingUp,
+      href: "/gifts/browse",
+      description: "Discover trending gifts from affiliated stores",
+    },
     {
       title: "Analytics",
       icon: BarChart3,
@@ -146,29 +151,30 @@ export function Header() {
 
             {user ? (
               <>
-                <div className="hidden lg:flex items-center justify-end gap-1 flex-wrap">
-                  {menuItems.map((item) => (
-                    <div
-                      key={item.title}
-                      className="relative flex-shrink-0"
-                      onMouseEnter={() => item.submenu && setOpenDropdown(item.title)}
-                      onMouseLeave={() => setOpenDropdown(null)}
-                    >
-                      {item.submenu ? (
-                        <button className="flex items-center gap-1 px-4 py-2 text-[#F5DEB3] hover:text-[#DAA520] transition-colors duration-200 text-sm font-medium whitespace-nowrap">
-                          <item.icon className="w-4 h-4 flex-shrink-0" />
-                          {item.title}
-                          <ChevronDown className="w-3 h-3 flex-shrink-0" />
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handleMenuClick(item.href)}
-                          className="flex items-center gap-2 px-4 py-2 text-[#F5DEB3] hover:bg-gradient-to-r hover:from-[#6B4423] hover:via-[#8B5A3C] hover:to-[#6B4423] hover:text-[#DAA520] rounded-lg transition-all duration-200 text-sm font-medium whitespace-nowrap"
-                        >
-                          <item.icon className="w-4 h-4 flex-shrink-0" />
-                          <span className="font-medium">{item.title}</span>
-                        </button>
-                      )}
+                <div className="hidden md:flex items-center justify-end gap-0.5 sm:gap-1 md:gap-1.5 lg:gap-2 flex-1">
+                  <div className="flex items-center gap-0.5 sm:gap-1 md:gap-1.5 lg:gap-2 flex-nowrap">
+                    {menuItems.map((item) => (
+                      <div
+                        key={item.title}
+                        className="relative flex-shrink-0"
+                        onMouseEnter={() => item.submenu && setOpenDropdown(item.title)}
+                        onMouseLeave={() => setOpenDropdown(null)}
+                      >
+                        {item.submenu ? (
+                          <button className="flex items-center gap-1 px-1.5 sm:px-2 md:px-2.5 lg:px-3 py-2 text-[#F5DEB3] hover:text-[#DAA520] transition-colors duration-200 text-xs sm:text-sm font-medium whitespace-nowrap">
+                            <item.icon className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                            <span className="hidden sm:inline">{item.title}</span>
+                            <ChevronDown className="w-3 h-3 flex-shrink-0" />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleMenuClick(item.href)}
+                            className="flex items-center gap-1 px-1.5 sm:px-2 md:px-2.5 lg:px-3 py-2 text-[#F5DEB3] hover:bg-gradient-to-r hover:from-[#6B4423] hover:via-[#8B5A3C] hover:to-[#6B4423] hover:text-[#DAA520] rounded-lg transition-all duration-200 text-xs sm:text-sm font-medium whitespace-nowrap"
+                          >
+                            <item.icon className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                            <span className="font-medium hidden sm:inline">{item.title}</span>
+                          </button>
+                        )}
 
                       {item.submenu && openDropdown === item.title && (
                         <div className="absolute top-full left-0 mt-1 w-64 bg-[#F5DEB3] rounded-lg shadow-xl border-2 border-[#4A2F1A] py-2 animate-in fade-in slide-in-from-top-2 duration-200">
@@ -187,18 +193,17 @@ export function Header() {
                             </button>
                           ))}
                         </div>
-                      )}
-                    </div>
-                  ))}
-
-                  <div
-                    className="relative ml-2"
-                    onMouseEnter={() => setOpenDropdown("profile")}
-                    onMouseLeave={() => setOpenDropdown(null)}
-                  >
-                    <button className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#3B2F0F] rounded-full hover:from-[#F4C430] hover:to-[#DAA520] transition-all duration-200 text-sm font-semibold shadow-md">
-                      <User className="w-4 h-4" />
-                      <span className="hidden xl:inline">My Account</span>
+                        )}
+                      </div>
+                    ))}
+                    <div
+                      className="relative ml-0.5 sm:ml-1 flex-shrink-0"
+                      onMouseEnter={() => setOpenDropdown("profile")}
+                      onMouseLeave={() => setOpenDropdown(null)}
+                    >
+                    <button className="flex items-center gap-1 px-1.5 sm:px-2 md:px-2.5 lg:px-3 py-2 bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#3B2F0F] rounded-full hover:from-[#F4C430] hover:to-[#DAA520] transition-all duration-200 text-xs sm:text-sm font-semibold shadow-md">
+                      <User className="w-3 h-3 sm:w-4 sm:h-4" />
+                      <span className="hidden lg:inline">My Account</span>
                       <ChevronDown className="w-3 h-3" />
                     </button>
 
@@ -244,11 +249,12 @@ export function Header() {
                       </div>
                     )}
                   </div>
+                  </div>
                 </div>
 
                 <button
                   onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                  className="lg:hidden p-1.5 sm:p-2 text-[#F5DEB3] hover:text-[#DAA520] transition-colors"
+                  className="md:hidden p-1.5 sm:p-2 text-[#F5DEB3] hover:text-[#DAA520] transition-colors flex items-center justify-center"
                 >
                   {isMobileMenuOpen ? (
                     <X className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -277,36 +283,36 @@ export function Header() {
         </div>
 
         {user && isMobileMenuOpen && (
-          <div className="lg:hidden border-t-2 border-[#4A2F1A] bg-[#8B5A3C] animate-in slide-in-from-top duration-300">
-            <div className="px-2 sm:px-3 py-3 sm:py-4 space-y-1 max-h-[calc(100vh-4rem)] overflow-y-auto">
+          <div className="md:hidden border-t-2 border-[#4A2F1A] bg-[#8B5A3C] animate-in slide-in-from-top duration-300">
+            <div className="px-3 sm:px-4 py-3 sm:py-4 space-y-1 max-h-[calc(100vh-4rem)] overflow-y-auto">
               {menuItems.map((item) => (
-                <div key={item.title}>
+                <div key={item.title} className="w-full">
                   {item.submenu ? (
                     <>
                       <button
                         onClick={() => setOpenDropdown(openDropdown === item.title ? null : item.title)}
-                        className="flex items-center justify-between w-full px-3 sm:px-4 py-2 sm:py-3 text-[#F5DEB3] hover:bg-gradient-to-r hover:from-[#6B4423] hover:via-[#8B5A3C] hover:to-[#6B4423] hover:text-[#DAA520] rounded-lg transition-all duration-200 text-left text-sm sm:text-base"
+                        className="flex items-center justify-between w-full px-3 sm:px-4 py-2.5 sm:py-3 text-[#F5DEB3] hover:bg-gradient-to-r hover:from-[#6B4423] hover:via-[#8B5A3C] hover:to-[#6B4423] hover:text-[#DAA520] rounded-lg transition-all duration-200 text-left"
                       >
-                        <span className="flex items-center gap-2 font-medium">
-                          <item.icon className="w-4 h-4 sm:w-5 sm:h-5" />
+                        <span className="flex items-center gap-2 sm:gap-3 font-medium text-sm sm:text-base">
+                          <item.icon className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
                           {item.title}
                         </span>
                         <ChevronDown
-                          className={`w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform duration-200 ${
+                          className={`w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 transition-transform duration-200 ${
                             openDropdown === item.title ? "rotate-180" : ""
                           }`}
                         />
                       </button>
                       {openDropdown === item.title && (
-                        <div className="ml-4 sm:ml-6 mt-1 space-y-1 animate-in slide-in-from-top-1 duration-200">
+                        <div className="ml-6 sm:ml-8 mt-1 space-y-1 animate-in slide-in-from-top-1 duration-200">
                           {item.submenu.map((subitem) => (
                             <button
                               key={subitem.title}
                               onClick={() => handleMenuClick(subitem.href)}
-                              className="block w-full text-left px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm rounded-lg hover:bg-gradient-to-r hover:from-[#6B4423] hover:via-[#8B5A3C] hover:to-[#6B4423] transition-all duration-150"
+                              className="block w-full text-left px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg hover:bg-gradient-to-r hover:from-[#6B4423] hover:via-[#8B5A3C] hover:to-[#6B4423] transition-all duration-150"
                             >
-                              <div className="text-[#F5DEB3] font-medium">{subitem.title}</div>
-                              <div className="text-[#F5DEB3]/70 text-[10px] sm:text-xs mt-0.5">
+                              <div className="text-[#F5DEB3] font-medium text-sm sm:text-base">{subitem.title}</div>
+                              <div className="text-[#F5DEB3]/70 text-xs sm:text-sm mt-1">
                                 {subitem.description}
                               </div>
                             </button>
@@ -317,13 +323,13 @@ export function Header() {
                   ) : (
                     <button
                       onClick={() => handleMenuClick(item.href)}
-                      className={`flex items-center gap-2 w-full px-3 sm:px-4 py-2 sm:py-3 text-[#F5DEB3] hover:bg-gradient-to-r hover:from-[#6B4423] hover:via-[#8B5A3C] hover:to-[#6B4423] hover:text-[#DAA520] rounded-lg transition-all duration-200 text-left text-sm sm:text-base ${item.title === "Manage Affiliate Products" ? "whitespace-nowrap" : ""}`}
+                      className={`flex items-center gap-2 sm:gap-3 w-full px-3 sm:px-4 py-2.5 sm:py-3 text-[#F5DEB3] hover:bg-gradient-to-r hover:from-[#6B4423] hover:via-[#8B5A3C] hover:to-[#6B4423] hover:text-[#DAA520] rounded-lg transition-all duration-200 text-left ${item.title === "Manage Affiliate Products" ? "whitespace-nowrap" : ""}`}
                     >
                       <item.icon className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
-                      <div className={item.title === "Manage Affiliate Products" ? "whitespace-nowrap" : ""}>
-                        <div className="font-medium">{item.title}</div>
-                        {item.title !== "Analytics" && item.title !== "Manage Affiliate Products" && item.description && (
-                          <div className="text-[10px] sm:text-xs opacity-70">{item.description}</div>
+                      <div className={`flex-1 ${item.title === "Manage Affiliate Products" ? "whitespace-nowrap" : ""}`}>
+                        <div className="font-medium text-sm sm:text-base">{item.title}</div>
+                        {item.title !== "Analytics" && item.title !== "Manage Affiliate Products" && item.title !== "Trending Gifts" && item.description && (
+                          <div className="text-xs sm:text-sm opacity-70 mt-0.5">{item.description}</div>
                         )}
                       </div>
                     </button>
@@ -331,36 +337,36 @@ export function Header() {
                 </div>
               ))}
 
-              <hr className="my-2 sm:my-3 border-[#4A2F1A]" />
+              <hr className="my-3 sm:my-4 border-[#4A2F1A]" />
 
               <button
                 onClick={() => handleMenuClick("/profile")}
-                className="flex items-center gap-2 w-full px-3 sm:px-4 py-2 sm:py-3 text-[#F5DEB3] hover:bg-gradient-to-r hover:from-[#6B4423] hover:via-[#8B5A3C] hover:to-[#6B4423] hover:text-[#DAA520] rounded-lg transition-all duration-200 text-left text-sm sm:text-base"
+                className="flex items-center gap-2 sm:gap-3 w-full px-3 sm:px-4 py-2.5 sm:py-3 text-[#F5DEB3] hover:bg-gradient-to-r hover:from-[#6B4423] hover:via-[#8B5A3C] hover:to-[#6B4423] hover:text-[#DAA520] rounded-lg transition-all duration-200 text-left"
               >
-                <User className="w-4 h-4 sm:w-5 sm:h-5" />
-                <div>
-                  <div className="font-medium">Profile</div>
-                  <div className="text-[10px] sm:text-xs opacity-70">View your profile</div>
+                <User className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+                <div className="flex-1">
+                  <div className="font-medium text-sm sm:text-base">Profile</div>
+                  <div className="text-xs sm:text-sm opacity-70 mt-0.5">View your profile</div>
                 </div>
               </button>
               <button
                 onClick={() => handleMenuClick("/settings")}
-                className="flex items-center gap-2 w-full px-3 sm:px-4 py-2 sm:py-3 text-[#F5DEB3] hover:bg-gradient-to-r hover:from-[#6B4423] hover:via-[#8B5A3C] hover:to-[#6B4423] hover:text-[#DAA520] rounded-lg transition-all duration-200 text-left text-sm sm:text-base"
+                className="flex items-center gap-2 sm:gap-3 w-full px-3 sm:px-4 py-2.5 sm:py-3 text-[#F5DEB3] hover:bg-gradient-to-r hover:from-[#6B4423] hover:via-[#8B5A3C] hover:to-[#6B4423] hover:text-[#DAA520] rounded-lg transition-all duration-200 text-left"
               >
-                <Settings className="w-4 h-4 sm:w-5 sm:h-5" />
-                <div>
-                  <div className="font-medium">Settings</div>
-                  <div className="text-[10px] sm:text-xs opacity-70">Manage preferences</div>
+                <Settings className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+                <div className="flex-1">
+                  <div className="font-medium text-sm sm:text-base">Settings</div>
+                  <div className="text-xs sm:text-sm opacity-70 mt-0.5">Manage preferences</div>
                 </div>
               </button>
               <button
                 onClick={handleLogout}
-                className="flex items-center gap-2 w-full px-3 sm:px-4 py-2 sm:py-3 text-[#F5DEB3] hover:bg-gradient-to-r hover:from-[#6B4423] hover:via-[#8B5A3C] hover:to-[#6B4423] hover:text-[#DAA520] rounded-lg transition-all duration-200 font-bold text-left text-sm sm:text-base"
+                className="flex items-center gap-2 sm:gap-3 w-full px-3 sm:px-4 py-2.5 sm:py-3 text-[#F5DEB3] hover:bg-gradient-to-r hover:from-[#6B4423] hover:via-[#8B5A3C] hover:to-[#6B4423] hover:text-[#DAA520] rounded-lg transition-all duration-200 font-bold text-left"
               >
-                <LogOut className="w-4 h-4 sm:w-5 sm:h-5" />
-                <div>
-                  <div className="font-medium">Logout</div>
-                  <div className="text-[10px] sm:text-xs opacity-70">Sign out of account</div>
+                <LogOut className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+                <div className="flex-1">
+                  <div className="font-medium text-sm sm:text-base">Logout</div>
+                  <div className="text-xs sm:text-sm opacity-70 mt-0.5">Sign out of account</div>
                 </div>
               </button>
             </div>

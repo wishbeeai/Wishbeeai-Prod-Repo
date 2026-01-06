@@ -719,6 +719,186 @@ async function extractWithoutAI(
     log("[v0] 🏪 Amazon URL detected - will use Amazon-specific price extraction")
     log(`[v0] 🔍 Starting Amazon price extraction, htmlContent length: ${htmlContent.length}`)
     try {
+      // Pattern 0: Amazon-specific price extraction - look for a-price-whole and a-price-fraction FIRST
+      // This should run BEFORE other patterns to get the most accurate prices with decimals
+      // IMPORTANT: ALWAYS run this for Amazon to find prices with proper decimal precision
+      // Look for ALL price instances to find both sale price and original price
+      
+      // First, try to find prices within a-price containers (more reliable - they're grouped together)
+      const priceContainerPattern = /<span[^>]*class=["'][^"']*a-price[^"']*["'][^>]*>[\s\S]{0,500}?<span[^>]*class=["'][^"']*a-price-whole[^"']*["'][^>]*>([0-9]+)<\/span>[\s\S]{0,100}?<span[^>]*class=["'][^"']*a-price-fraction[^"']*["'][^>]*>([0-9]{1,2})<\/span>/gi
+      
+      const prices: Array<{ value: number; index: number; hasDecimals: boolean }> = []
+      const usedFractionIndices = new Set<number>()
+      
+      // Match prices within containers first (most reliable)
+      let containerMatch
+      while ((containerMatch = priceContainerPattern.exec(htmlContent)) !== null) {
+        const wholePart = Number.parseInt(String(containerMatch[1]))
+        const fractionPart = String(containerMatch[2]).padStart(2, '0')
+        const fullPrice = Number.parseFloat(`${wholePart}.${fractionPart}`)
+        if (fullPrice >= 1 && fullPrice <= 10000) {
+          prices.push({ value: fullPrice, index: containerMatch.index || 0, hasDecimals: true })
+          log(`[v0] Pattern 0 - Found price in container with decimals: $${fullPrice} (whole: ${wholePart}, fraction: ${fractionPart})`)
+        }
+      }
+      
+      // Also find all individual matches for fallback - make regex more flexible
+      // Try multiple patterns to catch different HTML structures
+      const allPriceWholeMatches = Array.from(htmlContent.matchAll(/<span[^>]*class=["'][^"']*a-price-whole[^"']*["'][^>]*>([0-9]+)<\/span>/gi))
+      // Also try without quotes in class attribute
+      const allPriceWholeMatches2 = Array.from(htmlContent.matchAll(/<span[^>]*class=[^"'][^>]*a-price-whole[^>]*>([0-9]+)<\/span>/gi))
+      // Combine both
+      const allPriceWholeMatchesCombined = [...allPriceWholeMatches, ...allPriceWholeMatches2]
+      
+      const allPriceFractionMatches = Array.from(htmlContent.matchAll(/<span[^>]*class=["'][^"']*a-price-fraction[^"']*["'][^>]*>([0-9]{1,2})<\/span>/gi))
+      // Also try without quotes
+      const allPriceFractionMatches2 = Array.from(htmlContent.matchAll(/<span[^>]*class=[^"'][^>]*a-price-fraction[^>]*>([0-9]{1,2})<\/span>/gi))
+      // Combine both
+      const allPriceFractionMatchesCombined = [...allPriceFractionMatches, ...allPriceFractionMatches2]
+      
+      log(`[v0] Pattern 0 - Found ${allPriceWholeMatchesCombined.length} a-price-whole matches (with quotes: ${allPriceWholeMatches.length}, without: ${allPriceWholeMatches2.length}) and ${allPriceFractionMatchesCombined.length} a-price-fraction matches`)
+      
+      log(`[v0] Pattern 0 - Found ${prices.length} prices in containers, ${allPriceWholeMatches.length} a-price-whole matches and ${allPriceFractionMatches.length} a-price-fraction matches`)
+      
+      // Match whole and fraction parts that are close together (within 200 chars) - only if not already found in container
+      for (const wholeMatch of allPriceWholeMatchesCombined) {
+        const wholeIndex = wholeMatch.index || 0
+        const wholePart = Number.parseInt(String(wholeMatch[1]))
+        
+        // Skip if we already found this price in a container (check within 50 chars)
+        let alreadyFound = false
+        for (const existingPrice of prices) {
+          if (Math.abs(existingPrice.index - wholeIndex) < 50 && Math.abs(existingPrice.value - wholePart) < 1) {
+            alreadyFound = true
+            break
+          }
+        }
+        if (alreadyFound) continue
+        
+        // Find the closest fraction match
+        let closestFraction: { value: string; distance: number; index: number } | null = null
+        for (const fracMatch of allPriceFractionMatchesCombined) {
+          const fracIndex = fracMatch.index || 0
+          // Skip if this fraction was already used
+          if (usedFractionIndices.has(fracIndex)) continue
+          
+          const distance = Math.abs(fracIndex - wholeIndex)
+          if (distance < 200 && (!closestFraction || distance < closestFraction.distance)) {
+            closestFraction = { value: fracMatch[1], distance, index: fracIndex }
+          }
+        }
+        
+        if (closestFraction) {
+          const fractionPart = String(closestFraction.value).padStart(2, '0')
+          const fullPrice = Number.parseFloat(`${wholePart}.${fractionPart}`)
+          if (fullPrice >= 1 && fullPrice <= 10000) {
+            prices.push({ value: fullPrice, index: wholeIndex, hasDecimals: true })
+            usedFractionIndices.add(closestFraction.index)
+            log(`[v0] Pattern 0 - Found price with decimals: $${fullPrice} (whole: ${wholePart}, fraction: ${fractionPart})`)
+          }
+        } else {
+          // No fraction found, use whole part as integer price (but mark as no decimals)
+          if (wholePart >= 1 && wholePart <= 10000) {
+            prices.push({ value: wholePart, index: wholeIndex, hasDecimals: false })
+            log(`[v0] Pattern 0 - Found price without decimals: $${wholePart}`)
+          }
+        }
+      }
+      
+      // Remove duplicates (same price value), but prefer ones with decimals
+      const priceMap = new Map<number, { value: number; index: number; hasDecimals: boolean }>()
+      for (const price of prices) {
+        const existing = priceMap.get(price.value)
+        if (!existing || (price.hasDecimals && !existing.hasDecimals)) {
+          priceMap.set(price.value, price)
+        }
+      }
+      const uniquePrices = Array.from(priceMap.values())
+      
+      log(`[v0] Pattern 0 - Unique prices found: ${uniquePrices.length} (${uniquePrices.map(p => `$${p.value}${p.hasDecimals ? ' (with cents)' : ''}`).join(', ')})`)
+      
+      // If we found multiple different prices, use the higher one as original and lower as sale
+      if (uniquePrices.length >= 2) {
+        const sortedPrices = [...uniquePrices].sort((a, b) => b.value - a.value)
+        const originalPrice = sortedPrices[0].value
+        const salePrice = sortedPrices[sortedPrices.length - 1].value
+        
+        if (originalPrice > salePrice && originalPrice >= 1 && originalPrice <= 10000 && salePrice >= 1 && salePrice <= 10000) {
+          // ALWAYS use these prices from a-price patterns (they're the most accurate)
+          productData.originalPrice = originalPrice
+          productData.salePrice = salePrice
+          productData.price = salePrice
+          const discount = ((originalPrice - salePrice) / originalPrice) * 100
+          if (discount >= 0.1 && discount <= 95) {
+            productData.discountPercent = Math.round(discount * 10) / 10
+          }
+          log(`[v0] ✅ Pattern 0 - Set Amazon prices from multiple a-price instances - original: $${originalPrice}, sale: $${salePrice}, discount: ${productData.discountPercent}%`)
+        } else if (uniquePrices.length > 0) {
+          // Prices are same or invalid - use the first one as sale price
+          const singlePrice = uniquePrices[0].value
+          productData.price = singlePrice
+          productData.salePrice = singlePrice
+          log(`[v0] ✅ Pattern 0 - Set Amazon price from a-price-whole + a-price-fraction: $${singlePrice}`)
+        }
+      } else if (uniquePrices.length === 1) {
+        // Single price found - ALWAYS use it (it's from a-price which is most accurate)
+        const singlePrice = uniquePrices[0].value
+        productData.price = singlePrice
+        productData.salePrice = singlePrice
+        log(`[v0] ✅ Pattern 0 - Set Amazon price from a-price-whole + a-price-fraction: $${singlePrice}`)
+        
+        // Try to find original price from "List Price" or "Was" patterns - be more aggressive
+        // Look for List Price with decimals - try multiple patterns
+        const listPricePatterns = [
+          /List\s+Price[:\s]*\$?([0-9]{1,4}(?:\.[0-9]{1,2})?)/i,
+          /listPrice[:\s]*["']?([0-9]{1,4}(?:\.[0-9]{1,2})?)/i,
+          /originalPrice[:\s]*["']?([0-9]{1,4}(?:\.[0-9]{1,2})?)/i,
+          /"listPrice"\s*:\s*["']?([0-9]{1,4}(?:\.[0-9]{1,2})?)/i,
+        ]
+        
+        for (const pattern of listPricePatterns) {
+          const listPriceMatch = htmlContent.match(pattern)
+          if (listPriceMatch && listPriceMatch[1]) {
+            const listPrice = Number.parseFloat(String(listPriceMatch[1]))
+            if (listPrice > singlePrice && listPrice >= 1 && listPrice <= 10000) {
+              productData.originalPrice = listPrice
+              const discount = ((listPrice - singlePrice) / listPrice) * 100
+              if (discount >= 0.1 && discount <= 95) {
+                productData.discountPercent = Math.round(discount * 10) / 10
+              }
+              log(`[v0] ✅ Pattern 0 - Found original price from List Price pattern: $${listPrice}, sale: $${singlePrice}, discount: ${productData.discountPercent}%`)
+              break
+            }
+          }
+        }
+        
+        // Also check for "Was:" pattern with multiple variations
+        if (!productData.originalPrice) {
+          const wasPricePatterns = [
+            /Was[:\s]*\$?([0-9]{1,4}(?:\.[0-9]{1,2})?)/i,
+            /Was\s+Price[:\s]*\$?([0-9]{1,4}(?:\.[0-9]{1,2})?)/i,
+            /wasPrice[:\s]*["']?([0-9]{1,4}(?:\.[0-9]{1,2})?)/i,
+            /"wasPrice"\s*:\s*["']?([0-9]{1,4}(?:\.[0-9]{1,2})?)/i,
+          ]
+          
+          for (const pattern of wasPricePatterns) {
+            const wasPriceMatch = htmlContent.match(pattern)
+            if (wasPriceMatch && wasPriceMatch[1]) {
+              const wasPrice = Number.parseFloat(String(wasPriceMatch[1]))
+              if (wasPrice > singlePrice && wasPrice >= 1 && wasPrice <= 10000) {
+                productData.originalPrice = wasPrice
+                const discount = ((wasPrice - singlePrice) / wasPrice) * 100
+                if (discount >= 0.1 && discount <= 95) {
+                  productData.discountPercent = Math.round(discount * 10) / 10
+                }
+                log(`[v0] ✅ Pattern 0 - Found original price from Was pattern: $${wasPrice}, sale: $${singlePrice}, discount: ${productData.discountPercent}%`)
+                break
+              }
+            }
+          }
+        }
+      }
+      
       // Amazon-specific price patterns
       // Pattern 1: "-35% $29.25" or "Save 35% $29.25" with List Price nearby
       // Try multiple discount patterns to catch different formats
@@ -830,62 +1010,85 @@ async function extractWithoutAI(
           log(`[v0] Pattern 2 - Sample text: ${afterListPrice.substring(0, 200)}`)
           
           // Try different price patterns - be more aggressive
-          const pricePatterns = [
-            // Look for "Price:" or "Your Price:" followed by a price - MUST capture decimals
-            /(?:Price|Your\s+Price|Sale\s+Price|Now)[:\s]*\$?([0-9]{1,4}(?:\.[0-9]{1,2})?)/i,
-            // Look for dollar sign followed by a price with decimals (not 45)
-            /\$([0-9]{1,4}(?:\.[0-9]{1,2})?)(?![0-9])(?!.*45)/i,
-            // Look for any number between 20-200 with decimals (likely sale price)
-            /\b([1-2]?[0-9]{1,2}(?:\.[0-9]{1,2})?)\b/i,
-            // Look for price in data attributes or JavaScript - MUST capture decimals
-            /(?:price|currentPrice|salePrice)["']?\s*[:=]\s*["']?([0-9]{1,4}(?:\.[0-9]{1,2})?)["']?/i,
-          ]
-          
-          let priceMatch2 = null
-          for (let i = 0; i < pricePatterns.length; i++) {
-            const pattern = pricePatterns[i]
-            priceMatch2 = afterListPrice.match(pattern)
-            if (priceMatch2) {
-              // Preserve full decimal precision
-              const testPrice = Number.parseFloat(String(priceMatch2[1]))
-              log(`[v0] Pattern 2 (${i}) - Found price: $${testPrice} (preserved decimals)`)
-              // Only use if it's different from list price and reasonable (up to $999.99)
-              if (testPrice !== originalPrice && testPrice < originalPrice && testPrice >= 1 && testPrice <= 999.99) {
-                log(`[v0] Pattern 2 (${i}) - Valid price found: $${testPrice}`)
-                break
-              } else {
-                log(`[v0] Pattern 2 (${i}) - Rejected price: $${testPrice} (same as original or invalid)`)
-                priceMatch2 = null
+          // First, look for a-price patterns in the area after List Price
+          const aPricePattern = /<span[^>]*class=["'][^"']*a-price[^"']*["'][^>]*>[\s\S]{0,200}?<span[^>]*class=["'][^"']*a-price-whole[^"']*["'][^>]*>([0-9]+)<\/span>[\s\S]{0,100}?<span[^>]*class=["'][^"']*a-price-fraction[^"']*["'][^>]*>([0-9]{1,2})<\/span>/i
+          const aPriceMatch = afterListPrice.match(aPricePattern)
+          if (aPriceMatch && aPriceMatch[1] && aPriceMatch[2]) {
+            const wholePart = Number.parseInt(String(aPriceMatch[1]))
+            const fractionPart = String(aPriceMatch[2]).padStart(2, '0')
+            const salePrice = Number.parseFloat(`${wholePart}.${fractionPart}`)
+            if (salePrice !== originalPrice && salePrice < originalPrice && salePrice >= 1 && salePrice <= 10000) {
+              productData.originalPrice = originalPrice
+              productData.salePrice = salePrice
+              productData.price = salePrice
+              const discount = ((originalPrice - salePrice) / originalPrice) * 100
+              if (discount >= 0.1 && discount <= 95) {
+                productData.discountPercent = Math.round(discount * 10) / 10
               }
+              log(`[v0] ✅ Pattern 2 - Found sale price from a-price pattern after List Price - original: $${originalPrice}, sale: $${salePrice}, discount: ${productData.discountPercent}%`)
             }
           }
           
-          log(`[v0] Pattern 2 - listPriceMatch2: ${listPriceMatch2[0]}, priceMatch2: ${priceMatch2 ? priceMatch2[0] : 'null'}`)
-          
-          if (priceMatch2) {
-            // Preserve full decimal precision
-            const salePrice = Number.parseFloat(String(priceMatch2[1]))
+          // If a-price pattern didn't work, try other patterns
+          if (!productData.salePrice) {
+            const pricePatterns = [
+              // Look for "Price:" or "Your Price:" followed by a price - MUST capture decimals
+              /(?:Price|Your\s+Price|Sale\s+Price|Now)[:\s]*\$?([0-9]{1,4}(?:\.[0-9]{1,2})?)/i,
+              // Look for dollar sign followed by a price with decimals
+              /\$([0-9]{1,4}(?:\.[0-9]{1,2})?)(?![0-9])/i,
+              // Look for any number with decimals (likely sale price)
+              /\b([0-9]{1,3}(?:\.[0-9]{1,2})?)\b/i,
+              // Look for price in data attributes or JavaScript - MUST capture decimals
+              /(?:price|currentPrice|salePrice)["']?\s*[:=]\s*["']?([0-9]{1,4}(?:\.[0-9]{1,2})?)["']?/i,
+            ]
             
-            log(`[v0] Pattern 2 values - original: $${originalPrice}, sale: $${salePrice} (preserved decimals)`)
+            let priceMatch2 = null
+            for (let i = 0; i < pricePatterns.length; i++) {
+              const pattern = pricePatterns[i]
+              priceMatch2 = afterListPrice.match(pattern)
+              if (priceMatch2) {
+                // Preserve full decimal precision
+                const testPrice = Number.parseFloat(String(priceMatch2[1]))
+                log(`[v0] Pattern 2 (${i}) - Found price: $${testPrice} (preserved decimals)`)
+                // Only use if it's different from list price and reasonable (up to $999.99)
+                if (testPrice !== originalPrice && testPrice < originalPrice && testPrice >= 1 && testPrice <= 999.99) {
+                  log(`[v0] Pattern 2 (${i}) - Valid price found: $${testPrice}`)
+                  break
+                } else {
+                  log(`[v0] Pattern 2 (${i}) - Rejected price: $${testPrice} (same as original or invalid)`)
+                  priceMatch2 = null
+                }
+            }
+            }
             
-            // CRITICAL: Must be different prices (at least $1 difference)
-            if (originalPrice > salePrice && originalPrice >= 1 && originalPrice <= 10000 &&
-                salePrice >= 1 && salePrice <= 10000 &&
-                (originalPrice - salePrice) >= 1) {  // At least $1 difference
-              const discount = ((originalPrice - salePrice) / originalPrice) * 100
-              if (discount >= 5 && discount <= 95) {
-                productData.originalPrice = originalPrice
-                productData.salePrice = salePrice
-                productData.discountPercent = Math.round(discount)
-                log(`[v0] ✅ Found Amazon price pattern (List Price/Price) - original: $${originalPrice}, sale: $${salePrice}, discount: ${Math.round(discount)}%`)
+            log(`[v0] Pattern 2 - listPriceMatch2: ${listPriceMatch2[0]}, priceMatch2: ${priceMatch2 ? priceMatch2[0] : 'null'}`)
+            
+            if (priceMatch2) {
+              // Preserve full decimal precision
+              const salePrice = Number.parseFloat(String(priceMatch2[1]))
+              
+              log(`[v0] Pattern 2 values - original: $${originalPrice}, sale: $${salePrice} (preserved decimals)`)
+              
+              // CRITICAL: Must be different prices (at least $0.01 difference)
+              if (originalPrice > salePrice && originalPrice >= 1 && originalPrice <= 10000 &&
+                  salePrice >= 1 && salePrice <= 10000 &&
+                  (originalPrice - salePrice) >= 0.01) {  // At least $0.01 difference
+                const discount = ((originalPrice - salePrice) / originalPrice) * 100
+                // Accept any discount >= 0.1% (even small discounts are valid)
+                if (discount >= 0.1 && discount <= 95) {
+                  if (!productData.originalPrice) productData.originalPrice = originalPrice
+                  if (!productData.salePrice) productData.salePrice = salePrice
+                  productData.discountPercent = Math.round(discount * 10) / 10 // Round to 1 decimal
+                  log(`[v0] ✅ Found Amazon price pattern (List Price/Price) - original: $${originalPrice}, sale: $${salePrice}, discount: ${productData.discountPercent}%`)
+                } else {
+                  log(`[v0] ⚠️ Pattern 2 discount validation failed - discount: ${discount.toFixed(1)}%`)
+                }
               } else {
-                log(`[v0] ⚠️ Pattern 2 discount validation failed - discount: ${discount.toFixed(1)}%`)
+                log(`[v0] ⚠️ Pattern 2 price validation failed - original: $${originalPrice}, sale: $${salePrice}, difference: $${(originalPrice - salePrice).toFixed(2)}`)
               }
             } else {
-              log(`[v0] ⚠️ Pattern 2 price validation failed - original: $${originalPrice}, sale: $${salePrice}, difference: $${(originalPrice - salePrice).toFixed(2)}`)
+              log(`[v0] ⚠️ Pattern 2 - Could not find sale price after List Price`)
             }
-          } else {
-            log(`[v0] ⚠️ Pattern 2 - Could not find sale price after List Price`)
           }
         }
       }
@@ -929,25 +1132,7 @@ async function extractWithoutAI(
         }
       }
       
-      // Pattern 3.5: Amazon-specific price extraction - look for a-price-whole and a-price-fraction
-      // Amazon often splits prices like: <span class="a-price-whole">179</span><span class="a-price-fraction">99</span>
-      // Run this BEFORE other patterns to get the most accurate price
-      if (!productData.price && !productData.salePrice) {
-        const amazonPriceWholeMatch = htmlContent.match(/<span[^>]*class=["'][^"']*a-price-whole[^"']*["'][^>]*>([0-9]+)<\/span>/i)
-        const amazonPriceFractionMatch = htmlContent.match(/<span[^>]*class=["'][^"']*a-price-fraction[^"']*["'][^>]*>([0-9]{1,2})<\/span>/i)
-        
-        if (amazonPriceWholeMatch && amazonPriceFractionMatch) {
-          const wholePart = Number.parseInt(String(amazonPriceWholeMatch[1]))
-          const fractionPart = String(amazonPriceFractionMatch[1]).padStart(2, '0')
-          const fullPrice = Number.parseFloat(`${wholePart}.${fractionPart}`)
-          
-          if (fullPrice >= 1 && fullPrice <= 10000) {
-            productData.price = fullPrice
-            productData.salePrice = fullPrice
-            log(`[v0] ✅ Found Amazon price from a-price-whole + a-price-fraction: $${fullPrice}`)
-          }
-        }
-      }
+      // Pattern 3.5: Already handled by Pattern 0 above (runs first for better accuracy with decimals)
       
       // Pattern 3.6: Look for price in Amazon's JavaScript price data structures with decimals
       // Run this early to catch prices stored with full decimal precision
@@ -1111,8 +1296,9 @@ async function extractWithoutAI(
       // Pattern 5: Look for "List Price" and "Price" in close proximity (more reliable)
       if (!productData.originalPrice || !productData.salePrice) {
         // Find "List Price: $XX.XX" and "Price: $XX.XX" within 500 characters of each other
-        const listPriceRegex = /List\s+Price[:\s]*\$?([0-9]{1,4}\.?[0-9]{0,2})/gi
-        const priceRegex = /(?:Price|Your\s+Price)[:\s]*\$?([0-9]{1,4}\.?[0-9]{0,2})/gi
+        // IMPORTANT: Must capture decimals properly
+        const listPriceRegex = /List\s+Price[:\s]*\$?([0-9]{1,4}(?:\.[0-9]{1,2})?)/gi
+        const priceRegex = /(?:Price|Your\s+Price|Sale\s+Price|Now)[:\s]*\$?([0-9]{1,4}(?:\.[0-9]{1,2})?)/gi
         
         const listPriceMatches = Array.from(htmlContent.matchAll(listPriceRegex))
         const priceMatches = Array.from(htmlContent.matchAll(priceRegex))
@@ -1125,16 +1311,17 @@ async function extractWithoutAI(
               const originalPrice = Number.parseFloat(listMatch[1])
               const salePrice = Number.parseFloat(priceMatch[1])
               
-              // Must be different prices
+              // Must be different prices (at least $0.01 difference)
               if (originalPrice > salePrice && originalPrice >= 1 && originalPrice <= 10000 &&
                   salePrice >= 1 && salePrice <= 10000 &&
-                  (originalPrice - salePrice) >= 1) {
+                  (originalPrice - salePrice) >= 0.01) {
                 const discount = ((originalPrice - salePrice) / originalPrice) * 100
-                if (discount >= 5 && discount <= 95) {
-                  productData.originalPrice = originalPrice
-                  productData.salePrice = salePrice
-                  productData.discountPercent = Math.round(discount)
-                  log(`[v0] ✅ Found Amazon price (List Price + Price proximity) - original: $${originalPrice}, sale: $${salePrice}, discount: ${Math.round(discount)}%`)
+                // Accept any discount >= 0.1% (even small discounts are valid)
+                if (discount >= 0.1 && discount <= 95) {
+                  if (!productData.originalPrice) productData.originalPrice = originalPrice
+                  if (!productData.salePrice) productData.salePrice = salePrice
+                  productData.discountPercent = Math.round(discount * 10) / 10 // Round to 1 decimal
+                  log(`[v0] ✅ Found Amazon price (List Price + Price proximity) - original: $${originalPrice}, sale: $${salePrice}, discount: ${productData.discountPercent}%`)
                   break
                 }
               }
@@ -1143,6 +1330,67 @@ async function extractWithoutAI(
           if (productData.originalPrice && productData.salePrice) break
         }
       }
+      
+      // Pattern 5.5: Look for "Was:" or "Was $XX.XX" patterns (alternative to List Price)
+      if (!productData.originalPrice && productData.salePrice) {
+        const wasPricePatterns = [
+          /Was[:\s]*\$?([0-9]{1,4}(?:\.[0-9]{1,2})?)/i,
+          /Was\s+Price[:\s]*\$?([0-9]{1,4}(?:\.[0-9]{1,2})?)/i,
+          /Original[:\s]*Price[:\s]*\$?([0-9]{1,4}(?:\.[0-9]{1,2})?)/i,
+        ]
+        
+        for (const pattern of wasPricePatterns) {
+          const match = htmlContent.match(pattern)
+          if (match && match[1]) {
+            const originalPrice = Number.parseFloat(match[1])
+            if (originalPrice > productData.salePrice && originalPrice >= 1 && originalPrice <= 10000) {
+              productData.originalPrice = originalPrice
+              const discount = ((originalPrice - productData.salePrice) / originalPrice) * 100
+              productData.discountPercent = Math.round(discount * 10) / 10
+              log(`[v0] ✅ Found original price from "Was" pattern - original: $${originalPrice}, sale: $${productData.salePrice}, discount: ${productData.discountPercent}%`)
+              break
+            }
+          }
+        }
+      }
+      
+      // Final fallback: If we still don't have a price, try to extract ANY price from the page
+      if (!productData.price && !productData.salePrice) {
+        log("[v0] 🔍 Final fallback: Searching for any price on Amazon page...")
+        
+        // Look for common Amazon price patterns
+        const fallbackPricePatterns = [
+          // Look for prices in a-price class containers
+          /<span[^>]*class=["'][^"']*a-price[^"']*["'][^>]*>[\s\S]{0,300}?\$([0-9]{1,4}(?:\.[0-9]{1,2})?)/i,
+          // Look for "Price:" followed by a price
+          /(?:Price|Your\s+Price|Sale\s+Price|Now)[:\s]*\$?([0-9]{1,4}(?:\.[0-9]{1,2})?)(?![0-9])/i,
+          // Look for prices in data attributes
+          /data-a-price=["']?([0-9]{1,4}(?:\.[0-9]{1,2})?)/i,
+          /data-price-amount=["']?([0-9]{1,4}(?:\.[0-9]{1,2})?)/i,
+          // Look for prices in JavaScript
+          /"price"\s*:\s*["']?([0-9]{1,4}(?:\.[0-9]{1,2})?)/i,
+          /"amount"\s*:\s*["']?([0-9]{1,4}(?:\.[0-9]{1,2})?)/i,
+          // Look for dollar sign followed by price
+          /\$([0-9]{1,3}(?:\.[0-9]{1,2})?)(?![0-9])(?!.*List\s+Price)/i,
+        ]
+        
+        for (const pattern of fallbackPricePatterns) {
+          const match = htmlContent.match(pattern)
+          if (match && match[1]) {
+            const price = Number.parseFloat(match[1])
+            if (price >= 1 && price <= 10000) {
+              productData.price = price
+              productData.salePrice = price
+              log(`[v0] ✅ Extracted price from fallback pattern: $${price}`)
+              break
+            }
+          }
+        }
+      }
+      
+      // DO NOT set originalPrice to price if they're the same - originalPrice should be null if no discount
+      // This will be handled later in the code to clear originalPrice if it equals salePrice
+      
     } catch (error) {
       log(`[v0] Error in Amazon price extraction: ${error}`)
     }
@@ -3432,8 +3680,17 @@ async function extractWithoutAI(
                productNameLower.includes('appliance') ||
                productNameLower.includes('blender') ||
                productNameLower.includes('mixer') ||
+               productNameLower.includes('pressure cooker') ||
+               productNameLower.includes('slow cooker') ||
+               productNameLower.includes('instant pot') ||
+               productNameLower.includes('cooker') ||
+               productNameLower.includes('rice cooker') ||
+               productNameLower.includes('air fryer') ||
+               productNameLower.includes('toaster') ||
+               productNameLower.includes('food processor') ||
                urlLower.includes('/kitchen/') ||
-               urlLower.includes('/appliances/')) {
+               urlLower.includes('/appliances/') ||
+               urlLower.includes('/small-appliances/')) {
       productData.category = "Kitchen Appliances"
       console.log("[v0] Set category to Kitchen Appliances based on product name/URL")
     } else if (productNameLower.includes('furniture') ||
@@ -3451,6 +3708,86 @@ async function extractWithoutAI(
                productNameLower.includes('game') ||
                urlLower.includes('/toys/')) {
       productData.category = "Toys"
+    }
+  }
+  
+  // For Amazon, try to extract category from breadcrumbs (runs after keyword detection as fallback)
+  if (hostname.includes('amazon.com') && htmlContent && (!productData.category || productData.category === "General")) {
+    log("[v0] 🔍 Extracting category from Amazon breadcrumbs...")
+    
+    // Pattern 1: Extract from breadcrumb navigation
+    const breadcrumbPatterns = [
+      /<a[^>]*class=["'][^"']*a-link-normal[^"']*["'][^>]*>([^<]+)<\/a>[\s\S]{0,500}?<span[^>]*class=["'][^"']*a-list-item[^"']*["'][^>]*>([^<]+)<\/span>/gi,
+      /<span[^>]*class=["'][^"']*a-list-item[^"']*["'][^>]*>([^<]+)<\/span>/gi,
+      /"breadcrumb"[^>]*>[\s\S]{0,2000}?<a[^>]*>([^<]+)<\/a>/gi,
+    ]
+    
+    const breadcrumbs: string[] = []
+    for (const pattern of breadcrumbPatterns) {
+      let match
+      while ((match = pattern.exec(htmlContent)) !== null) {
+        const crumb = match[1] || match[2]
+        if (crumb && crumb.trim() && !crumb.includes('Home') && !crumb.includes('Departments')) {
+          breadcrumbs.push(crumb.trim())
+        }
+      }
+    }
+    
+    // Also try to extract from structured data breadcrumbs
+    try {
+      const breadcrumbJsonLd = htmlContent.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)
+      if (breadcrumbJsonLd) {
+        for (const jsonLd of breadcrumbJsonLd) {
+          try {
+            const parsed = JSON.parse(jsonLd.replace(/<script[^>]*>/, '').replace(/<\/script>/, ''))
+            if (parsed['@type'] === 'BreadcrumbList' && parsed.itemListElement) {
+              for (const item of parsed.itemListElement) {
+                if (item.name && !item.name.includes('Home') && !item.name.includes('Departments')) {
+                  breadcrumbs.push(item.name)
+                }
+              }
+            }
+          } catch (e) {
+            // Ignore parse errors
+          }
+        }
+      }
+    } catch (e) {
+      // Ignore errors
+    }
+    
+    log(`[v0] Found breadcrumbs: ${breadcrumbs.join(' > ')}`)
+    
+    // Map Amazon categories to our categories
+    const categoryMap: { [key: string]: string } = {
+      'kitchen': 'Kitchen Appliances',
+      'kitchen & dining': 'Kitchen Appliances',
+      'small appliances': 'Kitchen Appliances',
+      'slow cookers': 'Kitchen Appliances',
+      'pressure cookers': 'Kitchen Appliances',
+      'home & kitchen': 'Kitchen Appliances',
+      'home improvement': 'Home Appliances',
+      'appliances': 'Kitchen Appliances',
+      'electronics': 'Electronics',
+      'clothing': 'Clothing',
+      'shoes': 'Shoes',
+      'jewelry': 'Jewelry',
+      'furniture': 'Furniture',
+      'toys': 'Toys',
+      'books': 'Books',
+    }
+    
+    // Check breadcrumbs for category matches
+    for (const crumb of breadcrumbs) {
+      const crumbLower = crumb.toLowerCase()
+      for (const [key, value] of Object.entries(categoryMap)) {
+        if (crumbLower.includes(key)) {
+          productData.category = value
+          log(`[v0] ✅ Extracted category from Amazon breadcrumb: ${value} (from "${crumb}")`)
+          break
+        }
+      }
+      if (productData.category && productData.category !== "General") break
     }
   }
   
@@ -4714,6 +5051,15 @@ async function extractWithoutAI(
       productData.salePrice = productData.price
       log(`[v0] 🚨 ABSOLUTE FINAL FIX: No salePrice found, using main price: ${productData.price}`)
     }
+    
+    // CRITICAL: If originalPrice and salePrice are the same, clear originalPrice
+    // This means there's no discount, so originalPrice should be null
+    if (productData.originalPrice && productData.salePrice && 
+        Math.abs(productData.originalPrice - productData.salePrice) < 0.01) {
+      log(`[v0] ⚠️ Original price (${productData.originalPrice}) equals sale price (${productData.salePrice}) - clearing originalPrice`)
+      productData.originalPrice = null
+      productData.discountPercent = null
+    }
   }
 
   // FINAL BRAND CORRECTION: Ensure Tommy.com brand is always correct
@@ -4777,6 +5123,137 @@ async function extractWithoutAI(
     }
   }
 
+  // Ensure price is set from salePrice if available
+  if (!productData.price && productData.salePrice) {
+    productData.price = productData.salePrice
+    log(`[v0] ✅ Set price from salePrice: ${productData.price}`)
+  }
+  // Ensure salePrice is set from price if available
+  if (!productData.salePrice && productData.price) {
+    productData.salePrice = productData.price
+    log(`[v0] ✅ Set salePrice from price: ${productData.salePrice}`)
+  }
+  
+  // FINAL PASS: For Amazon, re-check a-price patterns one more time to ensure we have prices with decimals
+  // This runs after all other patterns to catch any prices that might have been missed
+  if (hostname.includes('amazon.com') && htmlContent) {
+    log("[v0] 🔍 FINAL PASS: Re-checking a-price patterns for decimal precision...")
+    
+    const finalPriceWholeMatches = Array.from(htmlContent.matchAll(/<span[^>]*class=["'][^"']*a-price-whole[^"']*["'][^>]*>([0-9]+)<\/span>/gi))
+    const finalPriceFractionMatches = Array.from(htmlContent.matchAll(/<span[^>]*class=["'][^"']*a-price-fraction[^"']*["'][^>]*>([0-9]{1,2})<\/span>/gi))
+    
+    const finalPrices: number[] = []
+    
+    for (const wholeMatch of finalPriceWholeMatches) {
+      const wholeIndex = wholeMatch.index || 0
+      const wholePart = Number.parseInt(String(wholeMatch[1]))
+      
+      let closestFraction: { value: string; distance: number } | null = null
+      for (const fracMatch of finalPriceFractionMatches) {
+        const fracIndex = fracMatch.index || 0
+        const distance = Math.abs(fracIndex - wholeIndex)
+        if (distance < 200 && (!closestFraction || distance < closestFraction.distance)) {
+          closestFraction = { value: fracMatch[1], distance }
+        }
+      }
+      
+      if (closestFraction) {
+        const fractionPart = String(closestFraction.value).padStart(2, '0')
+        const fullPrice = Number.parseFloat(`${wholePart}.${fractionPart}`)
+        if (fullPrice >= 1 && fullPrice <= 10000) {
+          finalPrices.push(fullPrice)
+        }
+      }
+    }
+    
+    const uniqueFinalPrices = Array.from(new Set(finalPrices)).sort((a, b) => b - a)
+    
+    log(`[v0] FINAL PASS - Found ${uniqueFinalPrices.length} unique prices: ${uniqueFinalPrices.map(p => `$${p}`).join(', ')}`)
+    
+    if (uniqueFinalPrices.length >= 2) {
+      const originalPrice = uniqueFinalPrices[0]
+      const salePrice = uniqueFinalPrices[uniqueFinalPrices.length - 1]
+      
+      // ALWAYS update if we found multiple prices (they're from a-price which is most accurate)
+      if (originalPrice > salePrice) {
+        productData.originalPrice = originalPrice
+        productData.salePrice = salePrice
+        productData.price = salePrice
+        const discount = ((originalPrice - salePrice) / originalPrice) * 100
+        if (discount >= 0.1 && discount <= 95) {
+          productData.discountPercent = Math.round(discount * 10) / 10
+        }
+        log(`[v0] ✅ FINAL PASS - Updated prices with decimals - original: $${originalPrice}, sale: $${salePrice}, discount: ${productData.discountPercent}%`)
+      } else {
+        // Prices are same - use as sale price
+        productData.price = salePrice
+        productData.salePrice = salePrice
+        log(`[v0] ✅ FINAL PASS - Updated price with decimals: $${salePrice}`)
+      }
+    } else if (uniqueFinalPrices.length === 1) {
+      const singlePrice = uniqueFinalPrices[0]
+      
+      // ALWAYS update price (it's from a-price which is most accurate)
+      productData.price = singlePrice
+      productData.salePrice = singlePrice
+      log(`[v0] ✅ FINAL PASS - Updated price with decimals: $${singlePrice}`)
+      
+      // Try to find original price from "List Price" or "Was" patterns if we don't have one
+      if (!productData.originalPrice) {
+        const listPriceMatch = htmlContent.match(/List\s+Price[:\s]*\$?([0-9]{1,4}(?:\.[0-9]{1,2})?)/i)
+        if (listPriceMatch && listPriceMatch[1]) {
+          const listPrice = Number.parseFloat(String(listPriceMatch[1]))
+          if (listPrice > singlePrice && listPrice >= 1 && listPrice <= 10000) {
+            productData.originalPrice = listPrice
+            const discount = ((listPrice - singlePrice) / listPrice) * 100
+            if (discount >= 0.1 && discount <= 95) {
+              productData.discountPercent = Math.round(discount * 10) / 10
+            }
+            log(`[v0] ✅ FINAL PASS - Found original price from List Price: $${listPrice}, sale: $${singlePrice}`)
+          }
+        }
+        
+        // Also check for "Was:" pattern
+        if (!productData.originalPrice) {
+          const wasPriceMatch = htmlContent.match(/Was[:\s]*\$?([0-9]{1,4}(?:\.[0-9]{1,2})?)/i)
+          if (wasPriceMatch && wasPriceMatch[1]) {
+            const wasPrice = Number.parseFloat(String(wasPriceMatch[1]))
+            if (wasPrice > singlePrice && wasPrice >= 1 && wasPrice <= 10000) {
+              productData.originalPrice = wasPrice
+              const discount = ((wasPrice - singlePrice) / wasPrice) * 100
+              if (discount >= 0.1 && discount <= 95) {
+                productData.discountPercent = Math.round(discount * 10) / 10
+              }
+              log(`[v0] ✅ FINAL PASS - Found original price from Was: $${wasPrice}, sale: $${singlePrice}`)
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  // Format prices to 2 decimal places - CRITICAL: Use Number() to preserve precision
+  // Store original values before formatting for logging
+  const priceBefore = productData.price
+  const salePriceBefore = productData.salePrice
+  const originalPriceBefore = productData.originalPrice
+  
+  if (productData.price) {
+    const priceStr = productData.price.toFixed(2)
+    productData.price = Number(priceStr) // Use Number() instead of parseFloat() to preserve precision
+    log(`[v0] Formatted price: ${productData.price} (was: ${priceBefore})`)
+  }
+  if (productData.salePrice) {
+    const salePriceStr = productData.salePrice.toFixed(2)
+    productData.salePrice = Number(salePriceStr) // Use Number() instead of parseFloat() to preserve precision
+    log(`[v0] Formatted salePrice: ${productData.salePrice} (was: ${salePriceBefore})`)
+  }
+  if (productData.originalPrice) {
+    const originalPriceStr = productData.originalPrice.toFixed(2)
+    productData.originalPrice = Number(originalPriceStr) // Use Number() instead of parseFloat() to preserve precision
+    log(`[v0] Formatted originalPrice: ${productData.originalPrice} (was: ${originalPriceBefore})`)
+  }
+  
   console.log("[v0] ✅ FINAL PRICE VALUES - price:", productData.price, "salePrice:", productData.salePrice, "originalPrice:", productData.originalPrice, "discountPercent:", productData.discountPercent)
 
   // Extract rating and review count for Amazon products
@@ -4784,29 +5261,241 @@ async function extractWithoutAI(
     log("[v0] 🔍 Extracting Amazon rating and review count...")
     
     try {
-      // Pattern 1: Look for data-asin-reviews-link-footnote attribute (most reliable)
-      const reviewFootnoteMatch = htmlContent.match(/<span[^>]*data-asin-reviews-link-footnote[^>]*>([^<]+)<\/span>/i)
-      if (reviewFootnoteMatch && reviewFootnoteMatch[1]) {
-        const reviewText = reviewFootnoteMatch[1].trim()
-        log(`[v0] Found review footnote text: ${reviewText}`)
+      // Pattern 0: Extract rating and review count separately (most reliable for Amazon)
+      // Amazon often has rating in aria-label and review count in data-asin-reviews-link-footnote
+      
+      // First, try to extract rating from aria-label - look for ALL instances and use the most common one
+      // IMPORTANT: Must match decimal ratings (like 4.4, 4.6) NOT integer "5" from "out of 5"
+      if (!productData.rating) {
+        const ariaLabelRatingPatterns = [
+          /aria-label=["']([^"']*?)(\d+\.\d+)\s+out\s+of\s+5[^"']*?["']/gi,
+          /aria-label=["']([^"']*?)(\d+\.\d+)\s+stars?[^"']*?["']/gi,
+        ]
         
-        // Parse "4.7 out of 5 stars (93)" or "4.7 4.7 out of 5 stars (93)" format
-        // Handle duplicate rating numbers at the start
-        const ratingMatch = reviewText.match(/(\d+\.?\d*)\s+(?:\d+\.?\d*\s+)?out\s+of\s+5\s+stars?\s*\((\d+(?:,\d+)*)\)/i) || 
-                           reviewText.match(/(\d+\.?\d*)\s+out\s+of\s+5\s+stars?\s*\((\d+(?:,\d+)*)\)/i)
-        if (ratingMatch && ratingMatch[1] && ratingMatch[2]) {
-          const rating = parseFloat(ratingMatch[1]) // Use first number (the rating)
-          const reviewCountStr = ratingMatch[2].replace(/,/g, '')
-          const reviewCount = parseInt(reviewCountStr, 10)
+        const ratingCandidates: number[] = []
+        
+        for (const pattern of ariaLabelRatingPatterns) {
+          let match
+          while ((match = pattern.exec(htmlContent)) !== null) {
+            if (match[2]) {
+              const rating = parseFloat(match[2])
+              // CRITICAL: Only accept decimal ratings (must have decimal point) to avoid matching "5" from "out of 5"
+              // Also ensure it's a reasonable rating (1.0-5.0) and not exactly 5.0 (which is rare)
+              if (!isNaN(rating) && rating >= 1.0 && rating <= 5.0 && rating % 1 !== 0 && rating < 5.0) {
+                ratingCandidates.push(rating)
+              }
+            }
+          }
+        }
+        
+        // Use the most common rating (or first if all are the same)
+        if (ratingCandidates.length > 0) {
+          // Count occurrences of each rating
+          const ratingCounts = new Map<number, number>()
+          for (const rating of ratingCandidates) {
+            ratingCounts.set(rating, (ratingCounts.get(rating) || 0) + 1)
+          }
           
-          // Validate: rating should be reasonable (>= 3.0 for most products) and review count should be meaningful (>= 10)
-          // Reject obviously wrong values like "2" or "2.0" as ratings (products rarely have ratings below 3)
-          if (!isNaN(rating) && rating >= 3.0 && rating <= 5.0 && !isNaN(reviewCount) && reviewCount >= 10) {
-            productData.rating = rating
-            productData.reviewCount = reviewCount
-            log(`[v0] ✅ Extracted rating: ${rating}, review count: ${reviewCount}`)
-          } else {
-            log(`[v0] ⚠️ Rejected invalid rating values - rating: ${rating}, reviewCount: ${reviewCount}`)
+          // Log all ratings found for debugging
+          const ratingSummary = Array.from(ratingCounts.entries())
+            .sort((a, b) => b[1] - a[1]) // Sort by count descending
+            .map(([rating, count]) => `${rating} (${count}x)`)
+            .join(', ')
+          log(`[v0] All ratings found: ${ratingSummary}`)
+          
+          // Find the rating with the highest count
+          let bestRating = ratingCandidates[0]
+          let maxCount = ratingCounts.get(bestRating) || 0
+          for (const [rating, count] of ratingCounts.entries()) {
+            if (count > maxCount) {
+              bestRating = rating
+              maxCount = count
+            }
+          }
+          
+          // If there are multiple ratings with similar counts, prefer the higher rating
+          // (e.g., if 4.4 appears 5 times and 4.6 appears 4 times, prefer 4.6)
+          const sortedRatings = Array.from(ratingCounts.entries())
+            .sort((a, b) => {
+              // First sort by count (descending), then by rating value (descending)
+              if (b[1] !== a[1]) return b[1] - a[1]
+              return b[0] - a[0]
+            })
+          
+          // If the top 2 ratings have counts within 2 of each other, prefer the higher rating
+          if (sortedRatings.length >= 2) {
+            const topCount = sortedRatings[0][1]
+            const secondCount = sortedRatings[1][1]
+            const topRating = sortedRatings[0][0]
+            const secondRating = sortedRatings[1][0]
+            
+            // If counts are close (within 2) and second rating is higher, prefer it
+            if (topCount - secondCount <= 2 && secondRating > topRating) {
+              bestRating = secondRating
+              maxCount = secondCount
+              log(`[v0] Preferring higher rating ${bestRating} (${maxCount}x) over ${topRating} (${topCount}x) due to close counts`)
+            }
+          }
+          
+          productData.rating = bestRating
+          log(`[v0] ✅ Extracted rating from aria-label: ${bestRating} (found ${ratingCandidates.length} instances, ${maxCount} occurrences)`)
+        }
+      }
+      
+      // Then, try to extract review count from data-asin-reviews-link-footnote - look for ALL instances
+      if (!productData.reviewCount) {
+        // Pattern 0a: Look for data-asin-reviews-link-footnote with parentheses
+        const reviewFootnoteMatches = Array.from(htmlContent.matchAll(/<span[^>]*data-asin-reviews-link-footnote[^>]*>\(([^)]+)\)<\/span>/gi))
+        
+        const reviewCountCandidates: number[] = []
+        
+        for (const match of reviewFootnoteMatches) {
+          if (match[1]) {
+            const reviewCountStr = match[1].trim().replace(/,/g, '').replace(/\+/g, '')
+            let reviewCount = 0
+            
+            // Handle K and M suffixes
+            if (reviewCountStr.toLowerCase().endsWith('k')) {
+              reviewCount = parseInt(reviewCountStr.slice(0, -1), 10) * 1000
+            } else if (reviewCountStr.toLowerCase().endsWith('m')) {
+              reviewCount = parseInt(reviewCountStr.slice(0, -1), 10) * 1000000
+            } else {
+              reviewCount = parseInt(reviewCountStr, 10)
+            }
+            
+            if (!isNaN(reviewCount) && reviewCount >= 1) {
+              reviewCountCandidates.push(reviewCount)
+            }
+          }
+        }
+        
+        // Pattern 0b: Look for review count in acrCustomerReviewText container
+        if (reviewCountCandidates.length === 0) {
+          const acrContainerMatch = htmlContent.match(/<span[^>]*id=["']acrCustomerReviewText["'][^>]*>([\s\S]{0,1000}?)<\/span>/i)
+          if (acrContainerMatch && acrContainerMatch[1]) {
+            const containerHtml = acrContainerMatch[1]
+            const reviewMatch = containerHtml.match(/<span[^>]*data-asin-reviews-link-footnote[^>]*>\(([^)]+)\)<\/span>/i)
+            if (reviewMatch && reviewMatch[1]) {
+              const reviewCountStr = reviewMatch[1].trim().replace(/,/g, '').replace(/\+/g, '')
+              let reviewCount = 0
+              
+              if (reviewCountStr.toLowerCase().endsWith('k')) {
+                reviewCount = parseInt(reviewCountStr.slice(0, -1), 10) * 1000
+              } else if (reviewCountStr.toLowerCase().endsWith('m')) {
+                reviewCount = parseInt(reviewCountStr.slice(0, -1), 10) * 1000000
+              } else {
+                reviewCount = parseInt(reviewCountStr, 10)
+              }
+              
+              if (!isNaN(reviewCount) && reviewCount >= 1) {
+                reviewCountCandidates.push(reviewCount)
+              }
+            }
+          }
+        }
+        
+        // Pattern 0c: Look for review count near rating in HTML text patterns
+        if (reviewCountCandidates.length === 0) {
+          const reviewPatterns = [
+            /(\d+(?:,\d+)*(?:K|M)?\+?)\s*reviews?/gi,
+            /reviews?[:\s]*(\d+(?:,\d+)*(?:K|M)?\+?)/gi,
+            /\((\d+(?:,\d+)*(?:K|M)?\+?)\s*reviews?\)/gi,
+          ]
+          
+          for (const pattern of reviewPatterns) {
+            let match
+            while ((match = pattern.exec(htmlContent)) !== null && reviewCountCandidates.length < 10) {
+              if (match[1]) {
+                const reviewCountStr = match[1].trim().replace(/,/g, '').replace(/\+/g, '')
+                let reviewCount = 0
+                
+                if (reviewCountStr.toLowerCase().endsWith('k')) {
+                  reviewCount = parseInt(reviewCountStr.slice(0, -1), 10) * 1000
+                } else if (reviewCountStr.toLowerCase().endsWith('m')) {
+                  reviewCount = parseInt(reviewCountStr.slice(0, -1), 10) * 1000000
+                } else {
+                  reviewCount = parseInt(reviewCountStr, 10)
+                }
+                
+                // Only accept reasonable review counts (>= 1 and <= 10 million)
+                if (!isNaN(reviewCount) && reviewCount >= 1 && reviewCount <= 10000000) {
+                  reviewCountCandidates.push(reviewCount)
+                }
+              }
+            }
+            if (reviewCountCandidates.length > 0) break
+          }
+        }
+        
+        // Use the highest review count (most likely to be correct)
+        if (reviewCountCandidates.length > 0) {
+          const maxReviewCount = Math.max(...reviewCountCandidates)
+          productData.reviewCount = maxReviewCount
+          log(`[v0] ✅ Extracted review count: ${maxReviewCount} (found ${reviewCountCandidates.length} instances)`)
+        } else {
+          log(`[v0] ⚠️ No review count found in HTML`)
+        }
+      }
+      
+      // Pattern 0.5: Look for rating and review count together in aria-label (fallback)
+      if ((!productData.rating || !productData.reviewCount)) {
+        const ariaLabelPatterns = [
+          /aria-label=["']([^"']*?)(\d+\.\d+)\s+out\s+of\s+5[^"']*?(\d+(?:,\d+)*(?:K|M)?\+?)[^"']*?["']/i,
+          /aria-label=["']([^"']*?)(\d+\.\d+)\s+stars?[^"']*?(\d+(?:,\d+)*(?:K|M)?\+?)[^"']*?["']/i,
+          /aria-label=["']([^"']*?)(\d+\.\d+)[^"']*?(\d+(?:,\d+)*(?:K|M)?\+?)\s+reviews?[^"']*?["']/i,
+        ]
+        
+        for (const pattern of ariaLabelPatterns) {
+          const match = htmlContent.match(pattern)
+          if (match && match[2] && match[3]) {
+            const rating = parseFloat(match[2])
+            let reviewCountStr = match[3].replace(/,/g, '').replace(/\+/g, '')
+            let reviewCount = 0
+            
+            // Handle K and M suffixes
+            if (reviewCountStr.toLowerCase().endsWith('k')) {
+              reviewCount = parseInt(reviewCountStr.slice(0, -1), 10) * 1000
+            } else if (reviewCountStr.toLowerCase().endsWith('m')) {
+              reviewCount = parseInt(reviewCountStr.slice(0, -1), 10) * 1000000
+            } else {
+              reviewCount = parseInt(reviewCountStr, 10)
+            }
+            
+            if (!isNaN(rating) && rating >= 1.0 && rating <= 5.0 && !isNaN(reviewCount) && reviewCount >= 1) {
+              if (!productData.rating) productData.rating = rating
+              if (!productData.reviewCount) productData.reviewCount = reviewCount
+              log(`[v0] ✅ Extracted rating from aria-label pattern: ${rating}, review count: ${reviewCount}`)
+              break
+            }
+          }
+        }
+      }
+      
+      // Pattern 1: Look for data-asin-reviews-link-footnote with full text (legacy pattern)
+      if ((!productData.rating || !productData.reviewCount)) {
+        const reviewFootnoteMatch = htmlContent.match(/<span[^>]*data-asin-reviews-link-footnote[^>]*>([^<]+)<\/span>/i)
+        if (reviewFootnoteMatch && reviewFootnoteMatch[1]) {
+          const reviewText = reviewFootnoteMatch[1].trim()
+          log(`[v0] Found review footnote text: ${reviewText}`)
+          
+          // Parse "4.7 out of 5 stars (93)" or "4.7 4.7 out of 5 stars (93)" format
+          // Handle duplicate rating numbers at the start
+          const ratingMatch = reviewText.match(/(\d+\.?\d*)\s+(?:\d+\.?\d*\s+)?out\s+of\s+5\s+stars?\s*\((\d+(?:,\d+)*)\)/i) || 
+                             reviewText.match(/(\d+\.?\d*)\s+out\s+of\s+5\s+stars?\s*\((\d+(?:,\d+)*)\)/i)
+          if (ratingMatch && ratingMatch[1] && ratingMatch[2]) {
+            const rating = parseFloat(ratingMatch[1]) // Use first number (the rating)
+            const reviewCountStr = ratingMatch[2].replace(/,/g, '')
+            const reviewCount = parseInt(reviewCountStr, 10)
+            
+            // Validate: rating should be reasonable (>= 1.0 for all products) and review count should be meaningful (>= 1)
+            // Allow lower ratings as some products may have poor reviews
+            if (!isNaN(rating) && rating >= 1.0 && rating <= 5.0 && !isNaN(reviewCount) && reviewCount >= 1) {
+              if (!productData.rating) productData.rating = rating
+              if (!productData.reviewCount) productData.reviewCount = reviewCount
+              log(`[v0] ✅ Extracted rating: ${rating}, review count: ${reviewCount}`)
+            } else {
+              log(`[v0] ⚠️ Rejected invalid rating values - rating: ${rating}, reviewCount: ${reviewCount}`)
+            }
           }
         }
       }
@@ -4827,8 +5516,8 @@ async function extractWithoutAI(
                   const rating = parseFloat(item.aggregateRating.ratingValue)
                   const reviewCount = parseInt(item.aggregateRating.reviewCount || item.aggregateRating.ratingCount || '0', 10)
                   
-                  // Validate: rating must be reasonable (>= 3.0) and review count must be meaningful (>= 10)
-                  if (!isNaN(rating) && rating >= 3.0 && rating <= 5.0 && !isNaN(reviewCount) && reviewCount >= 10) {
+                  // Validate: rating must be reasonable (>= 1.0) and review count must be meaningful (>= 1)
+                  if (!isNaN(rating) && rating >= 1.0 && rating <= 5.0 && !isNaN(reviewCount) && reviewCount >= 1) {
                     productData.rating = rating
                     productData.reviewCount = reviewCount
                     log(`[v0] ✅ Extracted rating from JSON-LD: ${rating}, review count: ${reviewCount}`)
@@ -4848,22 +5537,37 @@ async function extractWithoutAI(
       // Pattern 3: Look for common HTML patterns for ratings (handle duplicate rating format)
       if ((!productData.rating || !productData.reviewCount)) {
         // Try pattern: "4.7 out of 5 stars (93)" or "4.7 4.7 out of 5 stars (93)"
-        // Pattern 3: Look for common HTML patterns for ratings - require reasonable values
-        const ratingPattern1 = /([3-5]\.\d+)\s+(?:\d+\.?\d*\s+)?out\s+of\s+5\s+stars?[\s\S]{0,200}?\((\d{2,}(?:,\d{3})*)\)/i
-        const ratingMatch1 = htmlContent.match(ratingPattern1)
-        if (ratingMatch1 && ratingMatch1[1] && ratingMatch1[2]) {
-          const rating = parseFloat(ratingMatch1[1])
-          const reviewCountStr = ratingMatch1[2].replace(/,/g, '')
-          const reviewCount = parseInt(reviewCountStr, 10)
-          
-          // Validate: rating must be decimal between 3-5, review count must be meaningful (>= 10)
-          if (!isNaN(rating) && rating >= 3.0 && rating <= 5.0 && rating.toString().includes('.') && 
-              !isNaN(reviewCount) && reviewCount >= 10) {
-            productData.rating = rating
-            productData.reviewCount = reviewCount
-            log(`[v0] ✅ Extracted rating from HTML pattern: ${rating}, review count: ${reviewCount}`)
-          } else {
-            log(`[v0] ⚠️ Rejected invalid rating from HTML pattern - rating: ${rating}, reviewCount: ${reviewCount}`)
+        // Pattern 3: Look for common HTML patterns for ratings - more flexible patterns
+        const ratingPatterns = [
+          /([1-5]\.\d+)\s+(?:\d+\.?\d*\s+)?out\s+of\s+5\s+stars?[\s\S]{0,200}?\((\d+(?:,\d+)*(?:K|M)?\+?)\)/i,
+          /([1-5]\.\d+)\s+out\s+of\s+5\s+stars?[\s\S]{0,200}?\((\d+(?:,\d+)*(?:K|M)?\+?)\)/i,
+          /([1-5]\.\d+)\s+stars?[\s\S]{0,200}?\((\d+(?:,\d+)*(?:K|M)?\+?)\s*reviews?\)/i,
+          /(\d+\.\d+)\s+out\s+of\s+5[\s\S]{0,300}?(\d+(?:,\d+)*(?:K|M)?\+?)\s*reviews?/i,
+        ]
+        
+        for (const pattern of ratingPatterns) {
+          const ratingMatch = htmlContent.match(pattern)
+          if (ratingMatch && ratingMatch[1] && ratingMatch[2]) {
+            const rating = parseFloat(ratingMatch[1])
+            let reviewCountStr = ratingMatch[2].replace(/,/g, '').replace(/\+/g, '')
+            let reviewCount = 0
+            
+            if (reviewCountStr.toLowerCase().endsWith('k')) {
+              reviewCount = parseInt(reviewCountStr.slice(0, -1), 10) * 1000
+            } else if (reviewCountStr.toLowerCase().endsWith('m')) {
+              reviewCount = parseInt(reviewCountStr.slice(0, -1), 10) * 1000000
+            } else {
+              reviewCount = parseInt(reviewCountStr, 10)
+            }
+            
+            // Validate: rating must be between 1-5, review count must be meaningful (>= 1)
+            if (!isNaN(rating) && rating >= 1.0 && rating <= 5.0 && 
+                !isNaN(reviewCount) && reviewCount >= 1) {
+              productData.rating = rating
+              productData.reviewCount = reviewCount
+              log(`[v0] ✅ Extracted rating from HTML pattern: ${rating}, review count: ${reviewCount}`)
+              break
+            }
           }
         }
       }
@@ -4877,9 +5581,9 @@ async function extractWithoutAI(
           const reviewCountStr = ariaMatch[3].replace(/,/g, '')
           const reviewCount = parseInt(reviewCountStr, 10)
           
-          // Validate: rating must be decimal between 3-5, review count must be meaningful (>= 10)
-          if (!isNaN(rating) && rating >= 3.0 && rating <= 5.0 && rating.toString().includes('.') && 
-              !isNaN(reviewCount) && reviewCount >= 10) {
+          // Validate: rating must be between 1-5, review count must be meaningful (>= 1)
+          if (!isNaN(rating) && rating >= 1.0 && rating <= 5.0 && 
+              !isNaN(reviewCount) && reviewCount >= 1) {
             productData.rating = rating
             productData.reviewCount = reviewCount
             log(`[v0] ✅ Extracted rating from aria-label: ${rating}, review count: ${reviewCount}`)
@@ -4890,19 +5594,21 @@ async function extractWithoutAI(
       }
       
       // Pattern 5: Look for id="acrPopover" or similar rating containers
+      // IMPORTANT: Must match decimal ratings, not integer "5" from "out of 5"
       if ((!productData.rating || !productData.reviewCount)) {
-        const popoverPattern = /<span[^>]*id=["']acrPopover["'][^>]*[^>]*>[\s\S]{0,500}?([3-5]\.\d+)[\s\S]{0,500}?(\d{2,}(?:,\d{3})*)/i
+        const popoverPattern = /<span[^>]*id=["']acrPopover["'][^>]*[^>]*>[\s\S]{0,500}?([1-4]\.\d+)[\s\S]{0,500}?(\d{2,}(?:,\d{3})*)/i
         const popoverMatch = htmlContent.match(popoverPattern)
         if (popoverMatch && popoverMatch[1] && popoverMatch[2]) {
           const rating = parseFloat(popoverMatch[1])
           const reviewCountStr = popoverMatch[2].replace(/,/g, '')
           const reviewCount = parseInt(reviewCountStr, 10)
           
-          // Validate: rating must be decimal between 3-5, review count must be meaningful (>= 10)
-          if (!isNaN(rating) && rating >= 3.0 && rating <= 5.0 && rating.toString().includes('.') && 
-              !isNaN(reviewCount) && reviewCount >= 10) {
-            productData.rating = rating
-            productData.reviewCount = reviewCount
+          // Validate: rating must be between 1-5 (but not exactly 5.0), review count must be meaningful (>= 1)
+          // Only accept decimal ratings to avoid matching "5" from "out of 5"
+          if (!isNaN(rating) && rating >= 1.0 && rating < 5.0 && rating % 1 !== 0 &&
+              !isNaN(reviewCount) && reviewCount >= 1) {
+            if (!productData.rating) productData.rating = rating
+            if (!productData.reviewCount) productData.reviewCount = reviewCount
             log(`[v0] ✅ Extracted rating from popover: ${rating}, review count: ${reviewCount}`)
           } else {
             log(`[v0] ⚠️ Rejected invalid rating from popover - rating: ${rating}, reviewCount: ${reviewCount}`)
@@ -4911,29 +5617,73 @@ async function extractWithoutAI(
       }
       
       // Pattern 6: Look for "acrCustomerReviewText" or similar review text patterns
+      // Extract rating and review count from the same container
       if ((!productData.rating || !productData.reviewCount)) {
-        const reviewTextPatterns = [
-          /<span[^>]*id=["']acrCustomerReviewText["'][^>]*>[\s\S]{0,300}?([3-5]\.\d+)[\s\S]{0,300}?(\d{2,}(?:,\d{3})*)/i,
-          /<a[^>]*href=["'][^"']*#customerReviews["'][^>]*>[\s\S]{0,300}?([3-5]\.\d+)[\s\S]{0,300}?(\d{2,}(?:,\d{3})*)/i,
-          /(?:rating|reviews?)[:\s]*([3-5]\.\d+)[\s\S]{0,200}?(\d{2,}(?:,\d{3})*)\s*(?:reviews?|ratings?)/i,
-        ]
+        // First, try to find the acrCustomerReviewText container and extract both separately
+        const acrContainerMatch = htmlContent.match(/<span[^>]*id=["']acrCustomerReviewText["'][^>]*>([\s\S]{0,1000}?)<\/span>/i)
+        if (acrContainerMatch && acrContainerMatch[1]) {
+          const containerHtml = acrContainerMatch[1]
+          
+          // Extract rating from aria-label within the container
+          if (!productData.rating) {
+            const ratingMatch = containerHtml.match(/aria-label=["']([^"']*?)(\d+\.\d+)\s+out\s+of\s+5[^"']*?["']/i)
+            if (ratingMatch && ratingMatch[2]) {
+              const rating = parseFloat(ratingMatch[2])
+              if (!isNaN(rating) && rating >= 1.0 && rating <= 5.0) {
+                productData.rating = rating
+                log(`[v0] ✅ Extracted rating from acrCustomerReviewText container: ${rating}`)
+              }
+            }
+          }
+          
+          // Extract review count from data-asin-reviews-link-footnote within the container
+          if (!productData.reviewCount) {
+            const reviewMatch = containerHtml.match(/<span[^>]*data-asin-reviews-link-footnote[^>]*>\(([^)]+)\)<\/span>/i)
+            if (reviewMatch && reviewMatch[1]) {
+              const reviewCountStr = reviewMatch[1].trim().replace(/,/g, '').replace(/\+/g, '')
+              let reviewCount = 0
+              
+              if (reviewCountStr.toLowerCase().endsWith('k')) {
+                reviewCount = parseInt(reviewCountStr.slice(0, -1), 10) * 1000
+              } else if (reviewCountStr.toLowerCase().endsWith('m')) {
+                reviewCount = parseInt(reviewCountStr.slice(0, -1), 10) * 1000000
+              } else {
+                reviewCount = parseInt(reviewCountStr, 10)
+              }
+              
+              if (!isNaN(reviewCount) && reviewCount >= 1) {
+                productData.reviewCount = reviewCount
+                log(`[v0] ✅ Extracted review count from acrCustomerReviewText container: ${reviewCount}`)
+              }
+            }
+          }
+        }
         
-        for (const pattern of reviewTextPatterns) {
-          const match = htmlContent.match(pattern)
-          if (match && match[1] && match[2]) {
-            const rating = parseFloat(match[1])
-            const reviewCountStr = match[2].replace(/,/g, '')
-            const reviewCount = parseInt(reviewCountStr, 10)
-            
-            // Validate: rating must be decimal between 3-5, review count must be meaningful (>= 10)
-            if (!isNaN(rating) && rating >= 3.0 && rating <= 5.0 && rating.toString().includes('.') && 
-                !isNaN(reviewCount) && reviewCount >= 10) {
-              productData.rating = rating
-              productData.reviewCount = reviewCount
-              log(`[v0] ✅ Extracted rating from review text pattern: ${rating}, review count: ${reviewCount}`)
-              break
-            } else {
-              log(`[v0] ⚠️ Rejected invalid rating from review text pattern - rating: ${rating}, reviewCount: ${reviewCount}`)
+        // Fallback: try other patterns that match both together
+        if ((!productData.rating || !productData.reviewCount)) {
+          const reviewTextPatterns = [
+            /<span[^>]*id=["']acrCustomerReviewText["'][^>]*>[\s\S]{0,500}?([1-5]\.\d+)[\s\S]{0,500}?\((\d+(?:,\d+)*)\)/i,
+            /<a[^>]*href=["'][^"']*#customerReviews["'][^>]*>[\s\S]{0,500}?([1-5]\.\d+)[\s\S]{0,500}?\((\d+(?:,\d+)*)\)/i,
+            /(?:rating|reviews?)[:\s]*([1-5]\.\d+)[\s\S]{0,200}?\((\d+(?:,\d+)*)\)/i,
+          ]
+          
+          for (const pattern of reviewTextPatterns) {
+            const match = htmlContent.match(pattern)
+            if (match && match[1] && match[2]) {
+              const rating = parseFloat(match[1])
+              const reviewCountStr = match[2].replace(/,/g, '')
+              const reviewCount = parseInt(reviewCountStr, 10)
+              
+              // Validate: rating must be between 1-5, review count must be meaningful (>= 1)
+              if (!isNaN(rating) && rating >= 1.0 && rating <= 5.0 && 
+                  !isNaN(reviewCount) && reviewCount >= 1) {
+                if (!productData.rating) productData.rating = rating
+                if (!productData.reviewCount) productData.reviewCount = reviewCount
+                log(`[v0] ✅ Extracted rating from review text pattern: ${rating}, review count: ${reviewCount}`)
+                break
+              } else {
+                log(`[v0] ⚠️ Rejected invalid rating from review text pattern - rating: ${rating}, reviewCount: ${reviewCount}`)
+              }
             }
           }
         }
@@ -4948,9 +5698,9 @@ async function extractWithoutAI(
           const reviewCountStr = csaMatch[2].replace(/,/g, '')
           const reviewCount = parseInt(reviewCountStr, 10)
           
-          // Validate: rating must be decimal between 3-5, review count must be meaningful (>= 10)
-          if (!isNaN(rating) && rating >= 3.0 && rating <= 5.0 && rating.toString().includes('.') && 
-              !isNaN(reviewCount) && reviewCount >= 10) {
+          // Validate: rating must be between 1-5, review count must be meaningful (>= 1)
+          if (!isNaN(rating) && rating >= 1.0 && rating <= 5.0 && 
+              !isNaN(reviewCount) && reviewCount >= 1) {
             productData.rating = rating
             productData.reviewCount = reviewCount
             log(`[v0] ✅ Extracted rating from CSA pattern: ${rating}, review count: ${reviewCount}`)
@@ -4960,47 +5710,164 @@ async function extractWithoutAI(
         }
       }
       
-      // Pattern 8: Look for JavaScript variables containing rating/review data
+      // Pattern 8: Look for JavaScript variables containing rating/review data (more aggressive)
       if ((!productData.rating || !productData.reviewCount)) {
         let extractedRating: number | null = null
         let extractedReviewCount: number | null = null
         
-        // Pattern for rating - require reasonable values
+        // Pattern for rating - more aggressive patterns
         if (!productData.rating) {
-          const ratingPattern = /(?:rating|averageRating|avgRating|average)\s*[:=]\s*["']?([3-5]\.\d+)/i
-          const ratingMatch = htmlContent.match(ratingPattern)
-          if (ratingMatch && ratingMatch[1]) {
-            const rating = parseFloat(ratingMatch[1])
-            // Validate: rating must be decimal between 3-5
-            if (!isNaN(rating) && rating >= 3.0 && rating <= 5.0 && rating.toString().includes('.')) {
-              extractedRating = rating
+          const ratingPatterns = [
+            /(?:rating|averageRating|avgRating|average|starRating|overallRating)\s*[:=]\s*["']?([1-5]\.\d+)/i,
+            /"rating":\s*([1-5]\.\d+)/i,
+            /'rating':\s*([1-5]\.\d+)/i,
+            /ratingValue["']?\s*[:=]\s*["']?([1-5]\.\d+)/i,
+            /averageRating["']?\s*[:=]\s*["']?([1-5]\.\d+)/i,
+            // Look for patterns like "4.6" near "rating" or "stars"
+            /([1-5]\.\d+)[\s\S]{0,50}?(?:rating|stars?)/i,
+            /(?:rating|stars?)[\s\S]{0,50}?([1-5]\.\d+)/i,
+          ]
+          
+          for (const pattern of ratingPatterns) {
+            const ratingMatch = htmlContent.match(pattern)
+            if (ratingMatch && ratingMatch[1]) {
+              const rating = parseFloat(ratingMatch[1])
+              // Validate: rating must be between 1-5
+              if (!isNaN(rating) && rating >= 1.0 && rating <= 5.0) {
+                extractedRating = rating
+                log(`[v0] Found rating in JS variable: ${rating}`)
+                break
+              }
             }
           }
         }
         
-        // Pattern for review count - require meaningful values
+        // Pattern for review count - more aggressive patterns
         if (!productData.reviewCount) {
-          const reviewPattern = /(?:reviewCount|numReviews|totalReviews|reviewCountTotal)\s*[:=]\s*["']?(\d{2,}(?:,\d{3})*)/i
-          const reviewMatch = htmlContent.match(reviewPattern)
-          if (reviewMatch && reviewMatch[1]) {
-            const reviewCountStr = reviewMatch[1].replace(/,/g, '')
-            const reviewCount = parseInt(reviewCountStr, 10)
-            // Validate: review count must be meaningful (>= 10)
-            if (!isNaN(reviewCount) && reviewCount >= 10) {
-              extractedReviewCount = reviewCount
+          const reviewPatterns = [
+            /(?:reviewCount|numReviews|totalReviews|reviewCountTotal|numberOfReviews|totalReviewCount)\s*[:=]\s*["']?(\d+(?:,\d+)*(?:K|M)?\+?)/i,
+            /"reviewCount":\s*(\d+(?:,\d+)*)/i,
+            /'reviewCount':\s*(\d+(?:,\d+)*)/i,
+            /reviewCount["']?\s*[:=]\s*["']?(\d+(?:,\d+)*(?:K|M)?\+?)/i,
+            /numReviews["']?\s*[:=]\s*["']?(\d+(?:,\d+)*(?:K|M)?\+?)/i,
+            // Look for patterns like "15130" near "reviews" or "ratings"
+            /(\d{2,}(?:,\d{3})*(?:K|M)?\+?)[\s\S]{0,50}?(?:reviews?|ratings?)/i,
+            /(?:reviews?|ratings?)[\s\S]{0,50}?(\d{2,}(?:,\d{3})*(?:K|M)?\+?)/i,
+          ]
+          
+          for (const pattern of reviewPatterns) {
+            const reviewMatch = htmlContent.match(pattern)
+            if (reviewMatch && reviewMatch[1]) {
+              let reviewCountStr = reviewMatch[1].replace(/,/g, '').replace(/\+/g, '')
+              let reviewCount = 0
+              
+              if (reviewCountStr.toLowerCase().endsWith('k')) {
+                reviewCount = parseInt(reviewCountStr.slice(0, -1), 10) * 1000
+              } else if (reviewCountStr.toLowerCase().endsWith('m')) {
+                reviewCount = parseInt(reviewCountStr.slice(0, -1), 10) * 1000000
+              } else {
+                reviewCount = parseInt(reviewCountStr, 10)
+              }
+              
+              // Validate: review count must be meaningful (>= 1)
+              if (!isNaN(reviewCount) && reviewCount >= 1) {
+                extractedReviewCount = reviewCount
+                log(`[v0] Found review count in JS variable: ${reviewCount}`)
+                break
+              }
             }
           }
         }
         
         if (extractedRating !== null && !productData.rating) {
           productData.rating = extractedRating
+          log(`[v0] ✅ Set rating from JS variable: ${extractedRating}`)
         }
         if (extractedReviewCount !== null && !productData.reviewCount) {
           productData.reviewCount = extractedReviewCount
+          log(`[v0] ✅ Set review count from JS variable: ${extractedReviewCount}`)
         }
         
         if (extractedRating !== null || extractedReviewCount !== null) {
           log(`[v0] ✅ Extracted rating from JS variables: rating=${extractedRating}, reviewCount=${extractedReviewCount}`)
+        }
+      }
+      
+      // Pattern 8.5: Ultra-aggressive search for rating/review in minified HTML
+      if ((!productData.rating || !productData.reviewCount)) {
+        // Search for patterns that might be in minified JavaScript or HTML
+        // Look for decimal ratings (1.0-5.0) followed by large numbers (review counts)
+        const ultraAggressivePatterns = [
+          // Pattern: "4.6" followed by "15130" or "15,130" within reasonable distance
+          /([1-5]\.\d{1,2})[\s\S]{0,1000}?(\d{2,}(?:,\d{3})*(?:K|M)?\+?)/g,
+          // Pattern: Large number followed by decimal rating
+          /(\d{2,}(?:,\d{3})*(?:K|M)?\+?)[\s\S]{0,1000}?([1-5]\.\d{1,2})/g,
+        ]
+        
+        let candidates: Array<{ rating: number; reviewCount: number; distance: number }> = []
+        
+        for (const pattern of ultraAggressivePatterns) {
+          let match
+          const regex = new RegExp(pattern.source, 'gi')
+          while ((match = regex.exec(htmlContent)) !== null) {
+            if (match[1] && match[2]) {
+              // Determine which is rating and which is review count
+              let rating: number | null = null
+              let reviewCount: number | null = null
+              
+              // Check if first match is a rating (decimal between 1-5)
+              const firstNum = parseFloat(match[1])
+              const secondNumStr = match[2].replace(/,/g, '').replace(/\+/g, '')
+              let secondNum = 0
+              
+              if (secondNumStr.toLowerCase().endsWith('k')) {
+                secondNum = parseInt(secondNumStr.slice(0, -1), 10) * 1000
+              } else if (secondNumStr.toLowerCase().endsWith('m')) {
+                secondNum = parseInt(secondNumStr.slice(0, -1), 10) * 1000000
+              } else {
+                secondNum = parseInt(secondNumStr, 10)
+              }
+              
+              // If first is a valid rating (1-5 with decimal), second is likely review count
+              if (!isNaN(firstNum) && firstNum >= 1.0 && firstNum <= 5.0 && firstNum % 1 !== 0) {
+                rating = firstNum
+                if (!isNaN(secondNum) && secondNum >= 1) {
+                  reviewCount = secondNum
+                }
+              } 
+              // If second is a valid rating, first is likely review count
+              else if (!isNaN(secondNum) && secondNum >= 1.0 && secondNum <= 5.0 && secondNum % 1 !== 0) {
+                rating = secondNum
+                if (!isNaN(firstNum) && firstNum >= 1) {
+                  reviewCount = firstNum
+                }
+              }
+              
+              if (rating !== null && reviewCount !== null) {
+                const distance = match[0].length
+                candidates.push({ rating, reviewCount, distance })
+              }
+            }
+          }
+        }
+        
+        // Sort by distance (prefer closer matches) and review count (prefer higher counts)
+        candidates.sort((a, b) => {
+          if (a.distance !== b.distance) return a.distance - b.distance
+          return b.reviewCount - a.reviewCount
+        })
+        
+        // Use the best candidate
+        if (candidates.length > 0) {
+          const best = candidates[0]
+          if (!productData.rating && best.rating) {
+            productData.rating = best.rating
+            log(`[v0] ✅ Extracted rating from ultra-aggressive pattern: ${best.rating}`)
+          }
+          if (!productData.reviewCount && best.reviewCount) {
+            productData.reviewCount = best.reviewCount
+            log(`[v0] ✅ Extracted review count from ultra-aggressive pattern: ${best.reviewCount}`)
+          }
         }
       }
       
@@ -5031,9 +5898,9 @@ async function extractWithoutAI(
               const reviewCountStr = match[2].replace(/,/g, '')
               const reviewCount = parseInt(reviewCountStr, 10)
               
-              // Validate: rating must be decimal between 3-5, review count must be reasonable (>= 10)
-              if (!isNaN(rating) && rating >= 3.0 && rating <= 5.0 && rating.toString().includes('.') && 
-                  !isNaN(reviewCount) && reviewCount >= 10) {
+              // Validate: rating must be between 1-5, review count must be reasonable (>= 1)
+              if (!isNaN(rating) && rating >= 1.0 && rating <= 5.0 && 
+                  !isNaN(reviewCount) && reviewCount >= 1) {
                 // Prefer matches with higher review counts and ratings closer to 5
                 const confidence = (rating / 5) * (Math.min(reviewCount, 100000) / 1000)
                 if (!bestMatch || confidence > bestMatch.confidence) {
@@ -5051,12 +5918,131 @@ async function extractWithoutAI(
         }
       }
       
+      // Pattern 9: Look for "6K+ bought in past month" or similar patterns
+      if ((!productData.rating || !productData.reviewCount)) {
+        // Look for patterns like "6K+ bought" or "6K+ reviews" or "6,000+ reviews"
+        const boughtPattern = /(\d+(?:,\d+)*(?:K|M)?)\+?\s*(?:bought|reviews?|ratings?)/i
+        const boughtMatch = htmlContent.match(boughtPattern)
+        if (boughtMatch && boughtMatch[1]) {
+          let reviewCountStr = boughtMatch[1].replace(/,/g, '')
+          let reviewCount = 0
+          
+          // Handle K and M suffixes
+          if (reviewCountStr.toLowerCase().endsWith('k')) {
+            reviewCount = parseInt(reviewCountStr.slice(0, -1), 10) * 1000
+          } else if (reviewCountStr.toLowerCase().endsWith('m')) {
+            reviewCount = parseInt(reviewCountStr.slice(0, -1), 10) * 1000000
+          } else {
+            reviewCount = parseInt(reviewCountStr, 10)
+          }
+          
+          if (!isNaN(reviewCount) && reviewCount >= 1) {
+            if (!productData.reviewCount) {
+              productData.reviewCount = reviewCount
+              log(`[v0] ✅ Extracted review count from "bought" pattern: ${reviewCount}`)
+            }
+          }
+        }
+      }
+      
+      // Pattern 10: Look for rating in star display patterns (e.g., "4.7 out of 5")
+      if (!productData.rating) {
+        const starRatingPatterns = [
+          /([1-5]\.\d+)\s+out\s+of\s+5/i,
+          /([1-5]\.\d+)\s+stars?/i,
+          /rating[:\s]+([1-5]\.\d+)/i,
+          /average[:\s]+([1-5]\.\d+)/i,
+        ]
+        
+        for (const pattern of starRatingPatterns) {
+          const match = htmlContent.match(pattern)
+          if (match && match[1]) {
+            const rating = parseFloat(match[1])
+            if (!isNaN(rating) && rating >= 1.0 && rating <= 5.0) {
+              productData.rating = rating
+              log(`[v0] ✅ Extracted rating from star pattern: ${rating}`)
+              break
+            }
+          }
+        }
+      }
+      
+      // Pattern 11: Final comprehensive search - look for any combination of rating and review count
+      // This pattern searches the entire HTML for any decimal rating (1.0-5.0) near any large number (>= 10)
+      if ((!productData.rating || !productData.reviewCount)) {
+        log(`[v0] 🔍 Running final comprehensive search for rating/review...`)
+        
+        // Extract all decimal ratings (1.0-5.0) and their positions
+        const ratingMatches: Array<{ value: number; index: number }> = []
+        const ratingRegex = /([1-5]\.\d{1,2})/g
+        let ratingMatch
+        while ((ratingMatch = ratingRegex.exec(htmlContent)) !== null) {
+          const rating = parseFloat(ratingMatch[1])
+          if (!isNaN(rating) && rating >= 1.0 && rating <= 5.0) {
+            ratingMatches.push({ value: rating, index: ratingMatch.index })
+          }
+        }
+        
+        // Extract all large numbers (>= 10) that could be review counts and their positions
+        const reviewMatches: Array<{ value: number; index: number }> = []
+        const reviewRegex = /(\d{2,}(?:,\d{3})*(?:K|M)?\+?)/g
+        let reviewMatch
+        while ((reviewMatch = reviewRegex.exec(htmlContent)) !== null) {
+          let reviewCountStr = reviewMatch[1].replace(/,/g, '').replace(/\+/g, '')
+          let reviewCount = 0
+          
+          if (reviewCountStr.toLowerCase().endsWith('k')) {
+            reviewCount = parseInt(reviewCountStr.slice(0, -1), 10) * 1000
+          } else if (reviewCountStr.toLowerCase().endsWith('m')) {
+            reviewCount = parseInt(reviewCountStr.slice(0, -1), 10) * 1000000
+          } else {
+            reviewCount = parseInt(reviewCountStr, 10)
+          }
+          
+          if (!isNaN(reviewCount) && reviewCount >= 10) { // Only consider numbers >= 10 as potential review counts
+            reviewMatches.push({ value: reviewCount, index: reviewMatch.index })
+          }
+        }
+        
+        // Find the closest rating-review pair (within 2000 characters)
+        let bestPair: { rating: number; reviewCount: number; distance: number } | null = null
+        for (const rating of ratingMatches) {
+          for (const review of reviewMatches) {
+            const distance = Math.abs(rating.index - review.index)
+            if (distance <= 2000) { // Within 2000 characters
+              if (!bestPair || distance < bestPair.distance) {
+                bestPair = { rating: rating.value, reviewCount: review.value, distance }
+              }
+            }
+          }
+        }
+        
+        if (bestPair) {
+          if (!productData.rating) {
+            productData.rating = bestPair.rating
+            log(`[v0] ✅ Extracted rating from comprehensive search: ${bestPair.rating}`)
+          }
+          if (!productData.reviewCount) {
+            productData.reviewCount = bestPair.reviewCount
+            log(`[v0] ✅ Extracted review count from comprehensive search: ${bestPair.reviewCount}`)
+          }
+        } else {
+          log(`[v0] ⚠️ No rating-review pair found within reasonable distance. Found ${ratingMatches.length} ratings and ${reviewMatches.length} potential review counts.`)
+        }
+      }
+      
     } catch (error) {
       log(`[v0] Error extracting rating/review count: ${error}`)
     }
     
     // Final logging to see what was extracted
     log(`[v0] 📊 FINAL RATING VALUES - rating: ${productData.rating}, reviewCount: ${productData.reviewCount}`)
+    
+    // If still no rating/review, log a sample of HTML for debugging
+    if (!productData.rating || !productData.reviewCount) {
+      const sampleHtml = htmlContent.substring(0, 5000) // First 5000 chars
+      log(`[v0] ⚠️ Rating or review count missing. HTML sample (first 5000 chars): ${sampleHtml.substring(0, 500)}...`)
+    }
   }
 
   // Extract jewelry-specific attributes for Amazon (gemstone, caratWeight, material)
