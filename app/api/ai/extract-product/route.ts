@@ -3896,6 +3896,119 @@ async function extractWithoutAI(
       log(`[v0] ✅ Extracted ${sizeOptions.length} size options: ${JSON.stringify(sizeOptions)}`)
     }
     
+    // Extract COMBINED variants (Size + Color together with prices)
+    // Format: "7 Quarts Stainless Steel - $47.99", "8 Quarts Black - $54.99"
+    log("[v0] 🔍 Extracting combined size+color variants...")
+    const combinedVariants: Array<{name: string, price?: string, originalPrice?: string, image?: string}> = []
+    
+    // Pattern 1: Look for dimensionValuesDisplayData with combined size+color names
+    const combinedDimMatch = htmlContent.match(/dimensionValuesDisplayData\s*[:=]\s*(\{[\s\S]*?\})\s*[,;]/i)
+    if (combinedDimMatch) {
+      try {
+        const dimDataStr = combinedDimMatch[1]
+        // Match patterns like "7 Quarts Stainless Steel", "8 Quarts Black", etc.
+        const combinedPatterns = [
+          // Size + Color pattern (e.g., "7 Quarts Stainless Steel")
+          /"(\d+\s*(?:Quarts?|Qt|Liters?|L|Gallons?|oz)\s+[A-Za-z\s]+)"/gi,
+          // Color + Size pattern
+          /"([A-Za-z]+\s+\d+\s*(?:Quarts?|Qt|Liters?|L|Gallons?|oz))"/gi,
+        ]
+        
+        for (const pattern of combinedPatterns) {
+          let match
+          while ((match = pattern.exec(dimDataStr)) !== null) {
+            const variantName = match[1].trim()
+            // Filter out invalid entries
+            if (variantName && 
+                variantName.length >= 5 && 
+                variantName.length <= 50 &&
+                !combinedVariants.find(v => v.name.toLowerCase() === variantName.toLowerCase())) {
+              combinedVariants.push({ name: variantName })
+              log(`[v0] ✅ Found combined variant: ${variantName}`)
+            }
+          }
+        }
+      } catch (e) {
+        log(`[v0] ⚠️ Error parsing combined variants: ${e}`)
+      }
+    }
+    
+    // Pattern 2: Look for twister button titles with combined size+color
+    if (combinedVariants.length === 0) {
+      const twisterCombinedPatterns = [
+        // Twister button with title containing size and color
+        /<li[^>]*class=["'][^"']*twisterSlotDiv[^"']*["'][^>]*>[\s\S]*?title=["']([^"']+)["']/gi,
+        // Button title attribute
+        /<button[^>]*title=["'](?:Click to select\s*)?(\d+\s*(?:Quarts?|Qt)\s+[A-Za-z\s]+)["']/gi,
+      ]
+      
+      for (const pattern of twisterCombinedPatterns) {
+        let match
+        while ((match = pattern.exec(htmlContent)) !== null) {
+          let variantName = decodeHtmlEntities((match[1] || '').trim())
+          variantName = variantName.replace(/^Click to select\s*/i, '').trim()
+          
+          // Validate it's a combined size+color pattern
+          if (variantName && 
+              /\d+\s*(?:Quarts?|Qt|L|Liters?)/i.test(variantName) &&
+              variantName.length >= 5 && 
+              variantName.length <= 50 &&
+              !combinedVariants.find(v => v.name.toLowerCase() === variantName.toLowerCase())) {
+            combinedVariants.push({ name: variantName })
+            log(`[v0] ✅ Found combined variant from twister: ${variantName}`)
+          }
+        }
+      }
+    }
+    
+    // Pattern 3: Extract from variant dropdown/selection data
+    if (combinedVariants.length === 0) {
+      const variantDataPattern = /"variation_values"\s*:\s*\{[^}]*"size_name"\s*:\s*\[([^\]]+)\]/i
+      const variantMatch = htmlContent.match(variantDataPattern)
+      if (variantMatch) {
+        const sizeNames = variantMatch[1].match(/"([^"]+)"/g)
+        if (sizeNames) {
+          for (const sn of sizeNames) {
+            const variantName = sn.replace(/"/g, '').trim()
+            // Check if it's a combined variant (has both size number and color word)
+            if (variantName && 
+                /\d+\s*(?:Quarts?|Qt|L)/i.test(variantName) &&
+                /[A-Za-z]{3,}/.test(variantName.replace(/\d+\s*(?:Quarts?|Qt|L)/i, '')) &&
+                !combinedVariants.find(v => v.name.toLowerCase() === variantName.toLowerCase())) {
+              combinedVariants.push({ name: variantName })
+              log(`[v0] ✅ Found combined variant from variation_values: ${variantName}`)
+            }
+          }
+        }
+      }
+    }
+    
+    // Try to extract prices for combined variants
+    if (combinedVariants.length > 0) {
+      // Look for price data associated with each variant
+      for (const variant of combinedVariants) {
+        const variantEscaped = variant.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        
+        // Try to find price near this variant name
+        const pricePatterns = [
+          new RegExp(`["']${variantEscaped}["'][^}]*["']price["']\\s*:\\s*["']?\\$?([\\d.]+)["']?`, 'i'),
+          new RegExp(`${variantEscaped}[\\s\\S]{0,100}\\$([\\d.]+)`, 'i'),
+        ]
+        
+        for (const pricePattern of pricePatterns) {
+          const priceMatch = htmlContent.match(pricePattern)
+          if (priceMatch && priceMatch[1]) {
+            variant.price = `$${priceMatch[1]}`
+            log(`[v0] ✅ Found price for ${variant.name}: ${variant.price}`)
+            break
+          }
+        }
+      }
+      
+      productData.attributes.combinedVariants = combinedVariants
+      log(`[v0] ✅ Extracted ${combinedVariants.length} combined variants: ${combinedVariants.map(v => v.name).join(', ')}`)
+    }
+    
     // Extract color variants with prices (for products like Apple Watch with multiple color/case/band combinations)
     log("[v0] 🔍 Extracting color variants with prices...")
     const colorVariants: Array<{color: string, price?: string, originalPrice?: string, savings?: string}> = []

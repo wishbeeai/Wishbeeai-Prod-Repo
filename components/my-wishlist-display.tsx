@@ -350,14 +350,64 @@ export function MyWishlistDisplay() {
                     Low Stock
                   </Badge>
                 )}
+                {/* Show selected variant or color/size badge on image */}
+                {(item.attributes?.Variant || item.attributes?.Color || item.attributes?.Size) && (
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3 pt-6">
+                    <div className="flex flex-wrap gap-1.5">
+                      {item.attributes?.Variant ? (
+                        <span className="bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] text-[9px] sm:text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                          {item.attributes.Variant}
+                        </span>
+                      ) : (
+                        <>
+                          {item.attributes?.Color && (
+                            <span className="bg-[#DAA520] text-white text-[9px] sm:text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                              {item.attributes.Color}
+                            </span>
+                          )}
+                          {item.attributes?.Size && (
+                            <span className="bg-[#654321] text-white text-[9px] sm:text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                              {item.attributes.Size}
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Product Details */}
               <div className="p-5 flex flex-col h-full">
-                <div className="h-16 mb-3">
+                {/* Product Title with Selected Options */}
+                <div className="mb-3">
                   <h3 className="font-bold text-sm sm:text-base md:text-lg text-gray-900 line-clamp-2 leading-tight">
                     {item.giftName}
                   </h3>
+                  {/* Show selected variant or options as subtitle */}
+                  {(() => {
+                    // Check for combined variant first
+                    if (item.attributes?.Variant) {
+                      return (
+                        <p className="text-xs sm:text-sm text-[#DAA520] font-medium mt-1">
+                          {item.attributes.Variant}
+                        </p>
+                      )
+                    }
+                    // Fall back to separate options
+                    const selectedOpts: string[] = []
+                    if (item.attributes?.Size) selectedOpts.push(item.attributes.Size)
+                    if (item.attributes?.Color) selectedOpts.push(item.attributes.Color)
+                    if (item.attributes?.Style) selectedOpts.push(item.attributes.Style)
+                    if (item.attributes?.Config || item.attributes?.Configuration) {
+                      selectedOpts.push(item.attributes.Config || item.attributes.Configuration || '')
+                    }
+                    return selectedOpts.length > 0 ? (
+                      <p className="text-xs sm:text-sm text-[#DAA520] font-medium mt-1">
+                        Selected: {selectedOpts.filter(Boolean).join(' • ')}
+                      </p>
+                    ) : null
+                  })()}
                 </div>
 
                 {/* Rating Stars */}

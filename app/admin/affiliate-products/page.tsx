@@ -62,6 +62,8 @@ interface ProductAttributes {
   earPlacement?: string
   formFactor?: string
   noiseControl?: string
+  // Combined Variants (Size + Color together, e.g., "7 Quarts Stainless Steel")
+  combinedVariants?: Array<{name: string, price?: string, originalPrice?: string, image?: string}>
   // Watch/Electronics variant attributes - with optional variant-specific image
   colorVariants?: Array<{color: string, price?: string, originalPrice?: string, savings?: string, image?: string}>
   styleOptions?: string[]

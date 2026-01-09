@@ -16,6 +16,8 @@ interface ProductAttributes {
   size?: string
   sizeOptions?: Array<{size: string, price?: string}>
   customFields?: Array<{name: string, value: string}>
+  // Combined Variants (Size + Color together, e.g., "7 Quarts Stainless Steel")
+  combinedVariants?: Array<{name: string, price?: string, originalPrice?: string, image?: string}>
   // Color Variants (for watches, electronics) - with optional variant-specific image
   colorVariants?: Array<{color: string, image?: string}>
   // Style and Configuration Options

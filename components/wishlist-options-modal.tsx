@@ -14,6 +14,8 @@ interface ProductOption {
   sizeOptions?: Array<{ size: string; price?: string }>
   color?: string
   colorVariants?: Array<{ color: string; image?: string }>
+  // Combined variants (Size + Color together, e.g., "7 Quarts Stainless Steel")
+  combinedVariants?: Array<{ name: string; price?: string; image?: string }>
   styleOptions?: string[]
   configurationOptions?: string[]
 }
@@ -37,6 +39,7 @@ interface SelectedOptions {
   color?: string
   style?: string
   configuration?: string
+  variant?: string // Combined variant selection (e.g., "7 Quarts Stainless Steel")
   note?: string
   isFlexible: boolean
 }
@@ -52,6 +55,7 @@ export function WishlistOptionsModal({
   const [selectedColor, setSelectedColor] = useState<string>('')
   const [selectedStyle, setSelectedStyle] = useState<string>('')
   const [selectedConfig, setSelectedConfig] = useState<string>('')
+  const [selectedVariant, setSelectedVariant] = useState<string>('') // Combined variant
   const [note, setNote] = useState('')
   const [isFlexible, setIsFlexible] = useState(false)
 
@@ -59,29 +63,52 @@ export function WishlistOptionsModal({
   // Only show options that the user can actually choose from
   const sizeOptions = product.attributes?.sizeOptions || []
   const colorVariants = product.attributes?.colorVariants || []
+  const combinedVariants = product.attributes?.combinedVariants || []
   const styleOptions = product.attributes?.styleOptions || []
   const configOptions = product.attributes?.configurationOptions || []
   
   // Show color options if there are color variants available
   // Even a single color can be shown for confirmation
   const colorOptions = colorVariants.length > 0 ? colorVariants : []
+  
+  // Check if we have combined variants (priority over separate size/color)
+  const hasCombinedVariants = combinedVariants.length > 0
 
   // Check if there are any SELECTABLE options to show
   // Material and Capacity are product attributes, NOT selectable options
-  const hasOptions = sizeOptions.length > 0 || colorOptions.length > 0 || styleOptions.length > 0 || configOptions.length > 0
+  const hasOptions = hasCombinedVariants || sizeOptions.length > 0 || colorOptions.length > 0 || styleOptions.length > 0 || configOptions.length > 0
   
-  // Get the current display image based on selected color
+  // Get the current display image based on selected variant or color
   const getCurrentImage = () => {
+    // First check combined variants
+    if (selectedVariant && combinedVariants.length > 0) {
+      const variant = combinedVariants.find(v => v.name === selectedVariant)
+      if (variant?.image) {
+        return variant.image
+      }
+    }
+    // Then check color variants
     if (selectedColor && colorOptions.length > 0) {
-      const selectedVariant = colorOptions.find(opt => opt.color === selectedColor)
-      if (selectedVariant?.image) {
-        return selectedVariant.image
+      const selectedColorVariant = colorOptions.find(opt => opt.color === selectedColor)
+      if (selectedColorVariant?.image) {
+        return selectedColorVariant.image
       }
     }
     return product.image
   }
   
   const currentDisplayImage = getCurrentImage()
+  
+  // Get price for selected variant
+  const getSelectedPrice = () => {
+    if (selectedVariant && combinedVariants.length > 0) {
+      const variant = combinedVariants.find(v => v.name === selectedVariant)
+      if (variant?.price) {
+        return variant.price
+      }
+    }
+    return `$${product.price.toFixed(2)}`
+  }
 
   const handleConfirm = () => {
     onConfirm({
@@ -89,6 +116,7 @@ export function WishlistOptionsModal({
       color: selectedColor || undefined,
       style: selectedStyle || undefined,
       configuration: selectedConfig || undefined,
+      variant: selectedVariant || undefined,
       note: note.trim() || undefined,
       isFlexible
     })
@@ -99,6 +127,7 @@ export function WishlistOptionsModal({
     setSelectedColor('')
     setSelectedStyle('')
     setSelectedConfig('')
+    setSelectedVariant('')
     setNote('')
     setIsFlexible(false)
   }
@@ -155,8 +184,14 @@ export function WishlistOptionsModal({
               <h3 className="font-semibold text-[#654321] text-sm leading-tight line-clamp-2 mb-1">
                 {product.name}
               </h3>
+              {/* Show selected variant name if chosen */}
+              {selectedVariant && (
+                <p className="text-xs text-amber-600 font-medium mb-1">
+                  {selectedVariant}
+                </p>
+              )}
               <p className="text-lg font-bold text-[#DAA520] mb-1">
-                ${product.price.toFixed(2)}
+                {getSelectedPrice()}
               </p>
               {product.source && (
                 <div className="flex items-center gap-1 text-xs text-gray-500">
@@ -169,8 +204,39 @@ export function WishlistOptionsModal({
 
           {hasOptions ? (
             <>
-              {/* Size Options */}
-              {sizeOptions.length > 0 && (
+              {/* Combined Variants (Size + Color together) */}
+              {hasCombinedVariants && (
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold text-[#654321]">
+                    Select Variant <span className="text-red-500">*</span>
+                  </Label>
+                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                    {combinedVariants.map((variant, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setSelectedVariant(variant.name)}
+                        className={`w-full px-4 py-3 rounded-lg text-sm font-medium transition-all text-left flex justify-between items-center ${
+                          selectedVariant === variant.name
+                            ? 'bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-white shadow-md ring-2 ring-[#DAA520] ring-offset-2'
+                            : 'bg-gray-100 text-gray-700 hover:bg-amber-100 hover:text-[#654321] border border-gray-200'
+                        }`}
+                      >
+                        <span>{variant.name}</span>
+                        {variant.price && (
+                          <span className={`font-bold ${
+                            selectedVariant === variant.name ? 'text-white' : 'text-[#DAA520]'
+                          }`}>
+                            {variant.price}
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Size Options - Only show if no combined variants */}
+              {!hasCombinedVariants && sizeOptions.length > 0 && (
                 <div className="space-y-2">
                   <Label className="text-sm font-semibold text-[#654321]">
                     Size <span className="text-red-500">*</span>
@@ -193,8 +259,8 @@ export function WishlistOptionsModal({
                 </div>
               )}
 
-              {/* Color Options */}
-              {colorOptions.length > 0 && (
+              {/* Color Options - Only show if no combined variants */}
+              {!hasCombinedVariants && colorOptions.length > 0 && (
                 <div className="space-y-2">
                   <Label className="text-sm font-semibold text-[#654321]">
                     Color <span className="text-red-500">*</span>

@@ -24,6 +24,8 @@ interface ProductAttributes {
   size?: string
   sizeOptions?: Array<{size: string, price?: string}>
   customFields?: Array<{name: string, value: string}>
+  // Combined Variants (Size + Color together, e.g., "7 Quarts Stainless Steel")
+  combinedVariants?: Array<{name: string, price?: string, originalPrice?: string, image?: string}>
   // Color Variants (for watches, electronics) - with optional variant-specific image
   colorVariants?: Array<{color: string, image?: string}>
   // Style and Configuration Options
@@ -180,6 +182,7 @@ export default function TrendingGiftsPage() {
     color?: string
     style?: string
     configuration?: string
+    variant?: string // Combined variant (e.g., "7 Quarts Stainless Steel")
     note?: string
     isFlexible: boolean
   }) => {
@@ -220,8 +223,14 @@ export default function TrendingGiftsPage() {
       const optionParts: string[] = []
       
       // Add user-selected options first (these are the user's preferences)
-      if (selectedOptions.size) optionParts.push(`Size: ${selectedOptions.size}`)
-      if (selectedOptions.color) optionParts.push(`Color: ${selectedOptions.color}`)
+      // Combined variant takes priority (includes both size and color)
+      if (selectedOptions.variant) {
+        optionParts.push(`Variant: ${selectedOptions.variant}`)
+      } else {
+        // Fall back to separate size/color if no combined variant
+        if (selectedOptions.size) optionParts.push(`Size: ${selectedOptions.size}`)
+        if (selectedOptions.color) optionParts.push(`Color: ${selectedOptions.color}`)
+      }
       if (selectedOptions.style) optionParts.push(`Style: ${selectedOptions.style}`)
       if (selectedOptions.configuration) optionParts.push(`Config: ${selectedOptions.configuration}`)
       
