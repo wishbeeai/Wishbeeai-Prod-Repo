@@ -405,25 +405,57 @@ export function MyWishlistDisplay() {
                   </span>
                 </div>
 
-                {/* Selected Options */}
+                {/* Product Specifications & Selected Options */}
                 {Object.keys(item.attributes).length > 0 && (
                   <div className="bg-amber-50 rounded-lg p-3 mb-3 border border-amber-200">
                     <h4 className="text-[9px] sm:text-xs font-semibold text-[#654321] uppercase mb-2">
-                      Selected Options
+                      Product Details & Selected Options
                     </h4>
-                    <div className="flex flex-wrap gap-2">
-                      {Object.entries(item.attributes)
-                        .filter(([_, value]) => value !== null && value !== "")
-                        .map(([key, value]) => (
-                          <span
-                            key={key}
-                            className="bg-white px-2 py-1 rounded-full text-[9px] sm:text-xs border border-amber-300"
-                          >
-                            <span className="font-semibold text-[#654321]">{key}:</span>{" "}
-                            <span className="text-gray-700">{value}</span>
-                          </span>
-                        ))}
-                    </div>
+                    
+                    {/* Separate user-selected options */}
+                    {(() => {
+                      const userSelectedKeys = ['Size', 'Color', 'Style', 'Config', 'Configuration']
+                      const userSelected = Object.entries(item.attributes)
+                        .filter(([key, value]) => value !== null && value !== "" && userSelectedKeys.includes(key))
+                      const productSpecs = Object.entries(item.attributes)
+                        .filter(([key, value]) => value !== null && value !== "" && !userSelectedKeys.includes(key))
+                      
+                      return (
+                        <>
+                          {/* User Selected Options - highlighted */}
+                          {userSelected.length > 0 && (
+                            <div className="mb-3">
+                              <p className="text-[9px] text-gray-500 mb-1.5">Your Selected Options:</p>
+                              <div className="flex flex-wrap gap-2">
+                                {userSelected.map(([key, value]) => (
+                                  <span
+                                    key={key}
+                                    className="bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-semibold shadow-sm"
+                                  >
+                                    {key}: {value}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Product Specifications */}
+                          {productSpecs.length > 0 && (
+                            <div>
+                              <p className="text-[9px] text-gray-500 mb-1.5">Product Specifications:</p>
+                              <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[10px] sm:text-xs">
+                                {productSpecs.map(([key, value]) => (
+                                  <div key={key} className="flex items-start">
+                                    <span className="text-gray-500 w-[70px] flex-shrink-0">{key}:</span>
+                                    <span className="text-[#654321] font-medium flex-1">{value}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )
+                    })()}
                   </div>
                 )}
 
@@ -432,6 +464,13 @@ export function MyWishlistDisplay() {
                   <div className="bg-gray-50 rounded-lg p-3 mb-3">
                     <h4 className="text-[9px] sm:text-xs font-semibold text-gray-700 uppercase mb-1">Notes</h4>
                     <p className="text-xs sm:text-sm text-gray-600">{item.description}</p>
+                  </div>
+                )}
+                
+                {/* Flexible with options indicator */}
+                {item.notes && item.notes.includes('[Flexible with options]') && (
+                  <div className="bg-green-50 rounded-lg px-3 py-2 mb-3 border border-green-200">
+                    <span className="text-[10px] sm:text-xs text-green-700 font-medium">✓ Flexible with options</span>
                   </div>
                 )}
 

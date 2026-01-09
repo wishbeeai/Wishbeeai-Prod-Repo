@@ -215,13 +215,36 @@ export default function TrendingGiftsPage() {
         wishlistId = createData.wishlist.id
       }
       
-      // Build note with selected options
+      // Build note with selected options and product attributes
       let fullNote = ''
       const optionParts: string[] = []
+      
+      // Add user-selected options first (these are the user's preferences)
       if (selectedOptions.size) optionParts.push(`Size: ${selectedOptions.size}`)
       if (selectedOptions.color) optionParts.push(`Color: ${selectedOptions.color}`)
       if (selectedOptions.style) optionParts.push(`Style: ${selectedOptions.style}`)
       if (selectedOptions.configuration) optionParts.push(`Config: ${selectedOptions.configuration}`)
+      
+      // Add extracted product attributes
+      const attrs = selectedGift.attributes || {}
+      if (attrs.brand) optionParts.push(`Brand: ${attrs.brand}`)
+      if (attrs.model) optionParts.push(`Model: ${attrs.model}`)
+      if (attrs.styleName) optionParts.push(`Style Name: ${attrs.styleName}`)
+      if (attrs.patternName) optionParts.push(`Pattern: ${attrs.patternName}`)
+      if (attrs.material) optionParts.push(`Material: ${attrs.material}`)
+      if (attrs.capacity) optionParts.push(`Capacity: ${attrs.capacity}`)
+      if (attrs.wattage) optionParts.push(`Wattage: ${attrs.wattage}`)
+      if (attrs.productDimensions) optionParts.push(`Dimensions: ${attrs.productDimensions}`)
+      if (attrs.finishType) optionParts.push(`Finish: ${attrs.finishType}`)
+      if (attrs.earPlacement) optionParts.push(`Ear Placement: ${attrs.earPlacement}`)
+      if (attrs.formFactor) optionParts.push(`Form Factor: ${attrs.formFactor}`)
+      if (attrs.noiseControl) optionParts.push(`Noise Control: ${attrs.noiseControl}`)
+      if (attrs.bluetoothVersion) optionParts.push(`Bluetooth: ${attrs.bluetoothVersion}`)
+      if (attrs.waterResistance) optionParts.push(`Water Resistance: ${attrs.waterResistance}`)
+      if (attrs.operatingSystem) optionParts.push(`OS: ${attrs.operatingSystem}`)
+      if (attrs.storageCapacity) optionParts.push(`Storage: ${attrs.storageCapacity}`)
+      if (attrs.screenSize) optionParts.push(`Screen: ${attrs.screenSize}`)
+      
       if (optionParts.length > 0) fullNote = optionParts.join(' | ')
       if (selectedOptions.note) fullNote = fullNote ? `${fullNote}\n${selectedOptions.note}` : selectedOptions.note
       if (selectedOptions.isFlexible) fullNote = fullNote ? `${fullNote}\n[Flexible with options]` : '[Flexible with options]'
