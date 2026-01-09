@@ -803,146 +803,146 @@ export default function TrendingGiftsPage() {
 
                 {/* Product Specifications */}
                 {gift.attributes && (
-                  <div className="mb-3 p-2 bg-amber-50 rounded-lg border border-amber-200 min-h-[180px]">
-                    <p className="text-[10px] font-semibold text-[#654321] mb-1.5">Specifications</p>
+                  <div className="mb-3 p-2.5 bg-amber-50 rounded-lg border border-amber-200 min-h-[180px]">
+                    <p className="text-[11px] font-semibold text-[#654321] mb-2">Specifications</p>
                     {/* Determine if this is an audio product to hide irrelevant attributes */}
                     {(() => {
                       const isAudioProduct = !!(gift.attributes?.earPlacement || gift.attributes?.formFactor || gift.attributes?.noiseControl || gift.attributes?.earpieceShape);
                       const isWatchProduct = !!(gift.attributes?.style || gift.attributes?.configuration || (gift.giftName && gift.giftName.toLowerCase().includes('apple watch')));
                       const hideApplianceAttrs = isAudioProduct || isWatchProduct;
                       return (
-                    <div className="space-y-1 text-[10px]">
+                    <div className="space-y-1.5 text-[11px]">
                       {gift.attributes?.styleName && (
-                        <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Style:</span> <span className="text-[#654321] font-medium">{gift.attributes.styleName}</span></div>
+                        <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Style:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.styleName}</span></div>
                       )}
                       {gift.attributes?.model && (
-                        <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Model:</span> <span className="text-[#654321] font-medium">{gift.attributes.model}</span></div>
+                        <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Model:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.model}</span></div>
                       )}
                       {gift.attributes?.patternName && (
-                        <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Pattern:</span> <span className="text-[#654321] font-medium">{gift.attributes.patternName}</span></div>
+                        <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Pattern:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.patternName}</span></div>
                       )}
                       {/* Color - show single color if only 1, otherwise handled by Color Variants below */}
                       {gift.attributes?.color && (!gift.attributes?.colorVariants || gift.attributes.colorVariants.length <= 1) && (
-                        <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Color:</span> <span className="text-[#654321] font-medium">{gift.attributes.color}</span></div>
+                        <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Color:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.color}</span></div>
                       )}
                       {/* Audio/Headphone-specific attributes */}
                       {gift.attributes?.earPlacement && (
-                        <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Ear:</span> <span className="text-[#654321] font-medium">{gift.attributes.earPlacement}</span></div>
+                        <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Ear:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.earPlacement}</span></div>
                       )}
                       {gift.attributes?.formFactor && (
-                        <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Form:</span> <span className="text-[#654321] font-medium">{gift.attributes.formFactor}</span></div>
+                        <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Form:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.formFactor}</span></div>
                       )}
                       {gift.attributes?.noiseControl && (
-                        <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Noise:</span> <span className="text-[#654321] font-medium">{gift.attributes.noiseControl}</span></div>
+                        <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Noise:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.noiseControl}</span></div>
                       )}
                       {gift.attributes?.modelName && (
-                        <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Model:</span> <span className="text-[#654321] font-medium">{gift.attributes.modelName}</span></div>
+                        <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Model:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.modelName}</span></div>
                       )}
                       {gift.attributes?.bluetoothVersion && (
-                        <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Bluetooth:</span> <span className="text-[#654321] font-medium">{gift.attributes.bluetoothVersion}</span></div>
+                        <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Bluetooth:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.bluetoothVersion}</span></div>
                       )}
                       {gift.attributes?.wirelessTechnology && (
-                        <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Wireless:</span> <span className="text-[#654321] font-medium">{gift.attributes.wirelessTechnology}</span></div>
+                        <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Wireless:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.wirelessTechnology}</span></div>
                       )}
                       {gift.attributes?.controlType && (
-                        <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Control:</span> <span className="text-[#654321] font-medium">{gift.attributes.controlType}</span></div>
+                        <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Control:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.controlType}</span></div>
                       )}
                       {gift.attributes?.earpieceShape && (
-                        <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Earpiece:</span> <span className="text-[#654321] font-medium">{gift.attributes.earpieceShape}</span></div>
+                        <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Earpiece:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.earpieceShape}</span></div>
                       )}
                       {gift.attributes?.compatibleDevices && (
-                        <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Compatible:</span> <span className="text-[#654321] font-medium">{gift.attributes.compatibleDevices}</span></div>
+                        <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Compatible:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.compatibleDevices}</span></div>
                       )}
                       {gift.attributes?.waterResistance && (
-                        <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Water:</span> <span className="text-[#654321] font-medium">{gift.attributes.waterResistance}</span></div>
+                        <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Water:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.waterResistance}</span></div>
                       )}
                       {gift.attributes?.specificUses && (
-                        <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Uses:</span> <span className="text-[#654321] font-medium">{gift.attributes.specificUses}</span></div>
+                        <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Uses:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.specificUses}</span></div>
                       )}
                       {gift.attributes?.recommendedUses && (
-                        <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">For:</span> <span className="text-[#654321] font-medium">{gift.attributes.recommendedUses}</span></div>
+                        <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">For:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.recommendedUses}</span></div>
                       )}
                       {gift.attributes?.includedComponents && (
-                        <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Includes:</span> <span className="text-[#654321] font-medium">{gift.attributes.includedComponents}</span></div>
+                        <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Includes:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.includedComponents}</span></div>
                       )}
                       {/* Non-audio/watch product attributes */}
                       {!hideApplianceAttrs && gift.attributes?.material && (
-                        <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Material:</span> <span className="text-[#654321] font-medium">{gift.attributes.material}</span></div>
+                        <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Material:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.material}</span></div>
                       )}
                       {!hideApplianceAttrs && gift.attributes?.capacity && (
-                        <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Capacity:</span> <span className="text-[#654321] font-medium">{gift.attributes.capacity}</span></div>
+                        <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Capacity:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.capacity}</span></div>
                       )}
                       {!hideApplianceAttrs && gift.attributes?.wattage && (
-                        <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Wattage:</span> <span className="text-[#654321] font-medium">{gift.attributes.wattage}</span></div>
+                        <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Wattage:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.wattage}</span></div>
                       )}
                       {!hideApplianceAttrs && gift.attributes?.productDimensions && (
-                        <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Dimensions:</span> <span className="text-[#654321] font-medium">{gift.attributes.productDimensions}</span></div>
+                        <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Dimensions:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.productDimensions}</span></div>
                       )}
                       {gift.attributes?.size && typeof gift.attributes.size === 'string' && (
-                        <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Size:</span> <span className="text-[#654321] font-medium">{gift.attributes.size}</span></div>
+                        <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Size:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.size}</span></div>
                       )}
                       {!hideApplianceAttrs && gift.attributes?.finishType && (
-                        <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Finish:</span> <span className="text-[#654321] font-medium">{gift.attributes.finishType}</span></div>
+                        <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Finish:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.finishType}</span></div>
                       )}
                       {!hideApplianceAttrs && gift.attributes?.controlMethod && (
-                        <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Control:</span> <span className="text-[#654321] font-medium">{gift.attributes.controlMethod}</span></div>
+                        <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Control:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.controlMethod}</span></div>
                       )}
                       {!hideApplianceAttrs && gift.attributes?.operationMode && (
-                        <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Mode:</span> <span className="text-[#654321] font-medium">{gift.attributes.operationMode}</span></div>
+                        <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Mode:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.operationMode}</span></div>
                       )}
                       {!hideApplianceAttrs && gift.attributes?.specialFeature && (
-                        <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Features:</span> <span className="text-[#654321] font-medium">{gift.attributes.specialFeature}</span></div>
+                        <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Features:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.specialFeature}</span></div>
                       )}
                       {/* Electronics-specific attributes */}
                       {gift.attributes?.operatingSystem && (
-                        <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">OS:</span> <span className="text-[#654321] font-medium">{gift.attributes.operatingSystem}</span></div>
+                        <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">OS:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.operatingSystem}</span></div>
                       )}
                       {gift.attributes?.storageCapacity && (
-                        <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Storage:</span> <span className="text-[#654321] font-medium">{gift.attributes.storageCapacity}</span></div>
+                        <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Storage:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.storageCapacity}</span></div>
                       )}
                       {gift.attributes?.screenSize && (
-                        <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Screen:</span> <span className="text-[#654321] font-medium">{gift.attributes.screenSize}</span></div>
+                        <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Screen:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.screenSize}</span></div>
                       )}
                       {gift.attributes?.resolution && (
-                        <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Resolution:</span> <span className="text-[#654321] font-medium">{gift.attributes.resolution}</span></div>
+                        <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Resolution:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.resolution}</span></div>
                       )}
                       {gift.attributes?.processor && (
-                        <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Processor:</span> <span className="text-[#654321] font-medium">{gift.attributes.processor}</span></div>
+                        <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Processor:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.processor}</span></div>
                       )}
                       {gift.attributes?.ram && (
-                        <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">RAM:</span> <span className="text-[#654321] font-medium">{gift.attributes.ram}</span></div>
+                        <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">RAM:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.ram}</span></div>
                       )}
                       {gift.attributes?.connectivityTechnology && (
-                        <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Connect:</span> <span className="text-[#654321] font-medium">{gift.attributes.connectivityTechnology}</span></div>
+                        <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Connect:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.connectivityTechnology}</span></div>
                       )}
                       {gift.attributes?.wirelessStandard && (
-                        <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Wireless:</span> <span className="text-[#654321] font-medium">{gift.attributes.wirelessStandard}</span></div>
+                        <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Wireless:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.wirelessStandard}</span></div>
                       )}
                       {gift.attributes?.gpsType && (
-                        <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">GPS:</span> <span className="text-[#654321] font-medium">{gift.attributes.gpsType}</span></div>
+                        <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">GPS:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.gpsType}</span></div>
                       )}
                       {gift.attributes?.batteryType && (
-                        <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Battery:</span> <span className="text-[#654321] font-medium">{gift.attributes.batteryType}</span></div>
+                        <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Battery:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.batteryType}</span></div>
                       )}
                       {gift.attributes?.shape && (
-                        <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Shape:</span> <span className="text-[#654321] font-medium">{gift.attributes.shape}</span></div>
+                        <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Shape:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.shape}</span></div>
                       )}
                       {gift.attributes?.style && (
-                        <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Style:</span> <span className="text-[#654321] font-medium">{gift.attributes.style}</span></div>
+                        <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Style:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.style}</span></div>
                       )}
                       {gift.attributes?.configuration && (
-                        <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Config:</span> <span className="text-[#654321] font-medium">{gift.attributes.configuration}</span></div>
+                        <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Config:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.configuration}</span></div>
                       )}
                     </div>
                       );
                     })()}
                     {/* Color Variants - Only show when multiple colors */}
                     {gift.attributes?.colorVariants && gift.attributes.colorVariants.length > 1 && (
-                      <div className="mt-1.5 pt-1.5 border-t border-amber-200">
-                        <span className="text-gray-500 text-[10px]">Color Variants ({gift.attributes.colorVariants.length}): </span>
-                        <div className="flex flex-wrap gap-1 mt-1">
+                      <div className="mt-2 pt-2 border-t border-amber-200">
+                        <span className="text-gray-500 text-[11px]">Color Variants ({gift.attributes.colorVariants.length}): </span>
+                        <div className="flex flex-wrap gap-1.5 mt-1.5">
                           {gift.attributes.colorVariants.map((variant, idx) => (
-                            <span key={idx} className="bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded text-[9px] font-medium">
+                            <span key={idx} className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded text-[10px] font-medium">
                               {variant.color}
                             </span>
                           ))}
@@ -951,11 +951,11 @@ export default function TrendingGiftsPage() {
                     )}
                     {/* Style Options */}
                     {gift.attributes?.styleOptions && gift.attributes.styleOptions.length > 0 && (
-                      <div className="mt-1.5 pt-1.5 border-t border-amber-200">
-                        <span className="text-gray-500 text-[10px]">Style Options: </span>
-                        <div className="flex flex-wrap gap-1 mt-1">
+                      <div className="mt-2 pt-2 border-t border-amber-200">
+                        <span className="text-gray-500 text-[11px]">Style Options: </span>
+                        <div className="flex flex-wrap gap-1.5 mt-1.5">
                           {gift.attributes.styleOptions.map((style, idx) => (
-                            <span key={idx} className="bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded text-[9px] font-medium">
+                            <span key={idx} className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-[10px] font-medium">
                               {style}
                             </span>
                           ))}
@@ -964,11 +964,11 @@ export default function TrendingGiftsPage() {
                     )}
                     {/* Configuration Options */}
                     {gift.attributes?.configurationOptions && gift.attributes.configurationOptions.length > 0 && (
-                      <div className="mt-1.5 pt-1.5 border-t border-amber-200">
-                        <span className="text-gray-500 text-[10px]">Configuration: </span>
-                        <div className="flex flex-wrap gap-1 mt-1">
+                      <div className="mt-2 pt-2 border-t border-amber-200">
+                        <span className="text-gray-500 text-[11px]">Configuration: </span>
+                        <div className="flex flex-wrap gap-1.5 mt-1.5">
                           {gift.attributes.configurationOptions.map((config, idx) => (
-                            <span key={idx} className="bg-green-100 text-green-800 px-1.5 py-0.5 rounded text-[9px] font-medium">
+                            <span key={idx} className="bg-green-100 text-green-800 px-2 py-0.5 rounded text-[10px] font-medium">
                               {config}
                             </span>
                           ))}
@@ -977,11 +977,11 @@ export default function TrendingGiftsPage() {
                     )}
                     {/* Size Options */}
                     {gift.attributes?.sizeOptions && gift.attributes.sizeOptions.length > 0 && (
-                      <div className="mt-1.5 pt-1.5 border-t border-amber-200">
-                        <span className="text-gray-500 text-[10px]">Available Sizes: </span>
-                        <div className="flex flex-wrap gap-1 mt-1">
+                      <div className="mt-2 pt-2 border-t border-amber-200">
+                        <span className="text-gray-500 text-[11px]">Available Sizes: </span>
+                        <div className="flex flex-wrap gap-1.5 mt-1.5">
                           {gift.attributes.sizeOptions.map((opt, idx) => (
-                            <span key={idx} className="bg-amber-100 text-[#654321] px-1.5 py-0.5 rounded text-[9px] font-medium">
+                            <span key={idx} className="bg-amber-100 text-[#654321] px-2 py-0.5 rounded text-[10px] font-medium">
                               {opt.size}
                             </span>
                           ))}
@@ -990,10 +990,10 @@ export default function TrendingGiftsPage() {
                     )}
                     {/* Custom Fields */}
                     {gift.attributes?.customFields && gift.attributes.customFields.length > 0 && (
-                      <div className="mt-1.5 pt-1.5 border-t border-amber-200">
+                      <div className="mt-2 pt-2 border-t border-amber-200 space-y-1.5">
                         {gift.attributes.customFields.map((field, idx) => (
-                          <div key={idx} className="text-[10px]">
-                            <span className="text-gray-500">{field.name}:</span> <span className="text-[#654321] font-medium">{field.value}</span>
+                          <div key={idx} className="flex items-start text-[11px]">
+                            <span className="text-gray-500 w-[72px] flex-shrink-0">{field.name}:</span> <span className="text-[#654321] font-medium flex-1">{field.value}</span>
                           </div>
                         ))}
                       </div>
@@ -1153,181 +1153,189 @@ export default function TrendingGiftsPage() {
                     
                     {/* Product Specifications - List View */}
                     {gift.attributes && (
-                      <div className="p-2 bg-amber-50 rounded-lg border border-amber-200">
+                      <div className="p-2.5 bg-amber-50 rounded-lg border border-amber-200">
                         {(() => {
                           const isAudioProduct = !!(gift.attributes?.earPlacement || gift.attributes?.formFactor || gift.attributes?.noiseControl || gift.attributes?.earpieceShape);
                           const isWatchProduct = !!(gift.attributes?.style || gift.attributes?.configuration || (gift.giftName && gift.giftName.toLowerCase().includes('apple watch')));
                           const hideApplianceAttrs = isAudioProduct || isWatchProduct;
                               return (
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-1 text-xs">
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-1.5 text-[11px]">
                           {gift.attributes?.styleName && (
-                            <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Style:</span> <span className="text-[#654321] font-medium">{gift.attributes.styleName}</span></div>
+                            <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Style:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.styleName}</span></div>
                           )}
                           {gift.attributes?.model && (
-                            <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Model:</span> <span className="text-[#654321] font-medium">{gift.attributes.model}</span></div>
+                            <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Model:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.model}</span></div>
                           )}
                           {gift.attributes?.patternName && (
-                            <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Pattern:</span> <span className="text-[#654321] font-medium">{gift.attributes.patternName}</span></div>
+                            <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Pattern:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.patternName}</span></div>
                           )}
                           {/* Color - show single color if only 1, otherwise handled by Color Variants below */}
                           {gift.attributes?.color && (!gift.attributes?.colorVariants || gift.attributes.colorVariants.length <= 1) && (
-                            <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Color:</span> <span className="text-[#654321] font-medium">{gift.attributes.color}</span></div>
+                            <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Color:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.color}</span></div>
                           )}
                           {/* Audio/Headphone-specific attributes */}
                           {gift.attributes?.earPlacement && (
-                            <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Ear:</span> <span className="text-[#654321] font-medium">{gift.attributes.earPlacement}</span></div>
+                            <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Ear:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.earPlacement}</span></div>
                           )}
                           {gift.attributes?.formFactor && (
-                            <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Form:</span> <span className="text-[#654321] font-medium">{gift.attributes.formFactor}</span></div>
+                            <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Form:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.formFactor}</span></div>
                           )}
                           {gift.attributes?.noiseControl && (
-                            <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Noise:</span> <span className="text-[#654321] font-medium">{gift.attributes.noiseControl}</span></div>
+                            <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Noise:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.noiseControl}</span></div>
                           )}
                           {gift.attributes?.modelName && (
-                            <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Model:</span> <span className="text-[#654321] font-medium">{gift.attributes.modelName}</span></div>
+                            <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Model:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.modelName}</span></div>
                           )}
                           {gift.attributes?.bluetoothVersion && (
-                            <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Bluetooth:</span> <span className="text-[#654321] font-medium">{gift.attributes.bluetoothVersion}</span></div>
+                            <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Bluetooth:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.bluetoothVersion}</span></div>
                           )}
                           {gift.attributes?.wirelessTechnology && (
-                            <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Wireless:</span> <span className="text-[#654321] font-medium">{gift.attributes.wirelessTechnology}</span></div>
+                            <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Wireless:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.wirelessTechnology}</span></div>
                           )}
                           {gift.attributes?.controlType && (
-                            <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Control:</span> <span className="text-[#654321] font-medium">{gift.attributes.controlType}</span></div>
+                            <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Control:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.controlType}</span></div>
                           )}
                           {gift.attributes?.earpieceShape && (
-                            <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Earpiece:</span> <span className="text-[#654321] font-medium">{gift.attributes.earpieceShape}</span></div>
+                            <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Earpiece:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.earpieceShape}</span></div>
                           )}
                           {gift.attributes?.compatibleDevices && (
-                            <div className="flex col-span-2"><span className="text-gray-500 w-20 flex-shrink-0">Compatible:</span> <span className="text-[#654321] font-medium">{gift.attributes.compatibleDevices}</span></div>
+                            <div className="flex items-start col-span-2"><span className="text-gray-500 w-[72px] flex-shrink-0">Compatible:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.compatibleDevices}</span></div>
                           )}
                           {gift.attributes?.waterResistance && (
-                            <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Water:</span> <span className="text-[#654321] font-medium">{gift.attributes.waterResistance}</span></div>
+                            <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Water:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.waterResistance}</span></div>
                           )}
                           {gift.attributes?.specificUses && (
-                            <div className="flex col-span-2"><span className="text-gray-500 w-20 flex-shrink-0">Uses:</span> <span className="text-[#654321] font-medium">{gift.attributes.specificUses}</span></div>
+                            <div className="flex items-start col-span-2"><span className="text-gray-500 w-[72px] flex-shrink-0">Uses:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.specificUses}</span></div>
                           )}
                           {gift.attributes?.recommendedUses && (
-                            <div className="flex col-span-2"><span className="text-gray-500 w-20 flex-shrink-0">For:</span> <span className="text-[#654321] font-medium">{gift.attributes.recommendedUses}</span></div>
+                            <div className="flex items-start col-span-2"><span className="text-gray-500 w-[72px] flex-shrink-0">For:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.recommendedUses}</span></div>
                           )}
                           {gift.attributes?.includedComponents && (
-                            <div className="flex col-span-2"><span className="text-gray-500 w-20 flex-shrink-0">Includes:</span> <span className="text-[#654321] font-medium">{gift.attributes.includedComponents}</span></div>
+                            <div className="flex items-start col-span-2"><span className="text-gray-500 w-[72px] flex-shrink-0">Includes:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.includedComponents}</span></div>
                           )}
                           {/* Non-audio/watch product attributes */}
                           {!hideApplianceAttrs && gift.attributes?.material && (
-                            <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Material:</span> <span className="text-[#654321] font-medium">{gift.attributes.material}</span></div>
+                            <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Material:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.material}</span></div>
                           )}
                           {!hideApplianceAttrs && gift.attributes?.capacity && (
-                            <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Capacity:</span> <span className="text-[#654321] font-medium">{gift.attributes.capacity}</span></div>
+                            <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Capacity:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.capacity}</span></div>
                           )}
                           {!hideApplianceAttrs && gift.attributes?.wattage && (
-                            <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Wattage:</span> <span className="text-[#654321] font-medium">{gift.attributes.wattage}</span></div>
+                            <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Wattage:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.wattage}</span></div>
                           )}
                           {!hideApplianceAttrs && gift.attributes?.productDimensions && (
-                            <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Dimensions:</span> <span className="text-[#654321] font-medium">{gift.attributes.productDimensions}</span></div>
+                            <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Dimensions:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.productDimensions}</span></div>
                           )}
                           {gift.attributes?.size && typeof gift.attributes.size === 'string' && (
-                            <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Size:</span> <span className="text-[#654321] font-medium">{gift.attributes.size}</span></div>
+                            <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Size:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.size}</span></div>
                           )}
                           {!hideApplianceAttrs && gift.attributes?.finishType && (
-                            <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Finish:</span> <span className="text-[#654321] font-medium">{gift.attributes.finishType}</span></div>
+                            <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Finish:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.finishType}</span></div>
                           )}
                           {!hideApplianceAttrs && gift.attributes?.controlMethod && (
-                            <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Control:</span> <span className="text-[#654321] font-medium">{gift.attributes.controlMethod}</span></div>
+                            <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Control:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.controlMethod}</span></div>
                           )}
                           {!hideApplianceAttrs && gift.attributes?.operationMode && (
-                            <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Mode:</span> <span className="text-[#654321] font-medium">{gift.attributes.operationMode}</span></div>
+                            <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Mode:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.operationMode}</span></div>
                           )}
                           {!hideApplianceAttrs && gift.attributes?.specialFeature && (
-                            <div className="flex col-span-2"><span className="text-gray-500 w-20 flex-shrink-0">Features:</span> <span className="text-[#654321] font-medium">{gift.attributes.specialFeature}</span></div>
+                            <div className="flex items-start col-span-2"><span className="text-gray-500 w-[72px] flex-shrink-0">Features:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.specialFeature}</span></div>
                           )}
                           {/* Electronics-specific attributes */}
                           {gift.attributes?.operatingSystem && (
-                            <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">OS:</span> <span className="text-[#654321] font-medium">{gift.attributes.operatingSystem}</span></div>
+                            <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">OS:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.operatingSystem}</span></div>
                           )}
                           {gift.attributes?.storageCapacity && (
-                            <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Storage:</span> <span className="text-[#654321] font-medium">{gift.attributes.storageCapacity}</span></div>
+                            <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Storage:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.storageCapacity}</span></div>
                           )}
                           {gift.attributes?.screenSize && (
-                            <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Screen:</span> <span className="text-[#654321] font-medium">{gift.attributes.screenSize}</span></div>
+                            <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Screen:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.screenSize}</span></div>
                           )}
                           {gift.attributes?.resolution && (
-                            <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Resolution:</span> <span className="text-[#654321] font-medium">{gift.attributes.resolution}</span></div>
+                            <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Resolution:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.resolution}</span></div>
                           )}
                           {gift.attributes?.processor && (
-                            <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Processor:</span> <span className="text-[#654321] font-medium">{gift.attributes.processor}</span></div>
+                            <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Processor:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.processor}</span></div>
                           )}
                           {gift.attributes?.ram && (
-                            <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">RAM:</span> <span className="text-[#654321] font-medium">{gift.attributes.ram}</span></div>
+                            <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">RAM:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.ram}</span></div>
                           )}
                           {gift.attributes?.connectivityTechnology && (
-                            <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Connect:</span> <span className="text-[#654321] font-medium">{gift.attributes.connectivityTechnology}</span></div>
+                            <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Connect:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.connectivityTechnology}</span></div>
                           )}
                           {gift.attributes?.wirelessStandard && (
-                            <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Wireless:</span> <span className="text-[#654321] font-medium">{gift.attributes.wirelessStandard}</span></div>
+                            <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Wireless:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.wirelessStandard}</span></div>
                           )}
                           {gift.attributes?.gpsType && (
-                            <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">GPS:</span> <span className="text-[#654321] font-medium">{gift.attributes.gpsType}</span></div>
+                            <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">GPS:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.gpsType}</span></div>
                           )}
                           {gift.attributes?.batteryType && (
-                            <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Battery:</span> <span className="text-[#654321] font-medium">{gift.attributes.batteryType}</span></div>
+                            <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Battery:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.batteryType}</span></div>
                           )}
                           {gift.attributes?.shape && (
-                            <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Shape:</span> <span className="text-[#654321] font-medium">{gift.attributes.shape}</span></div>
+                            <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Shape:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.shape}</span></div>
                           )}
                           {gift.attributes?.style && (
-                            <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Style:</span> <span className="text-[#654321] font-medium">{gift.attributes.style}</span></div>
+                            <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Style:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.style}</span></div>
                           )}
                           {gift.attributes?.configuration && (
-                            <div className="flex"><span className="text-gray-500 w-20 flex-shrink-0">Config:</span> <span className="text-[#654321] font-medium">{gift.attributes.configuration}</span></div>
+                            <div className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">Config:</span> <span className="text-[#654321] font-medium flex-1">{gift.attributes.configuration}</span></div>
                           )}
                           {/* Color Variants - Only show when multiple colors */}
                           {gift.attributes?.colorVariants && gift.attributes.colorVariants.length > 1 && (
-                            <div className="flex items-center gap-1 flex-wrap col-span-2">
-                              <span className="text-gray-500">Colors ({gift.attributes.colorVariants.length}):</span>
-                              {gift.attributes.colorVariants.map((variant, idx) => (
-                                <span key={idx} className="bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded text-[10px] font-medium">
-                                  {variant.color}
-                                </span>
-                              ))}
-                          </div>
+                            <div className="flex items-start gap-1.5 flex-wrap col-span-2">
+                              <span className="text-gray-500 w-[72px] flex-shrink-0">Colors ({gift.attributes.colorVariants.length}):</span>
+                              <div className="flex flex-wrap gap-1.5 flex-1">
+                                {gift.attributes.colorVariants.map((variant, idx) => (
+                                  <span key={idx} className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded text-[10px] font-medium">
+                                    {variant.color}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
                           )}
                           {/* Style Options */}
                           {gift.attributes?.styleOptions && gift.attributes.styleOptions.length > 0 && (
-                            <div className="flex items-center gap-1 flex-wrap">
-                              <span className="text-gray-500">Styles:</span>
-                              {gift.attributes.styleOptions.map((style, idx) => (
-                                <span key={idx} className="bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded text-[10px] font-medium">
-                                  {style}
-                                </span>
-                              ))}
-                        </div>
-                      )}
+                            <div className="flex items-start gap-1.5 flex-wrap col-span-2">
+                              <span className="text-gray-500 w-[72px] flex-shrink-0">Styles:</span>
+                              <div className="flex flex-wrap gap-1.5 flex-1">
+                                {gift.attributes.styleOptions.map((style, idx) => (
+                                  <span key={idx} className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-[10px] font-medium">
+                                    {style}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                           {/* Configuration Options */}
                           {gift.attributes?.configurationOptions && gift.attributes.configurationOptions.length > 0 && (
-                            <div className="flex items-center gap-1 flex-wrap">
-                              <span className="text-gray-500">Configs:</span>
-                              {gift.attributes.configurationOptions.map((config, idx) => (
-                                <span key={idx} className="bg-green-100 text-green-800 px-1.5 py-0.5 rounded text-[10px] font-medium">
-                                  {config}
-                                </span>
-                              ))}
-                    </div>
+                            <div className="flex items-start gap-1.5 flex-wrap col-span-2">
+                              <span className="text-gray-500 w-[72px] flex-shrink-0">Configs:</span>
+                              <div className="flex flex-wrap gap-1.5 flex-1">
+                                {gift.attributes.configurationOptions.map((config, idx) => (
+                                  <span key={idx} className="bg-green-100 text-green-800 px-2 py-0.5 rounded text-[10px] font-medium">
+                                    {config}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
                           )}
                           {/* Size Options */}
                           {gift.attributes?.sizeOptions && gift.attributes.sizeOptions.length > 0 && (
-                            <div className="flex items-center gap-1 flex-wrap">
-                              <span className="text-gray-500">Sizes:</span>
-                              {gift.attributes.sizeOptions.map((opt, idx) => (
-                                <span key={idx} className="bg-amber-100 text-[#654321] px-1.5 py-0.5 rounded text-[10px] font-medium">
-                                  {opt.size}
-                                </span>
-                              ))}
-                  </div>
+                            <div className="flex items-start gap-1.5 flex-wrap col-span-2">
+                              <span className="text-gray-500 w-[72px] flex-shrink-0">Sizes:</span>
+                              <div className="flex flex-wrap gap-1.5 flex-1">
+                                {gift.attributes.sizeOptions.map((opt, idx) => (
+                                  <span key={idx} className="bg-amber-100 text-[#654321] px-2 py-0.5 rounded text-[10px] font-medium">
+                                    {opt.size}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
                           )}
                           {/* Custom Fields */}
                           {gift.attributes?.customFields && gift.attributes.customFields.map((field, idx) => (
-                            <div key={idx}><span className="text-gray-500">{field.name}:</span> <span className="text-[#654321] font-medium">{field.value}</span></div>
+                            <div key={idx} className="flex items-start"><span className="text-gray-500 w-[72px] flex-shrink-0">{field.name}:</span> <span className="text-[#654321] font-medium flex-1">{field.value}</span></div>
                           ))}
                         </div>
                           );
