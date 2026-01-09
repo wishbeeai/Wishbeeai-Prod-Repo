@@ -4016,9 +4016,101 @@ async function extractWithoutAI(
       }
     }
     
+    // Extract color-to-image mappings from Amazon's colorImages or colorToAsin data
     if (colorVariants.length > 0) {
+      log("[v0] 🔍 Looking for color variant images...")
+      
+      // Pattern 1: Look for colorImages JavaScript object
+      // Format: "colorImages": { "initial": [{"hiRes":"https://...", "large":"https://..."}] }
+      const colorImagesMatch = htmlContent.match(/["']colorImages["']\s*:\s*\{([^}]+(?:\{[^}]*\}[^}]*)*)\}/i)
+      if (colorImagesMatch) {
+        try {
+          // Extract image URLs for each color
+          const colorImagesStr = colorImagesMatch[1]
+          
+          // Try to find images per color by looking for color name followed by image array
+          for (const variant of colorVariants) {
+            const colorPattern = new RegExp(`["']${variant.color.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}["']\\s*:\\s*\\[([^\\]]+)\\]`, 'i')
+            const colorImageMatch = colorImagesStr.match(colorPattern)
+            if (colorImageMatch) {
+              // Extract first large or hiRes image
+              const hiResMatch = colorImageMatch[1].match(/["'](?:hiRes|large)["']\s*:\s*["']([^"']+)["']/i)
+              if (hiResMatch && hiResMatch[1]) {
+                variant.image = hiResMatch[1]
+                log(`[v0] ✅ Found image for color ${variant.color}: ${variant.image.substring(0, 50)}...`)
+              }
+            }
+          }
+        } catch (e) {
+          log(`[v0] ⚠️ Error parsing colorImages: ${e}`)
+        }
+      }
+      
+      // Pattern 2: Look for colorToAsin mapping and construct image URLs
+      // Format: "colorToAsin": {"Jet Black": {"asin": "B09V3J3CWC"}, ...}
+      if (!colorVariants.some(v => v.image)) {
+        const colorToAsinMatch = htmlContent.match(/["']colorToAsin["']\s*:\s*\{([^}]+(?:\{[^}]*\}[^}]*)*)\}/i)
+        if (colorToAsinMatch) {
+          try {
+            for (const variant of colorVariants) {
+              // Look for this color's ASIN
+              const asinPattern = new RegExp(`["']${variant.color.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}["']\\s*:\\s*\\{[^}]*["']asin["']\\s*:\\s*["']([A-Z0-9]{10})["']`, 'i')
+              const asinMatch = colorToAsinMatch[1].match(asinPattern)
+              if (asinMatch && asinMatch[1]) {
+                // We have the ASIN, try to find an image for it in the page
+                const asin = asinMatch[1]
+                const asinImagePattern = new RegExp(`data-asin=["']${asin}["'][^>]*>.*?<img[^>]*src=["']([^"']+)["']`, 'is')
+                const asinImageMatch = htmlContent.match(asinImagePattern)
+                if (asinImageMatch && asinImageMatch[1]) {
+                  variant.image = asinImageMatch[1]
+                  log(`[v0] ✅ Found image for color ${variant.color} via ASIN ${asin}`)
+                }
+              }
+            }
+          } catch (e) {
+            log(`[v0] ⚠️ Error parsing colorToAsin: ${e}`)
+          }
+        }
+      }
+      
+      // Pattern 3: Look for image gallery data with color associations
+      // Format: twister swatch buttons often have image URLs in their data attributes
+      if (!colorVariants.some(v => v.image)) {
+        for (const variant of colorVariants) {
+          // Look for swatch button with this color that contains an image
+          const colorEscaped = variant.color.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+          const swatchPattern = new RegExp(`<li[^>]*title=["']${colorEscaped}["'][^>]*>[\\s\\S]*?<img[^>]*src=["']([^"']+)["']`, 'i')
+          const swatchMatch = htmlContent.match(swatchPattern)
+          if (swatchMatch && swatchMatch[1]) {
+            // Convert swatch thumbnail to larger image
+            let imageUrl = swatchMatch[1]
+            // Amazon swatch images are tiny, try to get larger version
+            imageUrl = imageUrl.replace(/\._[A-Z]+\d+_\./, '._AC_SX466_.')
+            variant.image = imageUrl
+            log(`[v0] ✅ Found swatch image for color ${variant.color}`)
+          }
+        }
+      }
+      
+      // Pattern 4: Extract from variant-specific image data in landing image JSON
+      if (!colorVariants.some(v => v.image)) {
+        const landingImageMatch = htmlContent.match(/["']landingImageUrl["']\s*:\s*\{([^}]+)\}/i)
+        if (landingImageMatch) {
+          for (const variant of colorVariants) {
+            const colorEscaped = variant.color.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+            const imgPattern = new RegExp(`["']${colorEscaped}["']\\s*:\\s*["']([^"']+)["']`, 'i')
+            const imgMatch = landingImageMatch[1].match(imgPattern)
+            if (imgMatch && imgMatch[1]) {
+              variant.image = imgMatch[1]
+              log(`[v0] ✅ Found landing image for color ${variant.color}`)
+            }
+          }
+        }
+      }
+      
       productData.attributes.colorVariants = colorVariants
-      log(`[v0] ✅ Extracted ${colorVariants.length} color variants: ${colorVariants.slice(0, 5).map(c => c.color).join(', ')}${colorVariants.length > 5 ? '...' : ''}`)
+      const variantsWithImages = colorVariants.filter(v => v.image).length
+      log(`[v0] ✅ Extracted ${colorVariants.length} color variants (${variantsWithImages} with images): ${colorVariants.slice(0, 5).map(c => c.color).join(', ')}${colorVariants.length > 5 ? '...' : ''}`)
     }
     
     // Extract Style options (GPS, GPS + Cellular, product variants, etc.)

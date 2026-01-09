@@ -62,8 +62,8 @@ interface ProductAttributes {
   earPlacement?: string
   formFactor?: string
   noiseControl?: string
-  // Watch/Electronics variant attributes
-  colorVariants?: Array<{color: string, price?: string, originalPrice?: string, savings?: string}>
+  // Watch/Electronics variant attributes - with optional variant-specific image
+  colorVariants?: Array<{color: string, price?: string, originalPrice?: string, savings?: string, image?: string}>
   styleOptions?: string[]
   configurationOptions?: string[]
   // Style/Pattern attributes

@@ -13,7 +13,7 @@ interface ProductOption {
   size?: string
   sizeOptions?: Array<{ size: string; price?: string }>
   color?: string
-  colorVariants?: Array<{ color: string }>
+  colorVariants?: Array<{ color: string; image?: string }>
   styleOptions?: string[]
   configurationOptions?: string[]
 }
@@ -69,6 +69,19 @@ export function WishlistOptionsModal({
   // Check if there are any SELECTABLE options to show
   // Material and Capacity are product attributes, NOT selectable options
   const hasOptions = sizeOptions.length > 0 || colorOptions.length > 0 || styleOptions.length > 0 || configOptions.length > 0
+  
+  // Get the current display image based on selected color
+  const getCurrentImage = () => {
+    if (selectedColor && colorOptions.length > 0) {
+      const selectedVariant = colorOptions.find(opt => opt.color === selectedColor)
+      if (selectedVariant?.image) {
+        return selectedVariant.image
+      }
+    }
+    return product.image
+  }
+  
+  const currentDisplayImage = getCurrentImage()
 
   const handleConfirm = () => {
     onConfirm({
@@ -116,17 +129,23 @@ export function WishlistOptionsModal({
         <div className="px-6 py-5 space-y-5">
           {/* Product Info */}
           <div className="flex gap-4 p-4 bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl border border-amber-200">
-            {/* Product Image */}
-            <div className="w-24 h-24 flex-shrink-0 rounded-lg overflow-hidden bg-white border border-amber-200 shadow-sm">
-              {product.image ? (
+            {/* Product Image - updates based on selected color */}
+            <div className="w-24 h-24 flex-shrink-0 rounded-lg overflow-hidden bg-white border border-amber-200 shadow-sm relative">
+              {currentDisplayImage ? (
                 <img 
-                  src={product.image} 
+                  src={currentDisplayImage} 
                   alt={product.name}
-                  className="w-full h-full object-contain"
+                  className="w-full h-full object-contain transition-all duration-300"
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-gray-100">
                   <Heart className="w-8 h-8 text-gray-300" />
+                </div>
+              )}
+              {/* Show color indicator when variant image is displayed */}
+              {selectedColor && colorOptions.find(opt => opt.color === selectedColor)?.image && (
+                <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[9px] text-center py-0.5 truncate px-1">
+                  {selectedColor}
                 </div>
               )}
             </div>

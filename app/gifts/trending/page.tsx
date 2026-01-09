@@ -24,8 +24,8 @@ interface ProductAttributes {
   size?: string
   sizeOptions?: Array<{size: string, price?: string}>
   customFields?: Array<{name: string, value: string}>
-  // Color Variants (for watches, electronics)
-  colorVariants?: Array<{color: string}>
+  // Color Variants (for watches, electronics) - with optional variant-specific image
+  colorVariants?: Array<{color: string, image?: string}>
   // Style and Configuration Options
   styleOptions?: string[]
   configurationOptions?: string[]
