@@ -651,6 +651,8 @@ export default function AdminAffiliateProductsPage() {
           size: extractedProduct.attributes?.size || undefined,
           brand: extractedProduct.attributes?.brand || extractedProduct.brand || undefined,
           sizeOptions: extractedProduct.attributes?.sizeOptions || undefined,
+          // Combined Variants (Size + Color together, e.g., "7 Quarts Stainless Steel")
+          combinedVariants: extractedProduct.attributes?.combinedVariants || undefined,
           // Color Variants (for products with multiple color options)
           colorVariants: extractedProduct.attributes?.colorVariants || undefined,
           // Style and Configuration Options
@@ -2227,34 +2229,49 @@ export default function AdminAffiliateProductsPage() {
                               </Button>
                             </div>
                           )}
-                          {/* Style Options / Variants - Always show with Add button */}
+                          {/* Combined Variants (Size + Color together) */}
                           <div className="mt-2 pt-2 border-t border-amber-200">
-                            <span className="text-gray-600 block mb-2">Style / Variants:</span>
+                            <span className="text-gray-600 block mb-2">
+                              Product Variants (Size + Color):
+                            </span>
                             <div className="space-y-2">
-                              {(extractedProduct?.attributes?.styleOptions || []).map((style: string, idx: number) => (
+                              {(extractedProduct?.attributes?.combinedVariants || []).map((variant: {name: string, price?: string}, idx: number) => (
                                 <div key={idx} className="flex items-center gap-2">
                                   <Input
-                                    value={style || ''}
+                                    value={variant.name || ''}
                                     onChange={(e) => {
-                                      const newStyleOptions = [...(extractedProduct?.attributes?.styleOptions || [])]
-                                      newStyleOptions[idx] = e.target.value
+                                      const newVariants = [...(extractedProduct?.attributes?.combinedVariants || [])]
+                                      newVariants[idx] = { ...newVariants[idx], name: e.target.value }
                                       setExtractedProduct({
                                         ...extractedProduct,
-                                        attributes: { ...(extractedProduct?.attributes || {}), styleOptions: newStyleOptions }
+                                        attributes: { ...(extractedProduct?.attributes || {}), combinedVariants: newVariants }
                                       })
                                     }}
                                     className="flex-1 h-8 text-sm border-gray-300 focus:border-amber-500"
-                                    placeholder="Style / Variant option"
+                                    placeholder="e.g., 7 Quarts Stainless Steel"
+                                  />
+                                  <Input
+                                    value={variant.price || ''}
+                                    onChange={(e) => {
+                                      const newVariants = [...(extractedProduct?.attributes?.combinedVariants || [])]
+                                      newVariants[idx] = { ...newVariants[idx], price: e.target.value }
+                                      setExtractedProduct({
+                                        ...extractedProduct,
+                                        attributes: { ...(extractedProduct?.attributes || {}), combinedVariants: newVariants }
+                                      })
+                                    }}
+                                    className="w-24 h-8 text-sm border-gray-300 focus:border-amber-500"
+                                    placeholder="$47.99"
                                   />
                                   <Button
                                     type="button"
                                     variant="ghost"
                                     size="sm"
                                     onClick={() => {
-                                      const newStyleOptions = (extractedProduct?.attributes?.styleOptions || []).filter((_: string, i: number) => i !== idx)
+                                      const newVariants = (extractedProduct?.attributes?.combinedVariants || []).filter((_: any, i: number) => i !== idx)
                                       setExtractedProduct({
                                         ...extractedProduct,
-                                        attributes: { ...(extractedProduct?.attributes || {}), styleOptions: newStyleOptions }
+                                        attributes: { ...(extractedProduct?.attributes || {}), combinedVariants: newVariants }
                                       })
                                     }}
                                     className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
@@ -2268,15 +2285,15 @@ export default function AdminAffiliateProductsPage() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => {
-                                  const newStyleOptions = [...(extractedProduct?.attributes?.styleOptions || []), '']
+                                  const newVariants = [...(extractedProduct?.attributes?.combinedVariants || []), { name: '', price: '' }]
                                   setExtractedProduct({
                                     ...extractedProduct,
-                                    attributes: { ...(extractedProduct?.attributes || {}), styleOptions: newStyleOptions }
+                                    attributes: { ...(extractedProduct?.attributes || {}), combinedVariants: newVariants }
                                   })
                                 }}
                                 className="text-xs h-7 border-amber-400 text-amber-700 hover:bg-amber-50"
                               >
-                                + Add Style / Variant
+                                + Add Variant
                               </Button>
                             </div>
                           </div>

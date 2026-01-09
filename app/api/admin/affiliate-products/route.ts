@@ -187,6 +187,8 @@ export async function POST(req: NextRequest) {
         "earPlacement", "formFactor", "noiseControl", "modelName",
         "wirelessTechnology", "controlType", "bluetoothVersion",
         "earpieceShape", "includedComponents", "specificUses", "recommendedUses",
+        // Combined Variants (Size + Color together)
+        "combinedVariants",
         // Watch/Electronics variants
         "colorVariants", "styleOptions", "configurationOptions",
         // Style/Pattern attributes

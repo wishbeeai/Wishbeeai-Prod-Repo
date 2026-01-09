@@ -79,6 +79,8 @@ export async function POST(req: NextRequest) {
         size: body.attributes.size || undefined,
         sizeOptions: body.attributes.sizeOptions || undefined,
         customFields: body.attributes.customFields || undefined,
+        // Combined Variants (Size + Color together, e.g., "7 Quarts Stainless Steel")
+        combinedVariants: body.attributes.combinedVariants || undefined,
         // Color Variants (for watches, electronics, drinkware)
         colorVariants: body.attributes.colorVariants || undefined,
         // Style and Configuration Options
