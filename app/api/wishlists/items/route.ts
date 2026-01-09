@@ -56,11 +56,11 @@ export async function POST(request: NextRequest) {
       review_count: review_count || null,
       affiliate_url: affiliate_url || product_url || productUrl || null,
       source: source || 'trending',
+      price_snapshot_at: price_snapshot_at ? new Date(price_snapshot_at) : new Date(), // Required field
     };
 
     // Only add optional fields if they have values
     if (asin) insertData.asin = asin;
-    if (price_snapshot_at) insertData.price_snapshot_at = new Date(price_snapshot_at);
 
     const { data: item, error } = await supabase
       .from('wishlist_items')
