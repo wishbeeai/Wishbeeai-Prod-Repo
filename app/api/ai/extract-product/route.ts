@@ -3940,6 +3940,82 @@ async function extractWithoutAI(
       }
     }
     
+    // Extract color variants from Amazon's twister color buttons (general products like YETI tumblers)
+    if (colorVariants.length === 0) {
+      log("[v0] 🔍 Looking for color variants in twister buttons...")
+      
+      // Pattern 1: Look for color swatch buttons with data-defaultasin and title
+      const colorSwatchPatterns = [
+        // Color name in twister li with data-defaultasin
+        /<li[^>]*id="[^"]*color_name[^"]*"[^>]*data-defaultasin[^>]*title=["']([^"']+)["']/gi,
+        // Color name in button title
+        /<li[^>]*id="[^"]*color_name[^"]*"[^>]*>[\s\S]*?<button[^>]*title=["']Click to select ([^"']+)["']/gi,
+        // Color name from img alt with color indicator
+        /<li[^>]*id="[^"]*color_name[^"]*"[^>]*>[\s\S]*?<img[^>]*alt=["']([^"']+)["']/gi,
+        // Color in twister slot div
+        /<div[^>]*class=["'][^"']*twisterSlotDiv[^"']*["'][^>]*>[\s\S]*?<span[^>]*>([A-Za-z][A-Za-z\s]+?)<\/span>/gi,
+      ]
+      
+      for (const pattern of colorSwatchPatterns) {
+        let match
+        while ((match = pattern.exec(htmlContent)) !== null) {
+          let colorName = decodeHtmlEntities((match[1] || '').trim())
+          // Clean up common prefixes
+          colorName = colorName.replace(/^Click to select\s*/i, '').trim()
+          // Validate it looks like a color
+          const validColorWords = ['black', 'white', 'silver', 'gold', 'rose', 'blue', 'red', 'green', 'gray', 'grey', 'pink', 'purple', 'orange', 'yellow', 'brown', 'natural', 'slate', 'jet', 'titanium', 'aluminum', 'navy', 'teal', 'coral', 'burgundy', 'maroon', 'beige', 'charcoal', 'aqua', 'seafoam', 'rescue', 'verde', 'harvest', 'nordic', 'alpine', 'offshore', 'prickly', 'canopy', 'power', 'camp', 'peak', 'big wave', 'cosmic', 'tropical', 'chartreuse', 'king crab', 'sandstone', 'agave', 'ice']
+          const hasValidColor = validColorWords.some(cw => colorName.toLowerCase().includes(cw)) || colorName.match(/^[A-Z][a-z]+(\s+[A-Z][a-z]+)?$/)
+          if (colorName && colorName.length >= 3 && colorName.length <= 50 && hasValidColor && !colorVariants.find(c => c.color.toLowerCase() === colorName.toLowerCase())) {
+            colorVariants.push({ color: colorName })
+            log(`[v0] ✅ Found color variant from twister: ${colorName}`)
+          }
+        }
+      }
+    }
+    
+    // Pattern 2: Extract from variation_values JavaScript object (common Amazon format)
+    if (colorVariants.length === 0) {
+      const variationValuesMatch = htmlContent.match(/variation_values\s*[:=]\s*(\{[\s\S]*?\})\s*[,;]?/i)
+      if (variationValuesMatch) {
+        try {
+          const colorNamesMatch = variationValuesMatch[1].match(/color_name['"]\s*:\s*\[([^\]]+)\]/i)
+          if (colorNamesMatch) {
+            const colorList = colorNamesMatch[1].match(/"([^"]+)"/g)
+            if (colorList) {
+              for (const c of colorList) {
+                const colorName = c.replace(/"/g, '').trim()
+                if (colorName && colorName.length >= 3 && colorName.length <= 50 && !colorVariants.find(cv => cv.color.toLowerCase() === colorName.toLowerCase())) {
+                  colorVariants.push({ color: colorName })
+                  log(`[v0] ✅ Found color variant from variation_values: ${colorName}`)
+                }
+              }
+            }
+          }
+        } catch (e) {
+          // Ignore parsing errors
+        }
+      }
+    }
+    
+    // Pattern 3: Extract from dimensionValuesDisplayData for general color names
+    if (colorVariants.length === 0) {
+      const dimDisplayMatch = htmlContent.match(/dimensionValuesDisplayData\s*[:=]\s*(\{[\s\S]*?\})\s*[,;]/i)
+      if (dimDisplayMatch) {
+        // Look for simple color name patterns (single or double word colors)
+        const simpleColorPattern = /"([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)"\s*:\s*\[/g
+        let colorMatch
+        const commonColors = ['rescue', 'red', 'blue', 'green', 'black', 'white', 'gray', 'grey', 'silver', 'gold', 'pink', 'purple', 'orange', 'yellow', 'brown', 'navy', 'teal', 'coral', 'verde', 'harvest', 'nordic', 'alpine', 'offshore', 'tropical', 'cosmic', 'seafoam', 'canopy', 'charcoal', 'slate', 'peak', 'camp', 'power', 'agave', 'sandstone', 'chartreuse']
+        while ((colorMatch = simpleColorPattern.exec(dimDisplayMatch[1])) !== null) {
+          const potentialColor = colorMatch[1].trim()
+          const hasColorWord = commonColors.some(cw => potentialColor.toLowerCase().includes(cw))
+          if (potentialColor && hasColorWord && potentialColor.length >= 3 && potentialColor.length <= 30 && !colorVariants.find(cv => cv.color.toLowerCase() === potentialColor.toLowerCase())) {
+            colorVariants.push({ color: potentialColor })
+            log(`[v0] ✅ Found color variant from dimensionValuesDisplayData: ${potentialColor}`)
+          }
+        }
+      }
+    }
+    
     if (colorVariants.length > 0) {
       productData.attributes.colorVariants = colorVariants
       log(`[v0] ✅ Extracted ${colorVariants.length} color variants: ${colorVariants.slice(0, 5).map(c => c.color).join(', ')}${colorVariants.length > 5 ? '...' : ''}`)
@@ -3954,35 +4030,86 @@ async function extractWithoutAI(
     if (styleDimensionMatch) {
       try {
         const dimDataStr = styleDimensionMatch[1]
-        // Match product variant names (like "Ninja Fit", "Ninja Pro", etc.)
-        const variantMatches = dimDataStr.match(/"([^"]{10,80})"/g)
+        // Match product variant names (like "Ninja Fit", "Ninja Pro", "Pitcher + Bowl + Cups", etc.)
+        const variantMatches = dimDataStr.match(/"([^"]{10,100})"/g)
         if (variantMatches) {
           for (const match of variantMatches) {
             const variant = match.replace(/"/g, '').trim()
             // Filter out non-style values (colors, sizes, ASINs, etc.)
             if (variant && 
                 variant.length >= 10 && 
-                variant.length <= 80 &&
+                variant.length <= 100 &&
                 !variant.match(/^[A-Z0-9]{10}$/) && // Not an ASIN
-                !variant.match(/^\d+\s*(Quart|Qt|oz|Liter|L|mm|cm|inch)/i) && // Not a size
-                !variant.match(/^(Black|White|Red|Blue|Green|Gray|Silver|Gold|Pink|Purple|Orange|Yellow|Brown)/i) && // Not a color
+                !variant.match(/^\d+\s*(Quart|Qt|oz|Liter|L|mm|cm|inch)$/i) && // Not just a size (but allow sizes in combination)
+                !variant.match(/^(Black|White|Red|Blue|Green|Gray|Silver|Gold|Pink|Purple|Orange|Yellow|Brown)$/i) && // Not just a color
                 !variant.match(/Case\s*w\//i) && // Not a watch case color
-                !styleOptions.includes(variant) &&
-                (variant.includes('Fit') || variant.includes('Pro') || variant.includes('Plus') || 
-                 variant.includes('Compact') || variant.includes('Personal') || variant.includes('Professional') ||
-                 variant.includes('Deluxe') || variant.includes('Classic') || variant.includes('Ultimate') ||
-                 variant.includes('Max') || variant.includes('Mini') || variant.includes('XL') ||
-                 variant.includes('Standard') || variant.includes('Premium') || variant.includes('Basic') ||
-                 variant.includes('Blender') || variant.includes('Mixer') || variant.includes('Processor') ||
-                 variant.includes('Cup') || variant.includes('Lid') || variant.includes('Piece') ||
-                 variant.includes('Set') || variant.includes('Kit') || variant.includes('Bundle'))) {
-              styleOptions.push(variant)
-              log(`[v0] ✅ Found style variant from dimension data: ${variant}`)
+                !styleOptions.includes(variant)) {
+              // Check if it's a valid style variant
+              const isKitchenVariant = variant.includes('Pitcher') || variant.includes('Bowl') || 
+                                       variant.includes('Blender') || variant.includes('Processor') ||
+                                       variant.includes('Cup') || variant.includes('Cups') ||
+                                       (variant.includes('+') && (variant.includes('oz') || variant.includes('Cup')))
+              const isProductVariant = variant.includes('Fit') || variant.includes('Pro') || variant.includes('Plus') || 
+                                       variant.includes('Compact') || variant.includes('Personal') || variant.includes('Professional') ||
+                                       variant.includes('Deluxe') || variant.includes('Classic') || variant.includes('Ultimate') ||
+                                       variant.includes('Max') || variant.includes('Mini') || variant.includes('XL') ||
+                                       variant.includes('Standard') || variant.includes('Premium') || variant.includes('Basic') ||
+                                       variant.includes('Mixer') || variant.includes('Lid') || variant.includes('Piece') ||
+                                       variant.includes('Set') || variant.includes('Kit') || variant.includes('Bundle') ||
+                                       variant.includes('Power')
+              
+              if (isKitchenVariant || isProductVariant) {
+                styleOptions.push(variant)
+                log(`[v0] ✅ Found style variant from dimension data: ${variant}`)
+              }
             }
           }
         }
       } catch (e) {
         log(`[v0] ⚠️ Error parsing style dimension data: ${e}`)
+      }
+    }
+    
+    // Look for Amazon's variation_values data which contains style options
+    const variationValuesMatch = htmlContent.match(/variation_values\s*[:=]\s*\{([^}]+)\}/i)
+    if (variationValuesMatch) {
+      try {
+        // Extract style dimension values
+        const styleValuesMatch = variationValuesMatch[1].match(/["']style_name["']\s*:\s*\[([^\]]+)\]/i)
+        if (styleValuesMatch) {
+          const styleValues = styleValuesMatch[1].match(/"([^"]+)"/g)
+          if (styleValues) {
+            for (const sv of styleValues) {
+              const styleName = sv.replace(/"/g, '').trim()
+              if (styleName && styleName.length >= 5 && !styleOptions.includes(styleName)) {
+                styleOptions.push(styleName)
+                log(`[v0] ✅ Found style from variation_values: ${styleName}`)
+              }
+            }
+          }
+        }
+      } catch (e) {
+        log(`[v0] ⚠️ Error parsing variation_values: ${e}`)
+      }
+    }
+    
+    // Look for twister dimension labels with style variants (Pitcher + Bowl + Cups format)
+    const twisterDimLabelPatterns = [
+      /<span[^>]*class=["'][^"']*a-size-base["'][^>]*>([^<]*(?:Pitcher|Bowl|Blender|Cup|Power)[^<]*\+[^<]*)<\/span>/gi,
+      /<span[^>]*class=["'][^"']*twister[-_]?label["'][^>]*>([^<]*(?:Pitcher|Bowl|Blender|Cup|Power)[^<]*)<\/span>/gi,
+      /<li[^>]*class=["'][^"']*swatchAvailable["'][^>]*>[\s\S]*?<span[^>]*>([^<]*(?:Pitcher|Bowl|Blender|Cup|Power)[^<]*)<\/span>/gi,
+      /title=["']([^"']*(?:Pitcher|Bowl|Blender|Cup|Power)[^"']*\+[^"']*)["']/gi,
+      /data-dp-url="[^"]*"[^>]*>[\s\S]*?<span[^>]*>([^<]*(?:Pitcher|Bowl|Blender|Power)[^<]*\+[^<]*)<\/span>/gi,
+    ]
+    
+    for (const pattern of twisterDimLabelPatterns) {
+      let match
+      while ((match = pattern.exec(htmlContent)) !== null) {
+        const style = decodeHtmlEntities((match[1] || '').trim())
+        if (style && style.length >= 10 && style.length <= 100 && !styleOptions.includes(style)) {
+          styleOptions.push(style)
+          log(`[v0] ✅ Found kitchen style variant: ${style}`)
+        }
       }
     }
     
@@ -4165,9 +4292,44 @@ async function extractWithoutAI(
       }
     }
     
-    if (styleOptions.length > 0) {
-      productData.attributes.styleOptions = styleOptions
-      log(`[v0] ✅ Extracted ${styleOptions.length} style options: ${styleOptions.join(', ')}`)
+    // Clean up and validate style options - remove invalid values
+    const invalidStylePatterns = [
+      /^[\d.]+$/,                    // Pure numbers like "4.6"
+      /^\[.*\]$/,                    // Bracketed text like "[PDF]"
+      /^(SQUARE|ROUND|OVAL|RECTANGLE|RECTANGULAR)$/i,  // Shape names (not styles)
+      /^Style$/i,                    // The label itself
+      /^(Select|Choose|Pick)/i,     // Selection prompts
+      /^(Black|White|Red|Blue|Green|Gray|Silver|Gold|Pink|Purple|Orange|Yellow|Brown|Beige|Navy|Tan)$/i,  // Single colors
+      /^\d+\s*(oz|Quart|Qt|Liter|L|mm|cm|inch|inches|W|HP|Watt|watts)$/i,  // Units
+      /^(Small|Medium|Large|XL|XXL|S|M|L)$/i,  // Simple sizes
+      /^https?:\/\//i,              // URLs
+      /^[A-Z0-9]{10}$/,             // ASINs
+      /\.(pdf|jpg|png|gif|svg)$/i,  // File extensions
+      /^(undefined|null|none|n\/a)$/i,  // Null-like values
+      /^(Brand|Color|Size|Material|Capacity|Weight|Dimensions|Special Feature|Model)$/i,  // Attribute labels
+      /^\d{1,2}\.\d$/,              // Rating-like numbers (4.5, 3.2)
+      /^#\d+/,                      // Rank numbers (#1)
+      /^\d+K?\+?\s*(bought|sold|reviews|ratings)/i,  // Sales/review counts
+    ]
+    
+    const validatedStyleOptions = styleOptions.filter(style => {
+      // Skip if matches any invalid pattern
+      for (const pattern of invalidStylePatterns) {
+        if (pattern.test(style)) {
+          log(`[v0] 🧹 Filtering out invalid style option: ${style}`)
+          return false
+        }
+      }
+      // Must be at least 3 chars and not just whitespace
+      if (!style || style.trim().length < 3) return false
+      // Must contain at least one letter
+      if (!/[a-zA-Z]/.test(style)) return false
+      return true
+    })
+    
+    if (validatedStyleOptions.length > 0) {
+      productData.attributes.styleOptions = validatedStyleOptions
+      log(`[v0] ✅ Extracted ${validatedStyleOptions.length} style options: ${validatedStyleOptions.join(', ')}`)
     }
     
     // Extract Configuration options (AppleCare+, etc.)

@@ -649,6 +649,15 @@ export default function AdminAffiliateProductsPage() {
           size: extractedProduct.attributes?.size || undefined,
           brand: extractedProduct.attributes?.brand || extractedProduct.brand || undefined,
           sizeOptions: extractedProduct.attributes?.sizeOptions || undefined,
+          // Color Variants (for products with multiple color options)
+          colorVariants: extractedProduct.attributes?.colorVariants || undefined,
+          // Style and Configuration Options
+          styleOptions: extractedProduct.attributes?.styleOptions || undefined,
+          configurationOptions: extractedProduct.attributes?.configurationOptions || undefined,
+          // Style/Pattern attributes
+          styleName: extractedProduct.attributes?.styleName || undefined,
+          patternName: extractedProduct.attributes?.patternName || undefined,
+          model: extractedProduct.attributes?.model || undefined,
           // Audio product attributes
           earPlacement: extractedProduct.attributes?.earPlacement || undefined,
           formFactor: extractedProduct.attributes?.formFactor || undefined,
@@ -988,14 +997,16 @@ export default function AdminAffiliateProductsPage() {
                     <td className="py-5 px-4">
                       <div className="flex items-center gap-4">
                         <div className="relative flex-shrink-0">
-                          <img
-                            src={product.image || "/placeholder.svg"}
-                            alt={product.productName}
-                            className="w-20 h-20 sm:w-24 sm:h-24 object-cover rounded-xl border-2 border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200"
-                            onError={(e) => {
-                              e.currentTarget.src = "/placeholder.svg"
-                            }}
-                          />
+                          <div className="w-24 h-24 sm:w-28 sm:h-28 bg-white rounded-xl border-2 border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200 flex items-center justify-center p-2">
+                            <img
+                              src={product.image || "/placeholder.svg"}
+                              alt={product.productName}
+                              className="max-w-full max-h-full object-contain"
+                              onError={(e) => {
+                                e.currentTarget.src = "/placeholder.svg"
+                              }}
+                            />
+                          </div>
                           {product.originalPrice && product.originalPrice > product.price && (
                             <div className="absolute -top-2 -right-2 bg-gradient-to-r from-red-500 to-rose-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg">
                               SALE

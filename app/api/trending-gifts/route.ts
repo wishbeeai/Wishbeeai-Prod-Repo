@@ -79,6 +79,15 @@ export async function POST(req: NextRequest) {
         size: body.attributes.size || undefined,
         sizeOptions: body.attributes.sizeOptions || undefined,
         customFields: body.attributes.customFields || undefined,
+        // Color Variants (for watches, electronics, drinkware)
+        colorVariants: body.attributes.colorVariants || undefined,
+        // Style and Configuration Options
+        styleOptions: body.attributes.styleOptions || undefined,
+        configurationOptions: body.attributes.configurationOptions || undefined,
+        // Style/Pattern attributes
+        styleName: body.attributes.styleName || undefined,
+        patternName: body.attributes.patternName || undefined,
+        model: body.attributes.model || undefined,
         // Electronics-specific attributes
         operatingSystem: body.attributes.operatingSystem || undefined,
         storageCapacity: body.attributes.storageCapacity || undefined,
@@ -107,6 +116,8 @@ export async function POST(req: NextRequest) {
         includedComponents: body.attributes.includedComponents || undefined,
         specificUses: body.attributes.specificUses || undefined,
         recommendedUses: body.attributes.recommendedUses || undefined,
+        // Custom badges
+        customBadges: body.attributes.customBadges || undefined,
       } : undefined,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

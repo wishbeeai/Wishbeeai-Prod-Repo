@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Search, Filter, Star, TrendingUp, SlidersHorizontal, Grid3x3, List, X, ExternalLink, Heart, Loader2 } from "lucide-react"
+import { ArrowLeft, Search, Filter, Star, TrendingUp, SlidersHorizontal, Grid3x3, List, X, ExternalLink, Heart, Trash2 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { useAuth } from "@/lib/auth-context"
+import { WishlistOptionsModal } from "@/components/wishlist-options-modal"
 
 interface ProductAttributes {
   brand?: string
@@ -107,16 +108,84 @@ export default function TrendingGiftsPage() {
   const [sortBy, setSortBy] = useState<SortOption>("popularity")
   const [viewMode, setViewMode] = useState<ViewMode>("grid")
   const [showFilters, setShowFilters] = useState(false)
-  const [addingToWishlist, setAddingToWishlist] = useState<string | null>(null)
+  
+  // Wishlist modal state
+  const [wishlistModalOpen, setWishlistModalOpen] = useState(false)
+  const [selectedGift, setSelectedGift] = useState<Gift | null>(null)
+  const [addingToWishlist, setAddingToWishlist] = useState(false)
+  const [deletingGiftId, setDeletingGiftId] = useState<string | null>(null)
 
-  const handleAddToWishlist = async (gift: Gift) => {
+  // Admin check
+  const isAdmin = user?.email === 'wishbeeai@gmail.com'
+
+  // Handle delete product (admin only)
+  const handleDeleteProduct = async (giftId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    
+    if (!isAdmin) {
+      toast.error('Only admins can delete products')
+      return
+    }
+
+    // Find the product name for the toast message
+    const giftToDelete = gifts.find(g => g.id === giftId)
+    const productName = giftToDelete?.giftName 
+      ? (giftToDelete.giftName.length > 40 
+          ? giftToDelete.giftName.substring(0, 40) + '...' 
+          : giftToDelete.giftName)
+      : 'Product'
+
+    if (!confirm(`Are you sure you want to remove "${productName}" from trending gifts?`)) {
+      return
+    }
+
+    setDeletingGiftId(giftId)
+    
+    try {
+      const response = await fetch(`/api/trending-gifts/${giftId}`, {
+        method: 'DELETE',
+      })
+      
+      if (!response.ok) {
+        throw new Error('Failed to delete product')
+      }
+      
+      // Remove from local state
+      setGifts(prev => prev.filter(g => g.id !== giftId))
+      
+      // Show success toast
+      toast.success(`"${productName}" removed from trending gifts`)
+    } catch (error) {
+      console.error('Error deleting product:', error)
+      toast.error(`Failed to remove "${productName}"`)
+    } finally {
+      setDeletingGiftId(null)
+    }
+  }
+
+  const handleAddToWishlist = (gift: Gift) => {
     // Check if user is logged in
     if (!user) {
       toast.error('Please sign in to add items to your wishlist')
       return
     }
+    
+    // Open the options modal
+    setSelectedGift(gift)
+    setWishlistModalOpen(true)
+  }
 
-    setAddingToWishlist(gift.id)
+  const handleConfirmAddToWishlist = async (selectedOptions: {
+    size?: string
+    color?: string
+    style?: string
+    configuration?: string
+    note?: string
+    isFlexible: boolean
+  }) => {
+    if (!selectedGift || !user) return
+
+    setAddingToWishlist(true)
     
     try {
       // Fetch user's wishlists
@@ -146,21 +215,33 @@ export default function TrendingGiftsPage() {
         wishlistId = createData.wishlist.id
       }
       
+      // Build note with selected options
+      let fullNote = ''
+      const optionParts: string[] = []
+      if (selectedOptions.size) optionParts.push(`Size: ${selectedOptions.size}`)
+      if (selectedOptions.color) optionParts.push(`Color: ${selectedOptions.color}`)
+      if (selectedOptions.style) optionParts.push(`Style: ${selectedOptions.style}`)
+      if (selectedOptions.configuration) optionParts.push(`Config: ${selectedOptions.configuration}`)
+      if (optionParts.length > 0) fullNote = optionParts.join(' | ')
+      if (selectedOptions.note) fullNote = fullNote ? `${fullNote}\n${selectedOptions.note}` : selectedOptions.note
+      if (selectedOptions.isFlexible) fullNote = fullNote ? `${fullNote}\n[Flexible with options]` : '[Flexible with options]'
+      
       // Add the item to the wishlist
       const addResponse = await fetch('/api/wishlists/items', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           wishlistId,
-          title: gift.giftName,
-          product_url: gift.productLink,
-          image_url: gift.image || gift.bannerImage,
-          list_price: Math.round(gift.targetAmount * 100), // Convert to cents
+          title: selectedGift.giftName,
+          product_url: selectedGift.productLink,
+          image_url: selectedGift.image || selectedGift.bannerImage,
+          list_price: Math.round(selectedGift.targetAmount * 100), // Convert to cents
           currency: 'USD',
-          review_star: gift.rating,
-          review_count: gift.reviewCount,
-          affiliate_url: gift.productLink,
-          source: gift.source || 'trending'
+          review_star: selectedGift.rating,
+          review_count: selectedGift.reviewCount,
+          affiliate_url: selectedGift.productLink,
+          source: selectedGift.source || 'trending',
+          notes: fullNote || undefined
         })
       })
       
@@ -169,7 +250,11 @@ export default function TrendingGiftsPage() {
         throw new Error(errorData.error || 'Failed to add to wishlist')
       }
       
-      toast.success(`Added "${gift.giftName.length > 30 ? gift.giftName.substring(0, 30) + '...' : gift.giftName}" to your wishlist!`)
+      toast.success(`Added "${selectedGift.giftName.length > 30 ? selectedGift.giftName.substring(0, 30) + '...' : selectedGift.giftName}" to your wishlist!`)
+      
+      // Close modal and reset
+      setWishlistModalOpen(false)
+      setSelectedGift(null)
       
       // Navigate to wishlist page
       router.push('/wishlist')
@@ -177,7 +262,7 @@ export default function TrendingGiftsPage() {
       console.error('Error adding to wishlist:', error)
       toast.error(error.message || 'Failed to add to wishlist')
     } finally {
-      setAddingToWishlist(null)
+      setAddingToWishlist(false)
     }
   }
 
@@ -621,7 +706,7 @@ export default function TrendingGiftsPage() {
                   />
                   </div>
                   {gift.category && (
-                    <div className="absolute top-2 left-2 bg-gradient-to-r from-teal-500 to-cyan-500 text-white px-2 py-1 rounded-full text-xs font-semibold shadow-md">
+                    <div className="absolute top-2 left-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white px-2 py-1 rounded-full text-xs font-semibold shadow-md">
                       {gift.category}
                     </div>
                   )}
@@ -679,25 +764,24 @@ export default function TrendingGiftsPage() {
                       )}
                     </div>
                   )}
-                  {(gift.amazonChoice || gift.bestSeller || (gift.attributes?.customBadges && gift.attributes.customBadges.some(b => b.enabled))) && (
-                    <div className="flex flex-wrap gap-1.5 mb-2">
-                      {gift.amazonChoice && (
-                        <span className="bg-[#232F3E] text-[#FFFFFF] text-[10px] font-bold px-2 py-0.5 rounded-full">
-                          Amazon's Choice
-                        </span>
-                      )}
-                      {gift.bestSeller && (
-                        <span className="bg-[#D14900] text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                          #1 Best Seller
-                        </span>
-                      )}
-                      {gift.attributes?.customBadges && gift.attributes.customBadges.filter(b => b.enabled).map((badge, idx) => (
-                        <span key={idx} className="bg-[#059669] text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                          {badge.name}
-                        </span>
-                      ))}
+                  {/* Badge container - always rendered for consistent layout alignment */}
+                  <div className="flex flex-wrap gap-1.5 mb-2 min-h-[20px]">
+                    {gift.amazonChoice && (
+                      <span className="bg-[#232F3E] text-[#FFFFFF] text-[10px] font-bold px-2 py-0.5 rounded-full">
+                        Amazon's Choice
+                      </span>
+                    )}
+                    {gift.bestSeller && (
+                      <span className="bg-[#D14900] text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                        #1 Best Seller
+                      </span>
+                    )}
+                    {gift.attributes?.customBadges && gift.attributes.customBadges.filter(b => b.enabled).map((badge, idx) => (
+                      <span key={idx} className="bg-[#059669] text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                        {badge.name}
+                      </span>
+                    ))}
                 </div>
-                  )}
                   {/* Price - moved below badges */}
                   <div className="mb-2">
                     <div className="flex items-center gap-2">
@@ -858,7 +942,7 @@ export default function TrendingGiftsPage() {
                         <span className="text-gray-500 text-[10px]">Color Variants ({gift.attributes.colorVariants.length}): </span>
                         <div className="flex flex-wrap gap-1 mt-1">
                           {gift.attributes.colorVariants.map((variant, idx) => (
-                            <span key={idx} className="bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded text-[9px] font-medium">
+                            <span key={idx} className="bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded text-[9px] font-medium">
                               {variant.color}
                             </span>
                           ))}
@@ -920,19 +1004,14 @@ export default function TrendingGiftsPage() {
 
                 <div className="flex flex-col gap-2 mt-auto">
                 <Button
-                    className="w-full px-3 py-2 bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#3B2F0F] rounded-lg text-xs sm:text-sm font-semibold hover:shadow-lg transition-all hover:scale-105 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full px-3 py-2 bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#3B2F0F] rounded-lg text-xs sm:text-sm font-semibold hover:shadow-lg transition-all hover:scale-105 flex items-center justify-center gap-2"
                   onClick={(e) => {
                     e.stopPropagation()
-                      handleAddToWishlist(gift)
+                    handleAddToWishlist(gift)
                   }}
-                  disabled={addingToWishlist === gift.id}
                 >
-                    {addingToWishlist === gift.id ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Heart className="w-4 h-4" />
-                    )}
-                    {addingToWishlist === gift.id ? 'Adding...' : 'Add to My Wishlist'}
+                    <Heart className="w-4 h-4" />
+                    Add to My Wishlist
                 </Button>
                   {gift.productLink && (
                     <Button
@@ -944,6 +1023,17 @@ export default function TrendingGiftsPage() {
                     >
                       <ExternalLink className="w-4 h-4" />
                       Buy now on {gift.source || 'Amazon'}
+                    </Button>
+                  )}
+                  {/* Admin Delete Button */}
+                  {isAdmin && (
+                    <Button
+                      className="w-full px-3 py-2 bg-gradient-to-r from-[#DC2626] to-[#EF4444] text-white rounded-lg text-xs sm:text-sm font-semibold hover:shadow-lg transition-all hover:scale-105 flex items-center justify-center gap-2 disabled:opacity-50"
+                      onClick={(e) => handleDeleteProduct(gift.id, e)}
+                      disabled={deletingGiftId === gift.id}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      {deletingGiftId === gift.id ? 'Removing...' : 'Remove'}
                     </Button>
                   )}
                 </div>
@@ -996,7 +1086,7 @@ export default function TrendingGiftsPage() {
                     </div>
                     <div className="flex items-center gap-4 flex-wrap mb-3">
                       {gift.category && (
-                        <span className="bg-gradient-to-r from-teal-500 to-cyan-500 text-white px-2 py-1 rounded-full text-xs font-semibold shadow-sm">
+                        <span className="bg-gradient-to-r from-amber-500 to-orange-500 text-white px-2 py-1 rounded-full text-xs font-semibold shadow-sm">
                           {gift.category}
                         </span>
                       )}
@@ -1041,26 +1131,25 @@ export default function TrendingGiftsPage() {
                           )}
                         </div>
                       )}
-                      {(gift.amazonChoice || gift.bestSeller || (gift.attributes?.customBadges && gift.attributes.customBadges.some(b => b.enabled))) && (
-                        <div className="flex gap-1.5">
-                          {gift.amazonChoice && (
-                            <span className="bg-[#232F3E] text-[#FFFFFF] text-[10px] font-bold px-2 py-0.5 rounded-full">
-                              Amazon's Choice
-                            </span>
-                          )}
-                          {gift.bestSeller && (
-                            <span className="bg-[#D14900] text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                              #1 Best Seller
-                            </span>
-                          )}
-                          {gift.attributes?.customBadges && gift.attributes.customBadges.filter(b => b.enabled).map((badge, idx) => (
-                            <span key={idx} className="bg-[#059669] text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                              {badge.name}
-                            </span>
-                          ))}
-                        </div>
-                      )}
+                      {/* Badge container - always rendered for consistent layout alignment */}
+                      <div className="flex gap-1.5 min-h-[20px]">
+                        {gift.amazonChoice && (
+                          <span className="bg-[#232F3E] text-[#FFFFFF] text-[10px] font-bold px-2 py-0.5 rounded-full">
+                            Amazon's Choice
+                          </span>
+                        )}
+                        {gift.bestSeller && (
+                          <span className="bg-[#D14900] text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                            #1 Best Seller
+                          </span>
+                        )}
+                        {gift.attributes?.customBadges && gift.attributes.customBadges.filter(b => b.enabled).map((badge, idx) => (
+                          <span key={idx} className="bg-[#059669] text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                            {badge.name}
+                          </span>
+                        ))}
                     </div>
+                  </div>
                     
                     {/* Product Specifications - List View */}
                     {gift.attributes && (
@@ -1197,7 +1286,7 @@ export default function TrendingGiftsPage() {
                             <div className="flex items-center gap-1 flex-wrap col-span-2">
                               <span className="text-gray-500">Colors ({gift.attributes.colorVariants.length}):</span>
                               {gift.attributes.colorVariants.map((variant, idx) => (
-                                <span key={idx} className="bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded text-[10px] font-medium">
+                                <span key={idx} className="bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded text-[10px] font-medium">
                                   {variant.color}
                                 </span>
                               ))}
@@ -1248,19 +1337,14 @@ export default function TrendingGiftsPage() {
                   </div>
                   <div className="flex flex-col gap-2 flex-shrink-0">
                   <Button
-                      className="px-4 py-2 bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#3B2F0F] rounded-lg text-sm font-semibold hover:shadow-lg transition-all hover:scale-105 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="px-4 py-2 bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#3B2F0F] rounded-lg text-sm font-semibold hover:shadow-lg transition-all hover:scale-105 flex items-center justify-center gap-2"
                     onClick={(e) => {
                       e.stopPropagation()
-                        handleAddToWishlist(gift)
+                      handleAddToWishlist(gift)
                     }}
-                    disabled={addingToWishlist === gift.id}
                   >
-                      {addingToWishlist === gift.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Heart className="w-4 h-4" />
-                      )}
-                      {addingToWishlist === gift.id ? 'Adding...' : 'Add to My Wishlist'}
+                      <Heart className="w-4 h-4" />
+                      Add to My Wishlist
                   </Button>
                     {gift.productLink && (
                       <Button
@@ -1274,6 +1358,17 @@ export default function TrendingGiftsPage() {
                         Buy now on {gift.source || 'Amazon'}
                       </Button>
                     )}
+                    {/* Admin Delete Button */}
+                    {isAdmin && (
+                      <Button
+                        className="px-4 py-2 bg-gradient-to-r from-[#DC2626] to-[#EF4444] text-white rounded-lg text-sm font-semibold hover:shadow-lg transition-all hover:scale-105 flex items-center justify-center gap-2 disabled:opacity-50"
+                        onClick={(e) => handleDeleteProduct(gift.id, e)}
+                        disabled={deletingGiftId === gift.id}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        {deletingGiftId === gift.id ? 'Removing...' : 'Remove'}
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1282,6 +1377,25 @@ export default function TrendingGiftsPage() {
         )}
       </div>
 
+      {/* Wishlist Options Modal */}
+      {selectedGift && (
+        <WishlistOptionsModal
+          isOpen={wishlistModalOpen}
+          onClose={() => {
+            setWishlistModalOpen(false)
+            setSelectedGift(null)
+          }}
+          onConfirm={handleConfirmAddToWishlist}
+          product={{
+            name: selectedGift.giftName,
+            price: selectedGift.targetAmount,
+            image: selectedGift.image || selectedGift.bannerImage || undefined,
+            source: selectedGift.source,
+            attributes: selectedGift.attributes
+          }}
+          isLoading={addingToWishlist}
+        />
+      )}
     </div>
   )
 }
