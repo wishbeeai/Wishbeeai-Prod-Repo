@@ -77,7 +77,12 @@ export function MyWishlistDisplay() {
 
         // Transform database items to component format
         // Database uses: title, image_url, list_price, product_url, review_star, review_count, source, notes
+        // Log raw data for debugging
+        console.log("[My Wishlist] Raw database items:", dbItems)
+        
         const transformedItems: WishlistItem[] = dbItems.map((item: any) => {
+          console.log("[My Wishlist] Processing item:", item)
+          
           // Extract store name from source field or URL
           let storeName = item.source || "Unknown Store"
           if (storeName === 'amazon') storeName = 'Amazon'
@@ -93,36 +98,57 @@ export function MyWishlistDisplay() {
             }
           }
 
-          // Parse price - list_price might be in cents
+          // Parse price - handle different formats
+          // list_price might be in cents (>1000) or dollars
+          // Also check product_price for backwards compatibility
           let price = 0
-          if (item.list_price) {
+          if (item.list_price != null) {
             price = item.list_price > 1000 ? item.list_price / 100 : item.list_price
+          } else if (item.product_price != null) {
+            price = item.product_price
           }
 
-          // Parse notes for selected options
-          const notes = item.notes || ''
+          // Parse description/notes for selected options
+          // Database field is 'description', but API may send 'notes'
+          const notes = item.description || item.notes || ''
           const attributes: { [key: string]: string | null } = {}
+          let userNotes = ''
           
           // Extract options from notes (format: "Size: M | Color: Red | ...")
           if (notes) {
-            const optionParts = notes.split('\n')[0].split(' | ')
+            const lines = notes.split('\n')
+            const optionLine = lines[0] || ''
+            userNotes = lines.slice(1).join('\n').trim()
+            
+            // Parse first line for options
+            const optionParts = optionLine.split(' | ')
             optionParts.forEach((part: string) => {
-              const [key, value] = part.split(': ')
-              if (key && value) {
-                attributes[key.trim()] = value.trim()
+              const colonIndex = part.indexOf(': ')
+              if (colonIndex > 0) {
+                const key = part.substring(0, colonIndex).trim()
+                const value = part.substring(colonIndex + 2).trim()
+                if (key && value && !key.startsWith('[')) {
+                  attributes[key] = value
+                }
               }
             })
           }
+
+          // Get product name - support both old and new schema
+          const productName = item.title || item.product_name || "Untitled Item"
+          
+          // Get image - support both old and new schema
+          const productImage = item.image_url || item.product_image || "/placeholder.svg"
 
           return {
             id: item.id,
             webLink: item.affiliate_url || item.product_url || "#",
             quantity: item.quantity || 1,
-            productImageUrl: item.image_url || "/placeholder.svg",
-            giftName: item.title || "Untitled Item",
+            productImageUrl: productImage,
+            giftName: productName,
             currentPrice: price,
             storeName,
-            description: notes.includes('\n') ? notes.split('\n').slice(1).join('\n') : "",
+            description: userNotes,
             category: item.category || undefined,
             attributes,
             stockStatus: "In Stock",

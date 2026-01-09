@@ -35,7 +35,8 @@ export async function POST(request: NextRequest) {
       affiliate_url,
       source,
       price_snapshot_at,
-      notes, // User notes with selected options
+      notes, // User notes with selected options (stored in description field)
+      description, // Alternative field name for notes
     } = body;
 
     const wishlistIdValue = wishlistId || wishlist_id;
@@ -63,7 +64,9 @@ export async function POST(request: NextRequest) {
 
     // Only add optional fields if they have values
     if (asin) insertData.asin = asin;
-    if (notes) insertData.notes = notes;
+    // Store notes in description field (notes is an alias)
+    const notesValue = notes || description;
+    if (notesValue) insertData.description = notesValue;
 
     const { data: item, error } = await supabase
       .from('wishlist_items')
