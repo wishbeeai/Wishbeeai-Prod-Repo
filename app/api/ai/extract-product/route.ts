@@ -3901,45 +3901,84 @@ async function extractWithoutAI(
     log("[v0] 🔍 Extracting combined size+color variants...")
     const combinedVariants: Array<{name: string, price?: string, originalPrice?: string, image?: string}> = []
     
-    // Pattern 1: Look for dimensionValuesDisplayData with combined size+color names
-    const combinedDimMatch = htmlContent.match(/dimensionValuesDisplayData\s*[:=]\s*(\{[\s\S]*?\})\s*[,;]/i)
-    if (combinedDimMatch) {
+    // Common color names for validation
+    const colorNames = ['stainless', 'steel', 'charcoal', 'turquoise', 'black', 'red', 'white', 'silver', 'gray', 'grey', 'blue', 'green', 'pink', 'purple', 'orange', 'yellow', 'brown', 'gold', 'rose', 'cream', 'ivory', 'navy', 'teal', 'coral', 'burgundy', 'maroon', 'beige', 'bronze', 'copper', 'nickel', 'chrome', 'matte', 'brushed']
+    
+    // Pattern 1: Look for size_name in variation_values (most reliable for Crock-Pot style products)
+    const sizeNamePattern = /["']size_name["']\s*:\s*\[([^\]]+)\]/gi
+    let sizeNameMatch
+    while ((sizeNameMatch = sizeNamePattern.exec(htmlContent)) !== null) {
       try {
-        const dimDataStr = combinedDimMatch[1]
-        // Match patterns like "7 Quarts Stainless Steel", "8 Quarts Black", etc.
-        const combinedPatterns = [
-          // Size + Color pattern (e.g., "7 Quarts Stainless Steel")
-          /"(\d+\s*(?:Quarts?|Qt|Liters?|L|Gallons?|oz)\s+[A-Za-z\s]+)"/gi,
-          // Color + Size pattern
-          /"([A-Za-z]+\s+\d+\s*(?:Quarts?|Qt|Liters?|L|Gallons?|oz))"/gi,
-        ]
-        
-        for (const pattern of combinedPatterns) {
-          let match
-          while ((match = pattern.exec(dimDataStr)) !== null) {
-            const variantName = match[1].trim()
-            // Filter out invalid entries
+        const sizeList = sizeNameMatch[1]
+        const sizeValues = sizeList.match(/"([^"]+)"/g)
+        if (sizeValues) {
+          for (const sv of sizeValues) {
+            const variantName = sv.replace(/"/g, '').trim()
+            // Validate it looks like "X Quarts Color" pattern
+            const hasSize = /\d+\s*(?:Quarts?|Qt|Liters?|L|Gallons?|oz)/i.test(variantName)
+            const hasColor = colorNames.some(c => variantName.toLowerCase().includes(c))
+            
             if (variantName && 
-                variantName.length >= 5 && 
+                hasSize && 
+                hasColor &&
+                variantName.length >= 8 && 
                 variantName.length <= 50 &&
                 !combinedVariants.find(v => v.name.toLowerCase() === variantName.toLowerCase())) {
               combinedVariants.push({ name: variantName })
-              log(`[v0] ✅ Found combined variant: ${variantName}`)
+              log(`[v0] ✅ Found combined variant from size_name: ${variantName}`)
             }
           }
         }
       } catch (e) {
-        log(`[v0] ⚠️ Error parsing combined variants: ${e}`)
+        log(`[v0] ⚠️ Error parsing size_name: ${e}`)
       }
     }
     
-    // Pattern 2: Look for twister button titles with combined size+color
+    // Pattern 2: Look for dimensionValuesDisplayData with combined size+color names
+    if (combinedVariants.length === 0) {
+      const combinedDimMatch = htmlContent.match(/dimensionValuesDisplayData\s*[:=]\s*(\{[\s\S]*?\})\s*[,;]/i)
+      if (combinedDimMatch) {
+        try {
+          const dimDataStr = combinedDimMatch[1]
+          // Match patterns like "7 Quarts Stainless Steel", "8 Quarts Black", etc.
+          const combinedPatterns = [
+            // Size + Color pattern (e.g., "7 Quarts Stainless Steel")
+            /"(\d+\s*(?:Quarts?|Qt|Liters?|L|Gallons?|oz)\s+[A-Za-z\s]+)"/gi,
+            // Color + Size pattern
+            /"([A-Za-z]+\s+\d+\s*(?:Quarts?|Qt|Liters?|L|Gallons?|oz))"/gi,
+          ]
+          
+          for (const pattern of combinedPatterns) {
+            let match
+            while ((match = pattern.exec(dimDataStr)) !== null) {
+              const variantName = match[1].trim()
+              const hasColor = colorNames.some(c => variantName.toLowerCase().includes(c))
+              // Filter out invalid entries
+              if (variantName && 
+                  hasColor &&
+                  variantName.length >= 8 && 
+                  variantName.length <= 50 &&
+                  !combinedVariants.find(v => v.name.toLowerCase() === variantName.toLowerCase())) {
+                combinedVariants.push({ name: variantName })
+                log(`[v0] ✅ Found combined variant: ${variantName}`)
+              }
+            }
+          }
+        } catch (e) {
+          log(`[v0] ⚠️ Error parsing combined variants: ${e}`)
+        }
+      }
+    }
+    
+    // Pattern 3: Look for twister button titles with combined size+color
     if (combinedVariants.length === 0) {
       const twisterCombinedPatterns = [
-        // Twister button with title containing size and color
-        /<li[^>]*class=["'][^"']*twisterSlotDiv[^"']*["'][^>]*>[\s\S]*?title=["']([^"']+)["']/gi,
-        // Button title attribute
+        // Twister li with data-defaultasin and title
+        /<li[^>]*data-defaultasin[^>]*title=["']([^"']+)["']/gi,
+        // Button title attribute with size pattern
         /<button[^>]*title=["'](?:Click to select\s*)?(\d+\s*(?:Quarts?|Qt)\s+[A-Za-z\s]+)["']/gi,
+        // Span with twister text
+        /<span[^>]*class=["'][^"']*a-size-base[^"']*["'][^>]*>(\d+\s*(?:Quarts?|Qt)\s+[A-Za-z\s]+)<\/span>/gi,
       ]
       
       for (const pattern of twisterCombinedPatterns) {
@@ -3948,10 +3987,14 @@ async function extractWithoutAI(
           let variantName = decodeHtmlEntities((match[1] || '').trim())
           variantName = variantName.replace(/^Click to select\s*/i, '').trim()
           
+          const hasSize = /\d+\s*(?:Quarts?|Qt|L|Liters?)/i.test(variantName)
+          const hasColor = colorNames.some(c => variantName.toLowerCase().includes(c))
+          
           // Validate it's a combined size+color pattern
           if (variantName && 
-              /\d+\s*(?:Quarts?|Qt|L|Liters?)/i.test(variantName) &&
-              variantName.length >= 5 && 
+              hasSize &&
+              hasColor &&
+              variantName.length >= 8 && 
               variantName.length <= 50 &&
               !combinedVariants.find(v => v.name.toLowerCase() === variantName.toLowerCase())) {
             combinedVariants.push({ name: variantName })
@@ -3961,22 +4004,25 @@ async function extractWithoutAI(
       }
     }
     
-    // Pattern 3: Extract from variant dropdown/selection data
+    // Pattern 4: Extract from asinVariationValues or similar JavaScript objects
     if (combinedVariants.length === 0) {
-      const variantDataPattern = /"variation_values"\s*:\s*\{[^}]*"size_name"\s*:\s*\[([^\]]+)\]/i
-      const variantMatch = htmlContent.match(variantDataPattern)
-      if (variantMatch) {
-        const sizeNames = variantMatch[1].match(/"([^"]+)"/g)
-        if (sizeNames) {
-          for (const sn of sizeNames) {
-            const variantName = sn.replace(/"/g, '').trim()
-            // Check if it's a combined variant (has both size number and color word)
+      const asinVariantPattern = /asinVariationValues\s*[:=]\s*\{([^}]+(?:\{[^}]*\}[^}]*)*)\}/i
+      const asinMatch = htmlContent.match(asinVariantPattern)
+      if (asinMatch) {
+        // Look for size_name values in the object
+        const sizeMatches = asinMatch[1].match(/["']size_name["']\s*:\s*["']([^"']+)["']/gi)
+        if (sizeMatches) {
+          for (const sm of sizeMatches) {
+            const variantName = sm.replace(/["']size_name["']\s*:\s*["']/i, '').replace(/["']$/, '').trim()
+            const hasColor = colorNames.some(c => variantName.toLowerCase().includes(c))
+            
             if (variantName && 
-                /\d+\s*(?:Quarts?|Qt|L)/i.test(variantName) &&
-                /[A-Za-z]{3,}/.test(variantName.replace(/\d+\s*(?:Quarts?|Qt|L)/i, '')) &&
+                hasColor &&
+                variantName.length >= 8 && 
+                variantName.length <= 50 &&
                 !combinedVariants.find(v => v.name.toLowerCase() === variantName.toLowerCase())) {
               combinedVariants.push({ name: variantName })
-              log(`[v0] ✅ Found combined variant from variation_values: ${variantName}`)
+              log(`[v0] ✅ Found combined variant from asinVariationValues: ${variantName}`)
             }
           }
         }
