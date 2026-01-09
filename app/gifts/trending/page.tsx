@@ -767,7 +767,7 @@ export default function TrendingGiftsPage() {
                   {/* Badge container - always rendered for consistent layout alignment */}
                   <div className="flex flex-wrap gap-1.5 mb-2 min-h-[20px]">
                     {gift.amazonChoice && (
-                      <span className="bg-[#FFFFFF] text-[#232F3E] text-[10px] font-bold px-2 py-0.5 rounded-full border border-[#232F3E] shadow-sm">
+                      <span className="bg-[#FFFFFF] text-black text-[10px] font-bold px-2 py-0.5 rounded-full border border-black shadow-sm">
                         Overall Pick
                       </span>
                     )}
@@ -1134,7 +1134,7 @@ export default function TrendingGiftsPage() {
                       {/* Badge container - always rendered for consistent layout alignment */}
                       <div className="flex gap-1.5 min-h-[20px]">
                         {gift.amazonChoice && (
-                          <span className="bg-[#FFFFFF] text-[#232F3E] text-[10px] font-bold px-2 py-0.5 rounded-full border border-[#232F3E] shadow-sm">
+                          <span className="bg-[#FFFFFF] text-black text-[10px] font-bold px-2 py-0.5 rounded-full border border-black shadow-sm">
                             Overall Pick
                           </span>
                         )}
