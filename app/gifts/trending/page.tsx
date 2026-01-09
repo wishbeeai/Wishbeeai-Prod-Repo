@@ -628,7 +628,7 @@ export default function TrendingGiftsPage() {
                   className="w-full px-3 py-2 rounded-lg border-2 border-[#DAA520]/20 focus:border-[#DAA520] focus:outline-none bg-white text-[#654321] text-sm"
                 >
                   <option value="all">All Products</option>
-                  <option value="amazon-choice">Amazon's Choice</option>
+                  <option value="amazon-choice">Overall Pick</option>
                   <option value="best-seller">Best Seller</option>
                   <option value="on-sale">On Sale</option>
                 </select>
@@ -767,8 +767,8 @@ export default function TrendingGiftsPage() {
                   {/* Badge container - always rendered for consistent layout alignment */}
                   <div className="flex flex-wrap gap-1.5 mb-2 min-h-[20px]">
                     {gift.amazonChoice && (
-                      <span className="bg-[#232F3E] text-[#FFFFFF] text-[10px] font-bold px-2 py-0.5 rounded-full">
-                        Amazon's Choice
+                      <span className="bg-[#FFFFFF] text-[#232F3E] text-[10px] font-bold px-2 py-0.5 rounded-full border border-[#232F3E] shadow-sm">
+                        Overall Pick
                       </span>
                     )}
                     {gift.bestSeller && (
@@ -1134,8 +1134,8 @@ export default function TrendingGiftsPage() {
                       {/* Badge container - always rendered for consistent layout alignment */}
                       <div className="flex gap-1.5 min-h-[20px]">
                         {gift.amazonChoice && (
-                          <span className="bg-[#232F3E] text-[#FFFFFF] text-[10px] font-bold px-2 py-0.5 rounded-full">
-                            Amazon's Choice
+                          <span className="bg-[#FFFFFF] text-[#232F3E] text-[10px] font-bold px-2 py-0.5 rounded-full border border-[#232F3E] shadow-sm">
+                            Overall Pick
                           </span>
                         )}
                         {gift.bestSeller && (
