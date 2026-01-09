@@ -59,7 +59,7 @@ export function TrendingGifts() {
           </h2>
           <p className="text-xs sm:text-sm md:text-base text-black font-medium mb-3">See what others are giving</p>
 
-          <Link href="/gifts/browse" className="inline-block">
+          <Link href="/gifts/trending" className="inline-block">
             <Button className="bg-gradient-to-r from-[#DAA520] to-[#FFD700] hover:from-[#B8860B] hover:to-[#DAA520] text-white shadow-lg hover:shadow-xl transition-all hover:scale-105 border-2 border-amber-400 hover:border-amber-400 hover:-translate-y-2">
               View All Gifts
               <ArrowRight className="w-4 h-4 ml-2" />

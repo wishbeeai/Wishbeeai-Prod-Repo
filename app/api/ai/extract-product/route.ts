@@ -414,6 +414,8 @@ async function extractWithoutAI(
     stockStatus: "Unknown",
     rating: null,
     reviewCount: null,
+    amazonChoice: false,
+    bestSeller: false,
     attributes: {
       brand: null,
       color: null,
@@ -3515,6 +3517,271 @@ async function extractWithoutAI(
     }
   }
   
+  // Extract ALL available size options from HTML (for Amazon and other stores)
+  // This extracts all options, not just the selected one
+  // For kitchen appliances, size options might be capacity values (e.g., "3 Quart", "6 Quart", "8 Quart")
+  const allSizeOptions: string[] = []
+  
+  if (htmlContent && hostname.includes('amazon.com')) {
+    // Pattern 1: Extract from Amazon's native dropdown - most reliable method
+    // Amazon uses specific IDs like "native_dropdown_selected_size_name" or "size_name"
+    const amazonSizeSelectPatterns = [
+      /<select[^>]*(?:id|name)=["']native_dropdown_selected_size_name["'][^>]*>([\s\S]*?)<\/select>/i,
+      /<select[^>]*(?:id|name)=["'][^"']*size[^"']*name[^"']*["'][^>]*>([\s\S]*?)<\/select>/i,
+      /<select[^>]*(?:id|name)=["'][^"']*native_dropdown[^"']*["'][^>]*>([\s\S]*?)<\/select>/i,
+      /<select[^>]*class=["'][^"']*native_dropdown[^"']*["'][^>]*>([\s\S]*?)<\/select>/i,
+    ]
+    
+    for (const selectPattern of amazonSizeSelectPatterns) {
+      const selectMatch = htmlContent.match(selectPattern)
+      if (selectMatch && selectMatch[1]) {
+        const optionsHtml = selectMatch[1]
+        console.log(`[v0] Found select dropdown, checking options...`)
+        const optionPattern = /<option[^>]*value=["']([^"']+)["'][^>]*>([^<]+)<\/option>/gi
+        let optionMatch
+        while ((optionMatch = optionPattern.exec(optionsHtml)) !== null) {
+          const value = optionMatch[1].trim()
+          const text = optionMatch[2].trim()
+          console.log(`[v0] Found option - value: "${value}", text: "${text}"`)
+          // Skip placeholder options
+          if (value && text && 
+              !text.match(/^(choose|select|please|--|none|select a|pick a|select an|please select|select size)/i) &&
+              !value.match(/^(choose|select|please|--|none|select a|pick a|select an|please select|select size)/i) &&
+              text.length > 0 && text.length < 100 &&
+              value.length > 0 && value.length < 100) {
+            // Prefer text over value, but use value if text is empty
+            const size = text || value
+            // Normalize: ensure "Quart" or "Quarts" format
+            let normalizedSize = size
+            // If it contains a number and "quart" (case insensitive), normalize it
+            if (size.match(/\d+\s*(?:quart|qt|q)/i)) {
+              // Extract number and unit
+              const match = size.match(/(\d+)\s*(quart|qt|q)(s?)/i)
+              if (match) {
+                const num = match[1]
+                const unit = match[2].toLowerCase() === 'q' ? 'Quart' : (match[2].toLowerCase() === 'qt' ? 'Quart' : 'Quart')
+                const plural = match[3] || 's' // Default to plural
+                normalizedSize = `${num} ${unit}${plural}`
+              }
+            }
+            if (normalizedSize && !allSizeOptions.includes(normalizedSize)) {
+              allSizeOptions.push(normalizedSize)
+              console.log(`[v0] Added size option: "${normalizedSize}"`)
+            }
+          }
+        }
+        // If we found options from native dropdown, use them (most reliable)
+        if (allSizeOptions.length > 0) {
+          console.log(`[v0] ✅ Found ${allSizeOptions.length} size options from Amazon native dropdown:`, allSizeOptions)
+          break
+        }
+      }
+    }
+    
+    // Pattern 2: If native dropdown didn't work, try all select elements
+    if (allSizeOptions.length === 0) {
+      const allSelectPattern = /<select[^>]*>([\s\S]*?)<\/select>/gi
+      let selectMatch
+      while ((selectMatch = allSelectPattern.exec(htmlContent)) !== null) {
+        const optionsHtml = selectMatch[1]
+        // Check if this select contains size-related options (has multiple options and contains size indicators)
+        const optionCount = (optionsHtml.match(/<option/gi) || []).length
+        if (optionCount > 2 && (optionsHtml.toLowerCase().includes('quart') || 
+            optionsHtml.toLowerCase().includes('size') || 
+            optionsHtml.match(/\d+\s*(?:quart|qt|q|oz|ounce)/i))) {
+          const optionPattern = /<option[^>]*value=["']([^"']+)["'][^>]*>([^<]+)<\/option>/gi
+          let optionMatch
+          while ((optionMatch = optionPattern.exec(optionsHtml)) !== null) {
+            const value = optionMatch[1].trim()
+            const text = optionMatch[2].trim()
+            // Skip placeholder options
+            if (value && text && 
+                !text.match(/^(choose|select|please|--|none|select a|pick a|select an|please select|select size)/i) &&
+                !value.match(/^(choose|select|please|--|none|select a|pick a|select an|please select|select size)/i) &&
+                text.length > 0 && text.length < 100 &&
+                value.length > 0 && value.length < 100) {
+              let size = text || value
+              // Normalize: ensure "Quart" or "Quarts" format
+              if (size.match(/\d+\s*(?:quart|qt|q)/i)) {
+                const match = size.match(/(\d+)\s*(quart|qt|q)(s?)/i)
+                if (match) {
+                  const num = match[1]
+                  const unit = match[2].toLowerCase() === 'q' ? 'Quart' : (match[2].toLowerCase() === 'qt' ? 'Quart' : 'Quart')
+                  const plural = match[3] || 's' // Default to plural
+                  size = `${num} ${unit}${plural}`
+                }
+              }
+              if (size && !allSizeOptions.includes(size)) {
+                allSizeOptions.push(size)
+                console.log(`[v0] Added size option from fallback select: "${size}"`)
+              }
+            }
+          }
+          // If we found multiple valid options, use them
+          if (allSizeOptions.length > 1) {
+            console.log(`[v0] ✅ Found ${allSizeOptions.length} size options from select element`)
+            break
+          }
+        }
+      }
+    }
+    
+    // Pattern 2: Extract from Amazon's JavaScript variant data structures
+    // Amazon stores variant data in various JavaScript objects
+    if (allSizeOptions.length === 0) {
+      try {
+        // Look for twister-js-init-data or similar Amazon variant data
+        const twisterDataPatterns = [
+          /<script[^>]*id=["']twister-js-init-data["'][^>]*>([\s\S]{0,100000})<\/script>/i,
+          /twister-js-init-data[^>]*>([\s\S]{0,100000})<\/script>/i,
+          /var\s+twisterData\s*=\s*({[\s\S]{0,100000}?});/i,
+        ]
+        
+        for (const twisterDataPattern of twisterDataPatterns) {
+          const twisterMatch = htmlContent.match(twisterDataPattern)
+          if (twisterMatch && twisterMatch[1]) {
+            const twisterData = twisterMatch[1]
+            console.log(`[v0] Found twister data, length: ${twisterData.length}`)
+            
+            // Try to parse as JSON if it looks like JSON
+            try {
+              let variantData: any = null
+              // Try to extract JSON object
+              const jsonMatch = twisterData.match(/\{[\s\S]*\}/)
+              if (jsonMatch) {
+                variantData = JSON.parse(jsonMatch[0])
+              }
+              
+              if (variantData && variantData.dimensionValuesDisplayData) {
+                // Extract size dimension values
+                const sizeDimension = variantData.dimensionValuesDisplayData.size_name || 
+                                     variantData.dimensionValuesDisplayData.size ||
+                                     variantData.dimensionValuesDisplayData.dimension1
+                
+                if (sizeDimension && typeof sizeDimension === 'object') {
+                  Object.keys(sizeDimension).forEach(key => {
+                    const option = sizeDimension[key]
+                    if (option && option.displayName) {
+                      let displayName = option.displayName.trim()
+                      // Normalize: ensure "Quart" or "Quarts" format
+                      if (displayName.match(/\d+\s*(?:quart|qt|q)/i)) {
+                        const match = displayName.match(/(\d+)\s*(quart|qt|q)(s?)/i)
+                        if (match) {
+                          const num = match[1]
+                          const unit = match[2].toLowerCase() === 'q' ? 'Quart' : (match[2].toLowerCase() === 'qt' ? 'Quart' : 'Quart')
+                          const plural = match[3] || 's' // Default to plural
+                          displayName = `${num} ${unit}${plural}`
+                        }
+                      }
+                      if (displayName && displayName.length > 0 && displayName.length < 100) {
+                        if (!displayName.match(/^(choose|select|please|--|none)$/i) && !allSizeOptions.includes(displayName)) {
+                          allSizeOptions.push(displayName)
+                          console.log(`[v0] Added size option from variant data: "${displayName}"`)
+                        }
+                      }
+                    }
+                  })
+                }
+              }
+            } catch (jsonError) {
+              // If JSON parsing fails, use regex patterns
+              console.log(`[v0] JSON parsing failed, using regex: ${jsonError}`)
+              
+              // Extract dimensionValuesDisplayData using regex
+              const dimensionValuesPattern = /"dimensionValuesDisplayData"\s*:\s*\{([\s\S]{0,50000}?)\}/i
+              const dimMatch = twisterData.match(dimensionValuesPattern)
+              if (dimMatch && dimMatch[1]) {
+                const dimData = dimMatch[1]
+                // Look for size_name dimension
+                const sizeNamePattern = /"size_name"\s*:\s*\{([\s\S]{0,10000}?)\}/i
+                const sizeNameMatch = dimData.match(sizeNamePattern)
+                if (sizeNameMatch && sizeNameMatch[1]) {
+                  const sizeData = sizeNameMatch[1]
+                  // Extract all displayName values
+                  const displayNamePattern = /"displayName"\s*:\s*"([^"]+)"/gi
+                  let displayMatch
+                  while ((displayMatch = displayNamePattern.exec(sizeData)) !== null) {
+                    let displayName = displayMatch[1]?.trim()
+                    // Normalize: ensure "Quart" or "Quarts" format
+                    if (displayName && displayName.match(/\d+\s*(?:quart|qt|q)/i)) {
+                      const match = displayName.match(/(\d+)\s*(quart|qt|q)(s?)/i)
+                      if (match) {
+                        const num = match[1]
+                        const unit = match[2].toLowerCase() === 'q' ? 'Quart' : (match[2].toLowerCase() === 'qt' ? 'Quart' : 'Quart')
+                        const plural = match[3] || 's' // Default to plural
+                        displayName = `${num} ${unit}${plural}`
+                      }
+                    }
+                    if (displayName && displayName.length > 0 && displayName.length < 100) {
+                      if (!displayName.match(/^(choose|select|please|--|none)$/i) && !allSizeOptions.includes(displayName)) {
+                        allSizeOptions.push(displayName)
+                        console.log(`[v0] Added size option from regex: "${displayName}"`)
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            
+            if (allSizeOptions.length > 0) {
+              console.log(`[v0] ✅ Found ${allSizeOptions.length} size options from twister data`)
+              break
+            }
+          }
+        }
+      } catch (e) {
+        console.log("[v0] Error parsing JavaScript variant data:", e)
+      }
+    }
+    
+    // Pattern 3: Extract from HTML buttons/swatches with size values
+    const buttonSizePattern = /<[^>]*(?:button|span|div|a)[^>]*(?:data-value|data-size|data-dimension|aria-label|title)=["']([^"']+)["'][^>]*>/gi
+    let buttonMatch
+    while ((buttonMatch = buttonSizePattern.exec(htmlContent)) !== null) {
+      const value = buttonMatch[1]?.trim()
+      if (value && value.length > 0 && value.length < 100) {
+        if (!value.match(/^(choose|select|please|--|none)$/i) && !allSizeOptions.includes(value)) {
+          allSizeOptions.push(value)
+        }
+      }
+    }
+    
+    // Pattern 4: Extract from text patterns that show all available sizes (e.g., "3 Quart, 6 Quart, 8 Quart")
+    // This is useful for kitchen appliances where capacity is shown as size options
+    const productCategory = productData.category?.toLowerCase() || ''
+    if (productCategory.includes('kitchen') || productCategory.includes('appliance') || productData.productName?.toLowerCase().includes('instant pot') || productData.productName?.toLowerCase().includes('pressure cooker')) {
+      const sizeListPattern = /(?:size|capacity|available)[^>]*>([^<]*(?:\d+\s*(?:quart|qt|q)[^<]*(?:,|and|or)[^<]*(?:\d+\s*(?:quart|qt|q))[^<]*))</i
+      const sizeListMatch = htmlContent.match(sizeListPattern)
+      if (sizeListMatch && sizeListMatch[1]) {
+        const sizeList = sizeListMatch[1]
+        const sizeValues = sizeList.split(/,|and|or/).map(s => s.trim()).filter(s => s.match(/\d+\s*(?:quart|qt|q)/i))
+        sizeValues.forEach(size => {
+          if (!allSizeOptions.includes(size)) {
+            allSizeOptions.push(size)
+          }
+        })
+      }
+    }
+    
+    // Remove duplicates and clean up
+    const uniqueSizeOptions = [...new Set(allSizeOptions)].filter(opt => opt && opt.length > 0)
+    
+    // If we found size options, set them as an array
+    if (uniqueSizeOptions.length > 0) {
+      // Sort by numeric value if they contain numbers (e.g., "3 Quart", "6 Quart", "8 Quart")
+      uniqueSizeOptions.sort((a, b) => {
+        const aNum = parseInt(a.match(/\d+/)?.[0] || '0')
+        const bNum = parseInt(b.match(/\d+/)?.[0] || '0')
+        if (aNum !== 0 && bNum !== 0) {
+          return aNum - bNum
+        }
+        return a.localeCompare(b)
+      })
+      productData.attributes.size = uniqueSizeOptions
+      console.log(`[v0] ✅ Extracted ${uniqueSizeOptions.length} size options:`, uniqueSizeOptions)
+    }
+  }
+  
   // Extract size from HTML - category-specific
   if (!productData.attributes.size && htmlContent) {
     // For drinkware, extract capacity (ounces) instead of clothing sizes
@@ -3795,29 +4062,10 @@ async function extractWithoutAI(
   if (htmlContent) {
     const category = productData.category.toLowerCase()
     
-    // Kitchen Appliances: Capacity, Features
+    // Kitchen Appliances: Features
     if (category.includes('kitchen') || category.includes('appliance')) {
-      // Extract capacity
-      if (!productData.attributes.capacity) {
-        const capacityPatterns = [
-          /capacity["']?\s*[:=]\s*["']?([^"',\n]+(?:L|ml|liter|gallon|cup|oz)[^"',\n]*)["']?/i,
-          /(?:water\s*tank|tank\s*capacity|capacity)[^>]*>([^<]+(?:L|ml|liter|gallon|cup|oz)[^<]*)</i,
-          /(\d+(?:\.\d+)?\s*(?:L|ml|liter|gallon|cup|oz))\s*(?:water|tank|capacity)/i,
-        ]
-        
-        for (const pattern of capacityPatterns) {
-          const match = htmlContent.match(pattern)
-          if (match && match[1]) {
-            const capacity = match[1].trim()
-            if (capacity && capacity.length < 50) {
-              productData.attributes.capacity = decodeHtmlEntities(capacity)
-              console.log("[v0] Extracted capacity for Kitchen Appliance:", productData.attributes.capacity)
-              break
-            }
-          }
-        }
-      }
-      
+      // Note: Size options (including capacity values like "3 Quart", "6 Quart", "8 Quart") 
+      // are already extracted in the size extraction logic above
       
       // Extract features (if not already extracted)
       if (!productData.attributes.features) {
@@ -5437,6 +5685,94 @@ async function extractWithoutAI(
         }
       }
       
+      // Extract Amazon Choice and Best Seller badges
+      log("[v0] 🔍 Extracting Amazon Choice and Best Seller badges...")
+      
+      // Amazon Choice badge patterns - comprehensive patterns for Amazon HTML structure
+      const amazonChoicePatterns = [
+        // Specific Amazon badge IDs and classes
+        /<span[^>]*id=["']ac-badge[^>]*>[\s\S]*?Amazon['"]?\s*Choice/i,
+        /<span[^>]*id=["']acBadge[^>]*>[\s\S]*?Amazon['"]?\s*Choice/i,
+        /<span[^>]*class=["'][^"']*ac-badge[^"']*["'][^>]*>[\s\S]*?Amazon['"]?\s*Choice/i,
+        /<span[^>]*class=["'][^"']*acBadge[^"']*["'][^>]*>[\s\S]*?Amazon['"]?\s*Choice/i,
+        /<div[^>]*id=["']ac-badge[^>]*>[\s\S]*?Amazon['"]?\s*Choice/i,
+        /<div[^>]*id=["']acBadge[^>]*>[\s\S]*?Amazon['"]?\s*Choice/i,
+        /<div[^>]*class=["'][^"']*ac-badge[^"']*["'][^>]*>[\s\S]*?Amazon['"]?\s*Choice/i,
+        /<div[^>]*class=["'][^"']*acBadge[^"']*["'][^>]*>[\s\S]*?Amazon['"]?\s*Choice/i,
+        // Data attributes
+        /data-a-badge-type=["']ac-badge["']/i,
+        /data-a-badge-type=["']acBadge["']/i,
+        /data-a-badge=["']ac-badge["']/i,
+        // Aria labels
+        /<span[^>]*aria-label=["'][^"']*Amazon['"]?\s*Choice[^"']*["']/i,
+        /<div[^>]*aria-label=["'][^"']*Amazon['"]?\s*Choice[^"']*["']/i,
+        // Text content patterns (more flexible)
+        /Amazon['"]?\s*Choice/i,
+        // JavaScript data patterns
+        /"acBadge":\s*true/i,
+        /"ac-badge":\s*true/i,
+        /acBadge["']?\s*:\s*["']?true/i,
+      ]
+      
+      let foundAmazonChoice = false
+      for (const pattern of amazonChoicePatterns) {
+        if (pattern.test(htmlContent)) {
+          productData.amazonChoice = true
+          foundAmazonChoice = true
+          log("[v0] ✅ Found Amazon Choice badge")
+          break
+        }
+      }
+      
+      if (!foundAmazonChoice) {
+        log("[v0] ⚠️ Amazon Choice badge not found")
+      }
+      
+      // Best Seller badge patterns - comprehensive patterns for Amazon HTML structure
+      const bestSellerPatterns = [
+        // Specific Amazon badge IDs and classes
+        /<span[^>]*id=["']best-seller-badge[^>]*>[\s\S]*?Best\s*Seller/i,
+        /<span[^>]*id=["']bestSellerBadge[^>]*>[\s\S]*?Best\s*Seller/i,
+        /<span[^>]*id=["']bestseller-badge[^>]*>[\s\S]*?Best\s*Seller/i,
+        /<span[^>]*class=["'][^"']*best-seller[^"']*["'][^>]*>[\s\S]*?Best\s*Seller/i,
+        /<span[^>]*class=["'][^"']*bestSeller[^"']*["'][^>]*>[\s\S]*?Best\s*Seller/i,
+        /<span[^>]*class=["'][^"']*bestseller[^"']*["'][^>]*>[\s\S]*?Best\s*Seller/i,
+        /<div[^>]*id=["']best-seller-badge[^>]*>[\s\S]*?Best\s*Seller/i,
+        /<div[^>]*id=["']bestSellerBadge[^>]*>[\s\S]*?Best\s*Seller/i,
+        /<div[^>]*class=["'][^"']*best-seller[^"']*["'][^>]*>[\s\S]*?Best\s*Seller/i,
+        /<div[^>]*class=["'][^"']*bestSeller[^"']*["'][^>]*>[\s\S]*?Best\s*Seller/i,
+        // Data attributes
+        /data-a-badge-type=["']best-seller["']/i,
+        /data-a-badge-type=["']bestSeller["']/i,
+        /data-a-badge=["']best-seller["']/i,
+        // Aria labels
+        /<span[^>]*aria-label=["'][^"']*Best\s*Seller[^"']*["']/i,
+        /<div[^>]*aria-label=["'][^"']*Best\s*Seller[^"']*["']/i,
+        // Text content patterns (more flexible)
+        /Best\s*Seller/i,
+        /#1\s*Best\s*Seller/i,
+        /#1\s*Bestseller/i,
+        /#1\s*Best\s*Seller/i,
+        // JavaScript data patterns
+        /"bestSeller":\s*true/i,
+        /"best-seller":\s*true/i,
+        /bestSeller["']?\s*:\s*["']?true/i,
+      ]
+      
+      let foundBestSeller = false
+      for (const pattern of bestSellerPatterns) {
+        if (pattern.test(htmlContent)) {
+          productData.bestSeller = true
+          foundBestSeller = true
+          log("[v0] ✅ Found Best Seller badge")
+          break
+        }
+      }
+      
+      if (!foundBestSeller) {
+        log("[v0] ⚠️ Best Seller badge not found")
+      }
+      
       // Pattern 0.5: Look for rating and review count together in aria-label (fallback)
       if ((!productData.rating || !productData.reviewCount)) {
         const ariaLabelPatterns = [
@@ -6624,6 +6960,8 @@ Return ONLY valid JSON, no markdown, no explanation.`
             stockStatus: "Unknown",
             rating: null,
             reviewCount: null,
+            amazonChoice: false,
+            bestSeller: false,
             attributes: {
               brand: null,
               color: null,

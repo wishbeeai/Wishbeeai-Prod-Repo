@@ -23,7 +23,6 @@ import {
   Loader2,
   Heart,
   ExternalLink,
-  ShoppingBag,
 } from "lucide-react"
 import { toast } from "sonner"
 import {
@@ -42,6 +41,7 @@ import {
 } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
 import Link from "next/link"
 
 interface AffiliateProduct {
@@ -88,47 +88,6 @@ export default function AdminAffiliateProductsPage() {
   const [tempRatingValue, setTempRatingValue] = useState<string>("")
   const [tempReviewCountValue, setTempReviewCountValue] = useState<string>("")
   const [addingToWishlist, setAddingToWishlist] = useState<string | null>(null)
-  const [isOptionModalOpen, setIsOptionModalOpen] = useState(false)
-  const [selectedProductForWishlist, setSelectedProductForWishlist] = useState<AffiliateProduct | null>(null)
-  const [productOptions, setProductOptions] = useState<any>(null)
-  const [isLoadingOptions, setIsLoadingOptions] = useState(false)
-  const [selectedOptions, setSelectedOptions] = useState<{
-    size?: string
-    color?: string
-    quantity?: number
-    [key: string]: any
-  }>({ quantity: 1 })
-  
-  // Map of attribute labels for better display
-  const attributeLabels: { [key: string]: string } = {
-    size: "Size",
-    color: "Color",
-    material: "Material",
-    type: "Type",
-    width: "Width",
-    capacity: "Capacity",
-    fitType: "Fit Type",
-    heelHeight: "Heel Height",
-    model: "Model",
-    offerType: "Offer Type",
-    kindleUnlimited: "Kindle Unlimited",
-    energyRating: "Energy Rating",
-    ageRange: "Age Range",
-    author: "Author",
-    publisher: "Publisher",
-    pageCount: "Page Count",
-    isbn: "ISBN",
-    gemstone: "Gemstone",
-    caratWeight: "Carat Weight",
-    dimensions: "Dimensions",
-    weight: "Weight",
-    assembly: "Assembly Required",
-    seatDepth: "Seat Depth",
-    seatHeight: "Seat Height",
-    weightLimit: "Weight Limit",
-    seatingCapacity: "Seating Capacity",
-    style: "Style",
-  }
   const [formData, setFormData] = useState({
     productName: "",
     image: "",
@@ -254,6 +213,8 @@ export default function AdminAffiliateProductsPage() {
       originalPrice: product.originalPrice || null,
       productLink: product.productLink || "",
       brand: null, // Will be extracted if needed
+      amazonChoice: product.amazonChoice || false,
+      bestSeller: product.bestSeller || false,
     })
     setIsEditModalOpen(true)
   }
@@ -361,6 +322,8 @@ export default function AdminAffiliateProductsPage() {
           rating: ratingValue,
           reviewCount: reviewCountValue,
           brand: extracted.attributes?.brand || extracted.brand || null,
+          amazonChoice: extracted.amazonChoice || false,
+          bestSeller: extracted.bestSeller || false,
         })
         
         // Auto-fill form fields with extracted data
@@ -428,154 +391,47 @@ export default function AdminAffiliateProductsPage() {
 
   const handleAddToWishlist = async (product: AffiliateProduct) => {
     if (!user) {
-      toast.error("Please log in to add items to your wishlist")
+      toast.error("Please log in to add products to trending gifts")
       return
     }
 
-    // Open option selection modal
-    setSelectedProductForWishlist(product)
-    setIsOptionModalOpen(true)
-    
-    // Fetch product options from URL
-    setIsLoadingOptions(true)
+    setAddingToWishlist(product.id)
     try {
-      const response = await fetch("/api/ai/extract-product", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ productUrl: product.productLink }),
-      })
+      const description = `${product.productName} from ${product.source}`
 
-      if (response.ok) {
-        const data = await response.json()
-        const extracted = data.productData || data
-        
-        // Extract all available attributes from the product
-        const attributes: { [key: string]: any } = {}
-        
-        // Get all attributes from the extracted data
-        if (extracted.attributes) {
-          // Filter out null/undefined/empty values and collect all available attributes
-          Object.keys(extracted.attributes).forEach((key) => {
-            const value = extracted.attributes[key]
-            if (value !== null && value !== undefined && value !== '') {
-              // For attributes that might be arrays or single values
-              if (Array.isArray(value) && value.length > 0) {
-                // Convert array items to strings if they're objects
-                attributes[key] = value.map((item: any) => {
-                  if (typeof item === 'object' && item !== null) {
-                    // If it's an object, try to extract a meaningful string representation
-                    return item.label || item.name || item.value || JSON.stringify(item)
-                  }
-                  return String(item)
-                })
-              } else if (typeof value === 'string' && value.trim() !== '') {
-                attributes[key] = [value] // Convert single value to array for consistency
-              } else if (typeof value === 'number') {
-                attributes[key] = [value.toString()]
-              } else if (typeof value === 'object' && value !== null) {
-                // Handle object values (e.g., {label: "Small", value: "S"})
-                const objValue = value.label || value.name || value.value || JSON.stringify(value)
-                if (objValue) {
-                  attributes[key] = [String(objValue)]
-                }
-              }
-            }
-          })
-        }
-        
-        // Also check for legacy size/color arrays
-        if (extracted.sizes && extracted.sizes.length > 0) {
-          attributes.size = extracted.sizes
-        }
-        if (extracted.colors && extracted.colors.length > 0) {
-          attributes.color = extracted.colors
-        }
-        
-        // If we have variants, extract them
-        if (extracted.variants && Array.isArray(extracted.variants)) {
-          const variantSizes = extracted.variants.map((v: any) => v.size).filter(Boolean)
-          const variantColors = extracted.variants.map((v: any) => v.color).filter(Boolean)
-          if (variantSizes.length > 0) {
-            attributes.size = [...new Set([...(attributes.size || []), ...variantSizes])]
-          }
-          if (variantColors.length > 0) {
-            attributes.color = [...new Set([...(attributes.color || []), ...variantColors])]
-          }
-        }
-        
-        setProductOptions(attributes)
-        setSelectedOptions({ quantity: 1 })
-      }
-    } catch (error) {
-      console.error("Error fetching product options:", error)
-      // Set default options if extraction fails
-      setProductOptions({ sizes: [], colors: [], quantity: 1 })
-    } finally {
-      setIsLoadingOptions(false)
-    }
-  }
-
-
-  const handleConfirmAddToWishlist = async () => {
-    if (!selectedProductForWishlist) return
-
-    setAddingToWishlist(selectedProductForWishlist.id)
-    try {
-      // Build product link with selected options
-      let productLink = selectedProductForWishlist.productLink
-      const url = new URL(productLink)
-      
-      // Add all selected attributes to URL parameters
-      Object.keys(selectedOptions).forEach((key) => {
-        if (key !== 'quantity' && selectedOptions[key]) {
-          url.searchParams.set(key, String(selectedOptions[key]))
-        }
-      })
-      productLink = url.toString()
-
-      // Build description with all selected attributes
-      const attributeDescriptions: string[] = []
-      Object.keys(selectedOptions).forEach((key) => {
-        if (key !== 'quantity' && selectedOptions[key]) {
-          const label = attributeLabels[key] || key.charAt(0).toUpperCase() + key.slice(1)
-          attributeDescriptions.push(`${label}: ${selectedOptions[key]}`)
-        }
-      })
-      
-      const description = `${selectedProductForWishlist.productName} from ${selectedProductForWishlist.source}${attributeDescriptions.length > 0 ? ` - ${attributeDescriptions.join(', ')}` : ''}${selectedOptions.quantity ? ` - Quantity: ${selectedOptions.quantity}` : ''}`
-
-      const response = await fetch("/api/wishlist", {
+      const response = await fetch("/api/trending-gifts", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          giftName: selectedProductForWishlist.productName,
-          currentPrice: selectedProductForWishlist.price,
+          productName: product.productName,
+          price: product.price,
+          originalPrice: product.originalPrice,
+          image: product.image,
+          source: product.source,
+          productLink: product.productLink,
+          category: product.category,
+          rating: product.rating,
+          reviewCount: product.reviewCount,
+          amazonChoice: product.amazonChoice || false,
+          bestSeller: product.bestSeller || false,
           description: description,
-          productImageUrl: selectedProductForWishlist.image,
-          storeName: selectedProductForWishlist.source,
-          productLink: productLink,
-          category: selectedProductForWishlist.category,
-          quantity: selectedOptions.quantity || 1,
         }),
       })
 
       if (response.ok) {
-        toast.success(`"${selectedProductForWishlist.productName}" added to your wishlist!`)
-        setIsOptionModalOpen(false)
-        setSelectedProductForWishlist(null)
-        setProductOptions(null)
-        setSelectedOptions({ quantity: 1 })
+        const result = await response.json()
+        console.log(`[handleAddToWishlist] Product added to trending gifts:`, result)
+        toast.success(`"${product.productName}" added to Trending Gifts!`)
       } else {
-        const error = await response.json()
-        throw new Error(error.error || "Failed to add to wishlist")
+        const error = await response.json().catch(() => ({ error: `HTTP ${response.status}: ${response.statusText}` }))
+        console.error(`[handleAddToWishlist] Error response:`, error)
+        toast.error(error.error || "Failed to add product to trending gifts")
       }
     } catch (error) {
-      console.error("Error adding to wishlist:", error)
-      toast.error(error instanceof Error ? error.message : "Failed to add to wishlist")
+      console.error("Error adding to trending gifts:", error)
+      toast.error("Failed to add product to trending gifts")
     } finally {
       setAddingToWishlist(null)
     }
@@ -630,8 +486,8 @@ export default function AdminAffiliateProductsPage() {
         productLink: isEditModalOpen && editingProduct 
           ? (editingProduct.productLink || extractedProduct.productLink || formData.productLink || "").trim() || undefined
           : (formData.productLink || extractedProduct.productLink || "").trim() || undefined,
-        amazonChoice: formData.amazonChoice,
-        bestSeller: formData.bestSeller,
+        amazonChoice: extractedProduct?.amazonChoice ?? formData.amazonChoice,
+        bestSeller: extractedProduct?.bestSeller ?? formData.bestSeller,
       }
 
       console.log(`[handleSave] ${method} request to: ${url}`)
@@ -1084,7 +940,7 @@ export default function AdminAffiliateProductsPage() {
                         <Button
                           onClick={() => handleAddToWishlist(product)}
                           disabled={addingToWishlist === product.id || !user}
-                          className="w-full h-9 px-3 rounded-full bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] text-xs font-semibold transition-all duration-200 hover:scale-105 hover:from-[#F4C430] hover:to-[#DAA520] active:scale-95 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                          className="w-full h-9 px-3 rounded-full bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] text-xs sm:text-sm font-bold transition-all duration-200 hover:scale-105 hover:from-[#F4C430] hover:to-[#DAA520] active:scale-95 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                         >
                           {addingToWishlist === product.id ? (
                             <>
@@ -1624,6 +1480,70 @@ export default function AdminAffiliateProductsPage() {
                       />
                     </div>
 
+                    {/* Badges Section */}
+                    <div className="bg-white rounded-xl p-4 shadow-md border border-amber-200">
+                      <label className="block text-sm font-bold text-[#654321] mb-3">Product Badges</label>
+                      <div className="space-y-3">
+                        {/* Amazon Choice Badge */}
+                        <div className="flex items-center space-x-3">
+                          <Checkbox
+                            id="amazon-choice"
+                            checked={extractedProduct?.amazonChoice || false}
+                            onCheckedChange={(checked) => {
+                              const newValue = checked === true
+                              setExtractedProduct({
+                                ...extractedProduct,
+                                amazonChoice: newValue
+                              })
+                              // Also update formData to keep in sync
+                              setFormData({
+                                ...formData,
+                                amazonChoice: newValue
+                              })
+                            }}
+                            className="border-2 border-gray-300 data-[state=checked]:bg-[#DAA520] data-[state=checked]:border-[#DAA520]"
+                          />
+                          <Label
+                            htmlFor="amazon-choice"
+                            className="text-sm font-semibold text-[#654321] cursor-pointer flex items-center gap-2"
+                          >
+                            <Badge className="bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] font-bold">
+                              Amazon Choice
+                            </Badge>
+                          </Label>
+                        </div>
+
+                        {/* Best Seller Badge */}
+                        <div className="flex items-center space-x-3">
+                          <Checkbox
+                            id="best-seller"
+                            checked={extractedProduct?.bestSeller || false}
+                            onCheckedChange={(checked) => {
+                              const newValue = checked === true
+                              setExtractedProduct({
+                                ...extractedProduct,
+                                bestSeller: newValue
+                              })
+                              // Also update formData to keep in sync
+                              setFormData({
+                                ...formData,
+                                bestSeller: newValue
+                              })
+                            }}
+                            className="border-2 border-gray-300 data-[state=checked]:bg-[#DAA520] data-[state=checked]:border-[#DAA520]"
+                          />
+                          <Label
+                            htmlFor="best-seller"
+                            className="text-sm font-semibold text-[#654321] cursor-pointer flex items-center gap-2"
+                          >
+                            <Badge className="bg-gradient-to-r from-[#FF6B6B] to-[#FF8E53] text-white font-bold">
+                              Best Seller
+                            </Badge>
+                          </Label>
+                        </div>
+                      </div>
+                    </div>
+
                   </div>
                 </div>
                 </div>
@@ -1658,297 +1578,6 @@ export default function AdminAffiliateProductsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Select Options Modal */}
-          <Dialog open={isOptionModalOpen} onOpenChange={(open) => {
-            setIsOptionModalOpen(open)
-            if (!open) {
-              setSelectedProductForWishlist(null)
-              setProductOptions(null)
-              setSelectedOptions({ quantity: 1 })
-            }
-          }}>
-            <DialogContent className="max-w-4xl lg:max-w-5xl max-h-[90vh] overflow-y-auto bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 [&>button[data-slot='dialog-close']]:top-4 [&>button[data-slot='dialog-close']]:right-4 [&>button[data-slot='dialog-close']]:z-50">
-              <DialogHeader>
-                <div className="bg-card border border-border rounded-lg p-6 mb-6">
-                  <div className="flex flex-row items-center justify-center gap-2">
-                    <ShoppingBag className="w-5 h-5 sm:w-8 sm:h-8 md:w-10 md:h-10 text-[#DAA520] flex-shrink-0" />
-                    <DialogTitle className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground whitespace-nowrap">
-                      Select Your Options
-                    </DialogTitle>
-                  </div>
-                  <p className="text-xs sm:text-sm text-muted-foreground text-center mt-2">
-                    Choose the right options for your gift
-                  </p>
-                </div>
-                <DialogDescription className="sr-only">
-                  Select product options such as size, color, and other attributes
-                </DialogDescription>
-              </DialogHeader>
-              
-              {selectedProductForWishlist && (
-                <div className="py-4 space-y-6">
-                  {/* Product Preview */}
-                  <div className="flex items-center gap-4 p-4 bg-gradient-to-br from-amber-50 to-orange-50 rounded-lg border-2 border-[#F4C430]/30">
-                    <img
-                      src={selectedProductForWishlist.image || "/placeholder.svg"}
-                      alt={selectedProductForWishlist.productName}
-                      className="w-20 h-20 sm:w-24 sm:h-24 object-cover rounded-xl border-2 border-gray-200"
-                      onError={(e) => {
-                        e.currentTarget.src = "/placeholder.svg"
-                      }}
-                    />
-                    <div className="flex-1">
-                      <h3 className="font-bold text-[#654321] text-sm sm:text-base mb-1 line-clamp-2">
-                        {selectedProductForWishlist.productName}
-                      </h3>
-                      <p className="text-xs sm:text-sm text-gray-600 mb-2">{selectedProductForWishlist.source}</p>
-                      <p className="text-lg font-bold text-[#654321]">${selectedProductForWishlist.price.toFixed(2)}</p>
-                    </div>
-                  </div>
-
-                  {isLoadingOptions ? (
-                    <div className="flex items-center justify-center py-8">
-                      <Loader2 className="w-8 h-8 animate-spin text-[#DAA520]" />
-                      <span className="ml-3 text-sm text-gray-600">Loading product options...</span>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {/* Dynamically render all available product attributes */}
-                      {productOptions && Object.keys(productOptions).length > 0 ? (
-                        Object.keys(productOptions).map((attrKey) => {
-                          const attrValues = productOptions[attrKey]
-                          if (!attrValues || !Array.isArray(attrValues) || attrValues.length === 0) return null
-                          
-                          const attrLabel = attributeLabels[attrKey] || attrKey.charAt(0).toUpperCase() + attrKey.slice(1)
-                          const isRequired = attrKey === 'size' || attrKey === 'color' || attrKey === 'offerType' || attrKey === 'kindleUnlimited'
-                          
-                          return (
-                            <div key={attrKey} className="space-y-2">
-                              <Label htmlFor={attrKey} className="text-sm font-semibold text-[#654321]">
-                                {attrLabel} {isRequired && <span className="text-red-500">*</span>}
-                              </Label>
-                              <Select
-                                value={selectedOptions[attrKey] || ""}
-                                onValueChange={(value) => setSelectedOptions({ ...selectedOptions, [attrKey]: value })}
-                              >
-                                <SelectTrigger id={attrKey} className="border-2 border-gray-300 focus:border-[#DAA520]">
-                                  <SelectValue placeholder={`Select ${attrLabel.toLowerCase()}`} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {attrValues.map((value: string, index: number) => (
-                                    <SelectItem key={index} value={String(value)}>
-                                      {String(value)}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          )
-                        })
-                      ) : (
-                        <div className="text-center py-4 text-sm text-gray-500">
-                          No additional options available for this product.
-                        </div>
-                      )}
-
-                      {/* Quantity Selection - Always show */}
-                      <div className="space-y-2">
-                        <Label htmlFor="quantity" className="text-sm font-semibold text-[#654321]">
-                          Quantity
-                        </Label>
-                        <Input
-                          id="quantity"
-                          type="number"
-                          min="1"
-                          max="10"
-                          value={selectedOptions.quantity || 1}
-                          onChange={(e) => setSelectedOptions({ ...selectedOptions, quantity: parseInt(e.target.value) || 1 })}
-                          className="border-2 border-gray-300 focus:border-[#DAA520]"
-                        />
-                      </div>
-
-                      {/* Action Buttons */}
-                      <div className="flex justify-end gap-3 pt-4 border-t">
-                        <Button
-                          variant="outline"
-                          onClick={() => {
-                            setIsOptionModalOpen(false)
-                            setSelectedProductForWishlist(null)
-                            setProductOptions(null)
-                            setSelectedOptions({ quantity: 1 })
-                          }}
-                          disabled={addingToWishlist === selectedProductForWishlist?.id}
-                          className="border-[#8B4513] text-[#8B4513] hover:bg-[#8B4513] hover:text-white"
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          onClick={handleConfirmAddToWishlist}
-                          disabled={addingToWishlist === selectedProductForWishlist?.id || isLoadingOptions}
-                          className="bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] hover:from-[#F4C430] hover:to-[#DAA520]"
-                        >
-                          {addingToWishlist === selectedProductForWishlist?.id ? (
-                            <>
-                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              Adding...
-                            </>
-                          ) : (
-                            "Add to Wishlist"
-                          )}
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </DialogContent>
-          </Dialog>
-
-          {/* Select Options Modal */}
-          <Dialog open={isOptionModalOpen} onOpenChange={(open) => {
-            setIsOptionModalOpen(open)
-            if (!open) {
-              setSelectedProductForWishlist(null)
-              setProductOptions(null)
-              setSelectedOptions({ quantity: 1 })
-            }
-          }}>
-            <DialogContent className="max-w-4xl lg:max-w-5xl max-h-[90vh] overflow-y-auto bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 [&>button[data-slot='dialog-close']]:top-4 [&>button[data-slot='dialog-close']]:right-4 [&>button[data-slot='dialog-close']]:z-50">
-              <DialogHeader>
-                <div className="bg-card border border-border rounded-lg p-6 mb-6">
-                  <div className="flex flex-row items-center justify-center gap-2">
-                    <ShoppingBag className="w-5 h-5 sm:w-8 sm:h-8 md:w-10 md:h-10 text-[#DAA520] flex-shrink-0" />
-                    <DialogTitle className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground whitespace-nowrap">
-                      Select Your Options
-                    </DialogTitle>
-                  </div>
-                  <p className="text-xs sm:text-sm text-muted-foreground text-center mt-2">
-                    Choose the right options for your gift
-                  </p>
-                </div>
-                <DialogDescription className="sr-only">
-                  Select product options such as size, color, and other attributes
-                </DialogDescription>
-              </DialogHeader>
-              
-              {selectedProductForWishlist && (
-                <div className="py-4 space-y-6">
-                  {/* Product Preview */}
-                  <div className="flex items-center gap-4 p-4 bg-gradient-to-br from-amber-50 to-orange-50 rounded-lg border-2 border-[#F4C430]/30">
-                    <img
-                      src={selectedProductForWishlist.image || "/placeholder.svg"}
-                      alt={selectedProductForWishlist.productName}
-                      className="w-20 h-20 sm:w-24 sm:h-24 object-cover rounded-xl border-2 border-gray-200"
-                      onError={(e) => {
-                        e.currentTarget.src = "/placeholder.svg"
-                      }}
-                    />
-                    <div className="flex-1">
-                      <h3 className="font-bold text-[#654321] text-sm sm:text-base mb-1 line-clamp-2">
-                        {selectedProductForWishlist.productName}
-                      </h3>
-                      <p className="text-xs sm:text-sm text-gray-600 mb-2">{selectedProductForWishlist.source}</p>
-                      <p className="text-lg font-bold text-[#654321]">${selectedProductForWishlist.price.toFixed(2)}</p>
-                    </div>
-                  </div>
-
-                  {isLoadingOptions ? (
-                    <div className="flex items-center justify-center py-8">
-                      <Loader2 className="w-8 h-8 animate-spin text-[#DAA520]" />
-                      <span className="ml-3 text-sm text-gray-600">Loading product options...</span>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {/* Dynamically render all available product attributes */}
-                      {productOptions && Object.keys(productOptions).length > 0 ? (
-                        Object.keys(productOptions).map((attrKey) => {
-                          const attrValues = productOptions[attrKey]
-                          if (!attrValues || !Array.isArray(attrValues) || attrValues.length === 0) return null
-                          
-                          const attrLabel = attributeLabels[attrKey] || attrKey.charAt(0).toUpperCase() + attrKey.slice(1)
-                          const isRequired = attrKey === 'size' || attrKey === 'color' || attrKey === 'offerType' || attrKey === 'kindleUnlimited'
-                          
-                          return (
-                            <div key={attrKey} className="space-y-2">
-                              <Label htmlFor={attrKey} className="text-sm font-semibold text-[#654321]">
-                                {attrLabel} {isRequired && <span className="text-red-500">*</span>}
-                              </Label>
-                              <Select
-                                value={selectedOptions[attrKey] || ""}
-                                onValueChange={(value) => setSelectedOptions({ ...selectedOptions, [attrKey]: value })}
-                              >
-                                <SelectTrigger id={attrKey} className="border-2 border-gray-300 focus:border-[#DAA520] w-full">
-                                  <SelectValue placeholder={`Select ${attrLabel.toLowerCase()}`} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {attrValues.map((value: string, index: number) => (
-                                    <SelectItem key={index} value={String(value)}>
-                                      {String(value)}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          )
-                        })
-                      ) : (
-                        <div className="text-center py-4 text-sm text-gray-500">
-                          No additional options available for this product.
-                        </div>
-                      )}
-
-                      {/* Quantity Selection - Always show */}
-                      <div className="space-y-2">
-                        <Label htmlFor="quantity" className="text-sm font-semibold text-[#654321]">
-                          Quantity
-                        </Label>
-                        <Input
-                          id="quantity"
-                          type="number"
-                          min="1"
-                          max="10"
-                          value={selectedOptions.quantity || 1}
-                          onChange={(e) => setSelectedOptions({ ...selectedOptions, quantity: parseInt(e.target.value) || 1 })}
-                          className="border-2 border-gray-300 focus:border-[#DAA520]"
-                        />
-                      </div>
-
-                      {/* Action Buttons */}
-                      <div className="flex justify-end gap-3 pt-4 border-t">
-                        <Button
-                          variant="outline"
-                          onClick={() => {
-                            setIsOptionModalOpen(false)
-                            setSelectedProductForWishlist(null)
-                            setProductOptions(null)
-                            setSelectedOptions({ quantity: 1 })
-                          }}
-                          disabled={addingToWishlist === selectedProductForWishlist?.id}
-                          className="border-[#8B4513] text-[#8B4513] hover:bg-[#8B4513] hover:text-white"
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          onClick={handleConfirmAddToWishlist}
-                          disabled={addingToWishlist === selectedProductForWishlist?.id || isLoadingOptions}
-                          className="bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] hover:from-[#F4C430] hover:to-[#DAA520]"
-                        >
-                          {addingToWishlist === selectedProductForWishlist?.id ? (
-                            <>
-                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              Adding...
-                            </>
-                          ) : (
-                            "Add to Wishlist"
-                          )}
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </DialogContent>
-          </Dialog>
         </div>
       )
     }
