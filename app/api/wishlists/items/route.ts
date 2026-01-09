@@ -45,6 +45,7 @@ export async function POST(request: NextRequest) {
 
     // Build insert object using the correct database schema
     // Note: Database uses 'title' not 'product_name', and 'list_price' for price
+    // source must be one of the allowed values in the database check constraint (e.g., 'amazon', 'manual')
     const insertData: any = {
       wishlist_id: wishlistIdValue,
       title: title || productName || 'Untitled Product',
@@ -55,7 +56,7 @@ export async function POST(request: NextRequest) {
       review_star: review_star || null,
       review_count: review_count || null,
       affiliate_url: affiliate_url || product_url || productUrl || null,
-      source: source || 'trending',
+      source: source === 'Amazon' || source === 'amazon' ? 'amazon' : (source || 'amazon'),
       price_snapshot_at: price_snapshot_at ? new Date(price_snapshot_at) : new Date(), // Required field
     };
 
