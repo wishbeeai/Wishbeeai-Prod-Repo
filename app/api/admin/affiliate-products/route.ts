@@ -171,14 +171,44 @@ export async function POST(req: NextRequest) {
     const attributes: any = {}
     if (body.attributes) {
       const attributeFields = [
-        "brand", "color", "material", "capacity", "dimensions",
-        "caratWeight", "gemstone", "size", "storage", "offerType", "kindleUnlimited", "fitType", "style", "volume",
-        "skinType", "ingredients", "weight", "assembly", "ageRange",
-        "safetyInfo", "author", "publisher", "pageCount", "isbn"
+        // Basic attributes
+        "brand", "color", "material", "capacity", "dimensions", "size",
+        // Product specifications (kitchen appliances, electronics)
+        "finishType", "wattage", "controlMethod", "operationMode", 
+        "specialFeature", "itemWeight", "productDimensions", "sizeOptions",
+        // Jewelry
+        "caratWeight", "gemstone",
+        // Electronics - detailed specs
+        "storage", "operatingSystem", "storageCapacity", "ram",
+        "connectivityTechnology", "wirelessStandard", "batteryType",
+        "gpsType", "shape", "screenSize", "resolution", "processor",
+        "compatibleDevices", "waterResistance", "configuration",
+        // Audio/Headphone-specific
+        "earPlacement", "formFactor", "noiseControl", "modelName",
+        "wirelessTechnology", "controlType", "bluetoothVersion",
+        "earpieceShape", "includedComponents", "specificUses", "recommendedUses",
+        // Watch/Electronics variants
+        "colorVariants", "styleOptions", "configurationOptions",
+        // Style/Pattern attributes
+        "styleName", "patternName", "model",
+        // Clothing
+        "fitType", "style",
+        // Beauty
+        "skinType", "ingredients", "volume",
+        // Furniture
+        "weight", "assembly",
+        // Toys/Kids
+        "ageRange", "safetyInfo",
+        // Books
+        "author", "publisher", "pageCount", "isbn",
+        // Other
+        "offerType", "kindleUnlimited",
+        // Custom fields and badges
+        "customFields", "customBadges"
       ]
       
       attributeFields.forEach((field) => {
-        if (body.attributes[field]) {
+        if (body.attributes[field] !== undefined && body.attributes[field] !== null) {
           attributes[field] = body.attributes[field]
         }
       })

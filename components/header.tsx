@@ -96,7 +96,7 @@ export function Header() {
     {
       title: "Trending Gifts",
       icon: TrendingUp,
-      href: "/gifts/browse",
+      href: "/gifts/trending",
       description: "Discover trending gifts from affiliated stores",
     },
     {

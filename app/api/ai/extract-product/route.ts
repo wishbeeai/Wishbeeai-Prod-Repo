@@ -3,20 +3,19 @@ import { openai } from "@ai-sdk/openai"
 import { NextResponse } from "next/server"
 import * as fal from "@fal-ai/serverless-client"
 
-import { appendFile } from 'fs/promises'
-import { join } from 'path'
+import { appendFile, mkdir } from 'fs/promises'
+import { join, dirname } from 'path'
 
 fal.config({
   credentials: process.env.FAL_KEY,
 })
 
 // Logging utility to write to both console and file
-const LOG_FILE = join(process.cwd(), 'logs', 'product-extraction.log')
+// Use the main project logs directory
+const LOG_FILE = '/Users/segar/Desktop/Wishbeeai-Prod/logs/product-extraction.log'
 
 async function logToFile(message: string) {
   try {
-    const { mkdir } = await import('fs/promises')
-    const { dirname } = await import('path')
     // Ensure logs directory exists
     await mkdir(dirname(LOG_FILE), { recursive: true }).catch(() => {})
     
@@ -32,6 +31,45 @@ function log(message: string) {
   console.log(message)
   // Write to file asynchronously (don't await to avoid blocking)
   logToFile(message).catch(() => {})
+}
+
+// Log extraction start with separator
+function logExtractionStart(url: string) {
+  const separator = '\n' + '='.repeat(80) + '\n'
+  const startMessage = `🚀 EXTRACTION STARTED for: ${url.substring(0, 100)}...`
+  logToFile(separator + startMessage).catch(() => {})
+  console.log(`[ExtractionLog] ${startMessage}`)
+}
+
+// Log extraction summary
+function logExtractionSummary(data: {
+  url: string
+  productName?: string | null
+  price?: number | null
+  hasImage: boolean
+  rating?: number | null
+  reviewCount?: number | null
+  amazonChoice?: boolean
+  bestSeller?: boolean
+  attributeCount: number
+  duration: number
+  success: boolean
+}) {
+  const summary = `
+📊 EXTRACTION SUMMARY:
+   URL: ${data.url.substring(0, 80)}...
+   Product: ${data.productName?.substring(0, 60) || 'N/A'}
+   Price: ${data.price ? '$' + data.price : 'N/A'}
+   Image: ${data.hasImage ? '✅' : '❌'}
+   Rating: ${data.rating || 'N/A'} (${data.reviewCount || 0} reviews)
+   Amazon Choice: ${data.amazonChoice ? '✅' : '❌'}
+   Best Seller: ${data.bestSeller ? '✅' : '❌'}
+   Attributes: ${data.attributeCount} extracted
+   Duration: ${data.duration}ms
+   Status: ${data.success ? '✅ SUCCESS' : '❌ FAILED'}
+`
+  logToFile(summary).catch(() => {})
+  console.log(`[ExtractionLog] Extraction ${data.success ? 'completed' : 'failed'} in ${data.duration}ms for: ${data.productName?.substring(0, 40) || 'Unknown'}`)
 }
 
 // Helper function to decode HTML entities
@@ -54,6 +92,19 @@ function decodeHtmlEntities(text: string | null | undefined): string {
     .replace(/&nbsp;/g, ' ')
     .replace(/&#160;/g, ' ')
     .replace(/&#xA0;/g, ' ')
+    // Remove directional formatting marks (LRM, RLM, etc.)
+    .replace(/&lrm;/gi, '')    // Left-to-Right Mark
+    .replace(/&rlm;/gi, '')    // Right-to-Left Mark
+    .replace(/&#8206;/g, '')   // LRM numeric
+    .replace(/&#8207;/g, '')   // RLM numeric
+    .replace(/&#x200E;/gi, '') // LRM hex
+    .replace(/&#x200F;/gi, '') // RLM hex
+    .replace(/\u200E/g, '')    // LRM unicode character
+    .replace(/\u200F/g, '')    // RLM unicode character
+    .replace(/\u200B/g, '')    // Zero-width space
+    .replace(/\u200C/g, '')    // Zero-width non-joiner
+    .replace(/\u200D/g, '')    // Zero-width joiner
+    .replace(/\uFEFF/g, '')    // BOM / Zero-width no-break space
     // Decode numeric entities
     .replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(parseInt(dec, 10)))
     // Decode hex entities
@@ -414,6 +465,8 @@ async function extractWithoutAI(
     stockStatus: "Unknown",
     rating: null,
     reviewCount: null,
+    amazonChoice: false,
+    bestSeller: false,
     attributes: {
       brand: null,
       color: null,
@@ -447,6 +500,16 @@ async function extractWithoutAI(
       weightLimit: null,
       seatingCapacity: null,
       style: null,
+      // Additional Amazon product attributes
+      finishType: null,
+      wattage: null,
+      controlMethod: null,
+      operationMode: null,
+      specialFeature: null,
+      itemWeight: null,
+      productDimensions: null,
+      // Size variants with prices
+      sizeOptions: null,
     },
   }
 
@@ -3427,6 +3490,807 @@ async function extractWithoutAI(
     }
   }
   
+  // Extract Amazon product specifications from the product details table
+  if (hostname.includes('amazon.com') && htmlContent) {
+    log("[v0] 🔍 Extracting Amazon product specifications table...")
+    
+    // Extract product specifications from various table formats
+    const specPatterns = [
+      // Pattern 1: Standard table row format
+      /<tr[^>]*>[\s\S]*?<th[^>]*>([^<]+)<\/th>[\s\S]*?<td[^>]*>([^<]+)<\/td>[\s\S]*?<\/tr>/gi,
+      // Pattern 2: Div-based product detail format (po- prefix classes)
+      /<div[^>]*class=["'][^"']*po-[^"']*["'][^>]*>[\s\S]*?<span[^>]*>([^<]+)<\/span>[\s\S]*?<span[^>]*>([^<]+)<\/span>/gi,
+      // Pattern 3: Amazon product overview table (a-keyvalue format)
+      /<tr[^>]*class=["'][^"']*a-spacing[^"']*["'][^>]*>[\s\S]*?<td[^>]*class=["'][^"']*a-span3[^"']*["'][^>]*>[\s\S]*?<span[^>]*>([^<]+)<\/span>[\s\S]*?<\/td>[\s\S]*?<td[^>]*class=["'][^"']*a-span9[^"']*["'][^>]*>[\s\S]*?<span[^>]*>([^<]+)<\/span>/gi,
+      // Pattern 4: Simple th/td with spans inside
+      /<tr[^>]*>[\s\S]*?<t[hd][^>]*>\s*<span[^>]*>([^<]+)<\/span>\s*<\/t[hd]>[\s\S]*?<t[hd][^>]*>\s*<span[^>]*>([^<]+)<\/span>\s*<\/t[hd]>[\s\S]*?<\/tr>/gi,
+      // Pattern 5: Product overview with label/value classes
+      /<td[^>]*class=["'][^"']*prodDetAttrName[^"']*["'][^>]*>([^<]+)<\/td>[\s\S]*?<td[^>]*class=["'][^"']*prodDetAttrValue[^"']*["'][^>]*>([^<]+)<\/td>/gi,
+    ]
+    
+    // Map of specification names to attribute keys - MUST be defined before use
+    const specMapping: Record<string, string> = {
+      'brand': 'brand',
+      'capacity': 'capacity',
+      'material': 'material',
+      'finish type': 'finishType',
+      'finish': 'finishType',
+      'product dimensions': 'productDimensions',
+      'dimensions': 'productDimensions',
+      'special feature': 'specialFeature',
+      'special features': 'specialFeature',
+      'wattage': 'wattage',
+      'power': 'wattage',
+      'item weight': 'itemWeight',
+      'weight': 'itemWeight',
+      'control method': 'controlMethod',
+      'operation mode': 'operationMode',
+      'color': 'color',
+      'size': 'size',
+      'model': 'model',
+      'model number': 'model',
+      'model name': 'modelName',
+      // Style/Variant attributes
+      'style': 'style',
+      'style name': 'styleName',
+      'pattern': 'pattern',
+      'pattern name': 'patternName',
+      // Electronics-specific attributes
+      'operating system': 'operatingSystem',
+      'os': 'operatingSystem',
+      'memory storage capacity': 'storageCapacity',
+      'storage capacity': 'storageCapacity',
+      'storage': 'storageCapacity',
+      'hard disk size': 'storageCapacity',
+      'ram': 'ram',
+      'ram memory installed size': 'ram',
+      'memory': 'ram',
+      'connectivity technology': 'connectivityTechnology',
+      'connectivity': 'connectivityTechnology',
+      'wireless communication standard': 'wirelessStandard',
+      'wireless type': 'wirelessStandard',
+      'wireless': 'wirelessStandard',
+      'battery cell composition': 'batteryType',
+      'battery type': 'batteryType',
+      'battery': 'batteryType',
+      'gps': 'gpsType',
+      'shape': 'shape',
+      'screen size': 'screenSize',
+      'display size': 'screenSize',
+      'resolution': 'resolution',
+      'display resolution': 'resolution',
+      'processor': 'processor',
+      'cpu': 'processor',
+      'chip': 'processor',
+      'compatible devices': 'compatibleDevices',
+      'water resistance level': 'waterResistance',
+      'water resistance': 'waterResistance',
+      'style': 'style',
+      'configuration': 'configuration',
+      // Audio/Headphone-specific attributes
+      'ear placement': 'earPlacement',
+      'form factor': 'formFactor',
+      'noise control': 'noiseControl',
+      'noise cancellation': 'noiseControl',
+      'earpiece shape': 'earpieceShape',
+      'bluetooth version': 'bluetoothVersion',
+      'display': 'screenSize',
+      'screen resolution': 'resolution',
+      'compatible with': 'compatibleDevices',
+      'water resistant': 'waterResistance',
+      'wireless communication technology': 'wirelessTechnology',
+      'control type': 'controlType',
+      'included components': 'includedComponents',
+      'specific uses for product': 'specificUses',
+      'recommended uses for product': 'recommendedUses',
+    }
+    
+    // Also try to extract from Amazon's product overview section specifically
+    // This section typically contains Brand, Color, Ear Placement, Form Factor, etc.
+    const productOverviewMatch = htmlContent.match(/id=["']productOverview_feature_div["'][^>]*>([\s\S]*?)<\/div>\s*<\/div>\s*<\/div>/i)
+    if (productOverviewMatch) {
+      log("[v0] 🔍 Found Amazon product overview section, extracting attributes...")
+      const overviewHtml = productOverviewMatch[1]
+      
+      // Extract from table rows in the overview
+      const overviewRowPattern = /<tr[^>]*>[\s\S]*?<td[^>]*>[\s\S]*?<span[^>]*class=["'][^"']*a-text-bold[^"']*["'][^>]*>([^<]+)<\/span>[\s\S]*?<\/td>[\s\S]*?<td[^>]*>[\s\S]*?<span[^>]*>([^<]+)<\/span>[\s\S]*?<\/td>[\s\S]*?<\/tr>/gi
+      let overviewMatch
+      // Key attributes that should always be overwritten from product overview (these are the most reliable)
+      const priorityAttributes = ['color', 'earPlacement', 'formFactor', 'noiseControl', 'brand']
+      
+      while ((overviewMatch = overviewRowPattern.exec(overviewHtml)) !== null) {
+        if (overviewMatch[1] && overviewMatch[2]) {
+          const specName = overviewMatch[1].trim().toLowerCase().replace(/\s+/g, ' ')
+          const specValue = decodeHtmlEntities(overviewMatch[2].trim())
+          log(`[v0] 📋 Found in product overview: ${specName} = ${specValue}`)
+          
+          const attributeKey = specMapping[specName]
+          if (attributeKey && specValue && specValue.length < 200) {
+            // Priority attributes always get overwritten from product overview
+            const isPriority = priorityAttributes.includes(attributeKey)
+            if (isPriority || !productData.attributes[attributeKey]) {
+              productData.attributes[attributeKey] = specValue
+              log(`[v0] ✅ Extracted from product overview - ${specName}: ${specValue}${isPriority ? ' (priority attribute)' : ''}`)
+            }
+          }
+        }
+      }
+    }
+    
+    // Also extract from the glance_icons_div which shows key specs like Color, Ear Placement
+    const glancePattern = /<tr[^>]*>[\s\S]*?<td[^>]*class=["'][^"']*label[^"']*["'][^>]*>([^<]+)<\/td>[\s\S]*?<td[^>]*class=["'][^"']*value[^"']*["'][^>]*>([^<]+)<\/td>/gi
+    let glanceMatch
+    while ((glanceMatch = glancePattern.exec(htmlContent)) !== null) {
+      if (glanceMatch[1] && glanceMatch[2]) {
+        const specName = glanceMatch[1].trim().toLowerCase().replace(/\s+/g, ' ')
+        const specValue = decodeHtmlEntities(glanceMatch[2].trim())
+        
+        const attributeKey = specMapping[specName]
+        if (attributeKey && specValue && specValue.length < 200) {
+          if (!productData.attributes[attributeKey]) {
+            productData.attributes[attributeKey] = specValue
+            log(`[v0] ✅ Extracted from glance icons - ${specName}: ${specValue}`)
+          }
+        }
+      }
+    }
+    
+    // Direct extraction for key audio product attributes using specific patterns
+    // These are shown prominently at the top of Amazon product pages
+    const keyAudioAttributes = [
+      { pattern: />\s*Color\s*<\/[^>]+>[\s\S]*?<[^>]*>\s*([A-Za-z]+)\s*</i, key: 'color', name: 'Color' },
+      { pattern: />\s*Ear Placement\s*<\/[^>]+>[\s\S]*?<[^>]*>\s*([A-Za-z\s]+)\s*</i, key: 'earPlacement', name: 'Ear Placement' },
+      { pattern: />\s*Form Factor\s*<\/[^>]+>[\s\S]*?<[^>]*>\s*([A-Za-z\s]+)\s*</i, key: 'formFactor', name: 'Form Factor' },
+      { pattern: />\s*Noise Control\s*<\/[^>]+>[\s\S]*?<[^>]*>\s*([A-Za-z\s]+)\s*</i, key: 'noiseControl', name: 'Noise Control' },
+    ]
+    
+    for (const attr of keyAudioAttributes) {
+      if (!productData.attributes[attr.key]) {
+        const match = htmlContent.match(attr.pattern)
+        if (match && match[1]) {
+          const value = decodeHtmlEntities(match[1].trim())
+          if (value && value.length > 0 && value.length < 100) {
+            productData.attributes[attr.key] = value
+            log(`[v0] ✅ Extracted ${attr.name} via direct pattern: ${value}`)
+          }
+        }
+      }
+    }
+    
+    // Also try JSON-based extraction for these attributes
+    // Amazon often includes structured data in JSON format
+    const jsonPatterns = [
+      { pattern: /"color"\s*:\s*"([^"]+)"/i, key: 'color', name: 'Color' },
+      { pattern: /"earPlacement"\s*:\s*"([^"]+)"/i, key: 'earPlacement', name: 'Ear Placement' },
+      { pattern: /"formFactor"\s*:\s*"([^"]+)"/i, key: 'formFactor', name: 'Form Factor' },
+      { pattern: /"noiseControl"\s*:\s*"([^"]+)"/i, key: 'noiseControl', name: 'Noise Control' },
+    ]
+    
+    for (const attr of jsonPatterns) {
+      if (!productData.attributes[attr.key]) {
+        const match = htmlContent.match(attr.pattern)
+        if (match && match[1]) {
+          const value = decodeHtmlEntities(match[1].trim())
+          if (value && value.length > 0 && value.length < 100) {
+            productData.attributes[attr.key] = value
+            log(`[v0] ✅ Extracted ${attr.name} from JSON: ${value}`)
+          }
+        }
+      }
+    }
+    
+    // Simple text-based extraction looking for "Brand Apple" pattern in the page
+    // This catches the table at the top of Amazon product pages
+    const simpleTextPatterns = [
+      { pattern: /Brand\s*[\|\:\-]?\s*([A-Za-z][A-Za-z0-9\s\-]+?)(?=\s*(?:Color|Ear|Form|Noise|Material|$|\|))/i, key: 'brand', name: 'Brand' },
+      { pattern: /Color\s*[\|\:\-]?\s*([A-Za-z][A-Za-z\s]+?)(?=\s*(?:Brand|Ear|Form|Noise|Material|$|\|))/i, key: 'color', name: 'Color' },
+      { pattern: /Ear Placement\s*[\|\:\-]?\s*([A-Za-z][A-Za-z\s]+?)(?=\s*(?:Brand|Color|Form|Noise|Material|$|\|))/i, key: 'earPlacement', name: 'Ear Placement' },
+      { pattern: /Form Factor\s*[\|\:\-]?\s*([A-Za-z][A-Za-z\s]+?)(?=\s*(?:Brand|Color|Ear|Noise|Material|$|\|))/i, key: 'formFactor', name: 'Form Factor' },
+      { pattern: /Noise Control\s*[\|\:\-]?\s*([A-Za-z][A-Za-z\s]+?)(?=\s*(?:Brand|Color|Ear|Form|Material|$|\|))/i, key: 'noiseControl', name: 'Noise Control' },
+    ]
+    
+    // Strip HTML and look for simple text patterns
+    const textContent = htmlContent.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')
+    
+    for (const attr of simpleTextPatterns) {
+      if (!productData.attributes[attr.key]) {
+        const match = textContent.match(attr.pattern)
+        if (match && match[1]) {
+          const value = decodeHtmlEntities(match[1].trim())
+          if (value && value.length > 0 && value.length < 50) {
+            productData.attributes[attr.key] = value
+            log(`[v0] ✅ Extracted ${attr.name} from text content: ${value}`)
+          }
+        }
+      }
+    }
+    
+    // Try to extract from product details table
+    for (const pattern of specPatterns) {
+      let match
+      while ((match = pattern.exec(htmlContent)) !== null) {
+        if (match[1] && match[2]) {
+          const specName = match[1].trim().toLowerCase().replace(/\s+/g, ' ')
+          const specValue = decodeHtmlEntities(match[2].trim())
+          
+          // Check if this spec maps to an attribute
+          const attributeKey = specMapping[specName]
+          if (attributeKey && specValue && specValue.length < 200) {
+            // Only set if not already set
+            if (!productData.attributes[attributeKey]) {
+              productData.attributes[attributeKey] = specValue
+              log(`[v0] ✅ Extracted Amazon spec - ${specName}: ${specValue}`)
+            }
+          }
+        }
+      }
+    }
+    
+    // BLACKLIST: Common invalid values that should NEVER be size options
+    // These are Amazon navigation items, menu sections, and other irrelevant text
+    const sizeBlacklistEarly = new Set([
+      // Amazon departments and navigation
+      'all departments', 'alexa skills', 'amazon autos', 'amazon devices', 'amazon fresh',
+      'amazon global store', 'amazon haul', 'amazon one medical', 'amazon pharmacy',
+      'amazon resale', 'appliances', 'apps & games', 'arts, crafts & sewing',
+      'audible books & originals', 'automotive parts & accessories', 'baby',
+      'beauty & personal care', 'books', 'cds & vinyl', 'cell phones & accessories',
+      'clothing, shoes & jewelry', "women's clothing, shoes & jewelry", "men's clothing, shoes & jewelry",
+      "girl's clothing, shoes & jewelry", "boy's clothing, shoes & jewelry", "baby clothing, shoes & jewelry",
+      'collectibles & fine art', 'computers', 'credit and payment cards', 'digital music',
+      'electronics', 'garden & outdoor', 'gift cards', 'grocery & gourmet food', 'handmade',
+      'health, household & baby care', 'home & business services', 'home & kitchen',
+      'industrial & scientific', 'just for prime', 'kindle store', 'luggage & travel gear',
+      'luxury stores', 'magazine subscriptions', 'movies & tv', 'musical instruments',
+      'office products', 'pet supplies', 'premium beauty', 'prime video', 'smart home',
+      'software', 'sports & outdoors', 'subscribe & save', 'subscription boxes',
+      'tools & home improvement', 'toys & games', 'under $10', 'video games',
+      'whole foods market', 'lucky',
+      // Cart and checkout terms
+      'subtotal', 'add to cart', 'buy now', 'add to list', 'add protection',
+      // AppleCare and service terms
+      'accidents happen, applecare+ covers them.', 'applecare+ for headphones - 2 years',
+      'applecare+ for headphones - monthly', 'no thanks', 'select a plan',
+      // Brand names that aren't sizes
+      'apple', 'amazon', 'instant pot', 'samsung', 'google', 'microsoft',
+      // Other navigation items
+      'search amazon', 'account & lists', 'returns & orders', 'cart', 'prime',
+      'hello, sign in', 'sign in', 'en', 'delivering to', 'update location',
+    ])
+    
+    // Helper function to check if a value is a valid size option (early version for this scope)
+    const isValidSizeOptionEarly = (value: string): boolean => {
+      if (!value || value.length === 0 || value.length > 60) return false
+      const lowerValue = value.toLowerCase().trim()
+      
+      // Check blacklist
+      if (sizeBlacklistEarly.has(lowerValue)) return false
+      
+      // Check for common patterns that indicate invalid sizes
+      if (lowerValue.includes('department') || 
+          lowerValue.includes('amazon') ||
+          lowerValue.includes('alexa') ||
+          lowerValue.includes('kindle') ||
+          lowerValue.includes('prime') ||
+          lowerValue.includes('subtotal') ||
+          lowerValue.includes('applecare') ||
+          lowerValue.includes('protection') ||
+          lowerValue.includes('add to') ||
+          lowerValue.includes('buy now') ||
+          lowerValue.includes('sign in') ||
+          lowerValue.includes('shipping') ||
+          lowerValue.includes('delivery') ||
+          lowerValue.includes('returns') ||
+          lowerValue.includes('& accessories') ||
+          lowerValue.includes('& jewelry') ||
+          lowerValue.includes('& outdoor') ||
+          lowerValue.includes('& games') ||
+          lowerValue.includes('& sewing') ||
+          lowerValue.includes('& originals') ||
+          lowerValue.includes('& more') ||
+          lowerValue.includes('& baby') ||
+          lowerValue.includes('whole foods') ||
+          lowerValue.includes('select a') ||
+          lowerValue.includes('no thanks')) {
+        return false
+      }
+      
+      // Must contain at least one of: number with unit, or recognized size descriptor
+      // Valid patterns: "42mm", "6 Quarts", "Small/Medium", "Large", "8 oz", etc.
+      const validSizePatterns = [
+        /^\d+\s*(?:mm|cm|in|inches?|"|'|ft|feet|m|meters?)$/i,  // Dimensions
+        /^\d+\s*(?:quarts?|qt|liters?|l|gallons?|gal)$/i,       // Capacity
+        /^\d+\s*(?:oz|ounces?|ml|fl\.?\s*oz)$/i,                 // Volume
+        /^\d+\s*(?:gb|tb|mb)$/i,                                  // Storage
+        /^(?:xx?s|xx?l|s|m|l|small|medium|large|extra\s*(?:small|large))$/i,  // Clothing sizes
+        /^\d+(?:mm|cm)?\s*(?:case|band)?(?:\s*\+\s*(?:small|medium|large)(?:\/(?:small|medium|large))?\s*band)?$/i,  // Watch sizes
+        /^(?:gps|gps\s*\+\s*cellular|wifi|wifi\s*\+\s*cellular|lte)$/i,  // Connectivity options
+      ]
+      
+      // Check if it matches any valid pattern
+      for (const pattern of validSizePatterns) {
+        if (pattern.test(lowerValue)) return true
+      }
+      
+      // For products like watches, accept size patterns like "42mm case + Small/Medium band"
+      if (lowerValue.match(/\d+(?:mm|cm)?\s*case/i)) return true
+      
+      return false
+    }
+    
+    // Extract size options with prices from variant data
+    log("[v0] 🔍 Extracting Amazon size options with prices...")
+    
+    // Look for twister configuration (Amazon variant data)
+    const twisterPatterns = [
+      /dimensionValuesDisplayData\s*:\s*(\{[\s\S]*?\})\s*,/i,
+      /"dimensions"\s*:\s*(\[[\s\S]*?\])/i,
+      /dimensionToAsinMap\s*:\s*(\{[\s\S]*?\})/i,
+    ]
+    
+    const sizeOptions: Array<{size: string, price?: string, asin?: string}> = []
+    
+    // Look for size/capacity options in the HTML
+    const sizeOptionPatterns = [
+      // Pattern for size dropdown options
+      /<option[^>]*value=["']([^"']+)["'][^>]*>([^<]*(?:Quart|Qt|Liter|L|Gallon|oz)[^<]*)<\/option>/gi,
+      // Pattern for twister buttons
+      /<span[^>]*class=["'][^"']*twister[^"']*["'][^>]*>[\s\S]*?<span[^>]*>([^<]*(?:Quart|Qt|Liter|L|Gallon|oz)[^<]*)<\/span>/gi,
+      // Pattern for size labels
+      /<span[^>]*id=["'][^"']*size[^"']*["'][^>]*>([^<]*(?:Quart|Qt|Liter|L)[^<]*)<\/span>/gi,
+    ]
+    
+    for (const pattern of sizeOptionPatterns) {
+      let match
+      while ((match = pattern.exec(htmlContent)) !== null) {
+        const sizeText = match[2] || match[1]
+        if (sizeText) {
+          const cleanSize = decodeHtmlEntities(sizeText.trim())
+          // Avoid duplicates and validate
+          if (cleanSize && isValidSizeOptionEarly(cleanSize) && !sizeOptions.find(s => s.size === cleanSize)) {
+            sizeOptions.push({ size: cleanSize })
+          }
+        }
+      }
+    }
+    
+    // Also try to extract from JavaScript data
+    const sizeDataMatch = htmlContent.match(/\["Size:([^\]]+)\]/gi)
+    if (sizeDataMatch) {
+      for (const match of sizeDataMatch) {
+        const sizeMatch = match.match(/\["Size:([^"]+)"\]/i)
+        if (sizeMatch && sizeMatch[1]) {
+          const cleanSize = decodeHtmlEntities(sizeMatch[1].trim())
+          if (cleanSize && isValidSizeOptionEarly(cleanSize) && !sizeOptions.find(s => s.size === cleanSize)) {
+            sizeOptions.push({ size: cleanSize })
+          }
+        }
+      }
+    }
+    
+    // Extract watch-specific size options (42mm, 46mm, etc.)
+    const watchSizePatterns = [
+      /(\d{2}mm\s*case\s*\+\s*(?:Small\/Medium|Medium\/Large|Small|Medium|Large)\s*band)/gi,
+      /"size_name"\s*:\s*"([^"]*\d{2}mm[^"]*)"/gi,
+      />\s*(\d{2}mm\s*case[^<]*band)\s*</gi,
+    ]
+    
+    for (const pattern of watchSizePatterns) {
+      const matches = htmlContent.match(pattern)
+      if (matches) {
+        for (const match of matches) {
+          // Clean up the match
+          let cleanSize = match.replace(/^[>"']|[<"']$/g, '').trim()
+          cleanSize = cleanSize.replace(/"size_name"\s*:\s*"/i, '').replace(/"$/, '')
+          
+          if (cleanSize && cleanSize.includes('mm') && !sizeOptions.find(s => s.size === cleanSize)) {
+            sizeOptions.push({ size: cleanSize })
+            log(`[v0] ✅ Extracted watch size option: ${cleanSize}`)
+          }
+        }
+      }
+    }
+    
+    if (sizeOptions.length > 0) {
+      productData.attributes.sizeOptions = sizeOptions
+      log(`[v0] ✅ Extracted ${sizeOptions.length} size options: ${JSON.stringify(sizeOptions)}`)
+    }
+    
+    // Extract color variants with prices (for products like Apple Watch with multiple color/case/band combinations)
+    log("[v0] 🔍 Extracting color variants with prices...")
+    const colorVariants: Array<{color: string, price?: string, originalPrice?: string, savings?: string}> = []
+    
+    // Look for color variants in twister dimension data - specifically Case w/ Band patterns
+    const dimensionDataMatch = htmlContent.match(/dimensionValuesDisplayData\s*[:=]\s*(\{[\s\S]*?\})\s*[,;]/i)
+    if (dimensionDataMatch) {
+      try {
+        const dimDataStr = dimensionDataMatch[1]
+        // Match color variants that contain "Case w/" pattern (Apple Watch style)
+        const colorMatches = dimDataStr.match(/"([A-Za-z\s]+(?:Aluminum|Titanium)\s*Case\s*w\/\s*[A-Za-z\s]+(?:Sport\s*Band|Milanese\s*Loop|Sport\s*Loop|Solo\s*Loop|Braided\s*Solo\s*Loop|Link\s*Bracelet|Leather\s*Link|Modern\s*Buckle))"/gi)
+        if (colorMatches) {
+          for (const match of colorMatches) {
+            const color = match.replace(/"/g, '').trim()
+            if (color && color.length > 20 && !colorVariants.find(c => c.color === color)) {
+              colorVariants.push({ color })
+            }
+          }
+        }
+      } catch (e) {
+        // Ignore parsing errors
+      }
+    }
+    
+    // Also try pattern for standard color names if we didn't find Case/Band patterns
+    if (colorVariants.length === 0) {
+      const colorOptionMatch = htmlContent.match(/color_name['"]\s*:\s*\[([^\]]+)\]/i)
+      if (colorOptionMatch) {
+        const colorOptionsStr = colorOptionMatch[1]
+        const colorMatches = colorOptionsStr.match(/"([^"]+)"/g)
+        if (colorMatches) {
+          for (const colorMatch of colorMatches) {
+            const color = colorMatch.replace(/"/g, '').trim()
+            // Only include if it looks like a real color (contains color words)
+            const colorWords = ['black', 'white', 'silver', 'gold', 'rose', 'blue', 'red', 'green', 'gray', 'grey', 'pink', 'purple', 'orange', 'yellow', 'brown', 'natural', 'slate', 'jet', 'titanium', 'aluminum']
+            const hasColorWord = colorWords.some(cw => color.toLowerCase().includes(cw))
+            if (color && color.length > 2 && color.length < 100 && hasColorWord && !colorVariants.find(c => c.color === color)) {
+              colorVariants.push({ color })
+            }
+          }
+        }
+      }
+    }
+    
+    if (colorVariants.length > 0) {
+      productData.attributes.colorVariants = colorVariants
+      log(`[v0] ✅ Extracted ${colorVariants.length} color variants: ${colorVariants.slice(0, 5).map(c => c.color).join(', ')}${colorVariants.length > 5 ? '...' : ''}`)
+    }
+    
+    // Extract Style options (GPS, GPS + Cellular, product variants, etc.)
+    log("[v0] 🔍 Extracting style options...")
+    const styleOptions: string[] = []
+    
+    // First, look for Amazon's style/variant data in the dimension display data
+    const styleDimensionMatch = htmlContent.match(/dimensionValuesDisplayData\s*[:=]\s*(\{[\s\S]*?\})\s*[,;]/i)
+    if (styleDimensionMatch) {
+      try {
+        const dimDataStr = styleDimensionMatch[1]
+        // Match product variant names (like "Ninja Fit", "Ninja Pro", etc.)
+        const variantMatches = dimDataStr.match(/"([^"]{10,80})"/g)
+        if (variantMatches) {
+          for (const match of variantMatches) {
+            const variant = match.replace(/"/g, '').trim()
+            // Filter out non-style values (colors, sizes, ASINs, etc.)
+            if (variant && 
+                variant.length >= 10 && 
+                variant.length <= 80 &&
+                !variant.match(/^[A-Z0-9]{10}$/) && // Not an ASIN
+                !variant.match(/^\d+\s*(Quart|Qt|oz|Liter|L|mm|cm|inch)/i) && // Not a size
+                !variant.match(/^(Black|White|Red|Blue|Green|Gray|Silver|Gold|Pink|Purple|Orange|Yellow|Brown)/i) && // Not a color
+                !variant.match(/Case\s*w\//i) && // Not a watch case color
+                !styleOptions.includes(variant) &&
+                (variant.includes('Fit') || variant.includes('Pro') || variant.includes('Plus') || 
+                 variant.includes('Compact') || variant.includes('Personal') || variant.includes('Professional') ||
+                 variant.includes('Deluxe') || variant.includes('Classic') || variant.includes('Ultimate') ||
+                 variant.includes('Max') || variant.includes('Mini') || variant.includes('XL') ||
+                 variant.includes('Standard') || variant.includes('Premium') || variant.includes('Basic') ||
+                 variant.includes('Blender') || variant.includes('Mixer') || variant.includes('Processor') ||
+                 variant.includes('Cup') || variant.includes('Lid') || variant.includes('Piece') ||
+                 variant.includes('Set') || variant.includes('Kit') || variant.includes('Bundle'))) {
+              styleOptions.push(variant)
+              log(`[v0] ✅ Found style variant from dimension data: ${variant}`)
+            }
+          }
+        }
+      } catch (e) {
+        log(`[v0] ⚠️ Error parsing style dimension data: ${e}`)
+      }
+    }
+    
+    // Look for style dropdown/select options
+    const styleSelectMatch = htmlContent.match(/<select[^>]*id=["'][^"']*style[^"']*["'][^>]*>([\s\S]*?)<\/select>/i)
+    if (styleSelectMatch) {
+      const optionMatches = styleSelectMatch[1].match(/<option[^>]*>([^<]+)<\/option>/gi)
+      if (optionMatches) {
+        for (const opt of optionMatches) {
+          const optMatch = opt.match(/<option[^>]*>([^<]+)<\/option>/i)
+          if (optMatch && optMatch[1]) {
+            const style = decodeHtmlEntities(optMatch[1].trim())
+            if (style && style.length >= 5 && !styleOptions.includes(style) && !style.toLowerCase().includes('select')) {
+              styleOptions.push(style)
+              log(`[v0] ✅ Found style from dropdown: ${style}`)
+            }
+          }
+        }
+      }
+    }
+    
+    // Look for twister style buttons (Amazon's variant selector)
+    const twisterStylePatterns = [
+      /<li[^>]*data-defaultasin[^>]*>[\s\S]*?<span[^>]*class=["'][^"']*a-button-text["'][^>]*>[\s\S]*?<span[^>]*>([^<]{10,80})<\/span>/gi,
+      /<button[^>]*class=["'][^"']*twister[^"']*["'][^>]*title=["']([^"']{10,80})["']/gi,
+      /<span[^>]*class=["'][^"']*twisterSlotDiv["'][^>]*>[\s\S]*?<span[^>]*>([^<]{10,80})<\/span>/gi,
+    ]
+    
+    for (const pattern of twisterStylePatterns) {
+      let match
+      while ((match = pattern.exec(htmlContent)) !== null) {
+        const style = decodeHtmlEntities((match[1] || '').trim())
+        if (style && style.length >= 10 && style.length <= 80 && !styleOptions.includes(style)) {
+          // Filter out sizes and colors
+          if (!style.match(/^\d+\s*(Quart|Qt|oz|Liter|L|mm|cm|inch)/i) &&
+              !style.match(/^(Black|White|Red|Blue|Green|Gray|Silver|Gold|Pink|Purple|Orange|Yellow|Brown)/i) &&
+              !style.match(/Case\s*w\//i)) {
+            styleOptions.push(style)
+            log(`[v0] ✅ Found style from twister button: ${style}`)
+          }
+        }
+      }
+    }
+    
+    // Look for style dropdown or buttons in data attributes
+    const styleDataMatch = htmlContent.match(/["']style["']\s*:\s*["']([^"']+)["']/gi)
+    if (styleDataMatch) {
+      for (const match of styleDataMatch) {
+        const styleMatch = match.match(/["']style["']\s*:\s*["']([^"']+)["']/i)
+        if (styleMatch && styleMatch[1]) {
+          const style = styleMatch[1].trim()
+          if (style && !styleOptions.includes(style)) {
+            // Include GPS/Cellular for watches, and general product variants
+            if (style.includes('GPS') || style.includes('Cellular') || style.includes('Wi-Fi') ||
+                style.length >= 10) {
+              styleOptions.push(style)
+            }
+          }
+        }
+      }
+    }
+    
+    // Also search for GPS/Cellular in the page content (for watches)
+    const gpsMatch = htmlContent.match(/(?:Style|Connectivity)[:\s]*(?:<[^>]+>)*(GPS(?:\s*\+\s*Cellular)?|GPS|Cellular)/gi)
+    if (gpsMatch) {
+      for (const match of gpsMatch) {
+        const style = match.replace(/Style[:\s]*/i, '').replace(/<[^>]+>/g, '').trim()
+        if (style && !styleOptions.includes(style)) {
+          styleOptions.push(style)
+        }
+      }
+    }
+    
+    // Check for common watch style options
+    if (htmlContent.includes('GPS + Cellular') && !styleOptions.includes('GPS + Cellular')) {
+      styleOptions.push('GPS + Cellular')
+    }
+    if (htmlContent.includes('>GPS<') && !styleOptions.includes('GPS')) {
+      styleOptions.push('GPS')
+    }
+    
+    // Look for style name in Amazon's product overview table
+    const styleNamePatterns = [
+      /<tr[^>]*>[\s\S]*?<th[^>]*>[\s\S]*?Style\s*(?:Name)?[\s\S]*?<\/th>[\s\S]*?<td[^>]*>[\s\S]*?<span[^>]*>([^<]+)<\/span>/gi,
+      /Style\s*(?:Name)?[:\s]*<[^>]*>([^<]{5,80})<\/[^>]*>/gi,
+      /"style_name"\s*:\s*"([^"]+)"/gi,
+      /data-csa-c-slot-id="style_name"[^>]*>([^<]+)</gi,
+    ]
+    
+    for (const pattern of styleNamePatterns) {
+      let match
+      while ((match = pattern.exec(htmlContent)) !== null) {
+        const styleName = decodeHtmlEntities((match[1] || '').trim())
+        if (styleName && styleName.length >= 3 && styleName.length <= 100 && !styleOptions.includes(styleName)) {
+          // Don't add if it's just a color or size
+          if (!styleName.match(/^(Black|White|Red|Blue|Green|Gray|Silver|Gold|Pink|Purple|Orange|Yellow|Brown)$/i) &&
+              !styleName.match(/^\d+\s*(Quart|Qt|oz|Liter|L|mm|cm|inch)$/i)) {
+            styleOptions.push(styleName)
+            log(`[v0] ✅ Found style name from product overview: ${styleName}`)
+          }
+        }
+      }
+    }
+    
+    // Look for variation/style selector in twister elements with asin-metadata
+    const asinMetadataMatch = htmlContent.match(/asin-metadata[^}]*"style_name"\s*:\s*"([^"]+)"/gi)
+    if (asinMetadataMatch) {
+      for (const match of asinMetadataMatch) {
+        const styleMatch = match.match(/"style_name"\s*:\s*"([^"]+)"/i)
+        if (styleMatch && styleMatch[1]) {
+          const styleName = decodeHtmlEntities(styleMatch[1].trim())
+          if (styleName && !styleOptions.includes(styleName)) {
+            styleOptions.push(styleName)
+            log(`[v0] ✅ Found style name from asin-metadata: ${styleName}`)
+          }
+        }
+      }
+    }
+    
+    // Look for variation dimensions with style info
+    const variationDimMatch = htmlContent.match(/variationValues[^}]*"style_name"\s*:\s*\[([^\]]+)\]/i)
+    if (variationDimMatch && variationDimMatch[1]) {
+      const styleNames = variationDimMatch[1].match(/"([^"]+)"/g)
+      if (styleNames) {
+        for (const name of styleNames) {
+          const styleName = name.replace(/"/g, '').trim()
+          if (styleName && styleName.length >= 3 && !styleOptions.includes(styleName)) {
+            styleOptions.push(styleName)
+            log(`[v0] ✅ Found style from variation values: ${styleName}`)
+          }
+        }
+      }
+    }
+    
+    // If we still have no style options but there's a styleName attribute, use it
+    if (styleOptions.length === 0 && productData.attributes.styleName) {
+      styleOptions.push(productData.attributes.styleName)
+      log(`[v0] ✅ Using styleName as style option: ${productData.attributes.styleName}`)
+    }
+    
+    // Extract model number from product title as style variant (e.g., "BL770", "QB1004")
+    if (styleOptions.length === 0 && productData.productName) {
+      // Look for model numbers in the title (alphanumeric codes like BL770, QB1004, etc.)
+      const modelPatterns = [
+        /\b([A-Z]{1,3}\d{3,5}[A-Z]?)\b/g,  // BL770, QB1004, BN801
+        /\b(\d{3,5}[A-Z]{1,3})\b/g,         // 1500W pattern variations
+        /,\s*([A-Z0-9]{4,10})\s*$/,         // Model at end after comma
+      ]
+      
+      for (const pattern of modelPatterns) {
+        const matches = productData.productName.match(pattern)
+        if (matches) {
+          for (const match of matches) {
+            const modelNum = match.trim()
+            // Filter out common non-model strings
+            if (modelNum && 
+                modelNum.length >= 4 && 
+                modelNum.length <= 10 &&
+                !modelNum.match(/^\d+W$/i) && // Not wattage like 1500W
+                !modelNum.match(/^\d+oz$/i) && // Not ounces
+                !modelNum.match(/^\d+HP$/i) && // Not horsepower
+                !styleOptions.includes(modelNum)) {
+              styleOptions.push(modelNum)
+              log(`[v0] ✅ Found model number as style variant from title: ${modelNum}`)
+              break // Only take the first valid model number
+            }
+          }
+        }
+        if (styleOptions.length > 0) break
+      }
+    }
+    
+    // Look for style in product specifications table
+    const styleSpecMatch = htmlContent.match(/>\s*Style\s*(?:Name)?[:\s]*<\/th>[\s\S]*?<td[^>]*>([\s\S]*?)<\/td>/i)
+    if (styleSpecMatch && styleSpecMatch[1]) {
+      const styleFromSpec = decodeHtmlEntities(styleSpecMatch[1].replace(/<[^>]+>/g, '').trim())
+      if (styleFromSpec && styleFromSpec.length >= 3 && styleFromSpec.length <= 50 && !styleOptions.includes(styleFromSpec)) {
+        styleOptions.push(styleFromSpec)
+        log(`[v0] ✅ Found style from specifications table: ${styleFromSpec}`)
+      }
+    }
+    
+    if (styleOptions.length > 0) {
+      productData.attributes.styleOptions = styleOptions
+      log(`[v0] ✅ Extracted ${styleOptions.length} style options: ${styleOptions.join(', ')}`)
+    }
+    
+    // Extract Configuration options (AppleCare+, etc.)
+    log("[v0] 🔍 Extracting configuration options...")
+    const configOptions: string[] = []
+    
+    // Look for AppleCare or configuration options
+    const configPatterns = [
+      /(?:Without|With)\s*AppleCare\+?(?:\s*\([^)]+\))?/gi,
+      /configuration['"]\s*:\s*["']([^"']+)["']/gi,
+    ]
+    
+    // Invalid configuration values to filter out
+    const invalidConfigs = ['square', 'configuration', 'default', 'none', 'select', 'choose']
+    
+    for (const pattern of configPatterns) {
+      const matches = htmlContent.match(pattern)
+      if (matches) {
+        for (const match of matches) {
+          const config = match.replace(/configuration['"]\s*:\s*["']/i, '').replace(/["']/g, '').trim()
+          const configLower = config.toLowerCase()
+          // Validate: must contain AppleCare or be a valid configuration
+          if (config && 
+              config.length > 5 && 
+              !configOptions.includes(config) &&
+              !invalidConfigs.includes(configLower) &&
+              (config.includes('AppleCare') || config.includes('With') || config.includes('Without'))) {
+            configOptions.push(config)
+          }
+        }
+      }
+    }
+    
+    if (configOptions.length > 0) {
+      productData.attributes.configurationOptions = configOptions
+      log(`[v0] ✅ Extracted ${configOptions.length} configuration options: ${configOptions.join(', ')}`)
+    }
+    
+    // Early audio product detection to skip appliance-specific extractions
+    const productNameLower = (productData.productName || '').toLowerCase()
+    const isEarlyAudioProduct = !!(
+      productData.attributes.earPlacement || 
+      productData.attributes.formFactor === 'In Ear' ||
+      productData.attributes.noiseControl ||
+      productData.attributes.earpieceShape ||
+      productNameLower.includes('airpods') ||
+      productNameLower.includes('earbuds') ||
+      productNameLower.includes('headphone') ||
+      productNameLower.includes('earphone') ||
+      productNameLower.includes('headset') ||
+      productNameLower.includes('earpods')
+    )
+    
+    if (isEarlyAudioProduct) {
+      log(`[v0] 🎧 Detected audio product early - skipping appliance-specific extractions (capacity, wattage, size)`)
+    }
+    
+    // Extract capacity specifically for kitchen appliances (skip for audio products)
+    if (!isEarlyAudioProduct && !productData.attributes.capacity && htmlContent) {
+      const capacityPatterns = [
+        /(\d+(?:\.\d+)?)\s*(?:Quart|Qt|Liter|L|Gallon)/gi,
+        /capacity[:\s]*(\d+(?:\.\d+)?)\s*(?:Quart|Qt|Liter|L|Gallon)/gi,
+      ]
+      
+      for (const pattern of capacityPatterns) {
+        const match = htmlContent.match(pattern)
+        if (match && match[0]) {
+          productData.attributes.capacity = match[0].trim()
+          log(`[v0] ✅ Extracted capacity: ${productData.attributes.capacity}`)
+          break
+        }
+      }
+    }
+    
+    // Extract wattage for appliances (skip for audio products)
+    if (!isEarlyAudioProduct && !productData.attributes.wattage && htmlContent) {
+      const wattageMatch = htmlContent.match(/(\d+)\s*(?:watt|W)\b/i)
+      if (wattageMatch) {
+        productData.attributes.wattage = `${wattageMatch[1]} watts`
+        log(`[v0] ✅ Extracted wattage: ${productData.attributes.wattage}`)
+      }
+    }
+    
+    // Extract product dimensions
+    if (!productData.attributes.productDimensions && htmlContent) {
+      const dimensionPatterns = [
+        /(\d+(?:\.\d+)?["']?\s*[xX×]\s*\d+(?:\.\d+)?["']?\s*[xX×]\s*\d+(?:\.\d+)?["']?)/i,
+        /(\d+(?:\.\d+)?"?D\s*[xX×]\s*\d+(?:\.\d+)?"?W\s*[xX×]\s*\d+(?:\.\d+)?"?H)/i,
+      ]
+      
+      for (const pattern of dimensionPatterns) {
+        const match = htmlContent.match(pattern)
+        if (match && match[1]) {
+          productData.attributes.productDimensions = match[1].trim()
+          log(`[v0] ✅ Extracted dimensions: ${productData.attributes.productDimensions}`)
+          break
+        }
+      }
+    }
+    
+    // Extract item weight
+    if (!productData.attributes.itemWeight && htmlContent) {
+      const weightPatterns = [
+        /(?:item\s+)?weight[:\s]*(\d+(?:\.\d+)?)\s*(?:pounds?|lbs?|oz|ounces?|kg|kilograms?)/i,
+        /(\d+(?:\.\d+)?)\s*(?:pounds?|lbs?)\s*(?:item\s+)?weight/i,
+      ]
+      
+      for (const pattern of weightPatterns) {
+        const match = htmlContent.match(pattern)
+        if (match) {
+          const weight = match[1] || match[0]
+          if (weight) {
+            productData.attributes.itemWeight = weight.includes('pound') || weight.includes('lb') 
+              ? weight 
+              : `${weight} Pounds`
+            log(`[v0] ✅ Extracted item weight: ${productData.attributes.itemWeight}`)
+            break
+          }
+        }
+      }
+    }
+  }
+  
   // Determine category for category-specific attribute extraction
   const categoryLower = (productData.category || "General").toLowerCase()
   const productNameLower = (productData.productName || "").toLowerCase()
@@ -3515,6 +4379,504 @@ async function extractWithoutAI(
     }
   }
   
+  // Extract ALL available size options from HTML (for Amazon and other stores)
+  // This extracts all options, not just the selected one
+  // For kitchen appliances, size options might be capacity values (e.g., "3 Quart", "6 Quart", "8 Quart")
+  const allSizeOptions: string[] = []
+  
+  // BLACKLIST: Common invalid values that should NEVER be size options
+  // These are Amazon navigation items, menu sections, and other irrelevant text
+  const sizeBlacklist = new Set([
+    // Amazon departments and navigation
+    'all departments', 'alexa skills', 'amazon autos', 'amazon devices', 'amazon fresh',
+    'amazon global store', 'amazon haul', 'amazon one medical', 'amazon pharmacy',
+    'amazon resale', 'appliances', 'apps & games', 'arts, crafts & sewing',
+    'audible books & originals', 'automotive parts & accessories', 'baby',
+    'beauty & personal care', 'books', 'cds & vinyl', 'cell phones & accessories',
+    'clothing, shoes & jewelry', "women's clothing, shoes & jewelry", "men's clothing, shoes & jewelry",
+    "girl's clothing, shoes & jewelry", "boy's clothing, shoes & jewelry", "baby clothing, shoes & jewelry",
+    'collectibles & fine art', 'computers', 'credit and payment cards', 'digital music',
+    'electronics', 'garden & outdoor', 'gift cards', 'grocery & gourmet food', 'handmade',
+    'health, household & baby care', 'home & business services', 'home & kitchen',
+    'industrial & scientific', 'just for prime', 'kindle store', 'luggage & travel gear',
+    'luxury stores', 'magazine subscriptions', 'movies & tv', 'musical instruments',
+    'office products', 'pet supplies', 'premium beauty', 'prime video', 'smart home',
+    'software', 'sports & outdoors', 'subscribe & save', 'subscription boxes',
+    'tools & home improvement', 'toys & games', 'under $10', 'video games',
+    'whole foods market', 'lucky',
+    // Cart and checkout terms
+    'subtotal', 'add to cart', 'buy now', 'add to list', 'add protection',
+    // AppleCare and service terms
+    'accidents happen, applecare+ covers them.', 'applecare+ for headphones - 2 years',
+    'applecare+ for headphones - monthly', 'no thanks', 'select a plan',
+    // Brand names that aren't sizes
+    'apple', 'amazon', 'instant pot', 'samsung', 'google', 'microsoft',
+    // Other navigation items
+    'search amazon', 'account & lists', 'returns & orders', 'cart', 'prime',
+    'hello, sign in', 'sign in', 'en', 'delivering to', 'update location',
+  ])
+  
+  // Helper function to check if a value is a valid size option
+  const isValidSizeOption = (value: string): boolean => {
+    if (!value || value.length === 0 || value.length > 60) return false
+    const lowerValue = value.toLowerCase().trim()
+    
+    // Check blacklist
+    if (sizeBlacklist.has(lowerValue)) return false
+    
+    // Check for common patterns that indicate invalid sizes
+    if (lowerValue.includes('department') || 
+        lowerValue.includes('amazon') ||
+        lowerValue.includes('alexa') ||
+        lowerValue.includes('kindle') ||
+        lowerValue.includes('prime') ||
+        lowerValue.includes('subtotal') ||
+        lowerValue.includes('applecare') ||
+        lowerValue.includes('protection') ||
+        lowerValue.includes('add to') ||
+        lowerValue.includes('buy now') ||
+        lowerValue.includes('sign in') ||
+        lowerValue.includes('shipping') ||
+        lowerValue.includes('delivery') ||
+        lowerValue.includes('returns') ||
+        lowerValue.includes('& accessories') ||
+        lowerValue.includes('& jewelry') ||
+        lowerValue.includes('& outdoor') ||
+        lowerValue.includes('& games') ||
+        lowerValue.includes('& sewing') ||
+        lowerValue.includes('& originals') ||
+        lowerValue.includes('& more') ||
+        lowerValue.includes('& baby') ||
+        lowerValue.includes('whole foods') ||
+        lowerValue.includes('select a') ||
+        lowerValue.includes('no thanks')) {
+      return false
+    }
+    
+    // Must contain at least one of: number with unit, or recognized size descriptor
+    // Valid patterns: "42mm", "6 Quarts", "Small/Medium", "Large", "8 oz", etc.
+    const validSizePatterns = [
+      /^\d+\s*(?:mm|cm|in|inches?|"|'|ft|feet|m|meters?)$/i,  // Dimensions
+      /^\d+\s*(?:quarts?|qt|liters?|l|gallons?|gal)$/i,       // Capacity
+      /^\d+\s*(?:oz|ounces?|ml|fl\.?\s*oz)$/i,                 // Volume
+      /^\d+\s*(?:gb|tb|mb)$/i,                                  // Storage
+      /^(?:xx?s|xx?l|s|m|l|small|medium|large|extra\s*(?:small|large))$/i,  // Clothing sizes
+      /^\d+(?:mm|cm)?\s*(?:case|band)?(?:\s*\+\s*(?:small|medium|large)(?:\/(?:small|medium|large))?\s*band)?$/i,  // Watch sizes (e.g., "42mm case + Small/Medium band")
+      /^(?:gps|gps\s*\+\s*cellular|wifi|wifi\s*\+\s*cellular|lte)$/i,  // Connectivity options (style, not size)
+      /^(?:with|without)\s*applecare\+?.*$/i,  // AppleCare configuration (not a size, but valid variant)
+    ]
+    
+    // Check if it matches any valid pattern
+    for (const pattern of validSizePatterns) {
+      if (pattern.test(lowerValue)) return true
+    }
+    
+    // For products like watches, accept size patterns like "42mm case + Small/Medium band"
+    if (lowerValue.match(/\d+(?:mm|cm)?\s*case/i)) return true
+    
+    return false
+  }
+  
+  if (htmlContent && hostname.includes('amazon.com')) {
+    // Pattern 1: Extract from Amazon's native dropdown - most reliable method
+    // Amazon uses specific IDs like "native_dropdown_selected_size_name" or "size_name"
+    const amazonSizeSelectPatterns = [
+      /<select[^>]*(?:id|name)=["']native_dropdown_selected_size_name["'][^>]*>([\s\S]*?)<\/select>/i,
+      /<select[^>]*(?:id|name)=["'][^"']*size[^"']*name[^"']*["'][^>]*>([\s\S]*?)<\/select>/i,
+      /<select[^>]*(?:id|name)=["'][^"']*native_dropdown[^"']*["'][^>]*>([\s\S]*?)<\/select>/i,
+      /<select[^>]*class=["'][^"']*native_dropdown[^"']*["'][^>]*>([\s\S]*?)<\/select>/i,
+    ]
+    
+    for (const selectPattern of amazonSizeSelectPatterns) {
+      const selectMatch = htmlContent.match(selectPattern)
+      if (selectMatch && selectMatch[1]) {
+        const optionsHtml = selectMatch[1]
+        console.log(`[v0] Found select dropdown, checking options...`)
+        const optionPattern = /<option[^>]*value=["']([^"']+)["'][^>]*>([^<]+)<\/option>/gi
+        let optionMatch
+        while ((optionMatch = optionPattern.exec(optionsHtml)) !== null) {
+          const value = optionMatch[1].trim()
+          const text = optionMatch[2].trim()
+          console.log(`[v0] Found option - value: "${value}", text: "${text}"`)
+          // Skip placeholder options
+          if (value && text && 
+              !text.match(/^(choose|select|please|--|none|select a|pick a|select an|please select|select size)/i) &&
+              !value.match(/^(choose|select|please|--|none|select a|pick a|select an|please select|select size)/i) &&
+              text.length > 0 && text.length < 100 &&
+              value.length > 0 && value.length < 100) {
+            // Prefer text over value, but use value if text is empty
+            const size = text || value
+            // Normalize: ensure "Quart" or "Quarts" format
+            let normalizedSize = size
+            // If it contains a number and "quart" (case insensitive), normalize it
+            if (size.match(/\d+\s*(?:quart|qt|q)/i)) {
+              // Extract number and unit
+              const match = size.match(/(\d+)\s*(quart|qt|q)(s?)/i)
+              if (match) {
+                const num = match[1]
+                const unit = match[2].toLowerCase() === 'q' ? 'Quart' : (match[2].toLowerCase() === 'qt' ? 'Quart' : 'Quart')
+                const plural = match[3] || 's' // Default to plural
+                normalizedSize = `${num} ${unit}${plural}`
+              }
+            }
+            // Validate before adding
+            if (normalizedSize && isValidSizeOption(normalizedSize) && !allSizeOptions.includes(normalizedSize)) {
+              allSizeOptions.push(normalizedSize)
+              console.log(`[v0] Added size option: "${normalizedSize}"`)
+            }
+          }
+        }
+        // If we found options from native dropdown, use them (most reliable)
+        if (allSizeOptions.length > 0) {
+          console.log(`[v0] ✅ Found ${allSizeOptions.length} size options from Amazon native dropdown:`, allSizeOptions)
+          break
+        }
+      }
+    }
+    
+    // Pattern 2: If native dropdown didn't work, try all select elements
+    if (allSizeOptions.length === 0) {
+      const allSelectPattern = /<select[^>]*>([\s\S]*?)<\/select>/gi
+      let selectMatch
+      while ((selectMatch = allSelectPattern.exec(htmlContent)) !== null) {
+        const optionsHtml = selectMatch[1]
+        // Check if this select contains size-related options (has multiple options and contains size indicators)
+        const optionCount = (optionsHtml.match(/<option/gi) || []).length
+        if (optionCount > 2 && (optionsHtml.toLowerCase().includes('quart') || 
+            optionsHtml.toLowerCase().includes('size') || 
+            optionsHtml.match(/\d+\s*(?:quart|qt|q|oz|ounce)/i))) {
+          const optionPattern = /<option[^>]*value=["']([^"']+)["'][^>]*>([^<]+)<\/option>/gi
+          let optionMatch
+          while ((optionMatch = optionPattern.exec(optionsHtml)) !== null) {
+            const value = optionMatch[1].trim()
+            const text = optionMatch[2].trim()
+            // Skip placeholder options
+            if (value && text && 
+                !text.match(/^(choose|select|please|--|none|select a|pick a|select an|please select|select size)/i) &&
+                !value.match(/^(choose|select|please|--|none|select a|pick a|select an|please select|select size)/i) &&
+                text.length > 0 && text.length < 100 &&
+                value.length > 0 && value.length < 100) {
+              let size = text || value
+              // Normalize: ensure "Quart" or "Quarts" format
+              if (size.match(/\d+\s*(?:quart|qt|q)/i)) {
+                const match = size.match(/(\d+)\s*(quart|qt|q)(s?)/i)
+                if (match) {
+                  const num = match[1]
+                  const unit = match[2].toLowerCase() === 'q' ? 'Quart' : (match[2].toLowerCase() === 'qt' ? 'Quart' : 'Quart')
+                  const plural = match[3] || 's' // Default to plural
+                  size = `${num} ${unit}${plural}`
+                }
+              }
+              if (size && isValidSizeOption(size) && !allSizeOptions.includes(size)) {
+                allSizeOptions.push(size)
+                console.log(`[v0] Added size option from fallback select: "${size}"`)
+              }
+            }
+          }
+          // If we found multiple valid options, use them
+          if (allSizeOptions.length > 1) {
+            console.log(`[v0] ✅ Found ${allSizeOptions.length} size options from select element`)
+            break
+          }
+        }
+      }
+    }
+    
+    // Pattern 2: Extract from Amazon's JavaScript variant data structures
+    // Amazon stores variant data in various JavaScript objects
+    if (allSizeOptions.length === 0) {
+      try {
+        // Look for twister-js-init-data or similar Amazon variant data
+        const twisterDataPatterns = [
+          /<script[^>]*id=["']twister-js-init-data["'][^>]*>([\s\S]{0,100000})<\/script>/i,
+          /twister-js-init-data[^>]*>([\s\S]{0,100000})<\/script>/i,
+          /var\s+twisterData\s*=\s*({[\s\S]{0,100000}?});/i,
+        ]
+        
+        for (const twisterDataPattern of twisterDataPatterns) {
+          const twisterMatch = htmlContent.match(twisterDataPattern)
+          if (twisterMatch && twisterMatch[1]) {
+            const twisterData = twisterMatch[1]
+            console.log(`[v0] Found twister data, length: ${twisterData.length}`)
+            
+            // Try to parse as JSON if it looks like JSON
+            try {
+              let variantData: any = null
+              // Try to extract JSON object
+              const jsonMatch = twisterData.match(/\{[\s\S]*\}/)
+              if (jsonMatch) {
+                variantData = JSON.parse(jsonMatch[0])
+              }
+              
+              if (variantData && variantData.dimensionValuesDisplayData) {
+                // Extract size dimension values
+                const sizeDimension = variantData.dimensionValuesDisplayData.size_name || 
+                                     variantData.dimensionValuesDisplayData.size ||
+                                     variantData.dimensionValuesDisplayData.dimension1
+                
+                if (sizeDimension && typeof sizeDimension === 'object') {
+                  Object.keys(sizeDimension).forEach(key => {
+                    const option = sizeDimension[key]
+                    if (option && option.displayName) {
+                      let displayName = option.displayName.trim()
+                      // Normalize: ensure "Quart" or "Quarts" format
+                      if (displayName.match(/\d+\s*(?:quart|qt|q)/i)) {
+                        const match = displayName.match(/(\d+)\s*(quart|qt|q)(s?)/i)
+                        if (match) {
+                          const num = match[1]
+                          const unit = match[2].toLowerCase() === 'q' ? 'Quart' : (match[2].toLowerCase() === 'qt' ? 'Quart' : 'Quart')
+                          const plural = match[3] || 's' // Default to plural
+                          displayName = `${num} ${unit}${plural}`
+                        }
+                      }
+                      if (displayName && displayName.length > 0 && displayName.length < 100) {
+                        if (!displayName.match(/^(choose|select|please|--|none)$/i) && isValidSizeOption(displayName) && !allSizeOptions.includes(displayName)) {
+                          allSizeOptions.push(displayName)
+                          console.log(`[v0] Added size option from variant data: "${displayName}"`)
+                        }
+                      }
+                    }
+                  })
+                }
+              }
+            } catch (jsonError) {
+              // If JSON parsing fails, use regex patterns
+              console.log(`[v0] JSON parsing failed, using regex: ${jsonError}`)
+              
+              // Extract dimensionValuesDisplayData using regex
+              const dimensionValuesPattern = /"dimensionValuesDisplayData"\s*:\s*\{([\s\S]{0,50000}?)\}/i
+              const dimMatch = twisterData.match(dimensionValuesPattern)
+              if (dimMatch && dimMatch[1]) {
+                const dimData = dimMatch[1]
+                // Look for size_name dimension
+                const sizeNamePattern = /"size_name"\s*:\s*\{([\s\S]{0,10000}?)\}/i
+                const sizeNameMatch = dimData.match(sizeNamePattern)
+                if (sizeNameMatch && sizeNameMatch[1]) {
+                  const sizeData = sizeNameMatch[1]
+                  // Extract all displayName values
+                  const displayNamePattern = /"displayName"\s*:\s*"([^"]+)"/gi
+                  let displayMatch
+                  while ((displayMatch = displayNamePattern.exec(sizeData)) !== null) {
+                    let displayName = displayMatch[1]?.trim()
+                    // Normalize: ensure "Quart" or "Quarts" format
+                    if (displayName && displayName.match(/\d+\s*(?:quart|qt|q)/i)) {
+                      const match = displayName.match(/(\d+)\s*(quart|qt|q)(s?)/i)
+                      if (match) {
+                        const num = match[1]
+                        const unit = match[2].toLowerCase() === 'q' ? 'Quart' : (match[2].toLowerCase() === 'qt' ? 'Quart' : 'Quart')
+                        const plural = match[3] || 's' // Default to plural
+                        displayName = `${num} ${unit}${plural}`
+                      }
+                    }
+                    if (displayName && displayName.length > 0 && displayName.length < 100) {
+                      if (!displayName.match(/^(choose|select|please|--|none)$/i) && isValidSizeOption(displayName) && !allSizeOptions.includes(displayName)) {
+                        allSizeOptions.push(displayName)
+                        console.log(`[v0] Added size option from regex: "${displayName}"`)
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            
+            if (allSizeOptions.length > 0) {
+              console.log(`[v0] ✅ Found ${allSizeOptions.length} size options from twister data`)
+              break
+            }
+          }
+        }
+      } catch (e) {
+        console.log("[v0] Error parsing JavaScript variant data:", e)
+      }
+    }
+    
+    // Pattern 3: Extract size from "Selected Size is X" text pattern (very reliable for Amazon)
+    const selectedSizePattern = /Selected Size is\s*([^.]+)\./gi
+    let selectedMatch
+    while ((selectedMatch = selectedSizePattern.exec(htmlContent)) !== null) {
+      const selectedSize = selectedMatch[1]?.trim()
+      if (selectedSize && selectedSize.length < 50) {
+        console.log(`[v0] Pattern 3 - Found selected size: "${selectedSize}"`)
+        // This tells us the format of sizes, look for similar patterns
+      }
+    }
+    
+    // Pattern 3b: Extract size options from Amazon's size/capacity variant buttons
+    // Amazon uses specific patterns like "3 Quarts", "6 Quarts", "8 Quarts"
+    // Look for sizes with units only (Quarts, Qt, Liters, L, oz, etc.)
+    const sizeWithUnitPatterns = [
+      />\s*(\d+)\s*Quarts?\s*</gi,
+      />\s*(\d+)\s*Qt\s*</gi,
+      />\s*(\d+)\s*Liters?\s*</gi,
+      />\s*(\d+)\s*L\s*</gi,
+      /"size_name"\s*:\s*"([^"]*\d+\s*(?:Quarts?|Qt|Liters?|L)[^"]*)"/gi,
+      /data-csa-c-content-id="[^"]*"\s*[^>]*>([^<]*\d+\s*(?:Quarts?|Qt|Liters?)[^<]*)</gi,
+      // Amazon's twister dimension labels
+      /class="[^"]*twister[^"]*"[^>]*>\s*<span[^>]*>\s*(\d+\s*(?:Quarts?|Qt|Liters?|L))/gi,
+      // Size selector options text
+      /<li[^>]*data-defaultasin[^>]*>[\s\S]*?(\d+\s*(?:Quarts?|Qt|Liters?|L))/gi,
+    ]
+    
+    for (const pattern of sizeWithUnitPatterns) {
+      let match
+      while ((match = pattern.exec(htmlContent)) !== null) {
+        let sizeValue = match[1]?.trim()
+        if (sizeValue) {
+          // Normalize: if just a number, add "Quarts"
+          if (sizeValue.match(/^\d+$/)) {
+            sizeValue = `${sizeValue} Quarts`
+          } else {
+            // Normalize "Qt" to "Quarts"
+            sizeValue = sizeValue.replace(/\bQt\b/i, 'Quarts')
+            // Ensure "Quart" becomes "Quarts"
+            sizeValue = sizeValue.replace(/\bQuart\b/i, 'Quarts')
+          }
+          if (isValidSizeOption(sizeValue) && !allSizeOptions.includes(sizeValue) && !allSizeOptions.find(s => s.toLowerCase() === sizeValue.toLowerCase())) {
+            allSizeOptions.push(sizeValue)
+            console.log(`[v0] Pattern 3b - Found size from text: "${sizeValue}"`)
+          }
+        }
+      }
+    }
+    
+    // Pattern 3c: Extract from inline JavaScript data (Amazon embeds variant data in scripts)
+    // Look specifically for size variants in JSON structures
+    const inlineJsPatterns = [
+      /"variationDisplayLabels"\s*:\s*\{([^}]+)\}/gi,
+      /"variationValues"\s*:\s*\{([^}]+)\}/gi,
+      /"size_name"\s*:\s*\[([^\]]+)\]/gi,
+    ]
+    
+    for (const pattern of inlineJsPatterns) {
+      let match
+      while ((match = pattern.exec(htmlContent)) !== null) {
+        const data = match[1]
+        // Extract values like "3 Quarts", "6 Quarts", "8 Quarts"
+        const valueMatches = data.matchAll(/"([^"]*(?:\d+\s*(?:Quarts?|Qt|Liters?|L))[^"]*)"/gi)
+        for (const valueMatch of valueMatches) {
+          let value = valueMatch[1]?.trim()
+          if (value && value.length < 50) {
+            // Normalize
+            value = value.replace(/\bQt\b/i, 'Quarts')
+            value = value.replace(/\bQuart\b/i, 'Quarts')
+            if (isValidSizeOption(value) && !allSizeOptions.includes(value) && !allSizeOptions.find(s => s.toLowerCase() === value.toLowerCase())) {
+              allSizeOptions.push(value)
+              console.log(`[v0] Pattern 3c - Found size from inline JS: "${value}"`)
+            }
+          }
+        }
+      }
+    }
+    
+    // Pattern 3d: Look for Amazon's aok-relative size selector with variant ASINs
+    // This captures the actual size options shown in the size dropdown/buttons
+    const sizeVariantPattern = /<li[^>]*id="[^"]*size_name[^"]*"[^>]*data-defaultasin[^>]*>[\s\S]*?<span[^>]*>([^<]+)</gi
+    let variantMatch
+    while ((variantMatch = sizeVariantPattern.exec(htmlContent)) !== null) {
+      let sizeValue = variantMatch[1]?.trim()
+      if (sizeValue && sizeValue.match(/\d+\s*(?:Quarts?|Qt|Liters?|L)/i)) {
+        sizeValue = sizeValue.replace(/\bQt\b/i, 'Quarts')
+        sizeValue = sizeValue.replace(/\bQuart\b/i, 'Quarts')
+        if (isValidSizeOption(sizeValue) && !allSizeOptions.includes(sizeValue) && !allSizeOptions.find(s => s.toLowerCase() === sizeValue.toLowerCase())) {
+          allSizeOptions.push(sizeValue)
+          console.log(`[v0] Pattern 3d - Found size from variant: "${sizeValue}"`)
+        }
+      }
+    }
+    
+    // Pattern 4: Extract from text patterns that show all available sizes (e.g., "3 Quart, 6 Quart, 8 Quart")
+    // This is useful for kitchen appliances where capacity is shown as size options
+    const productCategory = productData.category?.toLowerCase() || ''
+    if (productCategory.includes('kitchen') || productCategory.includes('appliance') || productData.productName?.toLowerCase().includes('instant pot') || productData.productName?.toLowerCase().includes('pressure cooker')) {
+      const sizeListPattern = /(?:size|capacity|available)[^>]*>([^<]*(?:\d+\s*(?:quart|qt|q)[^<]*(?:,|and|or)[^<]*(?:\d+\s*(?:quart|qt|q))[^<]*))</i
+      const sizeListMatch = htmlContent.match(sizeListPattern)
+      if (sizeListMatch && sizeListMatch[1]) {
+        const sizeList = sizeListMatch[1]
+        const sizeValues = sizeList.split(/,|and|or/).map(s => s.trim()).filter(s => s.match(/\d+\s*(?:quart|qt|q)/i))
+        sizeValues.forEach(size => {
+          if (isValidSizeOption(size) && !allSizeOptions.includes(size)) {
+            allSizeOptions.push(size)
+          }
+        })
+      }
+    }
+    
+    // Remove duplicates, clean up, and filter to only valid size patterns
+    // Valid sizes must be CLEAN size values like "3 Quarts", "6 Quarts", "8 Quarts"
+    // NOT product names that happen to contain size text like "Instant Pot 6QT RIO"
+    const cleanSizePattern = /^\d+\s*(?:Quarts?|Qt|Liters?|L|oz|ounces?|inches?|in|cm|mm|")$/i
+    const uniqueSizeOptions = [...new Set(allSizeOptions)]
+      .filter(opt => {
+        if (!opt || opt.length === 0 || opt.length > 30) return false
+        // Must match clean size pattern (number + unit only, no extra text)
+        if (!cleanSizePattern.test(opt.trim())) {
+          console.log(`[v0] Rejected size option (not clean): "${opt}"`)
+          return false
+        }
+        return true
+      })
+    
+    console.log(`[v0] Filtered size options (before: ${allSizeOptions.length}, after: ${uniqueSizeOptions.length})`)
+    
+    // If we found valid size options, set them as an array
+    if (uniqueSizeOptions.length > 0) {
+      // Sort by numeric value if they contain numbers (e.g., "3 Quart", "6 Quart", "8 Quart")
+      uniqueSizeOptions.sort((a, b) => {
+        const aNum = parseInt(a.match(/\d+/)?.[0] || '0')
+        const bNum = parseInt(b.match(/\d+/)?.[0] || '0')
+        if (aNum !== 0 && bNum !== 0) {
+          return aNum - bNum
+        }
+        return a.localeCompare(b)
+      })
+      productData.attributes.size = uniqueSizeOptions
+      // Also set sizeOptions in the format expected by the frontend: {size: string, price?: string}[]
+      productData.attributes.sizeOptions = uniqueSizeOptions.map(size => ({ size }))
+      console.log(`[v0] ✅ Extracted ${uniqueSizeOptions.length} valid size options:`, uniqueSizeOptions)
+      console.log(`[v0] ✅ Set sizeOptions for frontend:`, productData.attributes.sizeOptions)
+    } else {
+      console.log(`[v0] ⚠️ No valid size options found in Pattern 3/4`)
+      // Don't overwrite existing sizeOptions if we didn't find anything better
+    }
+  }
+  
+  // If we still don't have sizeOptions, try one more targeted extraction
+  if (!productData.attributes.sizeOptions || productData.attributes.sizeOptions.length === 0) {
+    // Try one more targeted extraction specifically for Instant Pot / kitchen appliances
+    if (htmlContent && hostname.includes('amazon.com')) {
+      const instantPotSizes: string[] = []
+      
+      // Look for clean "3 Quarts", "6 Quarts", "8 Quarts" in HTML elements
+      // Pattern: element containing ONLY a number followed by Quarts (no other text)
+      const quartsPattern = />\s*(\d+)\s*Quarts?\s*</gi
+      let qMatch
+      while ((qMatch = quartsPattern.exec(htmlContent)) !== null) {
+        const num = qMatch[1]
+        // Only accept reasonable capacity sizes (1-20 quarts for kitchen appliances)
+        const numVal = parseInt(num)
+        if (numVal >= 1 && numVal <= 20) {
+          const size = `${num} Quarts`
+          if (!instantPotSizes.includes(size)) {
+            instantPotSizes.push(size)
+            console.log(`[v0] Final pass - Found quart size: "${size}"`)
+          }
+        }
+      }
+      
+      if (instantPotSizes.length > 0) {
+        // Sort by numeric value
+        instantPotSizes.sort((a, b) => {
+          const aNum = parseInt(a.match(/\d+/)?.[0] || '0')
+          const bNum = parseInt(b.match(/\d+/)?.[0] || '0')
+          return aNum - bNum
+        })
+        productData.attributes.size = instantPotSizes
+        productData.attributes.sizeOptions = instantPotSizes.map(size => ({ size }))
+        console.log(`[v0] ✅ Final pass - Extracted ${instantPotSizes.length} size options:`, instantPotSizes)
+      }
+    }
+  }
+  
   // Extract size from HTML - category-specific
   if (!productData.attributes.size && htmlContent) {
     // For drinkware, extract capacity (ounces) instead of clothing sizes
@@ -3563,42 +4925,61 @@ async function extractWithoutAI(
         }
       }
     } else {
-      // For clothing and other products, use standard size extraction
-      const sizePatterns = [
-        /<meta[^>]*property=["']product:size["'][^>]*content=["']([^"']+)["']/i,
-        /size["']?\s*[:=]\s*["']([^"']+)["']/i,
-        /"size"\s*:\s*"([^"]+)"/i,
-        /<option[^>]*selected[^>]*value=["']([^"']+)["'][^>]*>/i,
-        /<button[^>]*class=["'][^"']*size[^"']*selected[^"']*["'][^>]*>([^<]+)<\/button>/i,
-        /<span[^>]*class=["'][^"']*size[^"']*selected[^"']*["'][^>]*>([^<]+)<\/span>/i,
-        /data-size=["']([^"']+)["']/i,
-        /aria-label=["']([^"']*size[^"']*)["']/i,
-      ]
+      // Check if this is an audio product - skip size extraction for audio products
+      const pnLower = (productData.productName || '').toLowerCase()
+      const isAudioProductForSize = !!(
+        productData.attributes.earPlacement || 
+        productData.attributes.formFactor === 'In Ear' ||
+        productData.attributes.noiseControl ||
+        productData.attributes.earpieceShape ||
+        pnLower.includes('airpods') ||
+        pnLower.includes('earbuds') ||
+        pnLower.includes('headphone') ||
+        pnLower.includes('earphone') ||
+        pnLower.includes('headset') ||
+        pnLower.includes('earpods')
+      )
       
-      for (const pattern of sizePatterns) {
-        const match = htmlContent.match(pattern)
-        if (match && match[1]) {
-          const size = match[1].trim()
-          // Reject clothing sizes for furniture
-          if (productData.category === "Furniture") {
-            const clothingSizes = ['xs', 'small', 'medium', 'large', 'xl', 'xxl', 'xxxl', 's', 'm', 'l']
-            const sizeLower = size.toLowerCase()
-            const isClothingSize = clothingSizes.some(cs => sizeLower === cs || sizeLower.includes(cs + ' '))
-            if (isClothingSize) {
-              log(`[v0] ⚠️ Rejected clothing size "${size}" for Furniture`)
-              continue
+      if (isAudioProductForSize) {
+        log(`[v0] 🎧 Skipping size extraction for audio product`)
+      } else {
+        // For clothing and other products, use standard size extraction
+        const sizePatterns = [
+          /<meta[^>]*property=["']product:size["'][^>]*content=["']([^"']+)["']/i,
+          /size["']?\s*[:=]\s*["']([^"']+)["']/i,
+          /"size"\s*:\s*"([^"]+)"/i,
+          /<option[^>]*selected[^>]*value=["']([^"']+)["'][^>]*>/i,
+          /<button[^>]*class=["'][^"']*size[^"']*selected[^"']*["'][^>]*>([^<]+)<\/button>/i,
+          /<span[^>]*class=["'][^"']*size[^"']*selected[^"']*["'][^>]*>([^<]+)<\/span>/i,
+          /data-size=["']([^"']+)["']/i,
+          /aria-label=["']([^"']*size[^"']*)["']/i,
+        ]
+        
+        for (const pattern of sizePatterns) {
+          const match = htmlContent.match(pattern)
+          if (match && match[1]) {
+            const size = match[1].trim()
+            // Reject clothing sizes for furniture
+            if (productData.category === "Furniture") {
+              const clothingSizes = ['xs', 'small', 'medium', 'large', 'xl', 'xxl', 'xxxl', 's', 'm', 'l']
+              const sizeLower = size.toLowerCase()
+              const isClothingSize = clothingSizes.some(cs => sizeLower === cs || sizeLower.includes(cs + ' '))
+              if (isClothingSize) {
+                log(`[v0] ⚠️ Rejected clothing size "${size}" for Furniture`)
+                continue
+              }
             }
-          }
-          // Filter out common non-size words
-          if (size && 
-              size.length > 0 &&
-              !size.toLowerCase().includes('select') && 
-              !size.toLowerCase().includes('choose') &&
-              !size.toLowerCase().includes('size') &&
-              size.length < 20) {
-            productData.attributes.size = size
-            log(`[v0] Extracted size from HTML: ${productData.attributes.size}`)
-            break
+            // Filter out common non-size words
+            if (size && 
+                size.length > 0 &&
+                !size.toLowerCase().includes('select') && 
+                !size.toLowerCase().includes('choose') &&
+                !size.toLowerCase().includes('size') &&
+                size.length < 20) {
+              productData.attributes.size = size
+              log(`[v0] Extracted size from HTML: ${productData.attributes.size}`)
+              break
+            }
           }
         }
       }
@@ -3795,29 +5176,10 @@ async function extractWithoutAI(
   if (htmlContent) {
     const category = productData.category.toLowerCase()
     
-    // Kitchen Appliances: Capacity, Features
+    // Kitchen Appliances: Features
     if (category.includes('kitchen') || category.includes('appliance')) {
-      // Extract capacity
-      if (!productData.attributes.capacity) {
-        const capacityPatterns = [
-          /capacity["']?\s*[:=]\s*["']?([^"',\n]+(?:L|ml|liter|gallon|cup|oz)[^"',\n]*)["']?/i,
-          /(?:water\s*tank|tank\s*capacity|capacity)[^>]*>([^<]+(?:L|ml|liter|gallon|cup|oz)[^<]*)</i,
-          /(\d+(?:\.\d+)?\s*(?:L|ml|liter|gallon|cup|oz))\s*(?:water|tank|capacity)/i,
-        ]
-        
-        for (const pattern of capacityPatterns) {
-          const match = htmlContent.match(pattern)
-          if (match && match[1]) {
-            const capacity = match[1].trim()
-            if (capacity && capacity.length < 50) {
-              productData.attributes.capacity = decodeHtmlEntities(capacity)
-              console.log("[v0] Extracted capacity for Kitchen Appliance:", productData.attributes.capacity)
-              break
-            }
-          }
-        }
-      }
-      
+      // Note: Size options (including capacity values like "3 Quart", "6 Quart", "8 Quart") 
+      // are already extracted in the size extraction logic above
       
       // Extract features (if not already extracted)
       if (!productData.attributes.features) {
@@ -5437,6 +6799,106 @@ async function extractWithoutAI(
         }
       }
       
+      // Extract Amazon Choice and Best Seller badges
+      log("[v0] 🔍 Extracting Amazon Choice and Best Seller badges...")
+      
+      // Amazon Choice badge patterns - comprehensive patterns for Amazon HTML structure
+      // Also includes "Overall Pick" which is Amazon's newer version of the badge
+      const amazonChoicePatterns = [
+        // Overall Pick patterns (new Amazon badge)
+        /Overall\s*Pick/i,
+        /<span[^>]*>[\s\S]*?Overall\s*Pick/i,
+        /<div[^>]*>[\s\S]*?Overall\s*Pick/i,
+        // Specific Amazon badge IDs and classes
+        /<span[^>]*id=["']ac-badge[^>]*>[\s\S]*?Amazon['"]?\s*Choice/i,
+        /<span[^>]*id=["']acBadge[^>]*>[\s\S]*?Amazon['"]?\s*Choice/i,
+        /<span[^>]*class=["'][^"']*ac-badge[^"']*["'][^>]*>[\s\S]*?Amazon['"]?\s*Choice/i,
+        /<span[^>]*class=["'][^"']*acBadge[^"']*["'][^>]*>[\s\S]*?Amazon['"]?\s*Choice/i,
+        /<div[^>]*id=["']ac-badge[^>]*>[\s\S]*?Amazon['"]?\s*Choice/i,
+        /<div[^>]*id=["']acBadge[^>]*>[\s\S]*?Amazon['"]?\s*Choice/i,
+        /<div[^>]*class=["'][^"']*ac-badge[^"']*["'][^>]*>[\s\S]*?Amazon['"]?\s*Choice/i,
+        /<div[^>]*class=["'][^"']*acBadge[^"']*["'][^>]*>[\s\S]*?Amazon['"]?\s*Choice/i,
+        // Data attributes
+        /data-a-badge-type=["']ac-badge["']/i,
+        /data-a-badge-type=["']acBadge["']/i,
+        /data-a-badge=["']ac-badge["']/i,
+        // Aria labels
+        /<span[^>]*aria-label=["'][^"']*Amazon['"]?\s*Choice[^"']*["']/i,
+        /<div[^>]*aria-label=["'][^"']*Amazon['"]?\s*Choice[^"']*["']/i,
+        // Text content patterns (more flexible)
+        /Amazon['"]?\s*Choice/i,
+        // JavaScript data patterns
+        /"acBadge":\s*true/i,
+        /"ac-badge":\s*true/i,
+        /acBadge["']?\s*:\s*["']?true/i,
+      ]
+      
+      let foundAmazonChoice = false
+      // Check for Overall Pick first (newer badge)
+      if (/Overall\s*Pick/i.test(htmlContent)) {
+        productData.amazonChoice = true
+        foundAmazonChoice = true
+        log("[v0] ✅ Found Overall Pick badge (Amazon Choice equivalent)")
+      } else {
+        for (const pattern of amazonChoicePatterns) {
+          if (pattern.test(htmlContent)) {
+            productData.amazonChoice = true
+            foundAmazonChoice = true
+            log("[v0] ✅ Found Amazon Choice badge")
+            break
+          }
+        }
+      }
+      
+      if (!foundAmazonChoice) {
+        log("[v0] ⚠️ Amazon Choice/Overall Pick badge not found")
+      }
+      
+      // Best Seller badge patterns - comprehensive patterns for Amazon HTML structure
+      const bestSellerPatterns = [
+        // Specific Amazon badge IDs and classes
+        /<span[^>]*id=["']best-seller-badge[^>]*>[\s\S]*?Best\s*Seller/i,
+        /<span[^>]*id=["']bestSellerBadge[^>]*>[\s\S]*?Best\s*Seller/i,
+        /<span[^>]*id=["']bestseller-badge[^>]*>[\s\S]*?Best\s*Seller/i,
+        /<span[^>]*class=["'][^"']*best-seller[^"']*["'][^>]*>[\s\S]*?Best\s*Seller/i,
+        /<span[^>]*class=["'][^"']*bestSeller[^"']*["'][^>]*>[\s\S]*?Best\s*Seller/i,
+        /<span[^>]*class=["'][^"']*bestseller[^"']*["'][^>]*>[\s\S]*?Best\s*Seller/i,
+        /<div[^>]*id=["']best-seller-badge[^>]*>[\s\S]*?Best\s*Seller/i,
+        /<div[^>]*id=["']bestSellerBadge[^>]*>[\s\S]*?Best\s*Seller/i,
+        /<div[^>]*class=["'][^"']*best-seller[^"']*["'][^>]*>[\s\S]*?Best\s*Seller/i,
+        /<div[^>]*class=["'][^"']*bestSeller[^"']*["'][^>]*>[\s\S]*?Best\s*Seller/i,
+        // Data attributes
+        /data-a-badge-type=["']best-seller["']/i,
+        /data-a-badge-type=["']bestSeller["']/i,
+        /data-a-badge=["']best-seller["']/i,
+        // Aria labels
+        /<span[^>]*aria-label=["'][^"']*Best\s*Seller[^"']*["']/i,
+        /<div[^>]*aria-label=["'][^"']*Best\s*Seller[^"']*["']/i,
+        // Text content patterns (more flexible)
+        /Best\s*Seller/i,
+        /#1\s*Best\s*Seller/i,
+        /#1\s*Bestseller/i,
+        /#1\s*Best\s*Seller/i,
+        // JavaScript data patterns
+        /"bestSeller":\s*true/i,
+        /"best-seller":\s*true/i,
+        /bestSeller["']?\s*:\s*["']?true/i,
+      ]
+      
+      let foundBestSeller = false
+      for (const pattern of bestSellerPatterns) {
+        if (pattern.test(htmlContent)) {
+          productData.bestSeller = true
+          foundBestSeller = true
+          log("[v0] ✅ Found Best Seller badge")
+          break
+        }
+      }
+      
+      if (!foundBestSeller) {
+        log("[v0] ⚠️ Best Seller badge not found")
+      }
+      
       // Pattern 0.5: Look for rating and review count together in aria-label (fallback)
       if ((!productData.rating || !productData.reviewCount)) {
         const ariaLabelPatterns = [
@@ -6047,8 +7509,20 @@ async function extractWithoutAI(
 
   // Extract jewelry-specific attributes for Amazon (gemstone, caratWeight, material)
   // This should run after general attribute extraction
-  // Run for any Amazon product - the patterns will only match if jewelry-specific data exists
-  if (hostname.includes('amazon.com') && htmlContent) {
+  // Only run for products that appear to be jewelry based on category or name
+  const isLikelyJewelry = productData.category?.toLowerCase().includes('jewelry') ||
+    productData.category?.toLowerCase().includes('watch') ||
+    productData.productName?.toLowerCase().includes('ring') ||
+    productData.productName?.toLowerCase().includes('necklace') ||
+    productData.productName?.toLowerCase().includes('bracelet') ||
+    productData.productName?.toLowerCase().includes('earring') ||
+    productData.productName?.toLowerCase().includes('pendant') ||
+    productData.productName?.toLowerCase().includes('chain') ||
+    productData.productName?.toLowerCase().includes('gold') ||
+    productData.productName?.toLowerCase().includes('silver') ||
+    productData.productName?.toLowerCase().includes('diamond')
+  
+  if (hostname.includes('amazon.com') && htmlContent && isLikelyJewelry) {
     log("[v0] 🔍 Checking for jewelry-specific attributes...")
     
     try {
@@ -6321,6 +7795,69 @@ async function extractWithoutAI(
     }
   }
   
+  // Clean up invalid/generic color values that are not actual product options
+  // These are often extracted incorrectly from page content
+  if (productData.attributes?.color) {
+    const invalidColors = ['base', 'titanium', 'default', 'standard', 'n/a', 'na', 'none', 'other', ''];
+    const colorLower = productData.attributes.color.toLowerCase().trim();
+    
+    // Check if color is in the invalid list OR if it's a jewelry-type color but product is not jewelry
+    const isJewelryColor = /(?:18K|14K|10K|Gold|Silver|Platinum|Titanium|Plated)/i.test(productData.attributes.color);
+    const isJewelryCategory = productData.category?.toLowerCase().includes('jewelry') ||
+      productData.category?.toLowerCase().includes('watch');
+    
+    if (invalidColors.includes(colorLower) || (isJewelryColor && !isJewelryCategory)) {
+      log(`[v0] 🧹 Removing invalid/irrelevant color attribute: "${productData.attributes.color}"`)
+      delete productData.attributes.color;
+    }
+  }
+  
+  // Post-extraction validation: Remove irrelevant attributes for audio products
+  const prodNameLower = (productData.productName || '').toLowerCase()
+  const isAudioProduct = !!(
+    productData.attributes?.earPlacement || 
+    productData.attributes?.formFactor === 'In Ear' ||
+    productData.attributes?.noiseControl ||
+    productData.attributes?.earpieceShape ||
+    prodNameLower.includes('airpods') ||
+    prodNameLower.includes('earbuds') ||
+    prodNameLower.includes('headphone') ||
+    prodNameLower.includes('earphone') ||
+    prodNameLower.includes('wireless earbuds') ||
+    prodNameLower.includes('noise cancellation') ||
+    prodNameLower.includes('bluetooth headphones')
+  )
+  
+  log(`[v0] 🔍 Audio product detection: isAudioProduct=${isAudioProduct}, productName="${prodNameLower.substring(0, 50)}..."`)
+  
+  if (isAudioProduct && productData.attributes) {
+    // Remove irrelevant attributes for audio products
+    const irrelevantForAudio = ['capacity', 'wattage', 'controlMethod', 'operationMode', 'size']
+    for (const key of irrelevantForAudio) {
+      if (productData.attributes[key]) {
+        log(`[v0] 🧹 Removing irrelevant attribute for audio product: ${key} = ${productData.attributes[key]}`)
+        delete productData.attributes[key]
+      }
+    }
+  }
+  
+  // Additional validation: Remove obviously invalid values
+  if (productData.attributes?.capacity) {
+    const capacityVal = String(productData.attributes.capacity).toLowerCase()
+    if (capacityVal.match(/^\d+l$/i) || capacityVal.match(/^\d+\s*liters?$/i)) {
+      log(`[v0] 🧹 Removing invalid capacity value: ${productData.attributes.capacity}`)
+      delete productData.attributes.capacity
+    }
+  }
+  
+  if (productData.attributes?.wattage) {
+    const wattageVal = String(productData.attributes.wattage).toLowerCase()
+    if (wattageVal.match(/^[1-9]\s*watts?$/i)) {
+      log(`[v0] 🧹 Removing invalid wattage value: ${productData.attributes.wattage}`)
+      delete productData.attributes.wattage
+    }
+  }
+  
   return NextResponse.json(productData);
 }
 
@@ -6433,6 +7970,9 @@ function extractPriceFromHTML(html: string): number | null {
 }
 
 export async function POST(request: Request) {
+  const extractionStartTime = Date.now()
+  let extractionUrl = ''
+  
   try {
     log("[v0] === Product extraction API called ===")
     
@@ -6446,7 +7986,11 @@ export async function POST(request: Request) {
     const body = await request.json()
     const { productUrl, url } = body
     const finalUrl = productUrl || url
+    extractionUrl = finalUrl
 
+    // Log extraction start with separator
+    logExtractionStart(finalUrl)
+    
     log(`[v0] Received product URL: ${finalUrl}`)
     if (finalUrl && finalUrl.includes('macys.com')) {
       log("[v0] 🏪 Macy's URL detected - will use Macy's-specific price extraction")
@@ -6624,33 +8168,44 @@ Return ONLY valid JSON, no markdown, no explanation.`
             stockStatus: "Unknown",
             rating: null,
             reviewCount: null,
+            amazonChoice: false,
+            bestSeller: false,
             attributes: {
               brand: null,
               color: null,
               size: null,
               material: null,
-              type: null, // Added type attribute
+              type: null,
               width: null,
               capacity: null,
               features: null,
-              fitType: null, // Added fitType attribute for clothing
-              heelHeight: null, // Added heelHeight attribute for shoes
-              model: null, // Added model attribute for electronics
-              specifications: null, // Added specifications attribute for electronics
-              offerType: null, // Added offerType attribute for product variants (e.g., Ad-supported, Without Lockscreen Ads)
-              kindleUnlimited: null, // Added kindleUnlimited attribute for Kindle product variants
-              energyRating: null, // Added energyRating attribute for home appliances
-              ageRange: null, // Added ageRange attribute for toys
-              safetyInfo: null, // Added safetyInfo attribute for toys
-              author: null, // Added author attribute for books
-              publisher: null, // Added publisher attribute for books
-              pageCount: null, // Added pageCount attribute for books
-              isbn: null, // Added isbn attribute for books
-              gemstone: null, // Added gemstone attribute for jewelry
-              caratWeight: null, // Added caratWeight attribute for jewelry
-              dimensions: null, // Added dimensions attribute for furniture
-              weight: null, // Added weight attribute for furniture
-              assembly: null, // Added assembly attribute for furniture
+              fitType: null,
+              heelHeight: null,
+              model: null,
+              specifications: null,
+              offerType: null,
+              kindleUnlimited: null,
+              energyRating: null,
+              ageRange: null,
+              safetyInfo: null,
+              author: null,
+              publisher: null,
+              pageCount: null,
+              isbn: null,
+              gemstone: null,
+              caratWeight: null,
+              dimensions: null,
+              weight: null,
+              assembly: null,
+              // Additional Amazon product attributes
+              finishType: null,
+              wattage: null,
+              controlMethod: null,
+              operationMode: null,
+              specialFeature: null,
+              itemWeight: null,
+              productDimensions: null,
+              sizeOptions: null,
             },
           }
 
@@ -8421,6 +9976,75 @@ Return ONLY valid JSON, no markdown, no explanation.`
         }
       }
     }
+    
+    // Post-extraction validation: Remove irrelevant attributes for audio products
+    if (productData.attributes) {
+      const productNameLower = (productData.productName || '').toLowerCase()
+      const isAudioProduct = !!(
+        productData.attributes.earPlacement || 
+        productData.attributes.formFactor === 'In Ear' ||
+        productData.attributes.noiseControl ||
+        productData.attributes.earpieceShape ||
+        productNameLower.includes('airpods') ||
+        productNameLower.includes('earbuds') ||
+        productNameLower.includes('headphone') ||
+        productNameLower.includes('earphone') ||
+        productNameLower.includes('wireless earbuds') ||
+        productNameLower.includes('noise cancellation') ||
+        productNameLower.includes('bluetooth headphones')
+      )
+      
+      log(`[v0] 🔍 Audio product detection: isAudioProduct=${isAudioProduct}, productName="${productNameLower.substring(0, 50)}..."`)
+      
+      if (isAudioProduct) {
+        // Remove irrelevant attributes for audio products
+        const irrelevantForAudio = ['capacity', 'wattage', 'controlMethod', 'operationMode', 'size']
+        for (const key of irrelevantForAudio) {
+          if (productData.attributes[key]) {
+            log(`[v0] 🧹 Removing irrelevant attribute for audio product: ${key} = ${productData.attributes[key]}`)
+            delete productData.attributes[key]
+          }
+        }
+      }
+      
+      // Additional validation: Remove obviously invalid values
+      // Capacity should not be single/double digit liters for most products
+      if (productData.attributes.capacity) {
+        const capacityVal = String(productData.attributes.capacity).toLowerCase()
+        // Invalid capacity patterns: any digit followed by L (like "91L", "43l")
+        if (capacityVal.match(/^\d+l$/i) || 
+            capacityVal.match(/^\d+\s*liters?$/i)) {
+          log(`[v0] 🧹 Removing invalid capacity value: ${productData.attributes.capacity}`)
+          delete productData.attributes.capacity
+        }
+      }
+      
+      // Wattage validation: should be realistic values
+      if (productData.attributes.wattage) {
+        const wattageVal = String(productData.attributes.wattage).toLowerCase()
+        // Single digit wattage is usually invalid
+        if (wattageVal.match(/^[1-9]\s*watts?$/i)) {
+          log(`[v0] 🧹 Removing invalid wattage value: ${productData.attributes.wattage}`)
+          delete productData.attributes.wattage
+        }
+      }
+    }
+
+    // Log extraction summary
+    const extractionDuration = Date.now() - extractionStartTime
+    logExtractionSummary({
+      url: extractionUrl,
+      productName: productData.productName,
+      price: productData.price,
+      hasImage: !!productData.imageUrl,
+      rating: productData.rating,
+      reviewCount: productData.reviewCount,
+      amazonChoice: productData.amazonChoice,
+      bestSeller: productData.bestSeller,
+      attributeCount: productData.attributes ? Object.keys(productData.attributes).filter(k => productData.attributes[k]).length : 0,
+      duration: extractionDuration,
+      success: true
+    })
 
     return NextResponse.json(productData)
   } catch (error) {
@@ -8429,6 +10053,23 @@ Return ONLY valid JSON, no markdown, no explanation.`
     console.error("[v0] Error object:", error)
     console.error("[v0] Error message:", error instanceof Error ? error.message : String(error))
     console.error("[v0] Error stack:", error instanceof Error ? error.stack : "No stack trace")
+    
+    // Log extraction failure
+    const extractionDuration = Date.now() - extractionStartTime
+    logExtractionSummary({
+      url: extractionUrl,
+      productName: null,
+      price: null,
+      hasImage: false,
+      rating: null,
+      reviewCount: null,
+      amazonChoice: false,
+      bestSeller: false,
+      attributeCount: 0,
+      duration: extractionDuration,
+      success: false
+    })
+    logToFile(`❌ ERROR: ${error instanceof Error ? error.message : String(error)}`).catch(() => {})
     
     // Enhanced error details for debugging
     const errorDetails: any = {

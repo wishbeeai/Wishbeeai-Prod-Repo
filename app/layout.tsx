@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import { Poppins, Inter, Shadows_Into_Light, Kalam, Dancing_Script, Pacifico } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import { Toaster } from "@/components/ui/toaster"
+import { Toaster as SonnerToaster } from "sonner"
 import { AuthProvider } from "@/lib/auth-context"
 import "./globals.css"
 
@@ -77,6 +78,26 @@ export default function RootLayout({
         <AuthProvider>
           {children}
           <Toaster />
+          <SonnerToaster 
+            position="top-right"
+            toastOptions={{
+              style: {
+                background: '#ECFDF5',
+                border: '2px solid #10B981',
+                color: '#065F46',
+              },
+              classNames: {
+                success: 'bg-gradient-to-r from-emerald-50 to-green-50 border-emerald-500 text-emerald-800',
+                error: 'bg-red-50 border-red-400 text-red-800',
+                title: 'text-emerald-800 font-bold',
+                description: 'text-emerald-700',
+                actionButton: 'bg-emerald-600 text-white hover:bg-emerald-700',
+                closeButton: 'text-emerald-600 hover:text-emerald-800',
+              },
+            }}
+            richColors
+            closeButton
+          />
           <Analytics />
         </AuthProvider>
       </body>

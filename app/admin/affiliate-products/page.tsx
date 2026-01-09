@@ -23,7 +23,6 @@ import {
   Loader2,
   Heart,
   ExternalLink,
-  ShoppingBag,
 } from "lucide-react"
 import { toast } from "sonner"
 import {
@@ -42,7 +41,39 @@ import {
 } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
 import Link from "next/link"
+
+interface ProductAttributes {
+  capacity?: string
+  material?: string
+  finishType?: string
+  productDimensions?: string
+  wattage?: string
+  itemWeight?: string
+  controlMethod?: string
+  operationMode?: string
+  specialFeature?: string
+  color?: string
+  size?: string | string[]
+  brand?: string
+  sizeOptions?: Array<{size: string, price?: string}>
+  // Audio product attributes
+  earPlacement?: string
+  formFactor?: string
+  noiseControl?: string
+  // Watch/Electronics variant attributes
+  colorVariants?: Array<{color: string, price?: string, originalPrice?: string, savings?: string}>
+  styleOptions?: string[]
+  configurationOptions?: string[]
+  // Style/Pattern attributes
+  styleName?: string
+  patternName?: string
+  model?: string
+  modelName?: string
+  // Custom badges
+  customBadges?: Array<{name: string, enabled: boolean}>
+}
 
 interface AffiliateProduct {
   id: string
@@ -57,6 +88,7 @@ interface AffiliateProduct {
   amazonChoice?: boolean
   bestSeller?: boolean
   productLink: string
+  attributes?: ProductAttributes
   createdAt: string
   updatedAt: string
 }
@@ -82,53 +114,16 @@ export default function AdminAffiliateProductsPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [isExtracting, setIsExtracting] = useState(false)
   const [extractedProduct, setExtractedProduct] = useState<any>(null)
+  // Custom fields for product specifications
+  const [customFields, setCustomFields] = useState<Array<{name: string, value: string}>>([])
+  // Custom badges for product
+  const [customBadges, setCustomBadges] = useState<Array<{name: string, enabled: boolean}>>([])
   // Temporary string values to preserve decimal points while typing
   const [tempPriceValue, setTempPriceValue] = useState<string>("")
   const [tempOriginalPriceValue, setTempOriginalPriceValue] = useState<string>("")
   const [tempRatingValue, setTempRatingValue] = useState<string>("")
   const [tempReviewCountValue, setTempReviewCountValue] = useState<string>("")
   const [addingToWishlist, setAddingToWishlist] = useState<string | null>(null)
-  const [isOptionModalOpen, setIsOptionModalOpen] = useState(false)
-  const [selectedProductForWishlist, setSelectedProductForWishlist] = useState<AffiliateProduct | null>(null)
-  const [productOptions, setProductOptions] = useState<any>(null)
-  const [isLoadingOptions, setIsLoadingOptions] = useState(false)
-  const [selectedOptions, setSelectedOptions] = useState<{
-    size?: string
-    color?: string
-    quantity?: number
-    [key: string]: any
-  }>({ quantity: 1 })
-  
-  // Map of attribute labels for better display
-  const attributeLabels: { [key: string]: string } = {
-    size: "Size",
-    color: "Color",
-    material: "Material",
-    type: "Type",
-    width: "Width",
-    capacity: "Capacity",
-    fitType: "Fit Type",
-    heelHeight: "Heel Height",
-    model: "Model",
-    offerType: "Offer Type",
-    kindleUnlimited: "Kindle Unlimited",
-    energyRating: "Energy Rating",
-    ageRange: "Age Range",
-    author: "Author",
-    publisher: "Publisher",
-    pageCount: "Page Count",
-    isbn: "ISBN",
-    gemstone: "Gemstone",
-    caratWeight: "Carat Weight",
-    dimensions: "Dimensions",
-    weight: "Weight",
-    assembly: "Assembly Required",
-    seatDepth: "Seat Depth",
-    seatHeight: "Seat Height",
-    weightLimit: "Weight Limit",
-    seatingCapacity: "Seating Capacity",
-    style: "Style",
-  }
   const [formData, setFormData] = useState({
     productName: "",
     image: "",
@@ -192,6 +187,11 @@ export default function AdminAffiliateProductsPage() {
       })
       if (response.ok) {
         toast.success("Product deleted successfully")
+        
+        // Immediately update local state to remove the deleted product
+        setProducts((prevProducts) => prevProducts.filter((p) => String(p.id) !== String(id)))
+        
+        // Also fetch to ensure sync with server (though local update is primary)
         fetchProducts()
         setIsDeleteModalOpen(false)
         setDeletingProductId(null)
@@ -219,6 +219,8 @@ export default function AdminAffiliateProductsPage() {
       bestSeller: false,
     })
     setExtractedProduct(null) // Clear extracted product widget
+    setCustomFields([]) // Clear custom fields
+    setCustomBadges([]) // Clear custom badges
   }
 
   const handleOpenAddModal = () => {
@@ -253,8 +255,33 @@ export default function AdminAffiliateProductsPage() {
       price: product.price || null,
       originalPrice: product.originalPrice || null,
       productLink: product.productLink || "",
-      brand: null, // Will be extracted if needed
+      brand: product.attributes?.brand || null,
+      amazonChoice: product.amazonChoice || false,
+      bestSeller: product.bestSeller || false,
+      // Include product attributes/specifications for editing
+      attributes: product.attributes || {
+        capacity: null,
+        material: null,
+        finishType: null,
+        productDimensions: null,
+        wattage: null,
+        itemWeight: null,
+        controlMethod: null,
+        operationMode: null,
+        specialFeature: null,
+        color: null,
+        size: null,
+        brand: null,
+        sizeOptions: null,
+        earPlacement: null,
+        formFactor: null,
+        noiseControl: null,
+      },
     })
+    // Load custom fields from product attributes
+    setCustomFields(product.attributes?.customFields || [])
+    // Load custom badges from product attributes
+    setCustomBadges(product.attributes?.customBadges || [])
     setIsEditModalOpen(true)
   }
 
@@ -263,9 +290,21 @@ export default function AdminAffiliateProductsPage() {
     setExtractedProduct(null) // Clear previous extracted product when URL changes
   }
 
-  const handleExtractProduct = async () => {
-    const url = formData.productLink
+  // Auto-extract when URL is pasted - pass URL directly since state update is async
+  const handleAutoExtract = async (pastedUrl: string) => {
+    // First update the form data
+    setFormData(prev => ({ ...prev, productLink: pastedUrl }))
+    setExtractedProduct(null)
     
+    // Then trigger extraction with the pasted URL directly
+    await extractProductFromUrl(pastedUrl)
+  }
+
+  const handleExtractProduct = async () => {
+    await extractProductFromUrl(formData.productLink)
+  }
+
+  const extractProductFromUrl = async (url: string) => {
     if (!url.trim()) {
       toast.error("Please paste a product URL")
       return
@@ -361,6 +400,10 @@ export default function AdminAffiliateProductsPage() {
           rating: ratingValue,
           reviewCount: reviewCountValue,
           brand: extracted.attributes?.brand || extracted.brand || null,
+          amazonChoice: extracted.amazonChoice || false,
+          bestSeller: extracted.bestSeller || false,
+          // Include all product attributes/specifications
+          attributes: extracted.attributes || null,
         })
         
         // Auto-fill form fields with extracted data
@@ -428,154 +471,80 @@ export default function AdminAffiliateProductsPage() {
 
   const handleAddToWishlist = async (product: AffiliateProduct) => {
     if (!user) {
-      toast.error("Please log in to add items to your wishlist")
+      toast.error("Authentication Required", {
+        description: "Please log in to add products to Trending Gifts.",
+        duration: 4000,
+      })
       return
     }
 
-    // Open option selection modal
-    setSelectedProductForWishlist(product)
-    setIsOptionModalOpen(true)
-    
-    // Fetch product options from URL
-    setIsLoadingOptions(true)
+    setAddingToWishlist(product.id)
     try {
-      const response = await fetch("/api/ai/extract-product", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ productUrl: product.productLink }),
-      })
+      const description = `${product.productName} from ${product.source}`
 
-      if (response.ok) {
-        const data = await response.json()
-        const extracted = data.productData || data
-        
-        // Extract all available attributes from the product
-        const attributes: { [key: string]: any } = {}
-        
-        // Get all attributes from the extracted data
-        if (extracted.attributes) {
-          // Filter out null/undefined/empty values and collect all available attributes
-          Object.keys(extracted.attributes).forEach((key) => {
-            const value = extracted.attributes[key]
-            if (value !== null && value !== undefined && value !== '') {
-              // For attributes that might be arrays or single values
-              if (Array.isArray(value) && value.length > 0) {
-                // Convert array items to strings if they're objects
-                attributes[key] = value.map((item: any) => {
-                  if (typeof item === 'object' && item !== null) {
-                    // If it's an object, try to extract a meaningful string representation
-                    return item.label || item.name || item.value || JSON.stringify(item)
-                  }
-                  return String(item)
-                })
-              } else if (typeof value === 'string' && value.trim() !== '') {
-                attributes[key] = [value] // Convert single value to array for consistency
-              } else if (typeof value === 'number') {
-                attributes[key] = [value.toString()]
-              } else if (typeof value === 'object' && value !== null) {
-                // Handle object values (e.g., {label: "Small", value: "S"})
-                const objValue = value.label || value.name || value.value || JSON.stringify(value)
-                if (objValue) {
-                  attributes[key] = [String(objValue)]
-                }
-              }
-            }
-          })
-        }
-        
-        // Also check for legacy size/color arrays
-        if (extracted.sizes && extracted.sizes.length > 0) {
-          attributes.size = extracted.sizes
-        }
-        if (extracted.colors && extracted.colors.length > 0) {
-          attributes.color = extracted.colors
-        }
-        
-        // If we have variants, extract them
-        if (extracted.variants && Array.isArray(extracted.variants)) {
-          const variantSizes = extracted.variants.map((v: any) => v.size).filter(Boolean)
-          const variantColors = extracted.variants.map((v: any) => v.color).filter(Boolean)
-          if (variantSizes.length > 0) {
-            attributes.size = [...new Set([...(attributes.size || []), ...variantSizes])]
-          }
-          if (variantColors.length > 0) {
-            attributes.color = [...new Set([...(attributes.color || []), ...variantColors])]
-          }
-        }
-        
-        setProductOptions(attributes)
-        setSelectedOptions({ quantity: 1 })
-      }
-    } catch (error) {
-      console.error("Error fetching product options:", error)
-      // Set default options if extraction fails
-      setProductOptions({ sizes: [], colors: [], quantity: 1 })
-    } finally {
-      setIsLoadingOptions(false)
-    }
-  }
-
-
-  const handleConfirmAddToWishlist = async () => {
-    if (!selectedProductForWishlist) return
-
-    setAddingToWishlist(selectedProductForWishlist.id)
-    try {
-      // Build product link with selected options
-      let productLink = selectedProductForWishlist.productLink
-      const url = new URL(productLink)
-      
-      // Add all selected attributes to URL parameters
-      Object.keys(selectedOptions).forEach((key) => {
-        if (key !== 'quantity' && selectedOptions[key]) {
-          url.searchParams.set(key, String(selectedOptions[key]))
-        }
-      })
-      productLink = url.toString()
-
-      // Build description with all selected attributes
-      const attributeDescriptions: string[] = []
-      Object.keys(selectedOptions).forEach((key) => {
-        if (key !== 'quantity' && selectedOptions[key]) {
-          const label = attributeLabels[key] || key.charAt(0).toUpperCase() + key.slice(1)
-          attributeDescriptions.push(`${label}: ${selectedOptions[key]}`)
-        }
-      })
-      
-      const description = `${selectedProductForWishlist.productName} from ${selectedProductForWishlist.source}${attributeDescriptions.length > 0 ? ` - ${attributeDescriptions.join(', ')}` : ''}${selectedOptions.quantity ? ` - Quantity: ${selectedOptions.quantity}` : ''}`
-
-      const response = await fetch("/api/wishlist", {
+      const response = await fetch("/api/trending-gifts", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          giftName: selectedProductForWishlist.productName,
-          currentPrice: selectedProductForWishlist.price,
+          productName: product.productName,
+          price: product.price,
+          originalPrice: product.originalPrice,
+          image: product.image,
+          source: product.source,
+          productLink: product.productLink,
+          category: product.category,
+          rating: product.rating,
+          reviewCount: product.reviewCount,
+          amazonChoice: product.amazonChoice || false,
+          bestSeller: product.bestSeller || false,
           description: description,
-          productImageUrl: selectedProductForWishlist.image,
-          storeName: selectedProductForWishlist.source,
-          productLink: productLink,
-          category: selectedProductForWishlist.category,
-          quantity: selectedOptions.quantity || 1,
+          // Include all product attributes/specifications
+          attributes: product.attributes || undefined,
         }),
       })
 
       if (response.ok) {
-        toast.success(`"${selectedProductForWishlist.productName}" added to your wishlist!`)
-        setIsOptionModalOpen(false)
-        setSelectedProductForWishlist(null)
-        setProductOptions(null)
-        setSelectedOptions({ quantity: 1 })
+        const result = await response.json()
+        console.log(`[handleAddToWishlist] Product added to trending gifts:`, result)
+        
+        // Remove product from affiliate products list after successfully adding to trending gifts
+        try {
+          const deleteResponse = await fetch(`/api/admin/affiliate-products/${product.id}`, {
+            method: "DELETE",
+          })
+          if (deleteResponse.ok) {
+            // Update local state to remove the product from the list
+            setProducts(prev => prev.filter(p => p.id !== product.id))
+            console.log(`[handleAddToWishlist] Product removed from affiliate products list`)
+          }
+        } catch (deleteError) {
+          console.error(`[handleAddToWishlist] Error removing from affiliate products:`, deleteError)
+        }
+        
+        toast.success("Added to Trending Gifts!", {
+          description: `"${product.productName.length > 50 ? product.productName.substring(0, 50) + '...' : product.productName}" has been added and removed from this list.`,
+          action: {
+            label: "View Trending Gifts",
+            onClick: () => router.push("/gifts/trending"),
+          },
+          duration: 5000,
+        })
       } else {
-        const error = await response.json()
-        throw new Error(error.error || "Failed to add to wishlist")
+        const error = await response.json().catch(() => ({ error: `HTTP ${response.status}: ${response.statusText}` }))
+        console.error(`[handleAddToWishlist] Error response:`, error)
+        toast.error("Failed to add product", {
+          description: error.error || "Something went wrong. Please try again.",
+          duration: 4000,
+        })
       }
     } catch (error) {
-      console.error("Error adding to wishlist:", error)
-      toast.error(error instanceof Error ? error.message : "Failed to add to wishlist")
+      console.error("Error adding to trending gifts:", error)
+      toast.error("Failed to add product", {
+        description: "Unable to connect to the server. Please check your connection and try again.",
+        duration: 4000,
+      })
     } finally {
       setAddingToWishlist(null)
     }
@@ -598,6 +567,39 @@ export default function AdminAffiliateProductsPage() {
     if (!extractedProduct?.price || isNaN(parseFloat(extractedProduct.price.toString()))) {
       toast.error("Valid price is required")
       return
+    }
+
+    // Check for duplicate product (only when adding new, not editing)
+    if (!isEditModalOpen) {
+      const productLink = formData.productLink || extractedProduct.productLink || ""
+      const productName = extractedProduct.productName.trim().toLowerCase()
+      
+      // Check if product with same link already exists
+      const duplicateByLink = products.find(p => 
+        p.productLink && productLink && 
+        p.productLink.toLowerCase() === productLink.toLowerCase()
+      )
+      
+      if (duplicateByLink) {
+        toast.error("Duplicate Product", {
+          description: "A product with this URL already exists in your catalog.",
+          duration: 5000,
+        })
+        return
+      }
+      
+      // Check if product with same name already exists
+      const duplicateByName = products.find(p => 
+        p.productName && p.productName.trim().toLowerCase() === productName
+      )
+      
+      if (duplicateByName) {
+        toast.error("Duplicate Product", {
+          description: `"${extractedProduct.productName}" already exists in your catalog.`,
+          duration: 5000,
+        })
+        return
+      }
     }
 
     setIsSaving(true)
@@ -630,8 +632,36 @@ export default function AdminAffiliateProductsPage() {
         productLink: isEditModalOpen && editingProduct 
           ? (editingProduct.productLink || extractedProduct.productLink || formData.productLink || "").trim() || undefined
           : (formData.productLink || extractedProduct.productLink || "").trim() || undefined,
-        amazonChoice: formData.amazonChoice,
-        bestSeller: formData.bestSeller,
+        amazonChoice: extractedProduct?.amazonChoice ?? formData.amazonChoice,
+        bestSeller: extractedProduct?.bestSeller ?? formData.bestSeller,
+        // Include product specifications/attributes
+        attributes: extractedProduct.attributes || customFields.length > 0 || customBadges.length > 0 ? {
+          capacity: extractedProduct.attributes?.capacity || undefined,
+          material: extractedProduct.attributes?.material || undefined,
+          finishType: extractedProduct.attributes?.finishType || undefined,
+          productDimensions: extractedProduct.attributes?.productDimensions || undefined,
+          wattage: extractedProduct.attributes?.wattage || undefined,
+          itemWeight: extractedProduct.attributes?.itemWeight || undefined,
+          controlMethod: extractedProduct.attributes?.controlMethod || undefined,
+          operationMode: extractedProduct.attributes?.operationMode || undefined,
+          specialFeature: extractedProduct.attributes?.specialFeature || undefined,
+          color: extractedProduct.attributes?.color || undefined,
+          size: extractedProduct.attributes?.size || undefined,
+          brand: extractedProduct.attributes?.brand || extractedProduct.brand || undefined,
+          sizeOptions: extractedProduct.attributes?.sizeOptions || undefined,
+          // Audio product attributes
+          earPlacement: extractedProduct.attributes?.earPlacement || undefined,
+          formFactor: extractedProduct.attributes?.formFactor || undefined,
+          noiseControl: extractedProduct.attributes?.noiseControl || undefined,
+          // Include custom fields
+          customFields: customFields.filter(f => f.name && f.value).length > 0 
+            ? customFields.filter(f => f.name && f.value) 
+            : undefined,
+          // Include custom badges
+          customBadges: customBadges.filter(b => b.name).length > 0
+            ? customBadges.filter(b => b.name)
+            : undefined,
+        } : undefined,
       }
 
       console.log(`[handleSave] ${method} request to: ${url}`)
@@ -976,9 +1006,9 @@ export default function AdminAffiliateProductsPage() {
                           <div className="font-bold text-[#654321] text-sm sm:text-base mb-1.5 line-clamp-2 leading-tight">
                             {product.productName}
                           </div>
-                          <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-gradient-to-r from-amber-100 to-orange-100 rounded-full">
-                            <Package className="w-3 h-3 text-[#DAA520]" />
-                            <span className="text-xs font-semibold text-[#8B4513]">{product.category}</span>
+                          <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-gradient-to-r from-amber-100 to-orange-100 rounded-full whitespace-nowrap">
+                            <Package className="w-3 h-3 text-[#DAA520] flex-shrink-0" />
+                            <span className="text-xs font-semibold text-[#8B4513] truncate max-w-[150px]">{product.category}</span>
                           </div>
                         </div>
                       </div>
@@ -988,13 +1018,13 @@ export default function AdminAffiliateProductsPage() {
                         <span className="text-sm font-semibold text-[#654321]">{product.source}</span>
                         <div className="flex flex-wrap gap-1.5">
                           {product.amazonChoice && (
-                            <Badge className="bg-gradient-to-r from-[#FF9900] to-[#FFB84D] text-white text-[10px] font-bold px-2 py-0.5 border-0 shadow-sm">
-                              Amazon Choice
+                            <Badge className="bg-[#232F3E] text-[#FFFFFF] text-[10px] font-bold px-2 py-0.5 border-0 shadow-sm">
+                              Amazon's Choice
                             </Badge>
                           )}
                           {product.bestSeller && (
-                            <Badge className="bg-gradient-to-r from-gray-800 to-gray-900 text-white text-[10px] font-bold px-2 py-0.5 border-0 shadow-sm">
-                              Best Seller
+                            <Badge className="bg-[#D14900] text-white text-[10px] font-bold px-2 py-0.5 border-0 shadow-sm">
+                              #1 Best Seller
                             </Badge>
                           )}
                         </div>
@@ -1002,37 +1032,40 @@ export default function AdminAffiliateProductsPage() {
                     </td>
                     <td className="py-5 px-4">
                       <div className="flex flex-col items-start gap-1.5">
-                        <div className="flex items-center gap-1">
-                          {[1, 2, 3, 4, 5].map((star) => {
-                            // Calculate fill percentage for each star based on rating
-                            const starValue = product.rating - star
-                            let fillPercent = 0
-                            
-                            if (starValue >= 1) {
-                              fillPercent = 100 // Fully filled
-                            } else if (starValue <= 0) {
-                              fillPercent = 0 // Empty
-                            } else {
-                              // Fractional part: 0.1 → 10%, 0.9 → 90%
-                              fillPercent = Math.round(starValue * 100)
-                            }
-                            
-                            // For full star icons, show as filled if >= 50%, empty if < 50%
-                            const isFilled = fillPercent >= 50
+                        <div className="flex items-center gap-0.5">
+                          {[1, 2, 3, 4, 5].map((starPosition) => {
+                            const rating = product.rating || 0
+                            const fillAmount = Math.max(0, Math.min(1, rating - (starPosition - 1)))
+                            const fillPercent = Math.round(fillAmount * 100)
+                            const gradientId = `star-gradient-${product.id}-${starPosition}`
                             
                             return (
-                              <Star
-                                key={star}
-                                className={`w-4 h-4 sm:w-5 sm:h-5 ${
-                                  isFilled
-                                    ? "fill-[#F4C430] text-[#F4C430]"
-                                    : "fill-gray-200 text-gray-300"
-                                }`}
-                              />
+                              <svg
+                                key={starPosition}
+                                className="w-4 h-4 sm:w-5 sm:h-5"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                xmlns="http://www.w3.org/2000/svg"
+                              >
+                                <defs>
+                                  <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
+                                    <stop offset={`${fillPercent}%`} stopColor="#F4C430" />
+                                    <stop offset={`${fillPercent}%`} stopColor="#E5E7EB" />
+                                  </linearGradient>
+                                </defs>
+                                <path
+                                  d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"
+                                  fill={`url(#${gradientId})`}
+                                  stroke="#F4C430"
+                                  strokeWidth="1"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                              </svg>
                             )
                           })}
                         </div>
-                        <span className="text-sm font-bold text-[#654321]">{product.rating.toFixed(1)}</span>
+                        <span className="text-sm font-bold text-[#654321]">{(product.rating || 0).toFixed(1)}</span>
                       </div>
                     </td>
                     <td className="py-5 px-4">
@@ -1084,7 +1117,7 @@ export default function AdminAffiliateProductsPage() {
                         <Button
                           onClick={() => handleAddToWishlist(product)}
                           disabled={addingToWishlist === product.id || !user}
-                          className="w-full h-9 px-3 rounded-full bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] text-xs font-semibold transition-all duration-200 hover:scale-105 hover:from-[#F4C430] hover:to-[#DAA520] active:scale-95 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                          className="h-8 px-3 rounded-full bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] hover:from-[#F4C430] hover:to-[#DAA520] text-xs sm:text-sm font-bold transition-all duration-200 hover:scale-105 active:scale-95 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                         >
                           {addingToWishlist === product.id ? (
                             <>
@@ -1222,7 +1255,7 @@ export default function AdminAffiliateProductsPage() {
           <div className="pt-2 pb-4 space-y-4">
             {/* Product Link - Only show when adding, not when editing */}
             {!isEditModalOpen && (
-              <div className="mb-8">
+              <div className="mb-16">
                 <label htmlFor="productLink" className="block text-sm font-semibold text-gray-700 mb-2">
                   Product URL <span className="text-red-500">*</span>
                 </label>
@@ -1234,9 +1267,10 @@ export default function AdminAffiliateProductsPage() {
                       value={formData.productLink}
                       onChange={(e) => handleProductLinkChange(e.target.value)}
                       onPaste={(e) => {
-                        const pastedText = e.clipboardData.getData("text")
+                        const pastedText = e.clipboardData.getData("text").trim()
                         if (pastedText.startsWith("http")) {
-                          handleProductLinkChange(pastedText)
+                          e.preventDefault() // Prevent default paste to avoid double input
+                          handleAutoExtract(pastedText)
                         }
                       }}
                       placeholder="Paste product link to extract product details"
@@ -1264,38 +1298,11 @@ export default function AdminAffiliateProductsPage() {
                   </Button>
                 </div>
                 
-                {/* Cancel and Close Window Buttons - Only show before extraction */}
-                {!extractedProduct && (
-                  <div className="flex justify-center gap-3 mt-8">
-                    <Button
-                      onClick={() => {
-                        setIsAddModalOpen(false)
-                        setIsEditModalOpen(false)
-                        setEditingProduct(null)
-                        resetForm()
-                      }}
-                      className="bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] hover:from-[#F4C430] hover:to-[#DAA520]"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      onClick={() => {
-                        setIsAddModalOpen(false)
-                        setIsEditModalOpen(false)
-                        setEditingProduct(null)
-                        resetForm()
-                      }}
-                      className="bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] hover:from-[#F4C430] hover:to-[#DAA520]"
-                    >
-                      Close Window
-                    </Button>
-                  </div>
-                )}
               </div>
             )}
 
             {/* Product Extract Details Widget - Show when extracted or when editing */}
-            {(extractedProduct || isEditModalOpen) && (
+            {extractedProduct && (
               <div className="mt-6">
                 <div className="bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 border-2 border-[#F4C430] rounded-xl p-6 shadow-xl">
                   {/* Header section - Only show when adding (not editing) */}
@@ -1320,10 +1327,10 @@ export default function AdminAffiliateProductsPage() {
                     <div className="bg-white rounded-xl p-4 shadow-md border border-amber-200">
                       <label className="block text-sm font-bold text-[#654321] mb-3 text-center">Product Image</label>
                       <div className="w-full h-[500px] sm:h-[600px] md:h-[700px] bg-white rounded-xl overflow-auto border-2 border-amber-300 shadow-inner flex items-center justify-center">
-                        {extractedProduct.image ? (
+                        {extractedProduct?.image ? (
                           <img
                             src={extractedProduct.image}
-                            alt={extractedProduct.productName || "Product"}
+                            alt={extractedProduct?.productName || "Product"}
                             className="max-w-full max-h-full w-auto h-auto object-contain"
                             onError={(e) => {
                               e.currentTarget.src = "/placeholder.svg"
@@ -1624,6 +1631,982 @@ export default function AdminAffiliateProductsPage() {
                       />
                     </div>
 
+                    {/* Custom Fields Section */}
+                    <div className="bg-white rounded-xl p-4 shadow-md border border-amber-200">
+                      <label className="block text-sm font-bold text-[#654321] mb-3">Custom Fields</label>
+                      <div className="space-y-2">
+                        {customFields.map((field, idx) => (
+                          <div key={idx} className="flex items-center gap-2">
+                            <Input
+                              value={field.name || ''}
+                              onChange={(e) => {
+                                const newCustomFields = [...customFields]
+                                newCustomFields[idx] = { ...newCustomFields[idx], name: e.target.value }
+                                setCustomFields(newCustomFields)
+                              }}
+                              className="w-32 h-8 text-sm border-gray-300 focus:border-amber-500"
+                              placeholder="Field Name"
+                            />
+                            <Input
+                              value={field.value || ''}
+                              onChange={(e) => {
+                                const newCustomFields = [...customFields]
+                                newCustomFields[idx] = { ...newCustomFields[idx], value: e.target.value }
+                                setCustomFields(newCustomFields)
+                              }}
+                              className="flex-1 h-8 text-sm border-gray-300 focus:border-amber-500"
+                              placeholder="Field Value"
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const newCustomFields = customFields.filter((_, i) => i !== idx)
+                                setCustomFields(newCustomFields)
+                              }}
+                              className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                            >
+                              ×
+                            </Button>
+                          </div>
+                        ))}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setCustomFields([...customFields, { name: '', value: '' }])
+                          }}
+                          className="text-xs h-7 border-amber-400 text-amber-700 hover:bg-amber-50"
+                        >
+                          + Add Field
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Badges Section */}
+                    <div className="bg-white rounded-xl p-4 shadow-md border border-amber-200">
+                      <label className="block text-sm font-bold text-[#654321] mb-3">Product Badges</label>
+                      <div className="space-y-3">
+                        {/* Amazon's Choice Badge - Editable */}
+                        <div className="flex items-center gap-2">
+                          <Checkbox
+                            id="amazon-choice"
+                            checked={extractedProduct?.amazonChoice || false}
+                            onCheckedChange={(checked) => {
+                              const newValue = checked === true
+                              setExtractedProduct({
+                                ...extractedProduct,
+                                amazonChoice: newValue
+                              })
+                              setFormData({
+                                ...formData,
+                                amazonChoice: newValue
+                              })
+                            }}
+                            className="border-2 border-gray-300 data-[state=checked]:bg-[#DAA520] data-[state=checked]:border-[#DAA520]"
+                          />
+                          <Input
+                            value="Amazon's Choice"
+                            disabled
+                            className="flex-1 h-8 text-sm border-gray-300 bg-gray-50"
+                          />
+                          {extractedProduct?.amazonChoice && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setExtractedProduct({
+                                  ...extractedProduct,
+                                  amazonChoice: false
+                                })
+                                setFormData({
+                                  ...formData,
+                                  amazonChoice: false
+                                })
+                              }}
+                              className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                            >
+                              ×
+                            </Button>
+                          )}
+                        </div>
+
+                        {/* Best Seller Badge - Editable */}
+                        <div className="flex items-center gap-2">
+                          <Checkbox
+                            id="best-seller"
+                            checked={extractedProduct?.bestSeller || false}
+                            onCheckedChange={(checked) => {
+                              const newValue = checked === true
+                              setExtractedProduct({
+                                ...extractedProduct,
+                                bestSeller: newValue
+                              })
+                              setFormData({
+                                ...formData,
+                                bestSeller: newValue
+                              })
+                            }}
+                            className="border-2 border-gray-300 data-[state=checked]:bg-[#DAA520] data-[state=checked]:border-[#DAA520]"
+                          />
+                          <Input
+                            value="#1 Best Seller"
+                            disabled
+                            className="flex-1 h-8 text-sm border-gray-300 bg-gray-50"
+                          />
+                          {extractedProduct?.bestSeller && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setExtractedProduct({
+                                  ...extractedProduct,
+                                  bestSeller: false
+                                })
+                                setFormData({
+                                  ...formData,
+                                  bestSeller: false
+                                })
+                              }}
+                              className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                            >
+                              ×
+                            </Button>
+                          )}
+                        </div>
+
+                        {/* Custom Badges */}
+                        {customBadges.map((badge, idx) => (
+                          <div key={idx} className="flex items-center gap-2">
+                            <Checkbox
+                              id={`custom-badge-${idx}`}
+                              checked={badge.enabled}
+                              onCheckedChange={(checked) => {
+                                const newBadges = [...customBadges]
+                                newBadges[idx] = { ...newBadges[idx], enabled: checked === true }
+                                setCustomBadges(newBadges)
+                              }}
+                              className="border-2 border-gray-300 data-[state=checked]:bg-[#DAA520] data-[state=checked]:border-[#DAA520]"
+                            />
+                            <Input
+                              value={badge.name}
+                              onChange={(e) => {
+                                const newBadges = [...customBadges]
+                                newBadges[idx] = { ...newBadges[idx], name: e.target.value }
+                                setCustomBadges(newBadges)
+                              }}
+                              className="flex-1 h-8 text-sm border-gray-300 focus:border-amber-500"
+                              placeholder="Badge name"
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setCustomBadges(customBadges.filter((_, i) => i !== idx))
+                              }}
+                              className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                            >
+                              ×
+                            </Button>
+                          </div>
+                        ))}
+
+                        {/* Add Badge Button */}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setCustomBadges([...customBadges, { name: '', enabled: true }])
+                          }}
+                          className="text-xs h-7 border-amber-400 text-amber-700 hover:bg-amber-50 mt-2"
+                        >
+                          + Add Badge
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Product Specifications Section - Show when extractedProduct exists to allow adding custom fields */}
+                    {extractedProduct ? (() => {
+                      // Detect if this is an audio product to hide irrelevant attributes
+                      const productNameLower = (extractedProduct?.productName || '').toLowerCase()
+                      const isAudioProduct = !!(
+                        extractedProduct?.attributes?.earPlacement || 
+                        extractedProduct?.attributes?.formFactor === 'In Ear' ||
+                        extractedProduct?.attributes?.noiseControl ||
+                        productNameLower.includes('airpods') ||
+                        productNameLower.includes('earbuds') ||
+                        productNameLower.includes('headphone') ||
+                        productNameLower.includes('earphone') ||
+                        productNameLower.includes('headset')
+                      )
+                      
+                      // Detect if this is a watch product to hide irrelevant attributes
+                      const isWatchProduct = !!(
+                        productNameLower.includes('watch') ||
+                        productNameLower.includes('smartwatch') ||
+                        extractedProduct?.attributes?.styleOptions ||
+                        extractedProduct?.attributes?.colorVariants?.some((cv: {color: string}) => 
+                          cv.color.includes('Case') && cv.color.includes('Band')
+                        )
+                      )
+                      
+                      // Hide dimensions, weight, material, etc. for audio and watch products
+                      const hideApplianceAttrs = isAudioProduct || isWatchProduct
+                      
+                      return (
+                      <div className="bg-white rounded-xl p-4 shadow-md border border-amber-200">
+                        <label className="block text-sm font-bold text-[#654321] mb-3">Product Specifications</label>
+                        <div className="space-y-3 text-sm">
+                          {/* Capacity - hide for audio/watch products */}
+                          {!hideApplianceAttrs && (extractedProduct?.attributes?.capacity || isEditModalOpen) && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-600 w-28 flex-shrink-0">Capacity:</span>
+                              <Input
+                                value={extractedProduct?.attributes?.capacity || ''}
+                                onChange={(e) => setExtractedProduct({
+                                  ...extractedProduct,
+                                  attributes: { ...(extractedProduct?.attributes || {}), capacity: e.target.value }
+                                })}
+                                className="flex-1 h-8 text-sm border-gray-300 focus:border-amber-500"
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  const newAttrs = { ...(extractedProduct?.attributes || {}) }
+                                  delete newAttrs.capacity
+                                  setExtractedProduct({ ...extractedProduct, attributes: newAttrs })
+                                }}
+                                className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                              >
+                                ×
+                              </Button>
+                            </div>
+                          )}
+                          {/* Material - hide for audio/watch products */}
+                          {!hideApplianceAttrs && (extractedProduct?.attributes?.material || isEditModalOpen) && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-600 w-28 flex-shrink-0">Material:</span>
+                              <Input
+                                value={extractedProduct?.attributes?.material || ''}
+                                onChange={(e) => setExtractedProduct({
+                                  ...extractedProduct,
+                                  attributes: { ...(extractedProduct?.attributes || {}), material: e.target.value }
+                                })}
+                                className="flex-1 h-8 text-sm border-gray-300 focus:border-amber-500"
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  const newAttrs = { ...(extractedProduct?.attributes || {}) }
+                                  delete newAttrs.material
+                                  setExtractedProduct({ ...extractedProduct, attributes: newAttrs })
+                                }}
+                                className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                              >
+                                ×
+                              </Button>
+                            </div>
+                          )}
+                          {/* Finish Type - hide for audio/watch products */}
+                          {!hideApplianceAttrs && (extractedProduct?.attributes?.finishType || isEditModalOpen) && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-600 w-28 flex-shrink-0">Finish Type:</span>
+                              <Input
+                                value={extractedProduct?.attributes?.finishType || ''}
+                                onChange={(e) => setExtractedProduct({
+                                  ...extractedProduct,
+                                  attributes: { ...(extractedProduct?.attributes || {}), finishType: e.target.value }
+                                })}
+                                className="flex-1 h-8 text-sm border-gray-300 focus:border-amber-500"
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  const newAttrs = { ...(extractedProduct?.attributes || {}) }
+                                  delete newAttrs.finishType
+                                  setExtractedProduct({ ...extractedProduct, attributes: newAttrs })
+                                }}
+                                className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                              >
+                                ×
+                              </Button>
+                            </div>
+                          )}
+                          {/* Dimensions - hide for audio/watch products */}
+                          {!hideApplianceAttrs && (extractedProduct?.attributes?.productDimensions || isEditModalOpen) && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-600 w-28 flex-shrink-0">Dimensions:</span>
+                              <Input
+                                value={extractedProduct?.attributes?.productDimensions || ''}
+                                onChange={(e) => setExtractedProduct({
+                                  ...extractedProduct,
+                                  attributes: { ...(extractedProduct?.attributes || {}), productDimensions: e.target.value }
+                                })}
+                                className="flex-1 h-8 text-sm border-gray-300 focus:border-amber-500"
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  const newAttrs = { ...(extractedProduct?.attributes || {}) }
+                                  delete newAttrs.productDimensions
+                                  setExtractedProduct({ ...extractedProduct, attributes: newAttrs })
+                                }}
+                                className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                              >
+                                ×
+                              </Button>
+                            </div>
+                          )}
+                          {/* Wattage - hide for audio/watch products */}
+                          {!hideApplianceAttrs && (extractedProduct?.attributes?.wattage || isEditModalOpen) && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-600 w-28 flex-shrink-0">Wattage:</span>
+                              <Input
+                                value={extractedProduct?.attributes?.wattage || ''}
+                                onChange={(e) => setExtractedProduct({
+                                  ...extractedProduct,
+                                  attributes: { ...(extractedProduct?.attributes || {}), wattage: e.target.value }
+                                })}
+                                className="flex-1 h-8 text-sm border-gray-300 focus:border-amber-500"
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  const newAttrs = { ...(extractedProduct?.attributes || {}) }
+                                  delete newAttrs.wattage
+                                  setExtractedProduct({ ...extractedProduct, attributes: newAttrs })
+                                }}
+                                className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                              >
+                                ×
+                              </Button>
+                            </div>
+                          )}
+                          {/* Control Method - hide for audio/watch products */}
+                          {!hideApplianceAttrs && (extractedProduct?.attributes?.controlMethod || isEditModalOpen) && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-600 w-28 flex-shrink-0">Control:</span>
+                              <Input
+                                value={extractedProduct?.attributes?.controlMethod || ''}
+                                onChange={(e) => setExtractedProduct({
+                                  ...extractedProduct,
+                                  attributes: { ...(extractedProduct?.attributes || {}), controlMethod: e.target.value }
+                                })}
+                                className="flex-1 h-8 text-sm border-gray-300 focus:border-amber-500"
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  const newAttrs = { ...(extractedProduct?.attributes || {}) }
+                                  delete newAttrs.controlMethod
+                                  setExtractedProduct({ ...extractedProduct, attributes: newAttrs })
+                                }}
+                                className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                              >
+                                ×
+                              </Button>
+                            </div>
+                          )}
+                          {/* Operation Mode - hide for audio/watch products */}
+                          {!hideApplianceAttrs && (extractedProduct?.attributes?.operationMode || isEditModalOpen) && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-600 w-28 flex-shrink-0">Operation:</span>
+                              <Input
+                                value={extractedProduct?.attributes?.operationMode || ''}
+                                onChange={(e) => setExtractedProduct({
+                                  ...extractedProduct,
+                                  attributes: { ...(extractedProduct?.attributes || {}), operationMode: e.target.value }
+                                })}
+                                className="flex-1 h-8 text-sm border-gray-300 focus:border-amber-500"
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  const newAttrs = { ...(extractedProduct?.attributes || {}) }
+                                  delete newAttrs.operationMode
+                                  setExtractedProduct({ ...extractedProduct, attributes: newAttrs })
+                                }}
+                                className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                              >
+                                ×
+                              </Button>
+                            </div>
+                          )}
+                          {/* Special Feature - hide for audio/watch products */}
+                          {!hideApplianceAttrs && (extractedProduct?.attributes?.specialFeature || isEditModalOpen) && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-600 w-28 flex-shrink-0">Special:</span>
+                              <Input
+                                value={extractedProduct?.attributes?.specialFeature || ''}
+                                onChange={(e) => setExtractedProduct({
+                                  ...extractedProduct,
+                                  attributes: { ...(extractedProduct?.attributes || {}), specialFeature: e.target.value }
+                                })}
+                                className="flex-1 h-8 text-sm border-gray-300 focus:border-amber-500"
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  const newAttrs = { ...(extractedProduct?.attributes || {}) }
+                                  delete newAttrs.specialFeature
+                                  setExtractedProduct({ ...extractedProduct, attributes: newAttrs })
+                                }}
+                                className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                              >
+                                ×
+                              </Button>
+                            </div>
+                          )}
+                          {/* Style Name */}
+                          {(extractedProduct?.attributes?.styleName || isEditModalOpen) && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-600 w-28 flex-shrink-0">Style Name:</span>
+                              <Input
+                                value={extractedProduct?.attributes?.styleName || ''}
+                                onChange={(e) => setExtractedProduct({
+                                  ...extractedProduct,
+                                  attributes: { ...(extractedProduct?.attributes || {}), styleName: e.target.value }
+                                })}
+                                className="flex-1 h-8 text-sm border-gray-300 focus:border-amber-500"
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  const newAttrs = { ...(extractedProduct?.attributes || {}) }
+                                  delete newAttrs.styleName
+                                  setExtractedProduct({ ...extractedProduct, attributes: newAttrs })
+                                }}
+                                className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                              >
+                                ×
+                              </Button>
+                            </div>
+                          )}
+                          {/* Model Name */}
+                          {(extractedProduct?.attributes?.modelName || isEditModalOpen) && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-600 w-28 flex-shrink-0">Model:</span>
+                              <Input
+                                value={extractedProduct?.attributes?.modelName || ''}
+                                onChange={(e) => setExtractedProduct({
+                                  ...extractedProduct,
+                                  attributes: { ...(extractedProduct?.attributes || {}), modelName: e.target.value }
+                                })}
+                                className="flex-1 h-8 text-sm border-gray-300 focus:border-amber-500"
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  const newAttrs = { ...(extractedProduct?.attributes || {}) }
+                                  delete newAttrs.modelName
+                                  setExtractedProduct({ ...extractedProduct, attributes: newAttrs })
+                                }}
+                                className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                              >
+                                ×
+                              </Button>
+                            </div>
+                          )}
+                          {/* Ear Placement - Audio products */}
+                          {(extractedProduct?.attributes?.earPlacement || isEditModalOpen) && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-600 w-28 flex-shrink-0">Ear Placement:</span>
+                              <Input
+                                value={extractedProduct?.attributes?.earPlacement || ''}
+                                onChange={(e) => setExtractedProduct({
+                                  ...extractedProduct,
+                                  attributes: { ...(extractedProduct?.attributes || {}), earPlacement: e.target.value }
+                                })}
+                                className="flex-1 h-8 text-sm border-gray-300 focus:border-amber-500"
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  const newAttrs = { ...(extractedProduct?.attributes || {}) }
+                                  delete newAttrs.earPlacement
+                                  setExtractedProduct({ ...extractedProduct, attributes: newAttrs })
+                                }}
+                                className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                              >
+                                ×
+                              </Button>
+                            </div>
+                          )}
+                          {/* Form Factor - Audio products */}
+                          {(extractedProduct?.attributes?.formFactor || isEditModalOpen) && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-600 w-28 flex-shrink-0">Form Factor:</span>
+                              <Input
+                                value={extractedProduct?.attributes?.formFactor || ''}
+                                onChange={(e) => setExtractedProduct({
+                                  ...extractedProduct,
+                                  attributes: { ...(extractedProduct?.attributes || {}), formFactor: e.target.value }
+                                })}
+                                className="flex-1 h-8 text-sm border-gray-300 focus:border-amber-500"
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  const newAttrs = { ...(extractedProduct?.attributes || {}) }
+                                  delete newAttrs.formFactor
+                                  setExtractedProduct({ ...extractedProduct, attributes: newAttrs })
+                                }}
+                                className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                              >
+                                ×
+                              </Button>
+                            </div>
+                          )}
+                          {/* Noise Control - Audio products */}
+                          {(extractedProduct?.attributes?.noiseControl || isEditModalOpen) && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-600 w-28 flex-shrink-0">Noise Control:</span>
+                              <Input
+                                value={extractedProduct?.attributes?.noiseControl || ''}
+                                onChange={(e) => setExtractedProduct({
+                                  ...extractedProduct,
+                                  attributes: { ...(extractedProduct?.attributes || {}), noiseControl: e.target.value }
+                                })}
+                                className="flex-1 h-8 text-sm border-gray-300 focus:border-amber-500"
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  const newAttrs = { ...(extractedProduct?.attributes || {}) }
+                                  delete newAttrs.noiseControl
+                                  setExtractedProduct({ ...extractedProduct, attributes: newAttrs })
+                                }}
+                                className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                              >
+                                ×
+                              </Button>
+                            </div>
+                          )}
+                          {/* Style Options / Variants - Always show with Add button */}
+                          <div className="mt-2 pt-2 border-t border-amber-200">
+                            <span className="text-gray-600 block mb-2">Style / Variants:</span>
+                            <div className="space-y-2">
+                              {(extractedProduct?.attributes?.styleOptions || []).map((style: string, idx: number) => (
+                                <div key={idx} className="flex items-center gap-2">
+                                  <Input
+                                    value={style || ''}
+                                    onChange={(e) => {
+                                      const newStyleOptions = [...(extractedProduct?.attributes?.styleOptions || [])]
+                                      newStyleOptions[idx] = e.target.value
+                                      setExtractedProduct({
+                                        ...extractedProduct,
+                                        attributes: { ...(extractedProduct?.attributes || {}), styleOptions: newStyleOptions }
+                                      })
+                                    }}
+                                    className="flex-1 h-8 text-sm border-gray-300 focus:border-amber-500"
+                                    placeholder="Style / Variant option"
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      const newStyleOptions = (extractedProduct?.attributes?.styleOptions || []).filter((_: string, i: number) => i !== idx)
+                                      setExtractedProduct({
+                                        ...extractedProduct,
+                                        attributes: { ...(extractedProduct?.attributes || {}), styleOptions: newStyleOptions }
+                                      })
+                                    }}
+                                    className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                  >
+                                    ×
+                                  </Button>
+                                </div>
+                              ))}
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  const newStyleOptions = [...(extractedProduct?.attributes?.styleOptions || []), '']
+                                  setExtractedProduct({
+                                    ...extractedProduct,
+                                    attributes: { ...(extractedProduct?.attributes || {}), styleOptions: newStyleOptions }
+                                  })
+                                }}
+                                className="text-xs h-7 border-amber-400 text-amber-700 hover:bg-amber-50"
+                              >
+                                + Add Style / Variant
+                              </Button>
+                            </div>
+                          </div>
+                          {/* Configuration Options - AppleCare, etc. - Editable */}
+                          {(extractedProduct?.attributes?.configurationOptions && extractedProduct.attributes.configurationOptions.length > 0) && (
+                            <div className="mt-2 pt-2 border-t border-amber-200">
+                              <span className="text-gray-600 block mb-2">Configuration:</span>
+                              <div className="space-y-2">
+                                {extractedProduct.attributes.configurationOptions.map((config: string, idx: number) => (
+                                  <div key={idx} className="flex items-center gap-2">
+                                    <Input
+                                      value={config || ''}
+                                      onChange={(e) => {
+                                        const newConfigOptions = [...(extractedProduct?.attributes?.configurationOptions || [])]
+                                        newConfigOptions[idx] = e.target.value
+                                        setExtractedProduct({
+                                          ...extractedProduct,
+                                          attributes: { ...(extractedProduct?.attributes || {}), configurationOptions: newConfigOptions }
+                                        })
+                                      }}
+                                      className="flex-1 h-8 text-sm border-gray-300 focus:border-amber-500"
+                                      placeholder="Configuration option"
+                                    />
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        const newConfigOptions = (extractedProduct?.attributes?.configurationOptions || []).filter((_: string, i: number) => i !== idx)
+                                        setExtractedProduct({
+                                          ...extractedProduct,
+                                          attributes: { ...(extractedProduct?.attributes || {}), configurationOptions: newConfigOptions }
+                                        })
+                                      }}
+                                      className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                    >
+                                      ×
+                                    </Button>
+                                  </div>
+                                ))}
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    const newConfigOptions = [...(extractedProduct?.attributes?.configurationOptions || []), '']
+                                    setExtractedProduct({
+                                      ...extractedProduct,
+                                      attributes: { ...(extractedProduct?.attributes || {}), configurationOptions: newConfigOptions }
+                                    })
+                                  }}
+                                  className="text-xs h-7 border-amber-400 text-amber-700 hover:bg-amber-50"
+                                >
+                                  + Add Configuration Option
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                          {/* Color Field - Single color OR Color Variants - Multiple colors */}
+                          {(() => {
+                            const colorVariants = extractedProduct?.attributes?.colorVariants || []
+                            const singleColor = extractedProduct?.attributes?.color
+                            const hasMultipleColors = colorVariants.length > 1
+                            const hasSingleColorVariant = colorVariants.length === 1
+                            
+                            // Show single Color field if: only 1 color OR no colors yet
+                            if (!hasMultipleColors) {
+                              return (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-gray-600 w-28 flex-shrink-0">Color:</span>
+                                  <Input
+                                    value={hasSingleColorVariant ? colorVariants[0]?.color : (singleColor || '')}
+                                    onChange={(e) => {
+                                      const newColor = e.target.value
+                                      setExtractedProduct({
+                                        ...extractedProduct,
+                                        attributes: { 
+                                          ...(extractedProduct?.attributes || {}), 
+                                          color: newColor,
+                                          // Also update colorVariants if it had one entry
+                                          colorVariants: hasSingleColorVariant ? [{ color: newColor }] : colorVariants
+                                        }
+                                      })
+                                    }}
+                                    className="flex-1 h-8 text-sm border-gray-300 focus:border-amber-500"
+                                    placeholder="Product color (e.g., Black, Silver)"
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      // Convert to multiple colors mode
+                                      const currentColor = hasSingleColorVariant ? colorVariants[0]?.color : singleColor
+                                      const newColorVariants = currentColor 
+                                        ? [{ color: currentColor }, { color: '' }]
+                                        : [{ color: '' }, { color: '' }]
+                                      setExtractedProduct({
+                                        ...extractedProduct,
+                                        attributes: { 
+                                          ...(extractedProduct?.attributes || {}), 
+                                          color: undefined,
+                                          colorVariants: newColorVariants
+                                        }
+                                      })
+                                    }}
+                                    className="text-xs h-8 px-2 border-amber-400 text-amber-700 hover:bg-amber-50"
+                                    title="Add more colors"
+                                  >
+                                    + More
+                                  </Button>
+                                </div>
+                              )
+                            }
+                            
+                            // Show Color Variants for multiple colors
+                            return (
+                              <div className="mt-2 pt-2 border-t border-amber-200">
+                                <span className="text-gray-600 block mb-2">Color Variants ({colorVariants.length}):</span>
+                                <div className="space-y-2">
+                                  {colorVariants.map((variant: {color: string}, idx: number) => (
+                                    <div key={idx} className="flex items-center gap-2">
+                                      <Input
+                                        value={variant.color || ''}
+                                        onChange={(e) => {
+                                          const newColorVariants = [...colorVariants]
+                                          newColorVariants[idx] = { color: e.target.value }
+                                          setExtractedProduct({
+                                            ...extractedProduct,
+                                            attributes: { ...(extractedProduct?.attributes || {}), colorVariants: newColorVariants }
+                                          })
+                                        }}
+                                        className="flex-1 h-8 text-sm border-gray-300 focus:border-amber-500"
+                                        placeholder="Color variant"
+                                      />
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => {
+                                          const newColorVariants = colorVariants.filter((_: {color: string}, i: number) => i !== idx)
+                                          // If only 1 left, convert back to single color mode
+                                          if (newColorVariants.length <= 1) {
+                                            setExtractedProduct({
+                                              ...extractedProduct,
+                                              attributes: { 
+                                                ...(extractedProduct?.attributes || {}), 
+                                                color: newColorVariants[0]?.color || '',
+                                                colorVariants: newColorVariants
+                                              }
+                                            })
+                                          } else {
+                                            setExtractedProduct({
+                                              ...extractedProduct,
+                                              attributes: { ...(extractedProduct?.attributes || {}), colorVariants: newColorVariants }
+                                            })
+                                          }
+                                        }}
+                                        className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                      >
+                                        ×
+                                      </Button>
+                                    </div>
+                                  ))}
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      const newColorVariants = [...colorVariants, { color: '' }]
+                                      setExtractedProduct({
+                                        ...extractedProduct,
+                                        attributes: { ...(extractedProduct?.attributes || {}), colorVariants: newColorVariants }
+                                      })
+                                    }}
+                                    className="text-xs h-7 border-amber-400 text-amber-700 hover:bg-amber-50"
+                                  >
+                                    + Add Color Variant
+                                  </Button>
+                                </div>
+                              </div>
+                            )
+                          })()}
+                          {/* Available Size Options - Editable */}
+                          {((extractedProduct?.attributes?.sizeOptions && extractedProduct.attributes.sizeOptions.length > 0) || isEditModalOpen) && (
+                            <div className="mt-2 pt-2 border-t border-amber-200">
+                              <span className="text-gray-600 block mb-2">Available Sizes:</span>
+                              <div className="space-y-2">
+                                {(extractedProduct?.attributes?.sizeOptions || []).map((option: {size: string, price?: string}, idx: number) => (
+                                  <div key={idx} className="flex items-center gap-2">
+                                    <Input
+                                      value={option.size || ''}
+                                      onChange={(e) => {
+                                        const newSizeOptions = [...(extractedProduct?.attributes?.sizeOptions || [])]
+                                        newSizeOptions[idx] = { ...newSizeOptions[idx], size: e.target.value }
+                                        setExtractedProduct({
+                                          ...extractedProduct,
+                                          attributes: { ...(extractedProduct?.attributes || {}), sizeOptions: newSizeOptions }
+                                        })
+                                      }}
+                                      className="flex-1 h-8 text-sm border-gray-300 focus:border-amber-500"
+                                      placeholder="Size option"
+                                    />
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        const newSizeOptions = (extractedProduct?.attributes?.sizeOptions || []).filter((_, i) => i !== idx)
+                                        setExtractedProduct({
+                                          ...extractedProduct,
+                                          attributes: { ...(extractedProduct?.attributes || {}), sizeOptions: newSizeOptions }
+                                        })
+                                      }}
+                                      className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                    >
+                                      ×
+                                    </Button>
+                                  </div>
+                                ))}
+                                {/* Add new size option button */}
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    const newSizeOptions = [...(extractedProduct?.attributes?.sizeOptions || []), { size: '' }]
+                                    setExtractedProduct({
+                                      ...extractedProduct,
+                                      attributes: { ...(extractedProduct?.attributes || {}), sizeOptions: newSizeOptions }
+                                    })
+                                  }}
+                                  className="text-xs h-7 border-amber-400 text-amber-700 hover:bg-amber-50"
+                                >
+                                  + Add Size
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                          {/* Fallback: If size is an array (legacy), convert to editable sizeOptions */}
+                          {Array.isArray(extractedProduct?.attributes?.size) && extractedProduct.attributes.size.length > 0 && !extractedProduct?.attributes?.sizeOptions && (
+                            <div className="mt-2 pt-2 border-t border-amber-200">
+                              <span className="text-gray-600 block mb-2">Available Sizes:</span>
+                              <div className="space-y-2">
+                                {(extractedProduct.attributes.size as string[]).map((size: string, idx: number) => (
+                                  <div key={idx} className="flex items-center gap-2">
+                                    <Input
+                                      value={size || ''}
+                                      onChange={(e) => {
+                                        const newSizes = [...(extractedProduct?.attributes?.size as string[] || [])]
+                                        newSizes[idx] = e.target.value
+                                        setExtractedProduct({
+                                          ...extractedProduct,
+                                          attributes: { ...(extractedProduct?.attributes || {}), size: newSizes }
+                                        })
+                                      }}
+                                      className="flex-1 h-8 text-sm border-gray-300 focus:border-amber-500"
+                                      placeholder="Size option"
+                                    />
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        const newSizes = (extractedProduct?.attributes?.size as string[] || []).filter((_, i) => i !== idx)
+                                        setExtractedProduct({
+                                          ...extractedProduct,
+                                          attributes: { ...(extractedProduct?.attributes || {}), size: newSizes }
+                                        })
+                                      }}
+                                      className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                    >
+                                      ×
+                                    </Button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Custom Fields */}
+                          {customFields.length > 0 && (
+                            <div className="mt-3 pt-3 border-t border-amber-200">
+                              <span className="text-gray-600 block mb-2">Custom Fields:</span>
+                              <div className="space-y-2">
+                                {customFields.map((field, idx) => (
+                                  <div key={idx} className="flex items-center gap-2">
+                                    <Input
+                                      value={field.name}
+                                      onChange={(e) => {
+                                        const newFields = [...customFields]
+                                        newFields[idx] = { ...newFields[idx], name: e.target.value }
+                                        setCustomFields(newFields)
+                                      }}
+                                      className="w-28 h-8 text-sm border-gray-300 focus:border-amber-500"
+                                      placeholder="Field name"
+                                    />
+                                    <Input
+                                      value={field.value}
+                                      onChange={(e) => {
+                                        const newFields = [...customFields]
+                                        newFields[idx] = { ...newFields[idx], value: e.target.value }
+                                        setCustomFields(newFields)
+                                      }}
+                                      className="flex-1 h-8 text-sm border-gray-300 focus:border-amber-500"
+                                      placeholder="Field value"
+                                    />
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        setCustomFields(customFields.filter((_, i) => i !== idx))
+                                      }}
+                                      className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                    >
+                                      ×
+                                    </Button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Add Field Button */}
+                          <div className="mt-3 pt-3 border-t border-amber-200">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setCustomFields([...customFields, { name: '', value: '' }])
+                              }}
+                              className="text-xs h-7 border-amber-400 text-amber-700 hover:bg-amber-50"
+                            >
+                              + Add Field
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                    })() : null}
+
                   </div>
                 </div>
                 </div>
@@ -1631,7 +2614,7 @@ export default function AdminAffiliateProductsPage() {
             )}
 
             {/* Action Buttons - Only show after extraction or when editing */}
-            {(extractedProduct || isEditModalOpen) && (
+            {extractedProduct && (
               <div className="flex justify-end gap-3 pt-4 border-t">
                 <Button
                   onClick={() => {
@@ -1658,297 +2641,6 @@ export default function AdminAffiliateProductsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Select Options Modal */}
-          <Dialog open={isOptionModalOpen} onOpenChange={(open) => {
-            setIsOptionModalOpen(open)
-            if (!open) {
-              setSelectedProductForWishlist(null)
-              setProductOptions(null)
-              setSelectedOptions({ quantity: 1 })
-            }
-          }}>
-            <DialogContent className="max-w-4xl lg:max-w-5xl max-h-[90vh] overflow-y-auto bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 [&>button[data-slot='dialog-close']]:top-4 [&>button[data-slot='dialog-close']]:right-4 [&>button[data-slot='dialog-close']]:z-50">
-              <DialogHeader>
-                <div className="bg-card border border-border rounded-lg p-6 mb-6">
-                  <div className="flex flex-row items-center justify-center gap-2">
-                    <ShoppingBag className="w-5 h-5 sm:w-8 sm:h-8 md:w-10 md:h-10 text-[#DAA520] flex-shrink-0" />
-                    <DialogTitle className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground whitespace-nowrap">
-                      Select Your Options
-                    </DialogTitle>
-                  </div>
-                  <p className="text-xs sm:text-sm text-muted-foreground text-center mt-2">
-                    Choose the right options for your gift
-                  </p>
-                </div>
-                <DialogDescription className="sr-only">
-                  Select product options such as size, color, and other attributes
-                </DialogDescription>
-              </DialogHeader>
-              
-              {selectedProductForWishlist && (
-                <div className="py-4 space-y-6">
-                  {/* Product Preview */}
-                  <div className="flex items-center gap-4 p-4 bg-gradient-to-br from-amber-50 to-orange-50 rounded-lg border-2 border-[#F4C430]/30">
-                    <img
-                      src={selectedProductForWishlist.image || "/placeholder.svg"}
-                      alt={selectedProductForWishlist.productName}
-                      className="w-20 h-20 sm:w-24 sm:h-24 object-cover rounded-xl border-2 border-gray-200"
-                      onError={(e) => {
-                        e.currentTarget.src = "/placeholder.svg"
-                      }}
-                    />
-                    <div className="flex-1">
-                      <h3 className="font-bold text-[#654321] text-sm sm:text-base mb-1 line-clamp-2">
-                        {selectedProductForWishlist.productName}
-                      </h3>
-                      <p className="text-xs sm:text-sm text-gray-600 mb-2">{selectedProductForWishlist.source}</p>
-                      <p className="text-lg font-bold text-[#654321]">${selectedProductForWishlist.price.toFixed(2)}</p>
-                    </div>
-                  </div>
-
-                  {isLoadingOptions ? (
-                    <div className="flex items-center justify-center py-8">
-                      <Loader2 className="w-8 h-8 animate-spin text-[#DAA520]" />
-                      <span className="ml-3 text-sm text-gray-600">Loading product options...</span>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {/* Dynamically render all available product attributes */}
-                      {productOptions && Object.keys(productOptions).length > 0 ? (
-                        Object.keys(productOptions).map((attrKey) => {
-                          const attrValues = productOptions[attrKey]
-                          if (!attrValues || !Array.isArray(attrValues) || attrValues.length === 0) return null
-                          
-                          const attrLabel = attributeLabels[attrKey] || attrKey.charAt(0).toUpperCase() + attrKey.slice(1)
-                          const isRequired = attrKey === 'size' || attrKey === 'color' || attrKey === 'offerType' || attrKey === 'kindleUnlimited'
-                          
-                          return (
-                            <div key={attrKey} className="space-y-2">
-                              <Label htmlFor={attrKey} className="text-sm font-semibold text-[#654321]">
-                                {attrLabel} {isRequired && <span className="text-red-500">*</span>}
-                              </Label>
-                              <Select
-                                value={selectedOptions[attrKey] || ""}
-                                onValueChange={(value) => setSelectedOptions({ ...selectedOptions, [attrKey]: value })}
-                              >
-                                <SelectTrigger id={attrKey} className="border-2 border-gray-300 focus:border-[#DAA520]">
-                                  <SelectValue placeholder={`Select ${attrLabel.toLowerCase()}`} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {attrValues.map((value: string, index: number) => (
-                                    <SelectItem key={index} value={String(value)}>
-                                      {String(value)}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          )
-                        })
-                      ) : (
-                        <div className="text-center py-4 text-sm text-gray-500">
-                          No additional options available for this product.
-                        </div>
-                      )}
-
-                      {/* Quantity Selection - Always show */}
-                      <div className="space-y-2">
-                        <Label htmlFor="quantity" className="text-sm font-semibold text-[#654321]">
-                          Quantity
-                        </Label>
-                        <Input
-                          id="quantity"
-                          type="number"
-                          min="1"
-                          max="10"
-                          value={selectedOptions.quantity || 1}
-                          onChange={(e) => setSelectedOptions({ ...selectedOptions, quantity: parseInt(e.target.value) || 1 })}
-                          className="border-2 border-gray-300 focus:border-[#DAA520]"
-                        />
-                      </div>
-
-                      {/* Action Buttons */}
-                      <div className="flex justify-end gap-3 pt-4 border-t">
-                        <Button
-                          variant="outline"
-                          onClick={() => {
-                            setIsOptionModalOpen(false)
-                            setSelectedProductForWishlist(null)
-                            setProductOptions(null)
-                            setSelectedOptions({ quantity: 1 })
-                          }}
-                          disabled={addingToWishlist === selectedProductForWishlist?.id}
-                          className="border-[#8B4513] text-[#8B4513] hover:bg-[#8B4513] hover:text-white"
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          onClick={handleConfirmAddToWishlist}
-                          disabled={addingToWishlist === selectedProductForWishlist?.id || isLoadingOptions}
-                          className="bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] hover:from-[#F4C430] hover:to-[#DAA520]"
-                        >
-                          {addingToWishlist === selectedProductForWishlist?.id ? (
-                            <>
-                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              Adding...
-                            </>
-                          ) : (
-                            "Add to Wishlist"
-                          )}
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </DialogContent>
-          </Dialog>
-
-          {/* Select Options Modal */}
-          <Dialog open={isOptionModalOpen} onOpenChange={(open) => {
-            setIsOptionModalOpen(open)
-            if (!open) {
-              setSelectedProductForWishlist(null)
-              setProductOptions(null)
-              setSelectedOptions({ quantity: 1 })
-            }
-          }}>
-            <DialogContent className="max-w-4xl lg:max-w-5xl max-h-[90vh] overflow-y-auto bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 [&>button[data-slot='dialog-close']]:top-4 [&>button[data-slot='dialog-close']]:right-4 [&>button[data-slot='dialog-close']]:z-50">
-              <DialogHeader>
-                <div className="bg-card border border-border rounded-lg p-6 mb-6">
-                  <div className="flex flex-row items-center justify-center gap-2">
-                    <ShoppingBag className="w-5 h-5 sm:w-8 sm:h-8 md:w-10 md:h-10 text-[#DAA520] flex-shrink-0" />
-                    <DialogTitle className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground whitespace-nowrap">
-                      Select Your Options
-                    </DialogTitle>
-                  </div>
-                  <p className="text-xs sm:text-sm text-muted-foreground text-center mt-2">
-                    Choose the right options for your gift
-                  </p>
-                </div>
-                <DialogDescription className="sr-only">
-                  Select product options such as size, color, and other attributes
-                </DialogDescription>
-              </DialogHeader>
-              
-              {selectedProductForWishlist && (
-                <div className="py-4 space-y-6">
-                  {/* Product Preview */}
-                  <div className="flex items-center gap-4 p-4 bg-gradient-to-br from-amber-50 to-orange-50 rounded-lg border-2 border-[#F4C430]/30">
-                    <img
-                      src={selectedProductForWishlist.image || "/placeholder.svg"}
-                      alt={selectedProductForWishlist.productName}
-                      className="w-20 h-20 sm:w-24 sm:h-24 object-cover rounded-xl border-2 border-gray-200"
-                      onError={(e) => {
-                        e.currentTarget.src = "/placeholder.svg"
-                      }}
-                    />
-                    <div className="flex-1">
-                      <h3 className="font-bold text-[#654321] text-sm sm:text-base mb-1 line-clamp-2">
-                        {selectedProductForWishlist.productName}
-                      </h3>
-                      <p className="text-xs sm:text-sm text-gray-600 mb-2">{selectedProductForWishlist.source}</p>
-                      <p className="text-lg font-bold text-[#654321]">${selectedProductForWishlist.price.toFixed(2)}</p>
-                    </div>
-                  </div>
-
-                  {isLoadingOptions ? (
-                    <div className="flex items-center justify-center py-8">
-                      <Loader2 className="w-8 h-8 animate-spin text-[#DAA520]" />
-                      <span className="ml-3 text-sm text-gray-600">Loading product options...</span>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {/* Dynamically render all available product attributes */}
-                      {productOptions && Object.keys(productOptions).length > 0 ? (
-                        Object.keys(productOptions).map((attrKey) => {
-                          const attrValues = productOptions[attrKey]
-                          if (!attrValues || !Array.isArray(attrValues) || attrValues.length === 0) return null
-                          
-                          const attrLabel = attributeLabels[attrKey] || attrKey.charAt(0).toUpperCase() + attrKey.slice(1)
-                          const isRequired = attrKey === 'size' || attrKey === 'color' || attrKey === 'offerType' || attrKey === 'kindleUnlimited'
-                          
-                          return (
-                            <div key={attrKey} className="space-y-2">
-                              <Label htmlFor={attrKey} className="text-sm font-semibold text-[#654321]">
-                                {attrLabel} {isRequired && <span className="text-red-500">*</span>}
-                              </Label>
-                              <Select
-                                value={selectedOptions[attrKey] || ""}
-                                onValueChange={(value) => setSelectedOptions({ ...selectedOptions, [attrKey]: value })}
-                              >
-                                <SelectTrigger id={attrKey} className="border-2 border-gray-300 focus:border-[#DAA520] w-full">
-                                  <SelectValue placeholder={`Select ${attrLabel.toLowerCase()}`} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {attrValues.map((value: string, index: number) => (
-                                    <SelectItem key={index} value={String(value)}>
-                                      {String(value)}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          )
-                        })
-                      ) : (
-                        <div className="text-center py-4 text-sm text-gray-500">
-                          No additional options available for this product.
-                        </div>
-                      )}
-
-                      {/* Quantity Selection - Always show */}
-                      <div className="space-y-2">
-                        <Label htmlFor="quantity" className="text-sm font-semibold text-[#654321]">
-                          Quantity
-                        </Label>
-                        <Input
-                          id="quantity"
-                          type="number"
-                          min="1"
-                          max="10"
-                          value={selectedOptions.quantity || 1}
-                          onChange={(e) => setSelectedOptions({ ...selectedOptions, quantity: parseInt(e.target.value) || 1 })}
-                          className="border-2 border-gray-300 focus:border-[#DAA520]"
-                        />
-                      </div>
-
-                      {/* Action Buttons */}
-                      <div className="flex justify-end gap-3 pt-4 border-t">
-                        <Button
-                          variant="outline"
-                          onClick={() => {
-                            setIsOptionModalOpen(false)
-                            setSelectedProductForWishlist(null)
-                            setProductOptions(null)
-                            setSelectedOptions({ quantity: 1 })
-                          }}
-                          disabled={addingToWishlist === selectedProductForWishlist?.id}
-                          className="border-[#8B4513] text-[#8B4513] hover:bg-[#8B4513] hover:text-white"
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          onClick={handleConfirmAddToWishlist}
-                          disabled={addingToWishlist === selectedProductForWishlist?.id || isLoadingOptions}
-                          className="bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] hover:from-[#F4C430] hover:to-[#DAA520]"
-                        >
-                          {addingToWishlist === selectedProductForWishlist?.id ? (
-                            <>
-                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              Adding...
-                            </>
-                          ) : (
-                            "Add to Wishlist"
-                          )}
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </DialogContent>
-          </Dialog>
         </div>
       )
     }
