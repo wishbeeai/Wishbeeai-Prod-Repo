@@ -24,6 +24,11 @@ interface WishlistItem {
   }
   stockStatus: string
   addedDate: string
+  // Additional fields from database
+  reviewStar?: number
+  reviewCount?: number
+  source?: string
+  notes?: string
 }
 
 interface AIInsight {
@@ -71,32 +76,61 @@ export function MyWishlistDisplay() {
         const dbItems = data.items || []
 
         // Transform database items to component format
+        // Database uses: title, image_url, list_price, product_url, review_star, review_count, source, notes
         const transformedItems: WishlistItem[] = dbItems.map((item: any) => {
-          // Extract store name from URL
-          let storeName = "Unknown Store"
-          try {
-            if (item.product_url) {
-              const urlObj = new URL(item.product_url)
-              storeName = urlObj.hostname.replace("www.", "").split(".")[0]
-              storeName = storeName.charAt(0).toUpperCase() + storeName.slice(1)
+          // Extract store name from source field or URL
+          let storeName = item.source || "Unknown Store"
+          if (storeName === 'amazon') storeName = 'Amazon'
+          else if (!item.source) {
+            try {
+              if (item.product_url) {
+                const urlObj = new URL(item.product_url)
+                storeName = urlObj.hostname.replace("www.", "").split(".")[0]
+                storeName = storeName.charAt(0).toUpperCase() + storeName.slice(1)
+              }
+            } catch (e) {
+              // Keep default storeName
             }
-          } catch (e) {
-            // Keep default storeName
+          }
+
+          // Parse price - list_price might be in cents
+          let price = 0
+          if (item.list_price) {
+            price = item.list_price > 1000 ? item.list_price / 100 : item.list_price
+          }
+
+          // Parse notes for selected options
+          const notes = item.notes || ''
+          const attributes: { [key: string]: string | null } = {}
+          
+          // Extract options from notes (format: "Size: M | Color: Red | ...")
+          if (notes) {
+            const optionParts = notes.split('\n')[0].split(' | ')
+            optionParts.forEach((part: string) => {
+              const [key, value] = part.split(': ')
+              if (key && value) {
+                attributes[key.trim()] = value.trim()
+              }
+            })
           }
 
           return {
             id: item.id,
-            webLink: item.product_url || "#",
+            webLink: item.affiliate_url || item.product_url || "#",
             quantity: item.quantity || 1,
-            productImageUrl: item.product_image || "/placeholder.svg",
-            giftName: item.product_name || "Untitled Item",
-            currentPrice: item.product_price || 0,
+            productImageUrl: item.image_url || "/placeholder.svg",
+            giftName: item.title || "Untitled Item",
+            currentPrice: price,
             storeName,
-            description: item.description || "",
+            description: notes.includes('\n') ? notes.split('\n').slice(1).join('\n') : "",
             category: item.category || undefined,
-            attributes: {}, // Can be extended later
-            stockStatus: item.stock_status || "Unknown",
+            attributes,
+            stockStatus: "In Stock",
             addedDate: item.created_at ? new Date(item.created_at).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
+            reviewStar: item.review_star || undefined,
+            reviewCount: item.review_count || undefined,
+            source: storeName,
+            notes: notes,
           }
         })
 
@@ -300,9 +334,39 @@ export function MyWishlistDisplay() {
                   </h3>
                 </div>
 
+                {/* Rating Stars */}
+                {item.reviewStar && item.reviewStar > 0 && (
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="flex items-center gap-0.5">
+                      {[1, 2, 3, 4, 5].map((star) => {
+                        const fillPercentage = Math.min(100, Math.max(0, ((item.reviewStar || 0) - star + 1) * 100))
+                        return (
+                          <svg key={star} className="w-4 h-4" viewBox="0 0 20 20">
+                            <defs>
+                              <linearGradient id={`star-gradient-wishlist-${item.id}-${star}`}>
+                                <stop offset={`${fillPercentage}%`} stopColor="#F59E0B" />
+                                <stop offset={`${fillPercentage}%`} stopColor="#D1D5DB" />
+                              </linearGradient>
+                            </defs>
+                            <path
+                              fill={`url(#star-gradient-wishlist-${item.id}-${star})`}
+                              d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"
+                            />
+                          </svg>
+                        )
+                      })}
+                    </div>
+                    <span className="text-xs text-gray-600">
+                      {item.reviewStar.toFixed(1)} {item.reviewCount && `(${item.reviewCount.toLocaleString()})`}
+                    </span>
+                  </div>
+                )}
+
                 {/* Store name and quantity on same line */}
                 <div className="flex items-center justify-between mb-3">
-                  <p className="text-xs sm:text-sm text-gray-500 truncate">{item.storeName}</p>
+                  <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[9px] sm:text-xs">
+                    {item.storeName}
+                  </Badge>
                   <Badge className="bg-green-100 text-green-800 border-green-200 text-[9px] sm:text-xs">
                     Qty: {item.quantity}
                   </Badge>
@@ -315,29 +379,35 @@ export function MyWishlistDisplay() {
                   </span>
                 </div>
 
-                {/* Description - Fixed height */}
-                <div className="h-12 mb-3">
-                  <p className="text-xs sm:text-sm text-gray-600 line-clamp-2">{item.description}</p>
-                </div>
-
-                <div className="bg-gray-50 rounded-lg p-3 mb-3 min-h-[180px]">
-                  <h4 className="text-[9px] sm:text-xs font-semibold text-gray-700 uppercase mb-2">
-                    Product Details {item.category && `(${item.category})`}
-                  </h4>
-                  <div className="grid grid-cols-2 gap-2 text-[9px] sm:text-xs">
-                    {Object.entries(item.attributes)
-                      .filter(([_, value]) => value !== null && value !== "")
-                      .map(([key, value]) => (
-                        <div
-                          key={key}
-                          className={key === "Care Instructions" || key === "Compatibility" ? "col-span-2" : ""}
-                        >
-                          <span className="font-semibold text-gray-700">{key}:</span>{" "}
-                          <span className="text-gray-600">{value}</span>
-                        </div>
-                      ))}
+                {/* Selected Options */}
+                {Object.keys(item.attributes).length > 0 && (
+                  <div className="bg-amber-50 rounded-lg p-3 mb-3 border border-amber-200">
+                    <h4 className="text-[9px] sm:text-xs font-semibold text-[#654321] uppercase mb-2">
+                      Selected Options
+                    </h4>
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(item.attributes)
+                        .filter(([_, value]) => value !== null && value !== "")
+                        .map(([key, value]) => (
+                          <span
+                            key={key}
+                            className="bg-white px-2 py-1 rounded-full text-[9px] sm:text-xs border border-amber-300"
+                          >
+                            <span className="font-semibold text-[#654321]">{key}:</span>{" "}
+                            <span className="text-gray-700">{value}</span>
+                          </span>
+                        ))}
+                    </div>
                   </div>
-                </div>
+                )}
+
+                {/* Notes/Description */}
+                {item.description && (
+                  <div className="bg-gray-50 rounded-lg p-3 mb-3">
+                    <h4 className="text-[9px] sm:text-xs font-semibold text-gray-700 uppercase mb-1">Notes</h4>
+                    <p className="text-xs sm:text-sm text-gray-600">{item.description}</p>
+                  </div>
+                )}
 
                 <div className="space-y-4 mt-auto pt-2">
                   <div className="grid grid-cols-2 gap-2">
