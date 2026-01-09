@@ -43,12 +43,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'wishlistId is required' }, { status: 400 });
     }
 
-    // Build insert object using the Amazon PA-API format (new schema)
+    // Build insert object using the correct database schema
+    // Note: Database uses 'title' not 'product_name', and 'list_price' for price
     const insertData: any = {
       wishlist_id: wishlistIdValue,
-      product_name: title || productName || 'Untitled Product',
+      title: title || productName || 'Untitled Product',
       product_url: product_url || productUrl || null,
-      title: title || productName || null,
       image_url: image_url || productImage || null,
       list_price: list_price || (productPrice ? Math.round(productPrice * 100) : null),
       currency: currency || 'USD',
