@@ -4029,9 +4029,53 @@ async function extractWithoutAI(
       }
     }
     
-    // Try to extract prices for combined variants
+    // Try to extract prices and images for combined variants
     if (combinedVariants.length > 0) {
-      // Look for price data associated with each variant
+      // First, build a map of ASIN to image from colorImages or imageGalleryData
+      const asinToImage: Record<string, string> = {}
+      
+      // Pattern 1: colorImages JavaScript object
+      const colorImagesMatch = htmlContent.match(/['"]colorImages['"]\s*:\s*\{([^}]+(?:\{[^}]*\}[^}]*)*)\}/i)
+      if (colorImagesMatch) {
+        const colorImagesData = colorImagesMatch[1]
+        // Extract ASIN to image mappings
+        const asinImagePatterns = colorImagesData.matchAll(/["']([A-Z0-9]{10})["']\s*:\s*\[?\s*\{[^}]*["'](?:large|main|hiRes)["']\s*:\s*["']([^"']+)["']/gi)
+        for (const match of asinImagePatterns) {
+          if (match[1] && match[2] && match[2].includes('media-amazon.com')) {
+            asinToImage[match[1]] = match[2]
+            log(`[v0] 📸 Found image for ASIN ${match[1]}: ${match[2].substring(0, 50)}...`)
+          }
+        }
+      }
+      
+      // Pattern 2: variationImages or imageGalleryData
+      const variationImagesMatch = htmlContent.match(/['"](?:variationImages|imageGalleryData)['"]\s*:\s*\{([^}]+(?:\{[^}]*\}[^}]*)*)\}/i)
+      if (variationImagesMatch) {
+        const variationData = variationImagesMatch[1]
+        const varImagePatterns = variationData.matchAll(/["']([A-Z0-9]{10})["']\s*:\s*\[?\s*\{[^}]*["'](?:large|main)["']\s*:\s*["']([^"']+)["']/gi)
+        for (const match of varImagePatterns) {
+          if (match[1] && match[2] && match[2].includes('media-amazon.com') && !asinToImage[match[1]]) {
+            asinToImage[match[1]] = match[2]
+          }
+        }
+      }
+      
+      // Build variant name to ASIN mapping from asinVariationValues
+      const variantToAsin: Record<string, string> = {}
+      const asinVariationMatch = htmlContent.match(/asinVariationValues\s*[:=]\s*\{([^}]+(?:\{[^}]*\}[^}]*)*)\}/i)
+      if (asinVariationMatch) {
+        const asinData = asinVariationMatch[1]
+        // Match ASIN to size_name pairs
+        const asinSizePatterns = asinData.matchAll(/["']([A-Z0-9]{10})["']\s*:\s*\{[^}]*["']size_name["']\s*:\s*["']([^"']+)["']/gi)
+        for (const match of asinSizePatterns) {
+          if (match[1] && match[2]) {
+            variantToAsin[match[2].toLowerCase()] = match[1]
+            log(`[v0] 🔗 Mapped variant "${match[2]}" to ASIN ${match[1]}`)
+          }
+        }
+      }
+      
+      // Look for price data and assign images
       for (const variant of combinedVariants) {
         const variantEscaped = variant.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
         
@@ -4049,10 +4093,33 @@ async function extractWithoutAI(
             break
           }
         }
+        
+        // Try to find image for this variant
+        const variantLower = variant.name.toLowerCase()
+        if (variantToAsin[variantLower] && asinToImage[variantToAsin[variantLower]]) {
+          variant.image = asinToImage[variantToAsin[variantLower]]
+          log(`[v0] 📸 Assigned image to ${variant.name}: ${variant.image.substring(0, 50)}...`)
+        } else {
+          // Try to match by color word in variant name
+          const colorWords = ['charcoal', 'black', 'red', 'turquoise', 'stainless', 'steel', 'white', 'silver', 'blue', 'green', 'gray', 'grey']
+          for (const colorWord of colorWords) {
+            if (variantLower.includes(colorWord)) {
+              // Look for image with this color word in the data
+              const colorImagePattern = new RegExp(`["']${colorWord}["'][^}]*["'](?:large|main|hiRes)["']\\s*:\\s*["']([^"']+)["']`, 'i')
+              const colorImgMatch = htmlContent.match(colorImagePattern)
+              if (colorImgMatch && colorImgMatch[1] && colorImgMatch[1].includes('media-amazon.com')) {
+                variant.image = colorImgMatch[1]
+                log(`[v0] 📸 Assigned image by color word to ${variant.name}`)
+                break
+              }
+            }
+          }
+        }
       }
       
       productData.attributes.combinedVariants = combinedVariants
       log(`[v0] ✅ Extracted ${combinedVariants.length} combined variants: ${combinedVariants.map(v => v.name).join(', ')}`)
+      log(`[v0] 📸 Variants with images: ${combinedVariants.filter(v => v.image).length}/${combinedVariants.length}`)
     }
     
     // Extract color variants with prices (for products like Apple Watch with multiple color/case/band combinations)
