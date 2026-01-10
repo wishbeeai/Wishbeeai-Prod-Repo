@@ -478,167 +478,135 @@ export function WishlistOptionsModal({
               <div className="flex-1 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col min-h-0">
                 {/* Scrollable Container */}
                 <div className="flex-1 overflow-y-auto overscroll-contain">
-                  {/* Product Image - Clickable */}
-                  <button 
-                    onClick={handleViewOnStore}
-                    disabled={!product.productUrl}
-                    className="w-full bg-white p-4 flex items-center justify-center border-b border-gray-100 min-h-[180px] cursor-pointer hover:bg-gray-50 transition-colors disabled:cursor-default disabled:hover:bg-white group"
-                  >
+                  {/* Product Image */}
+                  <div className="bg-gradient-to-b from-gray-50 to-white p-4 flex items-center justify-center min-h-[160px]">
                     {currentDisplayImage ? (
-                      <div className="relative">
-                        <img 
-                          src={currentDisplayImage} 
-                          alt={product.name}
-                          className="max-w-full max-h-[200px] object-contain transition-all duration-300 group-hover:scale-105"
-                        />
-                        {product.productUrl && (
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/10 transition-colors rounded-lg">
-                            <div className="opacity-0 group-hover:opacity-100 bg-white/90 px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1.5 transition-opacity">
-                              <ExternalLink className="w-4 h-4 text-[#DAA520]" />
-                              <span className="text-xs font-semibold text-[#654321]">View on {product.source || 'Store'}</span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
+                      <img 
+                        src={currentDisplayImage} 
+                        alt={product.name}
+                        className="max-w-full max-h-[180px] object-contain"
+                      />
                     ) : (
-                      <div className="w-24 h-24 flex items-center justify-center bg-gray-100 rounded-lg">
-                        <Heart className="w-10 h-10 text-gray-300" />
+                      <div className="w-20 h-20 flex items-center justify-center bg-gray-100 rounded-lg">
+                        <Heart className="w-8 h-8 text-gray-300" />
                       </div>
                     )}
-                  </button>
+                  </div>
 
-                  {/* Product Details - Scrollable */}
-                  <div className="p-4 space-y-3 bg-gradient-to-b from-white to-gray-50">
-                    {/* Title - Clickable */}
-                    <button 
-                      onClick={handleViewOnStore}
-                      disabled={!product.productUrl}
-                      className="text-left w-full group"
-                    >
-                      <h3 className="font-semibold text-gray-900 text-sm leading-tight group-hover:text-[#DAA520] transition-colors">
+                  {/* Product Info Card */}
+                  <div className="p-4 space-y-3 border-t border-gray-100">
+                    {/* Title & Selected Variant */}
+                    <div>
+                      <h3 className="font-semibold text-gray-900 text-sm leading-tight">
                         {product.name}
                       </h3>
-                    </button>
+                      {selectedVariant && (
+                        <div className="flex items-center gap-1.5 mt-1.5">
+                          <Check className="w-3.5 h-3.5 text-green-600" />
+                          <span className="text-xs font-medium text-green-700">
+                            Selected: {selectedVariant}
+                          </span>
+                        </div>
+                      )}
+                    </div>
 
-                    {/* Selected Variant Badge */}
-                    {selectedVariant && (
-                      <div className="flex items-center gap-1.5">
-                        <Check className="w-3.5 h-3.5 text-green-600" />
-                        <span className="text-xs font-medium text-green-700 bg-green-50 px-2 py-0.5 rounded-full">
-                          {selectedVariant}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Price */}
-                    <div className="flex items-baseline gap-2">
+                    {/* Price & Rating Row */}
+                    <div className="flex items-center justify-between">
                       <span className="text-xl font-bold text-[#DAA520]">
                         {getSelectedPrice()}
                       </span>
+                      {product.rating && (
+                        <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-0.5">
+                            {renderStars(product.rating)}
+                          </div>
+                          <span className="text-xs text-gray-500">
+                            {product.rating.toFixed(1)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Store & Reviews */}
+                    <div className="flex items-center justify-between text-xs text-gray-500">
                       {product.source && (
-                        <span className="text-xs text-gray-500 flex items-center gap-1">
+                        <span className="flex items-center gap-1">
                           <Store className="w-3 h-3" />
                           {product.source}
                         </span>
                       )}
+                      {product.reviewCount && (
+                        <span>{product.reviewCount} reviews</span>
+                      )}
                     </div>
 
-                    {/* Rating */}
-                    {product.rating && (
-                      <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-0.5">
-                          {renderStars(product.rating)}
+                    {/* Divider */}
+                    <div className="border-t border-gray-100 pt-3">
+                      {/* Available Options - Only show unselected ones */}
+                      {product.attributes?.combinedVariants && product.attributes.combinedVariants.length > 1 && (
+                        <div className="space-y-2">
+                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                            Other Options Available
+                          </p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {product.attributes.combinedVariants
+                              .filter(v => v.name !== selectedVariant)
+                              .map((v, i) => (
+                                <span 
+                                  key={i} 
+                                  className="px-2.5 py-1 rounded-full text-[11px] bg-gray-100 text-gray-600 border border-gray-200"
+                                >
+                                  {v.name}
+                                  {v.price && <span className="ml-1 text-gray-400">{v.price}</span>}
+                                </span>
+                              ))}
+                          </div>
                         </div>
-                        <span className="text-xs text-gray-500">
-                          {product.rating.toFixed(1)}
-                          {product.reviewCount && ` (${product.reviewCount})`}
-                        </span>
-                      </div>
-                    )}
+                      )}
 
-                    {/* Product Attributes Preview */}
-                    {product.attributes && (
-                      <div className="space-y-2 pt-2 border-t border-gray-100">
-                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Product Details</p>
-                        <div className="grid grid-cols-2 gap-2 text-xs">
-                          {product.attributes.combinedVariants && product.attributes.combinedVariants.length > 0 && (
-                            <div className="col-span-2">
-                              <span className="text-gray-400">Available Options:</span>
-                              <div className="flex flex-wrap gap-1 mt-1">
-                                {product.attributes.combinedVariants.slice(0, 6).map((v, i) => (
-                                  <span key={i} className={`px-2 py-0.5 rounded-full text-[10px] ${
-                                    selectedVariant === v.name 
-                                      ? 'bg-[#DAA520] text-white' 
-                                      : 'bg-gray-100 text-gray-600'
-                                  }`}>
-                                    {v.name}
-                                  </span>
-                                ))}
-                                {product.attributes.combinedVariants.length > 6 && (
-                                  <span className="px-2 py-0.5 rounded-full text-[10px] bg-gray-100 text-gray-400">
-                                    +{product.attributes.combinedVariants.length - 6} more
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          )}
-                          {product.attributes.sizeOptions && product.attributes.sizeOptions.length > 0 && (
-                            <div>
-                              <span className="text-gray-400">Sizes:</span>
-                              <span className="ml-1 text-gray-700">
-                                {product.attributes.sizeOptions.map(s => s.size).join(', ')}
+                      {/* Size Options */}
+                      {product.attributes?.sizeOptions && product.attributes.sizeOptions.length > 0 && (
+                        <div className="mt-3">
+                          <p className="text-xs text-gray-400 mb-1">Available Sizes</p>
+                          <div className="flex flex-wrap gap-1">
+                            {product.attributes.sizeOptions.map((s, i) => (
+                              <span key={i} className="px-2 py-0.5 rounded text-[11px] bg-gray-50 text-gray-600 border border-gray-200">
+                                {s.size}
                               </span>
-                            </div>
-                          )}
-                          {product.attributes.colorVariants && product.attributes.colorVariants.length > 0 && (
-                            <div>
-                              <span className="text-gray-400">Colors:</span>
-                              <span className="ml-1 text-gray-700">
-                                {product.attributes.colorVariants.map(c => c.color).slice(0, 3).join(', ')}
-                                {product.attributes.colorVariants.length > 3 && ` +${product.attributes.colorVariants.length - 3}`}
-                              </span>
-                            </div>
-                          )}
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    {/* URL Preview */}
-                    {product.productUrl && (
-                      <div className="flex items-center gap-2 text-xs text-gray-400 bg-gray-50 px-2 py-1.5 rounded-lg overflow-hidden">
-                        <ExternalLink className="w-3 h-3 flex-shrink-0" />
-                        <span className="truncate">{product.productUrl}</span>
-                      </div>
-                    )}
-
-                    {/* Scroll hint */}
-                    <div className="text-center text-[10px] text-gray-300 pt-2">
-                      ↓ Scroll for more details ↓
+                      {/* Color Options */}
+                      {product.attributes?.colorVariants && product.attributes.colorVariants.length > 0 && (
+                        <div className="mt-3">
+                          <p className="text-xs text-gray-400 mb-1">Available Colors</p>
+                          <div className="flex flex-wrap gap-1">
+                            {product.attributes.colorVariants.map((c, i) => (
+                              <span key={i} className="px-2 py-0.5 rounded text-[11px] bg-gray-50 text-gray-600 border border-gray-200">
+                                {c.color}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
 
                 {/* Fixed View on Store Button */}
                 {product.productUrl && (
-                  <div className="p-3 bg-gray-50 border-t border-gray-100 flex-shrink-0">
+                  <div className="p-3 bg-gradient-to-t from-gray-100 to-gray-50 border-t border-gray-200 flex-shrink-0">
                     <Button
                       onClick={handleViewOnStore}
-                      variant="outline"
-                      className="w-full h-9 border-2 border-[#DAA520] text-[#DAA520] hover:bg-[#DAA520] hover:text-white font-semibold rounded-lg transition-all flex items-center justify-center gap-2 text-sm"
+                      className="w-full h-10 bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] hover:from-[#F4C430] hover:to-[#DAA520] font-semibold rounded-lg transition-all flex items-center justify-center gap-2 text-sm shadow-md"
                     >
                       <ExternalLink className="w-4 h-4" />
-                      View on {product.source || 'Store'} to verify options
+                      View on {product.source || 'Store'}
                     </Button>
-                    <p className="text-[10px] text-gray-400 text-center mt-2">
-                      Opens in a new tab. Select your exact options on the store page.
-                    </p>
                   </div>
                 )}
-              </div>
-
-              {/* Info Note */}
-              <div className="text-xs text-gray-400 text-center bg-white/50 rounded-lg p-2 border border-gray-100">
-                💡 Select your preferences on the left, then verify on the store page if needed
               </div>
             </div>
           </div>
