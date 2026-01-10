@@ -4096,24 +4096,57 @@ async function extractWithoutAI(
         
         // Try to find image for this variant
         const variantLower = variant.name.toLowerCase()
+        
+        // Method 1: ASIN mapping
         if (variantToAsin[variantLower] && asinToImage[variantToAsin[variantLower]]) {
           variant.image = asinToImage[variantToAsin[variantLower]]
-          log(`[v0] 📸 Assigned image to ${variant.name}: ${variant.image.substring(0, 50)}...`)
-        } else {
-          // Try to match by color word in variant name
-          const colorWords = ['charcoal', 'black', 'red', 'turquoise', 'stainless', 'steel', 'white', 'silver', 'blue', 'green', 'gray', 'grey']
+          log(`[v0] 📸 Assigned image to ${variant.name} via ASIN: ${variant.image.substring(0, 50)}...`)
+        }
+        
+        // Method 2: Look in twister swatch images (li elements with data-defaultasin)
+        if (!variant.image) {
+          const variantEscapedForImg = variant.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+          // Pattern: li with title matching variant name and contains img with src
+          const swatchPattern = new RegExp(`<li[^>]*title=["']${variantEscapedForImg}["'][^>]*>[\\s\\S]*?<img[^>]*src=["']([^"']+)["']`, 'i')
+          const swatchMatch = htmlContent.match(swatchPattern)
+          if (swatchMatch && swatchMatch[1] && swatchMatch[1].includes('media-amazon.com')) {
+            // Convert thumbnail to larger image
+            variant.image = swatchMatch[1].replace(/_SS\d+_/, '_SX522_').replace(/_US\d+_/, '_SX522_')
+            log(`[v0] 📸 Assigned swatch image to ${variant.name}`)
+          }
+        }
+        
+        // Method 3: Look in imageBlockATF data
+        if (!variant.image) {
+          // Extract color from variant name
+          const colorWords = ['charcoal', 'black', 'red', 'turquoise', 'stainless', 'steel', 'white', 'silver', 'blue', 'green', 'gray', 'grey', 'brown', 'pink', 'purple', 'orange', 'yellow', 'navy', 'beige']
           for (const colorWord of colorWords) {
             if (variantLower.includes(colorWord)) {
-              // Look for image with this color word in the data
-              const colorImagePattern = new RegExp(`["']${colorWord}["'][^}]*["'](?:large|main|hiRes)["']\\s*:\\s*["']([^"']+)["']`, 'i')
+              // Look for image in colorToAsin mapping then get image
+              const colorAsinPattern = new RegExp(`["']${colorWord}[^"']*["']\\s*:\\s*["']([A-Z0-9]{10})["']`, 'i')
+              const colorAsinMatch = htmlContent.match(colorAsinPattern)
+              if (colorAsinMatch && colorAsinMatch[1] && asinToImage[colorAsinMatch[1]]) {
+                variant.image = asinToImage[colorAsinMatch[1]]
+                log(`[v0] 📸 Assigned image by colorToAsin for ${variant.name}`)
+                break
+              }
+              
+              // Try direct color to image pattern
+              const colorImagePattern = new RegExp(`["']${colorWord}["'][\\s\\S]{0,200}["'](?:large|main|hiRes)["']\\s*:\\s*["']([^"']+media-amazon\\.com[^"']+)["']`, 'i')
               const colorImgMatch = htmlContent.match(colorImagePattern)
-              if (colorImgMatch && colorImgMatch[1] && colorImgMatch[1].includes('media-amazon.com')) {
+              if (colorImgMatch && colorImgMatch[1]) {
                 variant.image = colorImgMatch[1]
                 log(`[v0] 📸 Assigned image by color word to ${variant.name}`)
                 break
               }
             }
           }
+        }
+        
+        // Method 4: Use a default image based on variant index (different angles of same product)
+        if (!variant.image && productData.imageUrl) {
+          // For products without variant-specific images, use the main image
+          variant.image = productData.imageUrl
         }
       }
       
