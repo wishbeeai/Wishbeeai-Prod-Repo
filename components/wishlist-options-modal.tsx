@@ -222,9 +222,14 @@ export function WishlistOptionsModal({
           <div className="w-full md:w-[45%] overflow-y-auto border-r border-amber-100 bg-white">
             <div className="p-5 space-y-4">
               {/* Options Title */}
-              <div className="flex items-center gap-2 text-sm font-semibold text-[#654321] border-b border-amber-100 pb-2">
-                <ShoppingCart className="w-4 h-4" />
-                OPTIONS PANEL
+              <div className="flex items-center justify-between border-b border-amber-100 pb-2">
+                <div className="flex items-center gap-2 text-sm font-semibold text-[#654321]">
+                  <ShoppingCart className="w-4 h-4" />
+                  SELECT YOUR OPTIONS
+                </div>
+                {hasOptions && (
+                  <span className="text-[10px] text-red-500 font-medium">* Required</span>
+                )}
               </div>
 
               {hasOptions ? (
@@ -232,8 +237,8 @@ export function WishlistOptionsModal({
                   {/* Combined Variants (Size + Color together) */}
                   {hasCombinedVariants && (
                     <div className="space-y-2">
-                      <Label className="text-sm font-semibold text-[#654321]">
-                        Select Variant <span className="text-red-500">*</span>
+                      <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                        Choose Variant
                       </Label>
                       <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
                         {combinedVariants.map((variant, idx) => (
@@ -274,29 +279,20 @@ export function WishlistOptionsModal({
                   {/* Size Options - Only show if no combined variants */}
                   {!hasCombinedVariants && sizeOptions.length > 0 && (
                     <div className="space-y-2">
-                      <Label className="text-sm font-semibold text-[#654321]">
-                        Size <span className="text-red-500">*</span>
+                      <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                        Choose Size
                       </Label>
                       <div className="flex flex-wrap gap-1.5">
                         {sizeOptions.map((option, idx) => (
                           <button
                             key={idx}
                             onClick={() => setSelectedSize(option.size)}
-                            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1.5 ${
+                            className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
                               selectedSize === option.size
-                                ? 'bg-[#DAA520] text-white shadow-md'
-                                : 'bg-gray-100 text-gray-700 hover:bg-amber-100 hover:text-[#654321]'
+                                ? 'bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-white shadow-md ring-2 ring-[#DAA520] ring-offset-1'
+                                : 'bg-gray-100 text-gray-700 hover:bg-amber-100 hover:text-[#654321] border border-gray-200'
                             }`}
                           >
-                            <span className={`w-3 h-3 rounded-full border ${
-                              selectedSize === option.size 
-                                ? 'border-white bg-white' 
-                                : 'border-gray-400'
-                            }`}>
-                              {selectedSize === option.size && (
-                                <span className="block w-full h-full rounded-full bg-[#DAA520] scale-50" />
-                              )}
-                            </span>
                             {option.size}
                           </button>
                         ))}
@@ -307,23 +303,20 @@ export function WishlistOptionsModal({
                   {/* Color Options - Only show if no combined variants */}
                   {!hasCombinedVariants && colorOptions.length > 0 && (
                     <div className="space-y-2">
-                      <Label className="text-sm font-semibold text-[#654321]">
-                        Color <span className="text-red-500">*</span>
+                      <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                        Choose Color
                       </Label>
                       <div className="flex flex-wrap gap-1.5">
                         {colorOptions.map((option, idx) => (
                           <button
                             key={idx}
                             onClick={() => setSelectedColor(option.color)}
-                            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1.5 ${
+                            className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
                               selectedColor === option.color
-                                ? 'bg-[#654321] text-white shadow-md ring-2 ring-[#DAA520] ring-offset-1'
-                                : 'bg-gray-100 text-gray-700 hover:bg-amber-100 hover:text-[#654321]'
+                                ? 'bg-gradient-to-r from-[#654321] to-[#8B4513] text-white shadow-md ring-2 ring-[#DAA520] ring-offset-1'
+                                : 'bg-gray-100 text-gray-700 hover:bg-amber-100 hover:text-[#654321] border border-gray-200'
                             }`}
                           >
-                            <span className={`w-3 h-3 rounded-full ${
-                              selectedColor === option.color ? 'bg-white' : 'bg-gray-400'
-                            }`} />
                             {option.color}
                           </button>
                         ))}
@@ -334,7 +327,7 @@ export function WishlistOptionsModal({
                   {/* Style Options */}
                   {styleOptions.length > 0 && (
                     <div className="space-y-2">
-                      <Label className="text-sm font-semibold text-[#654321]">Style</Label>
+                      <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Style</Label>
                       <Select value={selectedStyle} onValueChange={setSelectedStyle}>
                         <SelectTrigger className="w-full border-amber-200 focus:border-[#DAA520] focus:ring-[#DAA520] text-xs h-9">
                           <SelectValue placeholder="Select style" />
@@ -353,7 +346,7 @@ export function WishlistOptionsModal({
                   {/* Configuration Options */}
                   {configOptions.length > 0 && (
                     <div className="space-y-2">
-                      <Label className="text-sm font-semibold text-[#654321]">Configuration</Label>
+                      <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Configuration</Label>
                       <Select value={selectedConfig} onValueChange={setSelectedConfig}>
                         <SelectTrigger className="w-full border-amber-200 focus:border-[#DAA520] focus:ring-[#DAA520] text-xs h-9">
                           <SelectValue placeholder="Select configuration" />
@@ -368,68 +361,45 @@ export function WishlistOptionsModal({
                       </Select>
                     </div>
                   )}
-
-                  {/* Acceptable Alternatives */}
-                  {alternativeOptions.length > 0 && (
-                    <div className="space-y-2">
-                      <Label className="text-sm font-semibold text-[#654321]">
-                        Acceptable Alternatives
-                      </Label>
-                      <div className="space-y-1 max-h-24 overflow-y-auto pr-1 bg-gray-50 rounded-lg p-2">
-                        {alternativeOptions.slice(0, 5).map((alt, idx) => (
-                          <div key={idx} className="flex items-center gap-2">
-                            <Checkbox
-                              id={`alt-${idx}`}
-                              checked={acceptableAlternatives.includes(alt)}
-                              onCheckedChange={() => toggleAlternative(alt)}
-                              className="border-amber-400 data-[state=checked]:bg-[#DAA520] data-[state=checked]:border-[#DAA520] h-3.5 w-3.5"
-                            />
-                            <Label 
-                              htmlFor={`alt-${idx}`} 
-                              className="text-xs text-gray-600 cursor-pointer truncate"
-                            >
-                              {alt} ok
-                            </Label>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </>
               ) : (
-                <div className="text-center py-4 text-gray-500 text-xs">
-                  No variant options available for this product.
+                <div className="text-center py-6 text-gray-500 text-sm">
+                  <div className="text-3xl mb-2">✨</div>
+                  No options to select for this product.
                 </div>
               )}
 
-              {/* Note Field */}
-              <div className="space-y-1.5">
-                <Label className="text-sm font-semibold text-[#654321]">
-                  Notes <span className="text-gray-400 text-xs">(optional)</span>
-                </Label>
-                <Textarea
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  placeholder="e.g., Medium preferred, Large also ok"
-                  className="resize-none h-16 border-amber-200 focus:border-[#DAA520] focus:ring-[#DAA520] text-xs"
-                  maxLength={200}
-                />
-              </div>
+              {/* Divider */}
+              <div className="border-t border-gray-200 pt-4 mt-4">
+                {/* Note Field */}
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                    Add a Note
+                  </Label>
+                  <Textarea
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    placeholder="Any preferences or instructions..."
+                    className="resize-none h-16 border-amber-200 focus:border-[#DAA520] focus:ring-[#DAA520] text-xs"
+                    maxLength={200}
+                  />
+                </div>
 
-              {/* Flexible Checkbox */}
-              <div className="flex items-center gap-2 p-2 bg-amber-50 rounded-lg border border-amber-200">
-                <Checkbox
-                  id="flexible"
-                  checked={isFlexible}
-                  onCheckedChange={(checked) => setIsFlexible(checked === true)}
-                  className="border-2 border-amber-400 data-[state=checked]:bg-[#DAA520] data-[state=checked]:border-[#DAA520] h-4 w-4"
-                />
-                <Label 
-                  htmlFor="flexible" 
-                  className="text-xs text-[#654321] cursor-pointer"
-                >
-                  I'm flexible with options
-                </Label>
+                {/* Flexible Checkbox */}
+                <div className="flex items-center gap-2 p-2.5 bg-amber-50 rounded-lg border border-amber-200 mt-3">
+                  <Checkbox
+                    id="flexible"
+                    checked={isFlexible}
+                    onCheckedChange={(checked) => setIsFlexible(checked === true)}
+                    className="border-2 border-amber-400 data-[state=checked]:bg-[#DAA520] data-[state=checked]:border-[#DAA520] h-4 w-4"
+                  />
+                  <Label 
+                    htmlFor="flexible" 
+                    className="text-xs text-[#654321] cursor-pointer font-medium"
+                  >
+                    I'm flexible with options
+                  </Label>
+                </div>
               </div>
 
               {/* Save Button (Mobile) */}
@@ -540,58 +510,44 @@ export function WishlistOptionsModal({
                       )}
                     </div>
 
-                    {/* Divider */}
-                    <div className="border-t border-gray-100 pt-3">
-                      {/* Available Options - Only show unselected ones */}
-                      {product.attributes?.combinedVariants && product.attributes.combinedVariants.length > 1 && (
-                        <div className="space-y-2">
-                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                            Other Options Available
-                          </p>
-                          <div className="flex flex-wrap gap-1.5">
-                            {product.attributes.combinedVariants
-                              .filter(v => v.name !== selectedVariant)
-                              .map((v, i) => (
-                                <span 
-                                  key={i} 
-                                  className="px-2.5 py-1 rounded-full text-[11px] bg-gray-100 text-gray-600 border border-gray-200"
-                                >
-                                  {v.name}
-                                  {v.price && <span className="ml-1 text-gray-400">{v.price}</span>}
-                                </span>
-                              ))}
-                          </div>
+                    {/* Selection Summary */}
+                    {(selectedVariant || selectedSize || selectedColor) && (
+                      <div className="border-t border-gray-100 pt-3 mt-3">
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                          Your Selection
+                        </p>
+                        <div className="space-y-1.5">
+                          {selectedVariant && (
+                            <div className="flex items-center gap-2 bg-green-50 px-3 py-2 rounded-lg border border-green-200">
+                              <Check className="w-4 h-4 text-green-600 flex-shrink-0" />
+                              <span className="text-sm font-medium text-green-800">{selectedVariant}</span>
+                            </div>
+                          )}
+                          {selectedSize && !selectedVariant && (
+                            <div className="flex items-center gap-2 bg-blue-50 px-3 py-2 rounded-lg border border-blue-200">
+                              <Check className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                              <span className="text-sm text-blue-800">Size: {selectedSize}</span>
+                            </div>
+                          )}
+                          {selectedColor && !selectedVariant && (
+                            <div className="flex items-center gap-2 bg-purple-50 px-3 py-2 rounded-lg border border-purple-200">
+                              <Check className="w-4 h-4 text-purple-600 flex-shrink-0" />
+                              <span className="text-sm text-purple-800">Color: {selectedColor}</span>
+                            </div>
+                          )}
                         </div>
-                      )}
+                      </div>
+                    )}
 
-                      {/* Size Options */}
-                      {product.attributes?.sizeOptions && product.attributes.sizeOptions.length > 0 && (
-                        <div className="mt-3">
-                          <p className="text-xs text-gray-400 mb-1">Available Sizes</p>
-                          <div className="flex flex-wrap gap-1">
-                            {product.attributes.sizeOptions.map((s, i) => (
-                              <span key={i} className="px-2 py-0.5 rounded text-[11px] bg-gray-50 text-gray-600 border border-gray-200">
-                                {s.size}
-                              </span>
-                            ))}
-                          </div>
+                    {/* No Selection Prompt */}
+                    {!selectedVariant && !selectedSize && !selectedColor && hasOptions && (
+                      <div className="border-t border-gray-100 pt-3 mt-3">
+                        <div className="flex items-center gap-2 bg-amber-50 px-3 py-2 rounded-lg border border-amber-200">
+                          <span className="text-amber-600 text-lg">👈</span>
+                          <span className="text-sm text-amber-700">Select your preferred option from the left panel</span>
                         </div>
-                      )}
-
-                      {/* Color Options */}
-                      {product.attributes?.colorVariants && product.attributes.colorVariants.length > 0 && (
-                        <div className="mt-3">
-                          <p className="text-xs text-gray-400 mb-1">Available Colors</p>
-                          <div className="flex flex-wrap gap-1">
-                            {product.attributes.colorVariants.map((c, i) => (
-                              <span key={i} className="px-2 py-0.5 rounded text-[11px] bg-gray-50 text-gray-600 border border-gray-200">
-                                {c.color}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
