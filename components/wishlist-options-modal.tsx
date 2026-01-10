@@ -458,40 +458,65 @@ export function WishlistOptionsModal({
           {/* RIGHT PANEL - Live Product View */}
           <div className="w-full md:w-[55%] bg-gradient-to-br from-gray-50 to-gray-100 overflow-y-auto">
             <div className="p-5 space-y-4 h-full flex flex-col">
-              {/* Panel Title */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-sm font-semibold text-gray-600">
+              {/* Panel Title - Clickable */}
+              <button 
+                onClick={handleViewOnStore}
+                disabled={!product.productUrl}
+                className="flex items-center justify-between w-full group hover:opacity-80 transition-opacity disabled:cursor-default disabled:opacity-100"
+              >
+                <div className="flex items-center gap-2 text-sm font-semibold text-gray-600 group-hover:text-[#DAA520] transition-colors">
                   <Eye className="w-4 h-4" />
                   LIVE PRODUCT VIEW
+                  {product.productUrl && <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />}
                 </div>
-                <span className="text-xs text-gray-400 bg-white px-2 py-0.5 rounded-full border">
-                  Trusted Source
+                <span className="text-xs text-gray-400 bg-white px-2 py-0.5 rounded-full border group-hover:border-[#DAA520] group-hover:text-[#DAA520] transition-colors">
+                  {product.productUrl ? 'Click to open' : 'Trusted Source'}
                 </span>
-              </div>
+              </button>
 
               {/* Product Preview Card */}
               <div className="flex-1 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
-                {/* Product Image */}
-                <div className="bg-white p-4 flex items-center justify-center border-b border-gray-100 flex-1 min-h-[200px]">
+                {/* Product Image - Clickable */}
+                <button 
+                  onClick={handleViewOnStore}
+                  disabled={!product.productUrl}
+                  className="bg-white p-4 flex items-center justify-center border-b border-gray-100 flex-1 min-h-[200px] cursor-pointer hover:bg-gray-50 transition-colors disabled:cursor-default disabled:hover:bg-white group"
+                >
                   {currentDisplayImage ? (
-                    <img 
-                      src={currentDisplayImage} 
-                      alt={product.name}
-                      className="max-w-full max-h-[250px] object-contain transition-all duration-300"
-                    />
+                    <div className="relative">
+                      <img 
+                        src={currentDisplayImage} 
+                        alt={product.name}
+                        className="max-w-full max-h-[250px] object-contain transition-all duration-300 group-hover:scale-105"
+                      />
+                      {product.productUrl && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/10 transition-colors rounded-lg">
+                          <div className="opacity-0 group-hover:opacity-100 bg-white/90 px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1.5 transition-opacity">
+                            <ExternalLink className="w-4 h-4 text-[#DAA520]" />
+                            <span className="text-xs font-semibold text-[#654321]">View on {product.source || 'Store'}</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   ) : (
                     <div className="w-32 h-32 flex items-center justify-center bg-gray-100 rounded-lg">
                       <Heart className="w-12 h-12 text-gray-300" />
                     </div>
                   )}
-                </div>
+                </button>
 
                 {/* Product Details */}
                 <div className="p-4 space-y-3 bg-gradient-to-b from-white to-gray-50">
-                  {/* Title */}
-                  <h3 className="font-semibold text-gray-900 text-sm leading-tight line-clamp-2">
-                    {product.name}
-                  </h3>
+                  {/* Title - Clickable */}
+                  <button 
+                    onClick={handleViewOnStore}
+                    disabled={!product.productUrl}
+                    className="text-left w-full group"
+                  >
+                    <h3 className="font-semibold text-gray-900 text-sm leading-tight line-clamp-2 group-hover:text-[#DAA520] transition-colors">
+                      {product.name}
+                    </h3>
+                  </button>
 
                   {/* Selected Variant Badge */}
                   {selectedVariant && (
