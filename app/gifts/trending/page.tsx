@@ -1431,6 +1431,9 @@ export default function TrendingGiftsPage() {
             price: selectedGift.targetAmount,
             image: selectedGift.image || selectedGift.bannerImage || undefined,
             source: selectedGift.source,
+            productUrl: selectedGift.productLink,
+            rating: selectedGift.rating,
+            reviewCount: selectedGift.reviewCount?.toString(),
             attributes: selectedGift.attributes
           }}
           isLoading={addingToWishlist}
