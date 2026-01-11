@@ -47,9 +47,10 @@ export async function GET(req: NextRequest) {
     }
 
     // Get all items from all wishlists
+    // Explicitly select columns to avoid schema cache issues with missing 'description' column
     const { data: items, error: itemsError } = await supabase
       .from("wishlist_items")
-      .select("*")
+      .select("id, wishlist_id, product_name, product_url, product_price, product_image, quantity, priority, category, stock_status, created_at, updated_at, title, asin, image_url, list_price, currency, review_star, review_count, affiliate_url, source, price_snapshot_at, store_name")
       .in("wishlist_id", wishlistIds)
       .order("created_at", { ascending: false })
 

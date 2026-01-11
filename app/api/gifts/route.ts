@@ -46,9 +46,10 @@ export async function GET(req: Request) {
     console.log(`[gifts-api] Fetching gifts, found ${trendingGifts.length} trending gifts`)
     if (trendingGifts.length > 0) {
       console.log(`[gifts-api] Sample gift:`, JSON.stringify(trendingGifts[0], null, 2))
+      console.log(`[gifts-api] Sample gift attributes:`, trendingGifts[0].attributes)
     }
 
-    // Convert trending gifts to gift format for display - include ALL fields
+    // Convert trending gifts to gift format for display - include ALL fields including attributes
     const gifts = trendingGifts.map((gift) => ({
       id: gift.id,
       collectionTitle: `Trending: ${gift.productName}`,
@@ -70,6 +71,8 @@ export async function GET(req: Request) {
       originalPrice: gift.originalPrice,
       amazonChoice: gift.amazonChoice,
       bestSeller: gift.bestSeller,
+      overallPick: gift.overallPick,
+      attributes: gift.attributes,
     }))
 
     console.log(`[gifts-api] Returning ${gifts.length} gifts`)

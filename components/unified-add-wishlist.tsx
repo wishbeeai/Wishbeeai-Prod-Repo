@@ -6,6 +6,8 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
@@ -20,6 +22,8 @@ import {
   Check,
   Edit2,
   ExternalLink,
+  Info,
+  AlertCircle,
 } from "lucide-react"
 
 interface ExtractedProduct {
@@ -80,6 +84,12 @@ export function UnifiedAddWishlist() {
   const [manualSize, setManualSize] = useState("")
   const [manualColor, setManualColor] = useState("")
   const [manualMaterial, setManualMaterial] = useState("")
+
+  // Preference level for variants - REQUIRED to prevent delays in gift purchases
+  // This helps contributors know exactly which variant to purchase, avoiding wrong purchases and delays
+  const [variantPreference, setVariantPreference] = useState<"I Like" | "Alternative" | "Optional" | "">("")
+  const [preferenceError, setPreferenceError] = useState<string>("")
+  const [isExtractingVariants, setIsExtractingVariants] = useState(false)
 
   useEffect(() => {
     const storedUrl = sessionStorage.getItem("pendingProductUrl")
@@ -335,6 +345,19 @@ export function UnifiedAddWishlist() {
       return
     }
 
+    // Validate preference levels - REQUIRED to prevent delays in gift purchases
+    // Without preference levels, contributors may hesitate or purchase wrong variants, causing delays
+    // Validate preference level if product has variants
+    if ((extractedProduct?.attributes?.color || extractedProduct?.attributes?.size) && !variantPreference) {
+      setPreferenceError("Preference level is required. This ensures contributors know which variant to purchase, preventing delays in buying gifts.")
+      toast({
+        title: "Preference Level Required",
+        description: "Please select a preference level for the product variants. This prevents delays in gift purchases by ensuring contributors know exactly which variant to buy.",
+        variant: "destructive",
+      })
+      return
+    }
+
     setIsSaving(true)
 
     try {
@@ -354,6 +377,9 @@ export function UnifiedAddWishlist() {
           color: formData.color,
           size: formData.size,
           quantity: Number.parseInt(formData.quantity) || 1,
+          // Preference level - required to prevent delays in gift purchases
+          // This helps contributors know exactly which variant to purchase
+          variantPreference: variantPreference || null,
         }),
       })
 
@@ -387,6 +413,9 @@ export function UnifiedAddWishlist() {
       setProductUrl("")
       setProductInput("")
       setExtractedProduct(null)
+      // Reset preference level
+      setVariantPreference("")
+      setPreferenceError("")
     } catch (error) {
       console.error("[v0] Wishlist save error:", error)
       toast({
@@ -397,6 +426,133 @@ export function UnifiedAddWishlist() {
     } finally {
       setIsSaving(false)
     }
+  }
+
+  // Handler to add extracted product directly to wishlist
+  const handleAddToWishlistFromExtracted = async () => {
+    if (!extractedProduct) {
+      toast({
+        title: "Error",
+        description: "No product extracted. Please extract a product first.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Validate preference level if product has variants
+    if ((extractedProduct.attributes?.color || extractedProduct.attributes?.size) && !variantPreference) {
+      setPreferenceError("Preference level is required. This ensures contributors know which variant to purchase, preventing delays in buying gifts.")
+      toast({
+        title: "Preference Level Required",
+        description: "Please select a preference level for the product variants. This prevents delays in gift purchases.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsSaving(true)
+
+    try {
+      // First, get or create a default wishlist
+      let wishlistId: string | null = null
+
+      // Fetch user's wishlists
+      const wishlistsResponse = await fetch("/api/wishlists")
+      if (wishlistsResponse.ok) {
+        const { wishlists } = await wishlistsResponse.json()
+        if (wishlists && wishlists.length > 0) {
+          // Use the first/most recent wishlist
+          wishlistId = wishlists[0].id
+        } else {
+          // Create a default wishlist
+          const createResponse = await fetch("/api/wishlists", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              title: "My Wishlist",
+              description: "Default wishlist",
+              isPublic: false,
+            }),
+          })
+          if (createResponse.ok) {
+            const { wishlist } = await createResponse.json()
+            wishlistId = wishlist.id
+          }
+        }
+      }
+
+      if (!wishlistId) {
+        throw new Error("Failed to get or create wishlist")
+      }
+
+      // Prepare product data for wishlist item
+      const wishlistItemData = {
+        wishlistId,
+        productName: extractedProduct.productName,
+        productUrl: extractedProduct.productLink || productInput,
+        productPrice: typeof extractedProduct.price === "number" ? extractedProduct.price : Number.parseFloat(extractedProduct.price.toString()),
+        productImage: extractedProduct.imageUrl,
+        // Map to new format
+        title: extractedProduct.productName,
+        product_url: extractedProduct.productLink || productInput,
+        image_url: extractedProduct.imageUrl,
+        list_price: typeof extractedProduct.price === "number" ? Math.round(extractedProduct.price * 100) : Math.round(Number.parseFloat(extractedProduct.price.toString()) * 100),
+        currency: "USD",
+        source: extractedProduct.storeName?.toLowerCase() || "amazon",
+        // Additional fields
+        category: formData.category || null,
+        quantity: 1,
+        // Variant information
+        color: extractedProduct.attributes?.color || null,
+        size: extractedProduct.attributes?.size || null,
+        variantPreference: variantPreference || null,
+      }
+
+      // Save to wishlist
+      const response = await fetch("/api/wishlists/items", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(wishlistItemData),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || "Failed to add to wishlist")
+      }
+
+      const result = await response.json()
+      console.log("[v0] Wishlist item added:", result)
+
+      toast({
+        title: "Success",
+        description: `${extractedProduct.productName} has been added to your wishlist!`,
+      })
+
+      // Reset form
+      handleCancelExtractedProduct()
+    } catch (error) {
+      console.error("[v0] Add to wishlist error:", error)
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to add to wishlist",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  // Handler to cancel and reset extracted product
+  const handleCancelExtractedProduct = () => {
+    setExtractedProduct(null)
+    setShowExtractedProduct(false)
+    setProductInput("")
+    setProductUrl("")
+    setVariantPreference("")
+    setPreferenceError("")
+    setSearchResults([])
+    setIsExtracting(false)
+    setIsExtractingVariants(false)
   }
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -594,7 +750,7 @@ export function UnifiedAddWishlist() {
           <div className="bg-white rounded-xl shadow-lg border-2 border-[#DAA520]/20 overflow-hidden hover:shadow-xl transition-all">
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 p-3 sm:p-4">
               {/* Product Image - Top on mobile, Left Side on larger screens */}
-              <div className="relative w-full sm:w-32 md:w-40 h-32 sm:h-32 md:h-40 bg-gray-100 flex-shrink-0 rounded-lg overflow-hidden group">
+              <div className="relative w-full sm:w-48 md:w-56 lg:w-64 h-48 sm:h-48 md:h-56 lg:h-64 bg-gray-100 flex-shrink-0 rounded-lg overflow-hidden group">
                 {!extractedProduct.imageUrl && (
                   <label
                     htmlFor="product-image-upload"
@@ -620,7 +776,7 @@ export function UnifiedAddWishlist() {
                     <img
                       src={extractedProduct.imageUrl || "/placeholder.svg"}
                       alt={extractedProduct.productName}
-                      className="w-full h-full object-contain p-2"
+                      className="w-full h-full object-contain p-1 sm:p-2"
                       crossOrigin="anonymous"
                       onError={(e) => {
                         e.currentTarget.src = "/placeholder.svg"
@@ -673,9 +829,9 @@ export function UnifiedAddWishlist() {
                 )}
 
                 {/* Product Details - Compact Grid */}
-                <div className="bg-gray-50 rounded-lg p-2 sm:p-2.5 mb-2 sm:mb-3 flex-grow">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <h4 className="text-[10px] sm:text-xs md:text-sm font-semibold text-gray-700">Product Details</h4>
+                <div className="bg-gray-50 rounded-lg p-3 mb-3 flex-grow">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-[9px] sm:text-xs font-semibold text-gray-700 uppercase">Product Details</h4>
                     <button
                       type="button"
                       onClick={() => {
@@ -704,7 +860,7 @@ export function UnifiedAddWishlist() {
                       )}
                     </button>
                   </div>
-                  <div className="grid grid-cols-2 gap-x-1 sm:gap-x-1.5 gap-y-1 sm:gap-y-1.5 text-[9px] sm:text-xs">
+                  <div className="grid grid-cols-2 gap-2 text-[9px] sm:text-xs">
                     {/* Color */}
                     {(extractedProduct.attributes?.color || isEditingProduct) && (
                       <>
@@ -790,6 +946,219 @@ export function UnifiedAddWishlist() {
                     )}
                   </div>
                 </div>
+
+                {/* Choose Your Preferred Options - PREFERENCE LEVEL (REQUIRED) */}
+                {/* 
+                  WHY PREFERENCE LEVELS ARE REQUIRED:
+                  - Prevents delays: Contributors need clear guidance on which variant to purchase
+                  - Avoids wrong purchases: Without preferences, contributors may hesitate or guess
+                  - Reduces returns: Correct variant selection the first time saves time and money
+                  - Ensures timely delivery: Clear preferences lead to faster purchase decisions
+                  - Without complete preference information, gift purchases may be delayed
+                  
+                  This section appears when a product has color or size attributes.
+                  All preference levels are REQUIRED to prevent delays in buying gifts.
+                */}
+                {/* Choose Your Preferred Options - PREFERENCE LEVEL (REQUIRED) */}
+                {/* Debug: Check if section should render */}
+                {extractedProduct && (extractedProduct.attributes?.color || extractedProduct.attributes?.size) && (
+                  <div className="mt-4 space-y-4 bg-amber-50 border-2 border-amber-200 rounded-xl p-4 shadow-lg">
+                    {/* DEBUG: This section should be visible when product has color or size */}
+                    <div className="flex items-start gap-2 mb-3">
+                      <Info className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
+                          <h3 className="text-sm font-bold text-amber-900">Choose Your Preferred Options</h3>
+                          {/* Paste Selected Options URL Button - Same styling as AI Extract in Add Affiliate Product */}
+                          {productInput && (
+                            <Button
+                              type="button"
+                              onClick={async () => {
+                                if (!productInput.trim()) {
+                                  toast({
+                                    title: "Error",
+                                    description: "Please enter a product URL first",
+                                    variant: "destructive",
+                                  })
+                                  return
+                                }
+
+                                setIsExtractingVariants(true)
+                                try {
+                                  const response = await fetch("/api/ai/extract-product", {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ url: productInput }),
+                                  })
+
+                                  if (!response.ok) throw new Error("Failed to extract variants")
+
+                                  const data = await response.json()
+                                  const extracted = data.productData || data
+
+                                  // Update extracted product with new variant data
+                                  if (extracted.attributes) {
+                                    setExtractedProduct((prev) => ({
+                                      ...prev!,
+                                      attributes: {
+                                        ...prev!.attributes,
+                                        color: extracted.attributes.color || prev!.attributes.color,
+                                        size: extracted.attributes.size || prev!.attributes.size,
+                                      },
+                                    }))
+                                  }
+
+                                  toast({
+                                    title: "Variants Extracted!",
+                                    description: "Available variants have been extracted from the URL",
+                                  })
+                                } catch (error) {
+                                  toast({
+                                    title: "Extraction Failed",
+                                    description: "Could not extract variants. Please select preferences manually.",
+                                    variant: "destructive",
+                                  })
+                                } finally {
+                                  setIsExtractingVariants(false)
+                                }
+                              }}
+                              disabled={isExtractingVariants || !productInput.trim()}
+                              className="bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 text-white hover:from-amber-600 hover:via-orange-600 hover:to-rose-600 whitespace-nowrap text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-1.5"
+                            >
+                              {isExtractingVariants ? (
+                                <>
+                                  <Loader2 className="mr-1.5 h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
+                                  <span className="hidden sm:inline">Extracting...</span>
+                                  <span className="sm:hidden">...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Sparkles className="mr-1.5 h-3 w-3 sm:h-4 sm:w-4" />
+                                  <span className="hidden sm:inline">Paste Selected Options URL</span>
+                                  <span className="sm:hidden">Paste URL</span>
+                                </>
+                              )}
+                            </Button>
+                          )}
+                        </div>
+                        <p className="text-xs text-amber-800">
+                          <strong>PREFERENCE LEVEL is required for all variants.</strong> This ensures contributors know
+                          exactly which variant to purchase, preventing delays and ensuring your gift is purchased
+                          correctly the first time.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Unified Preference Level Field */}
+                    <div className="bg-white rounded-lg p-3 border border-amber-300">
+                      <div className="space-y-3">
+                        {/* Show available variants */}
+                        <div className="flex flex-wrap gap-2">
+                          {extractedProduct.attributes?.color && (
+                            <div className="text-xs font-semibold text-gray-700">
+                              Color: <span className="text-gray-600 font-normal">{extractedProduct.attributes.color}</span>
+                            </div>
+                          )}
+                          {extractedProduct.attributes?.size && (
+                            <div className="text-xs font-semibold text-gray-700">
+                              Size: <span className="text-gray-600 font-normal">{extractedProduct.attributes.size}</span>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Single Preference Level Selector */}
+                        <div>
+                          <Label className="text-xs font-semibold text-gray-600 mb-1 block">
+                            PREFERENCE LEVEL <span className="text-red-500">*</span>
+                          </Label>
+                          <Select
+                            value={variantPreference}
+                            onValueChange={(value) => {
+                              setVariantPreference(value as "I Like" | "Alternative" | "Optional")
+                              setPreferenceError("")
+                            }}
+                            required
+                          >
+                            <SelectTrigger
+                              className={`w-full text-xs ${
+                                preferenceError
+                                  ? "border-red-500 focus:border-red-500"
+                                  : "border-gray-300 focus:border-[#DAA520]"
+                              }`}
+                            >
+                              <SelectValue placeholder="Select preference level" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="I Like">
+                                <div className="flex flex-col">
+                                  <span className="font-semibold text-xs">I Like</span>
+                                  <span className="text-[10px] text-gray-500">My preferred choice</span>
+                                </div>
+                              </SelectItem>
+                              <SelectItem value="Alternative">
+                                <div className="flex flex-col">
+                                  <span className="font-semibold text-xs">Alternative</span>
+                                  <span className="text-[10px] text-gray-500">Acceptable alternative</span>
+                                </div>
+                              </SelectItem>
+                              <SelectItem value="Optional">
+                                <div className="flex flex-col">
+                                  <span className="font-semibold text-xs">Optional</span>
+                                  <span className="text-[10px] text-gray-500">Nice to have if available</span>
+                                </div>
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                          {preferenceError && (
+                            <div className="flex items-center gap-1 mt-1 text-xs text-red-600">
+                              <AlertCircle className="w-3 h-3" />
+                              <span>{preferenceError}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    </div>
+
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 mt-3">
+                      <p className="text-[10px] text-blue-800 text-center">
+                        <strong>Remember:</strong> Complete all preference levels to ensure your gift is purchased
+                        correctly and delivered on time. This prevents delays in buying gifts.
+                      </p>
+                    </div>
+
+                    {/* Add to Wishlist and Cancel Buttons */}
+                    <div className="flex flex-col sm:flex-row gap-2 mt-4 pt-4 border-t border-amber-300">
+                      <Button
+                        type="button"
+                        onClick={handleAddToWishlistFromExtracted}
+                        disabled={isSaving}
+                        className="flex-1 h-12 px-4 sm:px-6 rounded-full bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] text-sm sm:text-base md:text-lg font-semibold transition-all duration-200 hover:scale-105 hover:from-[#F4C430] hover:to-[#DAA520] shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isSaving ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            <span>Adding...</span>
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle className="mr-2 h-4 w-4" />
+                            <span>Add to Wishlist</span>
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={handleCancelExtractedProduct}
+                        disabled={isSaving}
+                        className="flex-1 h-12 px-4 sm:px-6 rounded-full border-2 border-[#8B4513] text-[#8B4513] bg-transparent text-sm sm:text-base md:text-lg font-semibold transition-all duration-200 hover:scale-105 hover:bg-[#8B4513] hover:text-white shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <X className="mr-2 h-4 w-4" />
+                        <span>Cancel</span>
+                      </Button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Action Buttons */}
                 <div className="flex flex-col sm:flex-row gap-2">

@@ -390,14 +390,14 @@ export function TabbedWishlistCreator() {
 
                 <div className="bg-gray-50 rounded-lg p-3 mb-3">
                   <div className="flex items-center justify-between mb-2">
-                    <h4 className="text-xs font-semibold text-gray-700 uppercase">
+                    <h4 className="text-[9px] sm:text-xs font-semibold text-gray-700 uppercase">
                       Product Details {extractedProduct.category && `(${extractedProduct.category})`}
                     </h4>
                     {isGeneratingAttributes && <Loader2 className="w-4 h-4 animate-spin text-amber-500" />}
                   </div>
 
                   {Object.keys(extractedProduct.attributes).length > 0 ? (
-                    <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="grid grid-cols-2 gap-2 text-[9px] sm:text-xs">
                       {Object.entries(extractedProduct.attributes)
                         .filter(([_, value]) => value !== null && value !== "")
                         .map(([key, value]) => (

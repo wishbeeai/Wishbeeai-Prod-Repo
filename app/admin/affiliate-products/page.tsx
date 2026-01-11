@@ -44,6 +44,29 @@ import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import Link from "next/link"
 
+interface ProductAttributes {
+  capacity?: string
+  material?: string
+  finishType?: string
+  productDimensions?: string
+  wattage?: string
+  itemWeight?: string
+  controlMethod?: string
+  operationMode?: string
+  specialFeature?: string
+  // NOTE: color, size, style are intentionally excluded from product attributes
+  brand?: string
+  // Audio product attributes
+  earPlacement?: string
+  formFactor?: string
+  noiseControl?: string
+  configurationOptions?: string[]
+  model?: string
+  modelName?: string
+  // Custom badges
+  customBadges?: Array<{name: string, enabled: boolean}>
+}
+
 interface AffiliateProduct {
   id: string
   productName: string
@@ -57,6 +80,7 @@ interface AffiliateProduct {
   amazonChoice?: boolean
   bestSeller?: boolean
   productLink: string
+  attributes?: ProductAttributes
   createdAt: string
   updatedAt: string
 }
@@ -82,6 +106,10 @@ export default function AdminAffiliateProductsPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [isExtracting, setIsExtracting] = useState(false)
   const [extractedProduct, setExtractedProduct] = useState<any>(null)
+  // Custom fields for product specifications
+  const [customFields, setCustomFields] = useState<Array<{name: string, value: string}>>([])
+  // Custom badges for product
+  const [customBadges, setCustomBadges] = useState<Array<{name: string, enabled: boolean}>>([])
   // Temporary string values to preserve decimal points while typing
   const [tempPriceValue, setTempPriceValue] = useState<string>("")
   const [tempOriginalPriceValue, setTempOriginalPriceValue] = useState<string>("")
@@ -151,6 +179,11 @@ export default function AdminAffiliateProductsPage() {
       })
       if (response.ok) {
         toast.success("Product deleted successfully")
+        
+        // Immediately update local state to remove the deleted product
+        setProducts((prevProducts) => prevProducts.filter((p) => String(p.id) !== String(id)))
+        
+        // Also fetch to ensure sync with server (though local update is primary)
         fetchProducts()
         setIsDeleteModalOpen(false)
         setDeletingProductId(null)
@@ -178,6 +211,8 @@ export default function AdminAffiliateProductsPage() {
       bestSeller: false,
     })
     setExtractedProduct(null) // Clear extracted product widget
+    setCustomFields([]) // Clear custom fields
+    setCustomBadges([]) // Clear custom badges
   }
 
   const handleOpenAddModal = () => {
@@ -202,6 +237,15 @@ export default function AdminAffiliateProductsPage() {
       bestSeller: product.bestSeller || false,
     })
     // Populate extractedProduct with existing product data for editing
+    // Filter out color, size, and style from existing product attributes
+    let filteredEditAttributes = null
+    if (product.attributes) {
+      const { color, size, style, ...restAttributes } = product.attributes
+      if (Object.keys(restAttributes).length > 0) {
+        filteredEditAttributes = restAttributes
+      }
+    }
+    
     setExtractedProduct({
       productName: product.productName || "",
       image: product.image || "",
@@ -212,10 +256,32 @@ export default function AdminAffiliateProductsPage() {
       price: product.price || null,
       originalPrice: product.originalPrice || null,
       productLink: product.productLink || "",
-      brand: null, // Will be extracted if needed
+      brand: product.attributes?.brand || null,
       amazonChoice: product.amazonChoice || false,
       bestSeller: product.bestSeller || false,
+      // Include product attributes/specifications for editing (excluding color, size, style)
+      attributes: filteredEditAttributes || {
+        capacity: null,
+        material: null,
+        finishType: null,
+        productDimensions: null,
+        wattage: null,
+        itemWeight: null,
+        controlMethod: null,
+        operationMode: null,
+        specialFeature: null,
+        brand: null,
+        sizeOptions: null,
+        earPlacement: null,
+        formFactor: null,
+        noiseControl: null,
+        // NOTE: color, size, style are intentionally excluded
+      },
     })
+    // Load custom fields from product attributes
+    setCustomFields(product.attributes?.customFields || [])
+    // Load custom badges from product attributes
+    setCustomBadges(product.attributes?.customBadges || [])
     setIsEditModalOpen(true)
   }
 
@@ -224,9 +290,21 @@ export default function AdminAffiliateProductsPage() {
     setExtractedProduct(null) // Clear previous extracted product when URL changes
   }
 
-  const handleExtractProduct = async () => {
-    const url = formData.productLink
+  // Auto-extract when URL is pasted - pass URL directly since state update is async
+  const handleAutoExtract = async (pastedUrl: string) => {
+    // First update the form data
+    setFormData(prev => ({ ...prev, productLink: pastedUrl }))
+    setExtractedProduct(null)
     
+    // Then trigger extraction with the pasted URL directly
+    await extractProductFromUrl(pastedUrl)
+  }
+
+  const handleExtractProduct = async () => {
+    await extractProductFromUrl(formData.productLink)
+  }
+
+  const extractProductFromUrl = async (url: string) => {
     if (!url.trim()) {
       toast.error("Please paste a product URL")
       return
@@ -302,6 +380,10 @@ export default function AdminAffiliateProductsPage() {
         // Extract the product details - API returns productData object
         const extracted = data.productData || data
         
+        // DEBUG: Log the full extracted data to see what attributes are available
+        console.log('[Admin] Full extracted data from API:', JSON.stringify(extracted, null, 2))
+        console.log('[Admin] extracted.attributes:', extracted.attributes)
+        
         // Store extracted product details for widget display
         const sourceValue = extracted.storeName || extracted.source || extractSourceFromUrl(url) || ""
         const categoryValue = extracted.category || ""
@@ -310,6 +392,27 @@ export default function AdminAffiliateProductsPage() {
         const originalPriceValue = extracted.originalPrice || extracted.listPrice || null
         const ratingValue = extracted.rating || extracted.averageRating || null
         const reviewCountValue = extracted.reviewCount || extracted.numReviews || null
+        
+        // Filter out color, size, style, and variant-related properties from extracted attributes
+        let filteredAttributes = null
+        if (extracted.attributes) {
+          const excludedKeys = [
+            'color', 'size', 'style', 
+            'colorVariants', 'sizeOptions', 'combinedVariants', 'styleOptions',
+            'styleName', 'patternName'
+          ]
+          const restAttributes: Record<string, any> = {}
+          for (const [key, value] of Object.entries(extracted.attributes)) {
+            if (!excludedKeys.includes(key) && value !== null && value !== undefined && value !== '') {
+              restAttributes[key] = value
+            }
+          }
+          // Only keep attributes if there are any non-excluded properties
+          if (Object.keys(restAttributes).length > 0) {
+            filteredAttributes = restAttributes
+          }
+          console.log('[Admin] Extracted attributes after filtering:', filteredAttributes)
+        }
         
         setExtractedProduct({
           productName: extracted.productName || null,
@@ -324,6 +427,8 @@ export default function AdminAffiliateProductsPage() {
           brand: extracted.attributes?.brand || extracted.brand || null,
           amazonChoice: extracted.amazonChoice || false,
           bestSeller: extracted.bestSeller || false,
+          // Include filtered product attributes (excluding color, size, style)
+          attributes: filteredAttributes,
         })
         
         // Auto-fill form fields with extracted data
@@ -391,7 +496,10 @@ export default function AdminAffiliateProductsPage() {
 
   const handleAddToWishlist = async (product: AffiliateProduct) => {
     if (!user) {
-      toast.error("Please log in to add products to trending gifts")
+      toast.error("Authentication Required", {
+        description: "Please log in to add products to Trending Gifts.",
+        duration: 4000,
+      })
       return
     }
 
@@ -417,21 +525,51 @@ export default function AdminAffiliateProductsPage() {
           amazonChoice: product.amazonChoice || false,
           bestSeller: product.bestSeller || false,
           description: description,
+          // Include all product attributes/specifications
+          attributes: product.attributes || undefined,
         }),
       })
 
       if (response.ok) {
         const result = await response.json()
         console.log(`[handleAddToWishlist] Product added to trending gifts:`, result)
-        toast.success(`"${product.productName}" added to Trending Gifts!`)
+        
+        // Remove product from affiliate products list after successfully adding to trending gifts
+        try {
+          const deleteResponse = await fetch(`/api/admin/affiliate-products/${product.id}`, {
+            method: "DELETE",
+          })
+          if (deleteResponse.ok) {
+            // Update local state to remove the product from the list
+            setProducts(prev => prev.filter(p => p.id !== product.id))
+            console.log(`[handleAddToWishlist] Product removed from affiliate products list`)
+          }
+        } catch (deleteError) {
+          console.error(`[handleAddToWishlist] Error removing from affiliate products:`, deleteError)
+        }
+        
+        toast.success("Added to Trending Gifts!", {
+          description: `"${product.productName.length > 50 ? product.productName.substring(0, 50) + '...' : product.productName}" has been added and removed from this list.`,
+          action: {
+            label: "View Trending Gifts",
+            onClick: () => router.push("/gifts/trending"),
+          },
+          duration: 5000,
+        })
       } else {
         const error = await response.json().catch(() => ({ error: `HTTP ${response.status}: ${response.statusText}` }))
         console.error(`[handleAddToWishlist] Error response:`, error)
-        toast.error(error.error || "Failed to add product to trending gifts")
+        toast.error("Failed to add product", {
+          description: error.error || "Something went wrong. Please try again.",
+          duration: 4000,
+        })
       }
     } catch (error) {
       console.error("Error adding to trending gifts:", error)
-      toast.error("Failed to add product to trending gifts")
+      toast.error("Failed to add product", {
+        description: "Unable to connect to the server. Please check your connection and try again.",
+        duration: 4000,
+      })
     } finally {
       setAddingToWishlist(null)
     }
@@ -454,6 +592,39 @@ export default function AdminAffiliateProductsPage() {
     if (!extractedProduct?.price || isNaN(parseFloat(extractedProduct.price.toString()))) {
       toast.error("Valid price is required")
       return
+    }
+
+    // Check for duplicate product (only when adding new, not editing)
+    if (!isEditModalOpen) {
+      const productLink = formData.productLink || extractedProduct.productLink || ""
+      const productName = extractedProduct.productName.trim().toLowerCase()
+      
+      // Check if product with same link already exists
+      const duplicateByLink = products.find(p => 
+        p.productLink && productLink && 
+        p.productLink.toLowerCase() === productLink.toLowerCase()
+      )
+      
+      if (duplicateByLink) {
+        toast.error("Duplicate Product", {
+          description: "A product with this URL already exists in your catalog.",
+          duration: 5000,
+        })
+        return
+      }
+      
+      // Check if product with same name already exists
+      const duplicateByName = products.find(p => 
+        p.productName && p.productName.trim().toLowerCase() === productName
+      )
+      
+      if (duplicateByName) {
+        toast.error("Duplicate Product", {
+          description: `"${extractedProduct.productName}" already exists in your catalog.`,
+          duration: 5000,
+        })
+        return
+      }
     }
 
     setIsSaving(true)
@@ -488,6 +659,37 @@ export default function AdminAffiliateProductsPage() {
           : (formData.productLink || extractedProduct.productLink || "").trim() || undefined,
         amazonChoice: extractedProduct?.amazonChoice ?? formData.amazonChoice,
         bestSeller: extractedProduct?.bestSeller ?? formData.bestSeller,
+        // Include ALL product specifications/attributes dynamically (excluding color, size, style variants)
+        attributes: (() => {
+          // Start with all extracted attributes
+          const attrs: Record<string, any> = { ...extractedProduct.attributes }
+          
+          // Remove color/size/style variants (we filter these out)
+          const excludeKeys = ['color', 'size', 'style', 'sizeOptions', 'colorVariants', 'combinedVariants', 'styleOptions', 'styleName', 'patternName']
+          excludeKeys.forEach(key => delete attrs[key])
+          
+          // Add custom fields if any
+          if (customFields.filter(f => f.name && f.value).length > 0) {
+            attrs.customFields = customFields.filter(f => f.name && f.value)
+          }
+          
+          // Add custom badges if any
+          if (customBadges.filter(b => b.name).length > 0) {
+            attrs.customBadges = customBadges.filter(b => b.name)
+          }
+          
+          // Filter out empty/null/undefined values
+          const cleanedAttrs: Record<string, any> = {}
+          Object.entries(attrs).forEach(([key, value]) => {
+            if (value !== null && value !== undefined && value !== '') {
+              cleanedAttrs[key] = value
+            }
+          })
+          
+          console.log('[handleSave] Final attributes to save:', cleanedAttrs)
+          
+          return Object.keys(cleanedAttrs).length > 0 ? cleanedAttrs : undefined
+        })(),
       }
 
       console.log(`[handleSave] ${method} request to: ${url}`)
@@ -814,14 +1016,16 @@ export default function AdminAffiliateProductsPage() {
                     <td className="py-5 px-4">
                       <div className="flex items-center gap-4">
                         <div className="relative flex-shrink-0">
-                          <img
-                            src={product.image || "/placeholder.svg"}
-                            alt={product.productName}
-                            className="w-20 h-20 sm:w-24 sm:h-24 object-cover rounded-xl border-2 border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200"
-                            onError={(e) => {
-                              e.currentTarget.src = "/placeholder.svg"
-                            }}
-                          />
+                          <div className="w-24 h-24 sm:w-28 sm:h-28 bg-white rounded-xl border-2 border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200 flex items-center justify-center p-2">
+                            <img
+                              src={product.image || "/placeholder.svg"}
+                              alt={product.productName}
+                              className="max-w-full max-h-full object-contain"
+                              onError={(e) => {
+                                e.currentTarget.src = "/placeholder.svg"
+                              }}
+                            />
+                          </div>
                           {product.originalPrice && product.originalPrice > product.price && (
                             <div className="absolute -top-2 -right-2 bg-gradient-to-r from-red-500 to-rose-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg">
                               SALE
@@ -832,9 +1036,9 @@ export default function AdminAffiliateProductsPage() {
                           <div className="font-bold text-[#654321] text-sm sm:text-base mb-1.5 line-clamp-2 leading-tight">
                             {product.productName}
                           </div>
-                          <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-gradient-to-r from-amber-100 to-orange-100 rounded-full">
-                            <Package className="w-3 h-3 text-[#DAA520]" />
-                            <span className="text-xs font-semibold text-[#8B4513]">{product.category}</span>
+                          <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-gradient-to-r from-amber-100 to-orange-100 rounded-full whitespace-nowrap">
+                            <Package className="w-3 h-3 text-[#DAA520] flex-shrink-0" />
+                            <span className="text-xs font-semibold text-[#8B4513] truncate max-w-[150px]">{product.category}</span>
                           </div>
                         </div>
                       </div>
@@ -844,13 +1048,13 @@ export default function AdminAffiliateProductsPage() {
                         <span className="text-sm font-semibold text-[#654321]">{product.source}</span>
                         <div className="flex flex-wrap gap-1.5">
                           {product.amazonChoice && (
-                            <Badge className="bg-gradient-to-r from-[#FF9900] to-[#FFB84D] text-white text-[10px] font-bold px-2 py-0.5 border-0 shadow-sm">
-                              Amazon Choice
+                            <Badge className="bg-[#232F3E] text-[#FFFFFF] text-[10px] font-bold px-2 py-0.5 border-0 shadow-sm">
+                              Amazon's Choice
                             </Badge>
                           )}
                           {product.bestSeller && (
-                            <Badge className="bg-gradient-to-r from-gray-800 to-gray-900 text-white text-[10px] font-bold px-2 py-0.5 border-0 shadow-sm">
-                              Best Seller
+                            <Badge className="bg-[#D14900] text-white text-[10px] font-bold px-2 py-0.5 border-0 shadow-sm">
+                              #1 Best Seller
                             </Badge>
                           )}
                         </div>
@@ -858,37 +1062,40 @@ export default function AdminAffiliateProductsPage() {
                     </td>
                     <td className="py-5 px-4">
                       <div className="flex flex-col items-start gap-1.5">
-                        <div className="flex items-center gap-1">
-                          {[1, 2, 3, 4, 5].map((star) => {
-                            // Calculate fill percentage for each star based on rating
-                            const starValue = product.rating - star
-                            let fillPercent = 0
-                            
-                            if (starValue >= 1) {
-                              fillPercent = 100 // Fully filled
-                            } else if (starValue <= 0) {
-                              fillPercent = 0 // Empty
-                            } else {
-                              // Fractional part: 0.1 → 10%, 0.9 → 90%
-                              fillPercent = Math.round(starValue * 100)
-                            }
-                            
-                            // For full star icons, show as filled if >= 50%, empty if < 50%
-                            const isFilled = fillPercent >= 50
+                        <div className="flex items-center gap-0.5">
+                          {[1, 2, 3, 4, 5].map((starPosition) => {
+                            const rating = product.rating || 0
+                            const fillAmount = Math.max(0, Math.min(1, rating - (starPosition - 1)))
+                            const fillPercent = Math.round(fillAmount * 100)
+                            const gradientId = `star-gradient-${product.id}-${starPosition}`
                             
                             return (
-                              <Star
-                                key={star}
-                                className={`w-4 h-4 sm:w-5 sm:h-5 ${
-                                  isFilled
-                                    ? "fill-[#F4C430] text-[#F4C430]"
-                                    : "fill-gray-200 text-gray-300"
-                                }`}
-                              />
+                              <svg
+                                key={starPosition}
+                                className="w-4 h-4 sm:w-5 sm:h-5"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                xmlns="http://www.w3.org/2000/svg"
+                              >
+                                <defs>
+                                  <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
+                                    <stop offset={`${fillPercent}%`} stopColor="#F4C430" />
+                                    <stop offset={`${fillPercent}%`} stopColor="#E5E7EB" />
+                                  </linearGradient>
+                                </defs>
+                                <path
+                                  d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"
+                                  fill={`url(#${gradientId})`}
+                                  stroke="#F4C430"
+                                  strokeWidth="1"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                              </svg>
                             )
                           })}
                         </div>
-                        <span className="text-sm font-bold text-[#654321]">{product.rating.toFixed(1)}</span>
+                        <span className="text-sm font-bold text-[#654321]">{(product.rating || 0).toFixed(1)}</span>
                       </div>
                     </td>
                     <td className="py-5 px-4">
@@ -940,7 +1147,7 @@ export default function AdminAffiliateProductsPage() {
                         <Button
                           onClick={() => handleAddToWishlist(product)}
                           disabled={addingToWishlist === product.id || !user}
-                          className="w-full h-9 px-3 rounded-full bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] text-xs sm:text-sm font-bold transition-all duration-200 hover:scale-105 hover:from-[#F4C430] hover:to-[#DAA520] active:scale-95 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                          className="h-8 px-3 rounded-full bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] hover:from-[#F4C430] hover:to-[#DAA520] text-xs sm:text-sm font-bold transition-all duration-200 hover:scale-105 active:scale-95 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                         >
                           {addingToWishlist === product.id ? (
                             <>
@@ -1078,7 +1285,7 @@ export default function AdminAffiliateProductsPage() {
           <div className="pt-2 pb-4 space-y-4">
             {/* Product Link - Only show when adding, not when editing */}
             {!isEditModalOpen && (
-              <div className="mb-8">
+              <div className="mb-16">
                 <label htmlFor="productLink" className="block text-sm font-semibold text-gray-700 mb-2">
                   Product URL <span className="text-red-500">*</span>
                 </label>
@@ -1090,9 +1297,10 @@ export default function AdminAffiliateProductsPage() {
                       value={formData.productLink}
                       onChange={(e) => handleProductLinkChange(e.target.value)}
                       onPaste={(e) => {
-                        const pastedText = e.clipboardData.getData("text")
+                        const pastedText = e.clipboardData.getData("text").trim()
                         if (pastedText.startsWith("http")) {
-                          handleProductLinkChange(pastedText)
+                          e.preventDefault() // Prevent default paste to avoid double input
+                          handleAutoExtract(pastedText)
                         }
                       }}
                       placeholder="Paste product link to extract product details"
@@ -1120,38 +1328,11 @@ export default function AdminAffiliateProductsPage() {
                   </Button>
                 </div>
                 
-                {/* Cancel and Close Window Buttons - Only show before extraction */}
-                {!extractedProduct && (
-                  <div className="flex justify-center gap-3 mt-8">
-                    <Button
-                      onClick={() => {
-                        setIsAddModalOpen(false)
-                        setIsEditModalOpen(false)
-                        setEditingProduct(null)
-                        resetForm()
-                      }}
-                      className="bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] hover:from-[#F4C430] hover:to-[#DAA520]"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      onClick={() => {
-                        setIsAddModalOpen(false)
-                        setIsEditModalOpen(false)
-                        setEditingProduct(null)
-                        resetForm()
-                      }}
-                      className="bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] hover:from-[#F4C430] hover:to-[#DAA520]"
-                    >
-                      Close Window
-                    </Button>
-                  </div>
-                )}
               </div>
             )}
 
             {/* Product Extract Details Widget - Show when extracted or when editing */}
-            {(extractedProduct || isEditModalOpen) && (
+            {extractedProduct && (
               <div className="mt-6">
                 <div className="bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 border-2 border-[#F4C430] rounded-xl p-6 shadow-xl">
                   {/* Header section - Only show when adding (not editing) */}
@@ -1176,10 +1357,10 @@ export default function AdminAffiliateProductsPage() {
                     <div className="bg-white rounded-xl p-4 shadow-md border border-amber-200">
                       <label className="block text-sm font-bold text-[#654321] mb-3 text-center">Product Image</label>
                       <div className="w-full h-[500px] sm:h-[600px] md:h-[700px] bg-white rounded-xl overflow-auto border-2 border-amber-300 shadow-inner flex items-center justify-center">
-                        {extractedProduct.image ? (
+                        {extractedProduct?.image ? (
                           <img
                             src={extractedProduct.image}
-                            alt={extractedProduct.productName || "Product"}
+                            alt={extractedProduct?.productName || "Product"}
                             className="max-w-full max-h-full w-auto h-auto object-contain"
                             onError={(e) => {
                               e.currentTarget.src = "/placeholder.svg"
@@ -1480,12 +1661,66 @@ export default function AdminAffiliateProductsPage() {
                       />
                     </div>
 
+                    {/* Custom Fields Section */}
+                    <div className="bg-white rounded-xl p-4 shadow-md border border-amber-200">
+                      <label className="block text-sm font-bold text-[#654321] mb-3">Custom Fields</label>
+                      <div className="space-y-2">
+                        {customFields.map((field, idx) => (
+                          <div key={idx} className="flex items-center gap-2">
+                            <Input
+                              value={field.name || ''}
+                              onChange={(e) => {
+                                const newCustomFields = [...customFields]
+                                newCustomFields[idx] = { ...newCustomFields[idx], name: e.target.value }
+                                setCustomFields(newCustomFields)
+                              }}
+                              className="w-32 h-8 text-sm border-gray-300 focus:border-amber-500"
+                              placeholder="Field Name"
+                            />
+                            <Input
+                              value={field.value || ''}
+                              onChange={(e) => {
+                                const newCustomFields = [...customFields]
+                                newCustomFields[idx] = { ...newCustomFields[idx], value: e.target.value }
+                                setCustomFields(newCustomFields)
+                              }}
+                              className="flex-1 h-8 text-sm border-gray-300 focus:border-amber-500"
+                              placeholder="Field Value"
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const newCustomFields = customFields.filter((_, i) => i !== idx)
+                                setCustomFields(newCustomFields)
+                              }}
+                              className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                            >
+                              ×
+                            </Button>
+                          </div>
+                        ))}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setCustomFields([...customFields, { name: '', value: '' }])
+                          }}
+                          className="text-xs h-7 border-amber-400 text-amber-700 hover:bg-amber-50"
+                        >
+                          + Add Field
+                        </Button>
+                      </div>
+                    </div>
+
                     {/* Badges Section */}
                     <div className="bg-white rounded-xl p-4 shadow-md border border-amber-200">
                       <label className="block text-sm font-bold text-[#654321] mb-3">Product Badges</label>
                       <div className="space-y-3">
-                        {/* Amazon Choice Badge */}
-                        <div className="flex items-center space-x-3">
+                        {/* Amazon's Choice Badge - Editable */}
+                        <div className="flex items-center gap-2">
                           <Checkbox
                             id="amazon-choice"
                             checked={extractedProduct?.amazonChoice || false}
@@ -1495,7 +1730,6 @@ export default function AdminAffiliateProductsPage() {
                                 ...extractedProduct,
                                 amazonChoice: newValue
                               })
-                              // Also update formData to keep in sync
                               setFormData({
                                 ...formData,
                                 amazonChoice: newValue
@@ -1503,18 +1737,35 @@ export default function AdminAffiliateProductsPage() {
                             }}
                             className="border-2 border-gray-300 data-[state=checked]:bg-[#DAA520] data-[state=checked]:border-[#DAA520]"
                           />
-                          <Label
-                            htmlFor="amazon-choice"
-                            className="text-sm font-semibold text-[#654321] cursor-pointer flex items-center gap-2"
-                          >
-                            <Badge className="bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] font-bold">
-                              Amazon Choice
-                            </Badge>
-                          </Label>
+                          <Input
+                            value="Amazon's Choice"
+                            disabled
+                            className="flex-1 h-8 text-sm border-gray-300 bg-gray-50"
+                          />
+                          {extractedProduct?.amazonChoice && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setExtractedProduct({
+                                  ...extractedProduct,
+                                  amazonChoice: false
+                                })
+                                setFormData({
+                                  ...formData,
+                                  amazonChoice: false
+                                })
+                              }}
+                              className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                            >
+                              ×
+                            </Button>
+                          )}
                         </div>
 
-                        {/* Best Seller Badge */}
-                        <div className="flex items-center space-x-3">
+                        {/* Best Seller Badge - Editable */}
+                        <div className="flex items-center gap-2">
                           <Checkbox
                             id="best-seller"
                             checked={extractedProduct?.bestSeller || false}
@@ -1524,7 +1775,6 @@ export default function AdminAffiliateProductsPage() {
                                 ...extractedProduct,
                                 bestSeller: newValue
                               })
-                              // Also update formData to keep in sync
                               setFormData({
                                 ...formData,
                                 bestSeller: newValue
@@ -1532,17 +1782,168 @@ export default function AdminAffiliateProductsPage() {
                             }}
                             className="border-2 border-gray-300 data-[state=checked]:bg-[#DAA520] data-[state=checked]:border-[#DAA520]"
                           />
-                          <Label
-                            htmlFor="best-seller"
-                            className="text-sm font-semibold text-[#654321] cursor-pointer flex items-center gap-2"
-                          >
-                            <Badge className="bg-gradient-to-r from-[#FF6B6B] to-[#FF8E53] text-white font-bold">
-                              Best Seller
-                            </Badge>
-                          </Label>
+                          <Input
+                            value="#1 Best Seller"
+                            disabled
+                            className="flex-1 h-8 text-sm border-gray-300 bg-gray-50"
+                          />
+                          {extractedProduct?.bestSeller && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setExtractedProduct({
+                                  ...extractedProduct,
+                                  bestSeller: false
+                                })
+                                setFormData({
+                                  ...formData,
+                                  bestSeller: false
+                                })
+                              }}
+                              className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                            >
+                              ×
+                            </Button>
+                          )}
                         </div>
+
+                        {/* Custom Badges */}
+                        {customBadges.map((badge, idx) => (
+                          <div key={idx} className="flex items-center gap-2">
+                            <Checkbox
+                              id={`custom-badge-${idx}`}
+                              checked={badge.enabled}
+                              onCheckedChange={(checked) => {
+                                const newBadges = [...customBadges]
+                                newBadges[idx] = { ...newBadges[idx], enabled: checked === true }
+                                setCustomBadges(newBadges)
+                              }}
+                              className="border-2 border-gray-300 data-[state=checked]:bg-[#DAA520] data-[state=checked]:border-[#DAA520]"
+                            />
+                            <Input
+                              value={badge.name}
+                              onChange={(e) => {
+                                const newBadges = [...customBadges]
+                                newBadges[idx] = { ...newBadges[idx], name: e.target.value }
+                                setCustomBadges(newBadges)
+                              }}
+                              className="flex-1 h-8 text-sm border-gray-300 focus:border-amber-500"
+                              placeholder="Badge name"
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setCustomBadges(customBadges.filter((_, i) => i !== idx))
+                              }}
+                              className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                            >
+                              ×
+                            </Button>
+                          </div>
+                        ))}
+
+                        {/* Add Badge Button */}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setCustomBadges([...customBadges, { name: '', enabled: true }])
+                          }}
+                          className="text-xs h-7 border-amber-400 text-amber-700 hover:bg-amber-50 mt-2"
+                        >
+                          + Add Badge
+                        </Button>
                       </div>
                     </div>
+
+                    {/* Product Attributes Section - Displays extracted attributes (excluding color, size, style) */}
+                    {extractedProduct?.attributes && (() => {
+                      // Keys to exclude from display (variant-related + brand which is shown separately)
+                      const excludedKeys = ['color', 'size', 'style', 'sizeOptions', 'colorVariants', 'combinedVariants', 'styleOptions', 'styleName', 'patternName', 'brand']
+                      
+                      // Get all attribute entries
+                      const allEntries = Object.entries(extractedProduct.attributes)
+                      
+                      // Filter to non-excluded, non-empty values
+                      const filteredEntries = allEntries
+                        .filter(([key, value]) => 
+                          !excludedKeys.includes(key) && 
+                          value !== null && 
+                          value !== undefined && 
+                          value !== ''
+                        )
+                      
+                      if (filteredEntries.length === 0) {
+                        return null
+                      }
+                      
+                      return (
+                        <div className="bg-white rounded-xl p-3 sm:p-4 shadow-md border border-amber-200 w-full overflow-hidden">
+                          <label className="block text-xs sm:text-sm font-bold text-[#654321] mb-2 sm:mb-3">
+                            Product Attributes ({filteredEntries.length})
+                          </label>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
+                            {filteredEntries.map(([key, value]) => (
+                              <div key={key} className="group flex flex-col bg-amber-50 rounded-lg p-2 min-w-0 relative">
+                                <div className="flex items-center justify-between gap-1">
+                                  <span className="text-[10px] sm:text-xs font-semibold text-[#654321] capitalize truncate flex-1">
+                                    {key.replace(/([A-Z])/g, ' $1').trim()}
+                                  </span>
+                                  <div className="flex items-center gap-0.5">
+                                    {/* Edit Button */}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const newValue = prompt(
+                                          `Edit ${key.replace(/([A-Z])/g, ' $1').trim()}:`,
+                                          typeof value === 'object' ? JSON.stringify(value) : String(value)
+                                        )
+                                        if (newValue !== null) {
+                                          setExtractedProduct({
+                                            ...extractedProduct,
+                                            attributes: {
+                                              ...extractedProduct.attributes,
+                                              [key]: newValue
+                                            }
+                                          })
+                                        }
+                                      }}
+                                      className="opacity-60 hover:opacity-100 transition-opacity p-0.5 sm:p-1 hover:bg-amber-200 rounded"
+                                      title={`Edit ${key.replace(/([A-Z])/g, ' $1').trim()}`}
+                                    >
+                                      <Edit2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#654321]" />
+                                    </button>
+                                    {/* Remove Button */}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const { [key]: removed, ...restAttributes } = extractedProduct.attributes
+                                        setExtractedProduct({
+                                          ...extractedProduct,
+                                          attributes: restAttributes
+                                        })
+                                      }}
+                                      className="opacity-60 hover:opacity-100 transition-opacity p-0.5 sm:p-1 hover:bg-red-100 rounded"
+                                      title={`Remove ${key.replace(/([A-Z])/g, ' $1').trim()}`}
+                                    >
+                                      <Trash2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-red-500" />
+                                    </button>
+                                  </div>
+                                </div>
+                                <span className="text-[10px] sm:text-xs text-gray-700 break-words line-clamp-2" title={typeof value === 'object' ? JSON.stringify(value) : String(value)}>
+                                  {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })()}
 
                   </div>
                 </div>
@@ -1551,7 +1952,7 @@ export default function AdminAffiliateProductsPage() {
             )}
 
             {/* Action Buttons - Only show after extraction or when editing */}
-            {(extractedProduct || isEditModalOpen) && (
+            {extractedProduct && (
               <div className="flex justify-end gap-3 pt-4 border-t">
                 <Button
                   onClick={() => {

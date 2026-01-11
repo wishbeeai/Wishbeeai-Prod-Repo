@@ -31,6 +31,7 @@ export async function insertAmazonWishlistItem(
     userId = user.id
   }
 
+  // Explicitly select columns to avoid schema cache issues with missing 'description' column
   const { data: item, error } = await supabase
     .from('wishlist_items')
     .insert({
@@ -47,7 +48,7 @@ export async function insertAmazonWishlistItem(
       affiliate_url: normalizedData.affiliate_url,
       source: 'amazon',
     })
-    .select()
+    .select("id, wishlist_id, product_name, product_url, product_price, product_image, quantity, priority, category, stock_status, created_at, updated_at, title, asin, image_url, list_price, currency, review_star, review_count, affiliate_url, source, price_snapshot_at, store_name")
     .single()
 
   if (error) {

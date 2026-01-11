@@ -167,21 +167,21 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Build attributes object - include all possible attributes
+    // Build attributes object - include ALL attributes EXCEPT color, size, style variants
+    // This dynamically includes all extracted attributes
     const attributes: any = {}
-    if (body.attributes) {
-      const attributeFields = [
-        "brand", "color", "material", "capacity", "dimensions",
-        "caratWeight", "gemstone", "size", "storage", "offerType", "kindleUnlimited", "fitType", "style", "volume",
-        "skinType", "ingredients", "weight", "assembly", "ageRange",
-        "safetyInfo", "author", "publisher", "pageCount", "isbn"
-      ]
+    if (body.attributes && typeof body.attributes === 'object') {
+      // Excluded keys (variant-related)
+      const excludedKeys = ['color', 'size', 'style', 'sizeOptions', 'colorVariants', 'combinedVariants', 'styleOptions', 'styleName', 'patternName']
       
-      attributeFields.forEach((field) => {
-        if (body.attributes[field]) {
-          attributes[field] = body.attributes[field]
+      // Include ALL attributes except excluded ones
+      Object.entries(body.attributes).forEach(([key, value]) => {
+        if (!excludedKeys.includes(key) && value !== null && value !== undefined && value !== '') {
+          attributes[key] = value
         }
       })
+      
+      console.log('[API POST] Saving attributes:', JSON.stringify(attributes, null, 2))
     }
 
     // Create a short and understandable title from the product name
@@ -201,6 +201,7 @@ export async function POST(req: NextRequest) {
       productLink: body.productLink || "",
       amazonChoice: body.amazonChoice || false,
       bestSeller: body.bestSeller || false,
+      overallPick: body.overallPick || false,
       attributes: Object.keys(attributes).length > 0 ? attributes : undefined,
       tags: body.tags && Array.isArray(body.tags) && body.tags.length > 0 ? body.tags : undefined,
       createdAt: new Date().toISOString(),

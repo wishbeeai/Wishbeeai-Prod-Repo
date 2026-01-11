@@ -87,10 +87,15 @@ export async function createWishlistItemAction(data: WishlistItemInsert) {
       return { error: "Unauthorized" }
     }
 
+    // Filter out 'description' field temporarily until migration is run
+    // TODO: Remove this filter after running migration 002_add_description_to_wishlist_items.sql
+    const { description, ...insertData } = data as any
+
+    // Explicitly select columns to avoid schema cache issues with missing 'description' column
     const { data: item, error } = await supabase
       .from("wishlist_items")
-      .insert([data])
-      .select()
+      .insert([insertData])
+      .select("id, wishlist_id, product_name, product_url, product_price, product_image, quantity, priority, category, stock_status, created_at, updated_at, title, asin, image_url, list_price, currency, review_star, review_count, affiliate_url, source, price_snapshot_at, store_name")
       .single()
 
     if (error) throw error
@@ -111,11 +116,16 @@ export async function updateWishlistItemAction(id: string, data: WishlistItemUpd
       return { error: "Unauthorized" }
     }
 
+    // Filter out 'description' field temporarily until migration is run
+    // TODO: Remove this filter after running migration 002_add_description_to_wishlist_items.sql
+    const { description, ...updateData } = data as any
+
+    // Explicitly select columns to avoid schema cache issues with missing 'description' column
     const { data: item, error } = await supabase
       .from("wishlist_items")
-      .update(data)
+      .update(updateData)
       .eq("id", id)
-      .select()
+      .select("id, wishlist_id, product_name, product_url, product_price, product_image, quantity, priority, category, stock_status, created_at, updated_at, title, asin, image_url, list_price, currency, review_star, review_count, affiliate_url, source, price_snapshot_at, store_name")
       .single()
 
     if (error) throw error

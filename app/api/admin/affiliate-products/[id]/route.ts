@@ -242,22 +242,25 @@ export async function PUT(
     if (body.productLink !== undefined) updateData.productLink = body.productLink
     if (body.amazonChoice !== undefined) updateData.amazonChoice = Boolean(body.amazonChoice)
     if (body.bestSeller !== undefined) updateData.bestSeller = Boolean(body.bestSeller)
+    if (body.overallPick !== undefined) updateData.overallPick = Boolean(body.overallPick)
     
-    // Handle attributes - include all possible attributes
+    // Handle attributes - include ALL attributes EXCEPT color, size, style variants
+    // This dynamically includes all extracted attributes
     if (body.attributes !== undefined) {
       const attributes: any = {}
-      const attributeFields = [
-        "brand", "color", "material", "capacity", "dimensions",
-        "caratWeight", "gemstone", "size", "storage", "offerType", "kindleUnlimited", "fitType", "style", "volume",
-        "skinType", "ingredients", "weight", "assembly", "ageRange",
-        "safetyInfo", "author", "publisher", "pageCount", "isbn"
-      ]
+      // Excluded keys (variant-related)
+      const excludedKeys = ['color', 'size', 'style', 'sizeOptions', 'colorVariants', 'combinedVariants', 'styleOptions', 'styleName', 'patternName']
       
-      attributeFields.forEach((field) => {
-        if (body.attributes && body.attributes[field] !== undefined && body.attributes[field] !== null && body.attributes[field] !== "") {
-          attributes[field] = String(body.attributes[field]).trim()
-        }
-      })
+      if (body.attributes && typeof body.attributes === 'object') {
+        // Include ALL attributes except excluded ones
+        Object.entries(body.attributes).forEach(([key, value]) => {
+          if (!excludedKeys.includes(key) && value !== null && value !== undefined && value !== '') {
+            attributes[key] = typeof value === 'string' ? value.trim() : value
+          }
+        })
+      }
+      
+      console.log('[API PUT] Saving attributes:', JSON.stringify(attributes, null, 2))
       updateData.attributes = Object.keys(attributes).length > 0 ? attributes : undefined
     }
     
@@ -298,6 +301,7 @@ export async function PUT(
         productLink: updateData.productLink || body.productLink || "",
         amazonChoice: updateData.amazonChoice !== undefined ? updateData.amazonChoice : (body.amazonChoice || false),
         bestSeller: updateData.bestSeller !== undefined ? updateData.bestSeller : (body.bestSeller || false),
+        overallPick: updateData.overallPick !== undefined ? updateData.overallPick : (body.overallPick || false),
         attributes: body.attributes || undefined,
         tags: body.tags || undefined,
         createdAt: new Date().toISOString(),

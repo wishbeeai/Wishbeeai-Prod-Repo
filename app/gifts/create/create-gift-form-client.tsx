@@ -27,7 +27,10 @@ import {
   Upload,
   ExternalLink,
   Loader2,
+  Info,
+  AlertCircle,
 } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 export function CreateGiftFormClient() {
   const router = useRouter()
@@ -60,6 +63,12 @@ export function CreateGiftFormClient() {
   const [manualFeatures, setManualFeatures] = useState("")
   const [manualWarranty, setManualWarranty] = useState("")
   const [manualCapacity, setManualCapacity] = useState("")
+
+  // Preference level for variants - REQUIRED to prevent delays in gift purchases
+  // This helps contributors know exactly which variant to purchase, avoiding wrong purchases and delays
+  const [variantPreference, setVariantPreference] = useState<"I Like" | "Alternative" | "Optional" | "">("")
+  const [preferenceError, setPreferenceError] = useState<string>("")
+  const [isExtractingVariants, setIsExtractingVariants] = useState(false)
 
   const descriptionEditorRef = useRef<HTMLDivElement>(null)
   const colorPickerRef = useRef<HTMLDivElement>(null)
@@ -231,6 +240,22 @@ export function CreateGiftFormClient() {
       return
     }
 
+    // Validate preference level if product has color or size attributes
+    // This is REQUIRED to prevent delays in gift purchases
+    const hasColor = extractedProduct?.attributes?.color || manualColor
+    const hasSize = extractedProduct?.attributes?.size || manualSize
+
+    if ((hasColor || hasSize) && !variantPreference) {
+      setPreferenceError("Preference level is required. This ensures contributors know which variant to purchase, preventing delays in gift buying.")
+      toast({
+        title: "Preference Level Required",
+        description: "Please select a preference level for the product variants. This prevents delays in gift purchases.",
+        variant: "destructive",
+      })
+      setIsSubmitting(false)
+      return
+    }
+
     try {
       const response = await fetch("/api/gifts", {
         method: "POST",
@@ -255,6 +280,9 @@ export function CreateGiftFormClient() {
           material: extractedProduct?.attributes?.material || null,
           productImage: extractedProduct?.imageUrl || null,
           productLink: extractedProduct?.productLink || productUrl,
+          // Preference level - required to prevent delays in gift purchases
+          // This helps contributors know exactly which variant to purchase
+          variantPreference: variantPreference || null,
         }),
       })
 
@@ -265,6 +293,9 @@ export function CreateGiftFormClient() {
         title: "Gift collection created!",
         description: "Your gift funding campaign is now live.",
       })
+      // Reset preference level after successful submission
+      setVariantPreference("")
+      setPreferenceError("")
       router.push(`/gifts/${data.id}`)
     } catch (error) {
       console.error("[v0] Submit error:", error)
@@ -573,7 +604,7 @@ export function CreateGiftFormClient() {
               <div className="bg-white rounded-xl shadow-lg border-2 border-[#DAA520]/20 overflow-hidden hover:shadow-xl transition-all">
                 <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 p-3 sm:p-4">
                   {/* Product Image - Top on mobile, Left on larger screens */}
-                  <div className="relative w-full h-32 sm:w-40 sm:h-40 bg-gray-100 sm:flex-shrink-0 rounded-lg overflow-hidden group">
+                  <div className="relative w-full h-48 sm:w-48 md:w-56 lg:w-64 sm:h-48 md:h-56 lg:h-64 bg-gray-100 sm:flex-shrink-0 rounded-lg overflow-hidden group">
                     {!extractedProduct.imageUrl && (
                       <label
                         htmlFor="product-image-upload"
@@ -599,7 +630,7 @@ export function CreateGiftFormClient() {
                         <img
                           src={extractedProduct.imageUrl || "/placeholder.svg"}
                           alt={extractedProduct.productName}
-                          className="w-full h-full object-contain p-2"
+                          className="w-full h-full object-contain p-1 sm:p-2"
                           crossOrigin="anonymous"
                           onError={(e) => {
                             e.currentTarget.src = "/placeholder.svg"
@@ -840,6 +871,160 @@ export function CreateGiftFormClient() {
                     </div>
                   </div>
                 </div>
+
+                {/* Choose Your Preferred Options - PREFERENCE LEVEL (REQUIRED) */}
+                {/* 
+                  WHY PREFERENCE LEVELS ARE REQUIRED:
+                  - Prevents delays: Contributors need clear guidance on which variant to purchase
+                  - Avoids wrong purchases: Without preferences, contributors may hesitate or guess
+                  - Reduces returns: Correct variant selection the first time saves time and money
+                  - Ensures timely delivery: Clear preferences lead to faster purchase decisions
+                  - Without complete preference information, gift purchases may be delayed
+                  
+                  This section appears when a product has color or size attributes.
+                  All preference levels are REQUIRED to prevent delays in buying gifts.
+                */}
+                {extractedProduct && (extractedProduct.attributes?.color || extractedProduct.attributes?.size) && (
+                  <div className="mt-4 space-y-4 bg-amber-50 border-2 border-amber-200 rounded-xl p-4 shadow-lg">
+                    <div className="flex items-start gap-2 mb-3">
+                      <Info className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
+                          <h3 className="text-sm font-bold text-amber-900">Choose Your Preferred Options</h3>
+                          {/* Paste Selected Options URL Button - Same styling as AI Extract in Add Affiliate Product */}
+                          {productUrl && (
+                            <Button
+                              type="button"
+                              onClick={async () => {
+                                if (!productUrl.trim()) {
+                                  toast({
+                                    title: "Error",
+                                    description: "Please enter a product URL first",
+                                    variant: "destructive",
+                                  })
+                                  return
+                                }
+
+                                setIsExtractingVariants(true)
+                                try {
+                                  const response = await fetch("/api/ai/extract-product", {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ url: productUrl }),
+                                  })
+
+                                  if (!response.ok) throw new Error("Failed to extract variants")
+
+                                  const data = await response.json()
+                                  const extracted = data.productData || data
+
+                                  // Update extracted product with new variant data
+                                  if (extracted.attributes) {
+                                    setExtractedProduct((prev) => ({
+                                      ...prev!,
+                                      attributes: {
+                                        ...prev!.attributes,
+                                        color: extracted.attributes.color || prev!.attributes.color,
+                                        size: extracted.attributes.size || prev!.attributes.size,
+                                      },
+                                    }))
+                                  }
+
+                                  toast({
+                                    title: "Variants Extracted!",
+                                    description: "Available variants have been extracted from the URL",
+                                  })
+                                } catch (error) {
+                                  toast({
+                                    title: "Extraction Failed",
+                                    description: "Could not extract variants. Please select preferences manually.",
+                                    variant: "destructive",
+                                  })
+                                } finally {
+                                  setIsExtractingVariants(false)
+                                }
+                              }}
+                              disabled={isExtractingVariants || !productUrl.trim()}
+                              className="bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 text-white hover:from-amber-600 hover:via-orange-600 hover:to-rose-600 whitespace-nowrap text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-1.5"
+                            >
+                              {isExtractingVariants ? (
+                                <>
+                                  <Loader2 className="mr-1.5 h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
+                                  <span className="hidden sm:inline">Extracting...</span>
+                                  <span className="sm:hidden">...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Sparkles className="mr-1.5 h-3 w-3 sm:h-4 sm:w-4" />
+                                  <span className="hidden sm:inline">Paste Selected Options URL</span>
+                                  <span className="sm:hidden">Paste URL</span>
+                                </>
+                              )}
+                            </Button>
+                          )}
+                        </div>
+                        <p className="text-xs text-amber-800">
+                          <strong>PREFERENCE LEVEL is required for all variants.</strong> This ensures contributors know
+                          exactly which variant to purchase, preventing delays and ensuring your gift is purchased
+                          correctly the first time.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Unified Preference Level Field */}
+                    <div className="bg-white rounded-lg p-3 border border-amber-300">
+                      <div className="space-y-3">
+                        {/* Show available variants */}
+                        <div className="flex flex-wrap gap-2">
+                          {extractedProduct.attributes?.color && (
+                            <div className="text-xs font-semibold text-gray-700">
+                              Color: <span className="text-gray-600 font-normal">{extractedProduct.attributes.color}</span>
+                            </div>
+                          )}
+                          {extractedProduct.attributes?.size && (
+                            <div className="text-xs font-semibold text-gray-700">
+                              Size: <span className="text-gray-600 font-normal">{extractedProduct.attributes.size}</span>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Single Preference Level Selector */}
+                        <div>
+                          <Label className="text-sm font-semibold text-[#654321] flex items-center gap-1 mb-1">
+                            PREFERENCE LEVEL <span className="text-red-500">*</span>
+                          </Label>
+                          <Select
+                            value={variantPreference}
+                            onValueChange={(value) => {
+                              setVariantPreference(value as "I Like" | "Alternative" | "Optional")
+                              setPreferenceError("")
+                            }}
+                          >
+                            <SelectTrigger className={`w-full ${preferenceError ? "border-red-500" : ""}`}>
+                              <SelectValue placeholder="Select preference level" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="I Like">I Like</SelectItem>
+                              <SelectItem value="Alternative">Alternative</SelectItem>
+                              <SelectItem value="Optional">Optional</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          {preferenceError && (
+                            <div className="flex items-center gap-1 text-xs text-red-600 mt-1">
+                              <AlertCircle className="w-3 h-3" />
+                              <span>{preferenceError}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="text-xs text-amber-700 bg-amber-100 border border-amber-300 rounded-lg p-2 mt-2">
+                      <strong>Remember:</strong> Complete all preference levels to prevent delays in gift purchases.
+                      Contributors need clear guidance to purchase the correct variant.
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

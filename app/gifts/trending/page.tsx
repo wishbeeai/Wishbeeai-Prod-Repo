@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Search, Filter, Star, TrendingUp, SlidersHorizontal, Grid3x3, List, X } from "lucide-react"
+import { ArrowLeft, Search, Filter, Star, TrendingUp, SlidersHorizontal, Grid3x3, List, X, Heart, Trash2, Loader2, ExternalLink } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import { AddToWishlistModal } from "@/components/add-to-wishlist-modal"
 
 interface Gift {
   id: string
@@ -30,6 +31,8 @@ interface Gift {
   originalPrice?: number
   amazonChoice?: boolean
   bestSeller?: boolean
+  overallPick?: boolean
+  attributes?: Record<string, any>
 }
 
 type SortOption = "popularity" | "rating" | "price-low" | "price-high" | "name" | "newest"
@@ -48,6 +51,75 @@ export default function TrendingGiftsPage() {
   const [sortBy, setSortBy] = useState<SortOption>("popularity")
   const [viewMode, setViewMode] = useState<ViewMode>("grid")
   const [showFilters, setShowFilters] = useState(false)
+  const [selectedGiftForWishlist, setSelectedGiftForWishlist] = useState<Gift | null>(null)
+  const [isWishlistModalOpen, setIsWishlistModalOpen] = useState(false)
+  const [removingGiftId, setRemovingGiftId] = useState<string | null>(null)
+  const [selectedGiftForAttributes, setSelectedGiftForAttributes] = useState<Gift | null>(null)
+  const [isAttributesModalOpen, setIsAttributesModalOpen] = useState(false)
+
+  // Get filtered attributes for a gift (excluding variant-related keys)
+  const getFilteredAttributes = (gift: Gift) => {
+    if (!gift.attributes) return []
+    const excludedKeys = ['color', 'size', 'style', 'brand', 'sizeOptions', 'colorVariants', 'combinedVariants', 'styleOptions', 'styleName', 'patternName']
+    return Object.entries(gift.attributes).filter(([key, value]) => 
+      !excludedKeys.includes(key) && value !== null && value !== undefined && value !== ''
+    )
+  }
+
+  // Add affiliate tag to Amazon URLs
+  const addAffiliateTag = (url: string): string => {
+    if (!url) return url
+    try {
+      const urlObj = new URL(url)
+      // Check if it's an Amazon URL
+      if (urlObj.hostname.includes('amazon.')) {
+        // Remove existing tag if present and add our affiliate tag
+        urlObj.searchParams.delete('tag')
+        urlObj.searchParams.set('tag', 'wishbeeai-20')
+        return urlObj.toString()
+      }
+      return url
+    } catch {
+      return url
+    }
+  }
+
+  // Handle remove gift from trending
+  const handleRemoveGift = async (e: React.MouseEvent, gift: Gift) => {
+    e.stopPropagation() // Prevent card click navigation
+    
+    if (removingGiftId) return // Prevent double clicks
+    
+    setRemovingGiftId(gift.id)
+    try {
+      const response = await fetch(`/api/trending-gifts?id=${gift.id}`, {
+        method: "DELETE",
+      })
+      
+      if (response.ok) {
+        // Remove from local state
+        setGifts(prev => prev.filter(g => g.id !== gift.id))
+        toast.success("Product Removed", {
+          description: `"${gift.giftName.length > 40 ? gift.giftName.substring(0, 40) + '...' : gift.giftName}" has been removed from trending gifts.`,
+          duration: 4000,
+        })
+      } else {
+        const error = await response.json().catch(() => ({ error: "Failed to remove" }))
+        toast.error("Failed to remove product", {
+          description: error.error || "Something went wrong. Please try again.",
+          duration: 4000,
+        })
+      }
+    } catch (error) {
+      console.error("Error removing gift:", error)
+      toast.error("Failed to remove product", {
+        description: "Unable to connect to the server. Please try again.",
+        duration: 4000,
+      })
+    } finally {
+      setRemovingGiftId(null)
+    }
+  }
 
   // Fetch gifts from API
   useEffect(() => {
@@ -58,6 +130,17 @@ export default function TrendingGiftsPage() {
         const data = await response.json()
 
         console.log("[v0] API response:", data)
+        
+        // Debug: Log attributes for each gift
+        if (data.gifts) {
+          data.gifts.forEach((gift: any, index: number) => {
+            console.log(`[v0] Gift ${index} - ${gift.giftName}:`, {
+              hasAttributes: !!gift.attributes,
+              attributes: gift.attributes,
+              attributeKeys: gift.attributes ? Object.keys(gift.attributes) : []
+            })
+          })
+        }
 
         if (data.success && data.gifts) {
           setGifts(data.gifts)
@@ -115,6 +198,7 @@ export default function TrendingGiftsPage() {
         selectedBadge === "all" ||
         (selectedBadge === "amazon-choice" && gift.amazonChoice) ||
         (selectedBadge === "best-seller" && gift.bestSeller) ||
+        (selectedBadge === "overall-pick" && gift.overallPick) ||
         (selectedBadge === "on-sale" && gift.originalPrice && gift.originalPrice > gift.targetAmount)
 
       // Price range filter
@@ -411,8 +495,9 @@ export default function TrendingGiftsPage() {
                   className="w-full px-3 py-2 rounded-lg border-2 border-[#DAA520]/20 focus:border-[#DAA520] focus:outline-none bg-white text-[#654321] text-sm"
                 >
                   <option value="all">All Products</option>
-                  <option value="amazon-choice">Amazon Choice</option>
+                  <option value="amazon-choice">Amazon's Choice</option>
                   <option value="best-seller">Best Seller</option>
+                  <option value="overall-pick">Overall Pick</option>
                   <option value="on-sale">On Sale</option>
                 </select>
               </div>
@@ -477,110 +562,187 @@ export default function TrendingGiftsPage() {
             {filteredAndSortedGifts.map((gift) => (
               <div
                 key={gift.id}
-                className="bg-white rounded-xl shadow-lg border-2 border-[#DAA520]/20 p-6 hover:shadow-xl transition-all cursor-pointer group"
-                onClick={() => router.push(`/gifts/${gift.id}`)}
+                className="bg-gradient-to-br from-white to-amber-50/30 rounded-2xl shadow-lg border border-[#DAA520]/30 overflow-hidden hover:shadow-2xl hover:border-[#DAA520]/60 transition-all duration-300 group"
               >
-                <div className="relative mb-4">
+                {/* Image Section */}
+                <div className="relative overflow-hidden">
                   <img
                     src={gift.image || gift.bannerImage || "/placeholder.svg"}
                     alt={gift.giftName}
-                    className="w-full h-48 object-cover rounded-lg border-2 border-[#DAA520] group-hover:scale-105 transition-transform duration-300"
+                    className="w-full h-52 object-cover group-hover:scale-110 transition-transform duration-500"
                   />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                   {gift.category && (
-                    <div className="absolute top-2 left-2 bg-white/90 text-[#654321] px-2 py-1 rounded-full text-xs font-semibold">
+                    <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-sm text-[#654321] px-3 py-1 rounded-full text-xs font-bold shadow-md">
                       {gift.category}
                     </div>
                   )}
                   {gift.originalPrice && gift.originalPrice > gift.targetAmount && (
-                    <div className="absolute bottom-2 left-2 bg-gradient-to-r from-red-500 to-rose-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg">
+                    <div className="absolute top-3 right-3 bg-gradient-to-r from-red-500 to-rose-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-lg animate-pulse">
                       SALE
                     </div>
                   )}
                 </div>
 
-                <div className="mb-2">
-                  <h3 className="text-base sm:text-lg font-bold text-[#654321] mb-1 line-clamp-2">{gift.giftName}</h3>
+                {/* Content Section */}
+                <div className="p-4">
+                  <h3 className="text-sm font-semibold text-[#654321] mb-1 line-clamp-2 group-hover:text-[#8B4513] transition-colors">{gift.giftName}</h3>
                   {gift.source && (
-                    <p className="text-xs text-[#8B4513]/70 mb-2">From {gift.source}</p>
+                    <p className="text-xs text-[#8B4513]/60 mb-1.5 flex items-center gap-1">
+                      <span className="w-1 h-1 bg-[#DAA520] rounded-full"></span>
+                      From {gift.source}
+                    </p>
                   )}
-                  {(gift.amazonChoice || gift.bestSeller) && (
-                    <div className="flex flex-wrap gap-1.5 mb-2">
-                      {gift.amazonChoice && (
-                        <span className="bg-gradient-to-r from-[#FF9900] to-[#FFB84D] text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                          Amazon Choice
-                        </span>
-                      )}
-                      {gift.bestSeller && (
-                        <span className="bg-gradient-to-r from-gray-800 to-gray-900 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                          Best Seller
-                        </span>
-                      )}
-                    </div>
-                  )}
+                  {/* Rating */}
                   {gift.rating && gift.rating > 0 && (
-                    <div className="flex items-center gap-2 mb-2">
+                    <div className="flex items-center gap-2 mb-1.5 bg-amber-50/50 rounded-lg px-2 py-1 w-fit">
                       <div className="flex items-center gap-0.5">
                         {[1, 2, 3, 4, 5].map((star) => {
                           const starValue = (gift.rating || 0) - star
-                          let fillPercent = 0
-
-                          if (starValue >= 1) {
-                            fillPercent = 100
-                          } else if (starValue <= 0) {
-                            fillPercent = 0
-                          } else {
-                            fillPercent = Math.round(starValue * 100)
-                          }
-
-                          const isFilled = fillPercent >= 50
-
+                          const isFilled = starValue >= 0.5
                           return (
                             <Star
                               key={star}
-                              className={`w-3 h-3 ${
+                              className={`w-3.5 h-3.5 ${
                                 isFilled ? "fill-[#F4C430] text-[#F4C430]" : "fill-gray-200 text-gray-300"
                               }`}
                             />
                           )
                         })}
                       </div>
-                      <span className="text-xs font-bold text-[#654321]">{gift.rating.toFixed(1)}</span>
+                      <span className="text-sm font-bold text-[#654321]">{gift.rating.toFixed(1)}</span>
                       {gift.reviewCount && gift.reviewCount > 0 && (
-                        <span className="text-xs text-gray-500">({gift.reviewCount.toLocaleString()} reviews)</span>
+                        <span className="text-xs text-gray-500">({gift.reviewCount.toLocaleString()})</span>
                       )}
                     </div>
                   )}
-                </div>
-                <p className="text-xs text-[#8B4513]/70 mb-3 line-clamp-2">{gift.description}</p>
 
-                <div className="mb-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-[#8B4513]/70">Price</span>
-                    <div className="flex items-center gap-2">
+                  {/* Badges */}
+                  {(gift.amazonChoice || gift.bestSeller || gift.overallPick) && (
+                    <div className="flex flex-wrap gap-1 mb-1.5">
+                      {gift.amazonChoice && (
+                        <span className="bg-gradient-to-r from-gray-900 to-black text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-sm">
+                          Amazon's Choice
+                        </span>
+                      )}
+                      {gift.bestSeller && (
+                        <span className="bg-gradient-to-r from-amber-600 to-orange-600 text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-sm">
+                          🔥 Best Seller
+                        </span>
+                      )}
+                      {gift.overallPick && (
+                        <span className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-sm">
+                          ⭐ Overall Pick
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Price */}
+                  <div className="mb-1">
+                    <div className="flex items-baseline gap-1.5">
                       {gift.originalPrice && gift.originalPrice > gift.targetAmount ? (
                         <>
-                          <span className="font-bold text-[#654321]">${gift.targetAmount.toFixed(2)}</span>
+                          <span className="font-bold text-base text-[#654321]">${gift.targetAmount.toFixed(2)}</span>
                           <span className="text-gray-400 line-through text-xs">${gift.originalPrice.toFixed(2)}</span>
-                          <span className="text-red-600 font-semibold text-xs">
-                            Save ${(gift.originalPrice - gift.targetAmount).toFixed(2)}
+                          <span className="bg-red-100 text-red-600 font-semibold text-[10px] px-1.5 py-0.5 rounded-full">
+                            -{Math.round(((gift.originalPrice - gift.targetAmount) / gift.originalPrice) * 100)}%
                           </span>
                         </>
                       ) : (
-                        <span className="font-bold text-lg text-[#654321]">${gift.targetAmount.toFixed(2)}</span>
+                        <span className="font-bold text-base text-[#654321]">${gift.targetAmount.toFixed(2)}</span>
                       )}
                     </div>
                   </div>
+
+                {/* Product Specifications */}
+                {gift.attributes && Object.keys(gift.attributes).filter(key => 
+                  !['color', 'size', 'style', 'brand', 'sizeOptions', 'colorVariants', 'combinedVariants', 'styleOptions', 'styleName', 'patternName'].includes(key) &&
+                  gift.attributes![key] !== null && 
+                  gift.attributes![key] !== undefined && 
+                  gift.attributes![key] !== ''
+                ).length > 0 && (
+                  <div className="bg-gradient-to-r from-[#6B4423]/5 to-[#8B5A3C]/5 rounded-lg p-3 border border-[#8B5A3C]/10">
+                    <p className="text-[10px] font-bold text-[#6B4423] uppercase tracking-wider mb-2 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 bg-[#DAA520] rounded-full"></span>
+                      Specifications
+                    </p>
+                    <div className="flex flex-col gap-1.5">
+                      {Object.entries(gift.attributes)
+                        .filter(([key, value]) => 
+                          !['color', 'size', 'style', 'brand', 'sizeOptions', 'colorVariants', 'combinedVariants', 'styleOptions', 'styleName', 'patternName'].includes(key) &&
+                          value !== null && value !== undefined && value !== ''
+                        )
+                        .slice(0, 5)
+                        .map(([key, value]) => (
+                          <div key={key} className="flex items-center text-[11px]">
+                            <span className="font-semibold text-[#6B4423] capitalize min-w-[90px]">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
+                            <span className="text-[#654321] truncate flex-1" title={String(value)}>{String(value)}</span>
+                          </div>
+                        ))
+                      }
+                      {getFilteredAttributes(gift).length > 5 && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setSelectedGiftForAttributes(gift)
+                            setIsAttributesModalOpen(true)
+                          }}
+                          className="text-left text-[11px] font-bold text-[#DAA520] hover:text-[#B8860B] cursor-pointer transition-colors mt-1"
+                        >
+                          +{getFilteredAttributes(gift).length - 5} more →
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
                 </div>
 
-                <Button
-                  className="w-full px-3 py-2 bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#3B2F0F] rounded-lg text-xs sm:text-sm font-semibold hover:shadow-lg transition-all"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    router.push(`/gifts/${gift.id}`)
-                  }}
-                >
-                  View Details
-                </Button>
+                {/* Action Buttons */}
+                <div className="px-4 pb-4 pt-2 flex flex-col gap-1.5 border-t border-[#DAA520]/10">
+                  <button
+                    type="button"
+                    className="w-full px-4 py-2 bg-gradient-to-r from-[#EA580C] to-[#FB923C] hover:from-[#FB923C] hover:to-[#EA580C] text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 shadow-sm hover:shadow-md"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (gift.productLink) {
+                        window.open(addAffiliateTag(gift.productLink), '_blank')
+                      } else {
+                        router.push(`/gifts/${gift.id}`)
+                      }
+                    }}
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>Buy now on {gift.source || 'Store'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="w-full px-4 py-2 bg-gradient-to-r from-[#DAA520] to-[#F4C430] hover:from-[#F4C430] hover:to-[#DAA520] text-[#8B4513] rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 shadow-sm hover:shadow-md"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setSelectedGiftForWishlist(gift)
+                      setIsWishlistModalOpen(true)
+                    }}
+                  >
+                    <Heart className="w-3.5 h-3.5" />
+                    <span>Add to My Wishlist</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="w-full px-4 py-2 text-white bg-gradient-to-r from-[#DC2626] to-[#EF4444] hover:from-[#EF4444] hover:to-[#DC2626] rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                    onClick={(e) => handleRemoveGift(e, gift)}
+                    disabled={removingGiftId === gift.id}
+                    title="Remove from Trending Gifts"
+                  >
+                    {removingGiftId === gift.id ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-3.5 h-3.5" />
+                    )}
+                    <span>Remove</span>
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -589,8 +751,7 @@ export default function TrendingGiftsPage() {
             {filteredAndSortedGifts.map((gift) => (
               <div
                 key={gift.id}
-                className="bg-white rounded-xl shadow-lg border-2 border-[#DAA520]/20 p-6 hover:shadow-xl transition-all cursor-pointer group"
-                onClick={() => router.push(`/gifts/${gift.id}`)}
+                className="bg-white rounded-xl shadow-lg border-2 border-[#DAA520]/20 p-6 hover:shadow-xl transition-all group"
               >
                 <div className="flex gap-6">
                   <div className="relative flex-shrink-0">
@@ -610,19 +771,42 @@ export default function TrendingGiftsPage() {
                       <div className="flex-1">
                         <h3 className="text-lg font-bold text-[#654321] mb-1">{gift.giftName}</h3>
                         {gift.source && <p className="text-sm text-[#8B4513]/70 mb-2">From {gift.source}</p>}
-                        <p className="text-sm text-[#8B4513]/70 mb-3 line-clamp-2">{gift.description}</p>
-                      </div>
-                      <div className="text-right ml-4">
-                        {gift.originalPrice && gift.originalPrice > gift.targetAmount ? (
-                          <>
-                            <div className="font-bold text-xl text-[#654321]">${gift.targetAmount.toFixed(2)}</div>
-                            <div className="text-gray-400 line-through text-sm">${gift.originalPrice.toFixed(2)}</div>
-                            <div className="text-red-600 font-semibold text-xs">
-                              Save ${(gift.originalPrice - gift.targetAmount).toFixed(2)}
+                        {/* Product Specifications - List View */}
+                        {gift.attributes && Object.keys(gift.attributes).filter(key => 
+                          !['color', 'size', 'style', 'brand', 'sizeOptions', 'colorVariants', 'combinedVariants', 'styleOptions', 'styleName', 'patternName'].includes(key) &&
+                          gift.attributes![key] !== null && gift.attributes![key] !== undefined && gift.attributes![key] !== ''
+                        ).length > 0 && (
+                          <div className="mb-2">
+                            <p className="text-xs font-semibold text-[#6B4423] uppercase tracking-wide mb-1">Specifications</p>
+                            <div className="flex flex-col gap-1">
+                            {Object.entries(gift.attributes)
+                              .filter(([key, value]) => 
+                                !['color', 'size', 'style', 'brand', 'sizeOptions', 'colorVariants', 'combinedVariants', 'styleOptions', 'styleName', 'patternName'].includes(key) &&
+                                value !== null && value !== undefined && value !== ''
+                              )
+                              .slice(0, 5) // Show max 5 specs in card
+                              .map(([key, value]) => (
+                                <div key={key} className="flex items-center text-xs">
+                                  <span className="font-semibold text-[#6B4423] capitalize min-w-[120px]">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
+                                  <span className="text-[#654321] truncate" title={String(value)}>{String(value)}</span>
+                                </div>
+                              ))
+                            }
+                            {getFilteredAttributes(gift).length > 5 && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setSelectedGiftForAttributes(gift)
+                                  setIsAttributesModalOpen(true)
+                                }}
+                                className="text-left text-xs font-semibold text-[#8B5A3C] hover:text-[#6B4423] cursor-pointer transition-colors"
+                              >
+                                +{getFilteredAttributes(gift).length - 5} more specifications
+                              </button>
+                            )}
                             </div>
-                          </>
-                        ) : (
-                          <div className="font-bold text-xl text-[#654321]">${gift.targetAmount.toFixed(2)}</div>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -631,20 +815,6 @@ export default function TrendingGiftsPage() {
                         <span className="bg-gradient-to-r from-amber-100 to-orange-100 text-[#8B4513] px-2 py-1 rounded-full text-xs font-semibold">
                           {gift.category}
                         </span>
-                      )}
-                      {(gift.amazonChoice || gift.bestSeller) && (
-                        <div className="flex gap-1.5">
-                          {gift.amazonChoice && (
-                            <span className="bg-gradient-to-r from-[#FF9900] to-[#FFB84D] text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                              Amazon Choice
-                            </span>
-                          )}
-                          {gift.bestSeller && (
-                            <span className="bg-gradient-to-r from-gray-800 to-gray-900 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                              Best Seller
-                            </span>
-                          )}
-                        </div>
                       )}
                       {gift.rating && gift.rating > 0 && (
                         <div className="flex items-center gap-2">
@@ -668,20 +838,167 @@ export default function TrendingGiftsPage() {
                           )}
                         </div>
                       )}
+                      {(gift.amazonChoice || gift.bestSeller || gift.overallPick) && (
+                        <div className="flex gap-1.5">
+                          {gift.amazonChoice && (
+                            <span className="bg-gradient-to-r from-gray-900 to-black text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                              Amazon's Choice
+                            </span>
+                          )}
+                          {gift.bestSeller && (
+                            <span className="bg-gradient-to-r from-gray-800 to-gray-900 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                              Best Seller
+                            </span>
+                          )}
+                          {gift.overallPick && (
+                            <span className="!bg-[#161D26] !text-white text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ backgroundColor: '#161D26', color: '#FFFFFF' }}>
+                              Overall Pick
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {/* Price - below badges */}
+                      <div className="flex items-center gap-2">
+                        {gift.originalPrice && gift.originalPrice > gift.targetAmount ? (
+                          <>
+                            <span className="font-bold text-xl text-[#654321]">${gift.targetAmount.toFixed(2)}</span>
+                            <span className="text-gray-400 line-through text-sm">${gift.originalPrice.toFixed(2)}</span>
+                            <span className="text-red-600 font-semibold text-xs">
+                              Save ${(gift.originalPrice - gift.targetAmount).toFixed(2)}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="font-bold text-xl text-[#654321]">${gift.targetAmount.toFixed(2)}</span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                  <Button
-                    className="bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#3B2F0F] rounded-lg font-semibold hover:shadow-lg transition-all"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      router.push(`/gifts/${gift.id}`)
-                    }}
-                  >
-                    View Details
-                  </Button>
+                  <div className="flex flex-col gap-2 min-w-[180px]">
+                    <Button
+                      className="w-full bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#3B2F0F] rounded-lg font-semibold hover:shadow-lg transition-all"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (gift.productLink) {
+                          window.open(addAffiliateTag(gift.productLink), '_blank')
+                        } else {
+                          router.push(`/gifts/${gift.id}`)
+                        }
+                      }}
+                    >
+                      Buy now on {gift.source || 'Store'}
+                    </Button>
+                    <button
+                      type="button"
+                      className="w-full bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#3B2F0F] rounded-lg font-semibold hover:shadow-lg transition-all flex items-center justify-center gap-1.5 px-4 py-2 border-0 hover:opacity-90"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setSelectedGiftForWishlist(gift)
+                        setIsWishlistModalOpen(true)
+                      }}
+                    >
+                      <Heart className="w-4 h-4" />
+                      <span>Add to My Wishlist</span>
+                    </button>
+                    <button
+                      type="button"
+                      style={{
+                        background: 'linear-gradient(to right, #DC2626, #EF4444)',
+                      }}
+                      className="w-full px-4 py-2 text-white rounded-lg font-semibold hover:shadow-lg transition-all flex items-center justify-center gap-1.5 border-0 hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={(e) => handleRemoveGift(e, gift)}
+                      disabled={removingGiftId === gift.id}
+                      title="Remove from Trending Gifts"
+                    >
+                      {removingGiftId === gift.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-4 h-4" />
+                      )}
+                      <span>Remove</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Add to Wishlist Modal */}
+        <AddToWishlistModal
+          gift={selectedGiftForWishlist}
+          isOpen={isWishlistModalOpen}
+          onClose={() => {
+            setIsWishlistModalOpen(false)
+            setSelectedGiftForWishlist(null)
+          }}
+        />
+
+        {/* Product Attributes Modal */}
+        {isAttributesModalOpen && selectedGiftForAttributes && (
+          <div 
+            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+            onClick={() => {
+              setIsAttributesModalOpen(false)
+              setSelectedGiftForAttributes(null)
+            }}
+          >
+            <div 
+              className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[80vh] overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header - Same style as Home Page header */}
+              <div className="bg-gradient-to-r from-[#6B4423] via-[#8B5A3C] to-[#6B4423] p-4 border-b-2 border-[#4A2F1A]">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1 pr-4">
+                    <h3 className="text-lg font-bold text-[#F5DEB3] line-clamp-2">
+                      {selectedGiftForAttributes.giftName}
+                    </h3>
+                    <p className="text-sm text-[#DAA520] mt-1 font-semibold">Product Specifications</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setIsAttributesModalOpen(false)
+                      setSelectedGiftForAttributes(null)
+                    }}
+                    className="p-1 hover:bg-[#4A2F1A] rounded-full transition-colors"
+                  >
+                    <X className="w-5 h-5 text-[#F5DEB3]" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Attributes List */}
+              <div className="p-4 overflow-y-auto max-h-[60vh] bg-gradient-to-b from-[#F5F1E8] to-white">
+                <div className="grid grid-cols-1 gap-3">
+                  {getFilteredAttributes(selectedGiftForAttributes).map(([key, value]) => (
+                    <div 
+                      key={key} 
+                      className="bg-gradient-to-r from-[#6B4423]/10 via-[#8B5A3C]/10 to-[#6B4423]/10 rounded-lg p-3 border border-[#8B5A3C]/20"
+                    >
+                      <div className="text-xs font-semibold text-[#6B4423] uppercase tracking-wide mb-1">
+                        {key.replace(/([A-Z])/g, ' $1').trim()}
+                      </div>
+                      <div className="text-sm text-[#4A2F1A] font-medium">
+                        {String(value)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {getFilteredAttributes(selectedGiftForAttributes).length === 0 && (
+                  <div className="text-center py-8 text-[#8B5A3C]">
+                    No specifications available for this product.
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="h-[120px] w-full bg-gradient-to-r from-[#6B4423] via-[#8B5A3C] to-[#6B4423] border-t-2 border-[#4A2F1A] flex items-center justify-center">
+                <span className="text-xs text-[#DAA520] font-medium">
+                  {getFilteredAttributes(selectedGiftForAttributes).length} specifications
+                </span>
+              </div>
+            </div>
           </div>
         )}
       </div>

@@ -15,6 +15,8 @@ interface TrendingGift {
   description?: string
   amazonChoice?: boolean
   bestSeller?: boolean
+  overallPick?: boolean
+  attributes?: Record<string, any>
   createdAt: string
   updatedAt: string
 }

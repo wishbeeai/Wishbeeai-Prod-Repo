@@ -1106,7 +1106,9 @@ export function GroupGiftingHub() {
 
                       {/* Other Payment Methods (PayPal, Apple Pay, Google Pay, Venmo, Cash App) */}
                       <div className="space-y-2">
-                        <h3 className="text-base sm:text-lg font-bold text-gray-900">Other Payment Options</h3>
+                        <h3 className="text-base sm:text-lg font-bold text-gray-900">
+                          Choose Your Preferred Options
+                        </h3>
                         <div className="flex flex-nowrap gap-2 mb-4 overflow-x-auto pb-2 -mx-1 px-1 md:border md:border-gray-200 md:rounded-lg md:p-3 md:mx-0 scrollbar-hide">
                           <button
                             type="button"

@@ -35,6 +35,13 @@ export async function POST(request: NextRequest) {
       affiliate_url,
       source,
       price_snapshot_at,
+      
+      // Variant and preference fields
+      color,
+      size,
+      variantPreference,
+      category,
+      quantity,
     } = body;
 
     const wishlistIdValue = wishlistId || wishlist_id;
@@ -74,10 +81,25 @@ export async function POST(request: NextRequest) {
       insertData.product_image = productImage || null;
     }
 
+    // Add variant and preference information to description field as JSON
+    if (color || size || variantPreference) {
+      const variantInfo: any = {}
+      if (color) variantInfo.color = color
+      if (size) variantInfo.size = size
+      if (variantPreference) variantInfo.variantPreference = variantPreference
+      
+      insertData.description = JSON.stringify(variantInfo)
+    }
+
+    // Add other fields
+    if (category) insertData.category = category
+    if (quantity) insertData.quantity = quantity
+
+    // Explicitly select columns to avoid schema cache issues with missing 'description' column
     const { data: item, error } = await supabase
       .from('wishlist_items')
       .insert([insertData])
-      .select()
+      .select("id, wishlist_id, product_name, product_url, product_price, product_image, quantity, priority, category, stock_status, created_at, updated_at, title, asin, image_url, list_price, currency, review_star, review_count, affiliate_url, source, price_snapshot_at, store_name, description")
       .single();
 
     if (error) {

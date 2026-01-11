@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { getTrendingGifts, addTrendingGift } from './store'
+import { getTrendingGifts, addTrendingGift, removeTrendingGift } from './store'
 
 // Ensure store is initialized at module level
 console.log(`[trending-gifts-route] Module loaded, initial store count: ${getTrendingGifts().length}`)
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Create trending gift from affiliate product - include ALL fields
+    // Create trending gift from affiliate product - include ALL fields including attributes
     const trendingGift = {
       id: Date.now().toString(),
       productName: body.productName,
@@ -63,6 +63,8 @@ export async function POST(req: NextRequest) {
       description: body.description || `${body.productName} from ${body.source || body.storeName || 'Unknown'}`,
       amazonChoice: body.amazonChoice || false,
       bestSeller: body.bestSeller || false,
+      overallPick: body.overallPick || false,
+      attributes: body.attributes || undefined,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }
@@ -83,6 +85,55 @@ export async function POST(req: NextRequest) {
     console.error('[trending-gifts] Error adding to trending gifts:', error)
     return NextResponse.json(
       { error: 'Failed to add product to trending gifts' },
+      { status: 500 }
+    )
+  }
+}
+
+// DELETE - Remove a product from trending gifts
+export async function DELETE(req: NextRequest) {
+  try {
+    // Authenticate user
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please log in to remove products.' },
+        { status: 401 }
+      )
+    }
+
+    const { searchParams } = new URL(req.url)
+    const giftId = searchParams.get('id')
+    
+    if (!giftId) {
+      return NextResponse.json(
+        { error: 'Gift ID is required' },
+        { status: 400 }
+      )
+    }
+
+    const removed = removeTrendingGift(giftId)
+    
+    if (removed) {
+      console.log(`[trending-gifts] Product removed from trending gifts: ${giftId}`)
+      console.log(`[trending-gifts] Total trending gifts remaining: ${getTrendingGifts().length}`)
+      
+      return NextResponse.json({
+        success: true,
+        message: 'Product removed from trending gifts successfully',
+      })
+    } else {
+      return NextResponse.json(
+        { error: 'Gift not found' },
+        { status: 404 }
+      )
+    }
+  } catch (error) {
+    console.error('[trending-gifts] Error removing from trending gifts:', error)
+    return NextResponse.json(
+      { error: 'Failed to remove product from trending gifts' },
       { status: 500 }
     )
   }
