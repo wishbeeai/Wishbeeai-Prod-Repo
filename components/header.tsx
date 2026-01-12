@@ -177,7 +177,8 @@ export function Header() {
                         )}
 
                       {item.submenu && openDropdown === item.title && (
-                        <div className="absolute top-full left-0 mt-1 w-64 bg-[#F5DEB3] rounded-lg shadow-xl border-2 border-[#4A2F1A] py-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                        <div className="absolute top-full left-0 pt-2 w-64">
+                          <div className="bg-[#F5DEB3] rounded-lg shadow-xl border-2 border-[#4A2F1A] py-2 animate-in fade-in slide-in-from-top-2 duration-200">
                           {item.submenu.map((subitem) => (
                             <button
                               key={subitem.title}
@@ -192,6 +193,7 @@ export function Header() {
                               </div>
                             </button>
                           ))}
+                          </div>
                         </div>
                         )}
                       </div>
@@ -208,44 +210,46 @@ export function Header() {
                     </button>
 
                     {openDropdown === "profile" && (
-                      <div className="absolute top-full right-0 mt-1 w-52 bg-[#F5DEB3] rounded-lg shadow-xl border-2 border-[#4A2F1A] py-2 animate-in fade-in slide-in-from-top-2 duration-200">
-                        <button
-                          onClick={() => {
-                            handleMenuClick("/profile")
-                            setOpenDropdown(null)
-                          }}
-                          className="flex items-center gap-2 w-full text-left px-4 py-3 text-sm text-[#8B5A3C] hover:bg-gradient-to-r hover:from-[#6B4423] hover:via-[#8B5A3C] hover:to-[#6B4423] hover:text-[#F5DEB3] transition-all duration-150"
-                        >
-                          <User className="w-4 h-4" />
-                          <div>
-                            <div className="font-medium">Profile</div>
-                            <div className="text-xs opacity-70">View your profile</div>
-                          </div>
-                        </button>
-                        <button
-                          onClick={() => {
-                            handleMenuClick("/settings")
-                            setOpenDropdown(null)
-                          }}
-                          className="flex items-center gap-2 w-full text-left px-4 py-3 text-sm text-[#8B5A3C] hover:bg-gradient-to-r hover:from-[#6B4423] hover:via-[#8B5A3C] hover:to-[#6B4423] hover:text-[#F5DEB3] transition-all duration-150"
-                        >
-                          <Settings className="w-4 h-4" />
-                          <div>
-                            <div className="font-medium">Settings</div>
-                            <div className="text-xs opacity-70">Manage preferences</div>
-                          </div>
-                        </button>
-                        <hr className="my-2 border-[#4A2F1A]" />
-                        <button
-                          onClick={handleLogout}
-                          className="flex items-center gap-2 w-full px-4 py-3 text-sm text-[#8B5A3C] hover:bg-gradient-to-r hover:from-[#6B4423] hover:via-[#8B5A3C] hover:to-[#6B4423] hover:text-[#F5DEB3] transition-all duration-150 font-bold text-left"
-                        >
-                          <LogOut className="w-4 h-4" />
-                          <div>
-                            <div className="font-medium">Logout</div>
-                            <div className="text-xs opacity-70">Sign out of account</div>
-                          </div>
-                        </button>
+                      <div className="absolute top-full right-0 pt-2 w-52">
+                        <div className="bg-[#F5DEB3] rounded-lg shadow-xl border-2 border-[#4A2F1A] py-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                          <button
+                            onClick={() => {
+                              handleMenuClick("/profile")
+                              setOpenDropdown(null)
+                            }}
+                            className="flex items-center gap-2 w-full text-left px-4 py-3 text-sm text-[#8B5A3C] hover:bg-gradient-to-r hover:from-[#6B4423] hover:via-[#8B5A3C] hover:to-[#6B4423] hover:text-[#F5DEB3] transition-all duration-150"
+                          >
+                            <User className="w-4 h-4" />
+                            <div>
+                              <div className="font-medium">Profile</div>
+                              <div className="text-xs opacity-70">View your profile</div>
+                            </div>
+                          </button>
+                          <button
+                            onClick={() => {
+                              handleMenuClick("/settings")
+                              setOpenDropdown(null)
+                            }}
+                            className="flex items-center gap-2 w-full text-left px-4 py-3 text-sm text-[#8B5A3C] hover:bg-gradient-to-r hover:from-[#6B4423] hover:via-[#8B5A3C] hover:to-[#6B4423] hover:text-[#F5DEB3] transition-all duration-150"
+                          >
+                            <Settings className="w-4 h-4" />
+                            <div>
+                              <div className="font-medium">Settings</div>
+                              <div className="text-xs opacity-70">Manage preferences</div>
+                            </div>
+                          </button>
+                          <hr className="my-2 border-[#4A2F1A]" />
+                          <button
+                            onClick={handleLogout}
+                            className="flex items-center gap-2 w-full px-4 py-3 text-sm text-[#8B5A3C] hover:bg-gradient-to-r hover:from-[#6B4423] hover:via-[#8B5A3C] hover:to-[#6B4423] hover:text-[#F5DEB3] transition-all duration-150 font-bold text-left"
+                          >
+                            <LogOut className="w-4 h-4" />
+                            <div>
+                              <div className="font-medium">Logout</div>
+                              <div className="text-xs opacity-70">Sign out of account</div>
+                            </div>
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>

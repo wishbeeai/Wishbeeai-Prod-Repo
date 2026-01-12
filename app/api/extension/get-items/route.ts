@@ -48,10 +48,10 @@ export async function GET(req: NextRequest) {
     }
 
     // Get all items from all wishlists
-    // Explicitly select columns to avoid schema cache issues with missing 'description' column
+    // Select only columns that exist in the database
     const { data: items, error: itemsError } = await supabase
       .from("wishlist_items")
-      .select("id, wishlist_id, product_name, product_url, product_price, product_image, quantity, priority, category, stock_status, created_at, updated_at, title, asin, image_url, list_price, currency, review_star, review_count, affiliate_url, source, price_snapshot_at, store_name")
+      .select("id, wishlist_id, product_url, created_at, title, asin, image_url, list_price, currency, review_star, review_count, affiliate_url, source, price_snapshot_at, description")
       .in("wishlist_id", wishlistIds)
       .order("created_at", { ascending: false })
 
@@ -63,9 +63,9 @@ export async function GET(req: NextRequest) {
 
     // Transform to extension format
     const formattedItems = (items || []).map((item: any) => {
-      // Extract store name from URL if store_name doesn't exist
-      let storeName = item.store_name || "Unknown Store"
-      if (storeName === "Unknown Store" && item.product_url) {
+      // Extract store name from URL
+      let storeName = "Unknown Store"
+      if (item.product_url) {
         try {
           const urlObj = new URL(item.product_url)
           storeName = urlObj.hostname.replace("www.", "").split(".")[0]
@@ -77,10 +77,10 @@ export async function GET(req: NextRequest) {
       
       return {
         id: item.id,
-        title: item.product_name || "Untitled Item",
+        title: item.title || "Untitled Item",
         url: item.product_url || "#",
-        image: item.product_image || null,
-        price: item.product_price || null,
+        image: item.image_url || null,
+        price: item.list_price ? item.list_price / 100 : null, // Convert from cents
         description: item.description || null,
         storeName,
         addedDate: item.created_at,

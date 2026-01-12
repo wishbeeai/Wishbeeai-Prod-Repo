@@ -449,6 +449,33 @@ async function extractWithoutAI(
       weightLimit: null,
       seatingCapacity: null,
       style: null,
+      // Audio/Headphone-specific attributes
+      earPlacement: null,
+      formFactor: null,
+      impedance: null,
+      noiseControl: null,
+      connectivity: null,
+      wirelessType: null,
+      compatibleDevices: null,
+      batteryLife: null,
+      // Watch/Wearables-specific attributes
+      operatingSystem: null,
+      memoryStorageCapacity: null,
+      batteryCapacity: null,
+      connectivityTechnology: null,
+      wirelessCommunicationStandard: null,
+      batteryCellComposition: null,
+      gps: null,
+      shape: null,
+      screenSize: null,
+      displayType: null,
+      waterResistance: null,
+      // General technical specifications
+      wattage: null,
+      voltage: null,
+      powerSource: null,
+      controlMethod: null,
+      specialFeatures: null,
     },
   }
 
@@ -6378,6 +6405,242 @@ async function extractWithoutAI(
     if (!productData.rating || !productData.reviewCount) {
       const sampleHtml = htmlContent.substring(0, 5000) // First 5000 chars
       log(`[v0] ⚠️ Rating or review count missing. HTML sample (first 5000 chars): ${sampleHtml.substring(0, 500)}...`)
+    }
+  }
+
+  // Extract technical specifications from Amazon's product details table
+  // This extracts attributes like Ear Placement, Form Factor, Impedance, etc.
+  if (hostname.includes('amazon.com') && htmlContent) {
+    log("[v0] 🔍 Extracting Amazon technical specifications...")
+    log(`[v0] HTML content length for spec extraction: ${htmlContent.length}`)
+    
+    try {
+      // Amazon uses different table structures for product details
+      // 1. prodDetTable - older Amazon format
+      // 2. a-keyvalue table - newer format
+      // 3. tech-spec-table - technical specifications table
+      
+      // Define the specifications we want to extract (label -> attribute name mapping)
+      const specMappings: Record<string, keyof typeof productData.attributes> = {
+        // General
+        'brand': 'brand',
+        'model': 'model',
+        'model name': 'model',
+        // Audio/Headphones
+        'ear placement': 'earPlacement',
+        'form factor': 'formFactor',
+        'impedance': 'impedance',
+        'noise control': 'noiseControl',
+        'connectivity': 'connectivity',
+        'connectivity technology': 'connectivityTechnology',
+        'wireless type': 'wirelessType',
+        'compatible devices': 'compatibleDevices',
+        'battery life': 'batteryLife',
+        // Watch/Wearables
+        'operating system': 'operatingSystem',
+        'memory storage capacity': 'memoryStorageCapacity',
+        'storage capacity': 'memoryStorageCapacity',
+        'internal memory': 'memoryStorageCapacity',
+        'battery capacity': 'batteryCapacity',
+        'battery cell composition': 'batteryCellComposition',
+        'battery type': 'batteryCellComposition',
+        'wireless communication standard': 'wirelessCommunicationStandard',
+        'wireless communication': 'wirelessCommunicationStandard',
+        'gps': 'gps',
+        'shape': 'shape',
+        'case shape': 'shape',
+        'screen size': 'screenSize',
+        'display size': 'screenSize',
+        'display type': 'displayType',
+        'water resistance': 'waterResistance',
+        'water resistant': 'waterResistance',
+        'water resistance depth': 'waterResistance',
+        // General tech specs
+        'wattage': 'wattage',
+        'voltage': 'voltage',
+        'power source': 'powerSource',
+        'control method': 'controlMethod',
+        'special features': 'specialFeatures',
+        'special feature': 'specialFeatures',
+      }
+      
+      // Pattern 1: Extract from key-value table rows (th/td or span pairs)
+      // Format: <th>Label</th><td>Value</td> or similar
+      for (const [label, attrName] of Object.entries(specMappings)) {
+        if (!productData.attributes[attrName]) {
+          // Pattern for th/td structure
+          const thTdPattern = new RegExp(
+            `<th[^>]*>[^<]*${label}[^<]*</th>\\s*<td[^>]*>([^<]+)</td>`,
+            'gi'
+          )
+          const thTdMatch = htmlContent.match(thTdPattern)
+          if (thTdMatch && thTdMatch[0]) {
+            const valueMatch = thTdMatch[0].match(/<td[^>]*>([^<]+)<\/td>/i)
+            if (valueMatch && valueMatch[1]) {
+              const value = decodeHtmlEntities(valueMatch[1].trim())
+              if (value && value.length > 0 && value.length < 200) {
+                productData.attributes[attrName] = value
+                log(`[v0] ✅ Extracted ${attrName} from th/td: ${value}`)
+                continue
+              }
+            }
+          }
+          
+          // Pattern for span-based key-value (Amazon's a-keyvalue format)
+          // <span class="a-text-bold">Label</span><span>Value</span>
+          const spanPattern = new RegExp(
+            `<span[^>]*class=["'][^"']*a-text-bold[^"']*["'][^>]*>[^<]*${label}[^<]*</span>\\s*</span>\\s*<span[^>]*>([^<]+)</span>`,
+            'gi'
+          )
+          const spanMatch = htmlContent.match(spanPattern)
+          if (spanMatch && spanMatch[0]) {
+            const valueMatch = spanMatch[0].match(/([^>]+)<\/span>$/i)
+            if (valueMatch && valueMatch[1]) {
+              const value = decodeHtmlEntities(valueMatch[1].trim())
+              if (value && value.length > 0 && value.length < 200) {
+                productData.attributes[attrName] = value
+                log(`[v0] ✅ Extracted ${attrName} from span: ${value}`)
+                continue
+              }
+            }
+          }
+          
+          // Pattern for dt/dd structure (definition list)
+          const dtDdPattern = new RegExp(
+            `<dt[^>]*>[^<]*${label}[^<]*</dt>\\s*<dd[^>]*>([^<]+)</dd>`,
+            'gi'
+          )
+          const dtDdMatch = htmlContent.match(dtDdPattern)
+          if (dtDdMatch && dtDdMatch[0]) {
+            const valueMatch = dtDdMatch[0].match(/<dd[^>]*>([^<]+)<\/dd>/i)
+            if (valueMatch && valueMatch[1]) {
+              const value = decodeHtmlEntities(valueMatch[1].trim())
+              if (value && value.length > 0 && value.length < 200) {
+                productData.attributes[attrName] = value
+                log(`[v0] ✅ Extracted ${attrName} from dt/dd: ${value}`)
+                continue
+              }
+            }
+          }
+          
+          // Pattern for tr with label in first td and value in second td
+          const trPattern = new RegExp(
+            `<tr[^>]*>\\s*<t[dh][^>]*>[^<]*${label}[^<]*</t[dh]>\\s*<td[^>]*>([^<]+)</td>`,
+            'gi'
+          )
+          const trMatch = htmlContent.match(trPattern)
+          if (trMatch && trMatch[0]) {
+            const valueMatch = trMatch[0].match(/<td[^>]*>([^<]+)<\/td>\s*$/i)
+            if (valueMatch && valueMatch[1]) {
+              const value = decodeHtmlEntities(valueMatch[1].trim())
+              if (value && value.length > 0 && value.length < 200) {
+                productData.attributes[attrName] = value
+                log(`[v0] ✅ Extracted ${attrName} from tr: ${value}`)
+              }
+            }
+          }
+        }
+      }
+      
+      // ADDITIONAL EXTRACTION: Look for Amazon's product information table more aggressively
+      // Amazon uses various table structures - try to extract key-value pairs from any table
+      const tableRowPattern = /<tr[^>]*>\s*<t[hd][^>]*[^<]*class="[^"]*a-color-secondary[^"]*"[^>]*>([^<]+)<\/t[hd]>\s*<td[^>]*>([^<]+)<\/td>/gi
+      let tableMatch
+      while ((tableMatch = tableRowPattern.exec(htmlContent)) !== null) {
+        const label = tableMatch[1].trim().toLowerCase().replace(/\s+/g, ' ')
+        const value = decodeHtmlEntities(tableMatch[2].trim())
+        
+        if (value && value.length > 0 && value.length < 300) {
+          // Map to our attribute names
+          if (label.includes('operating system') && !productData.attributes.operatingSystem) {
+            productData.attributes.operatingSystem = value
+            log(`[v0] ✅ Table extracted operatingSystem: ${value}`)
+          } else if ((label.includes('memory storage') || label.includes('storage capacity')) && !productData.attributes.memoryStorageCapacity) {
+            productData.attributes.memoryStorageCapacity = value
+            log(`[v0] ✅ Table extracted memoryStorageCapacity: ${value}`)
+          } else if (label.includes('battery capacity') && !productData.attributes.batteryCapacity) {
+            productData.attributes.batteryCapacity = value
+            log(`[v0] ✅ Table extracted batteryCapacity: ${value}`)
+          } else if (label.includes('connectivity technology') && !productData.attributes.connectivityTechnology) {
+            productData.attributes.connectivityTechnology = value
+            log(`[v0] ✅ Table extracted connectivityTechnology: ${value}`)
+          } else if (label.includes('wireless communication') && !productData.attributes.wirelessCommunicationStandard) {
+            productData.attributes.wirelessCommunicationStandard = value
+            log(`[v0] ✅ Table extracted wirelessCommunicationStandard: ${value}`)
+          } else if ((label.includes('battery cell') || label.includes('battery type')) && !productData.attributes.batteryCellComposition) {
+            productData.attributes.batteryCellComposition = value
+            log(`[v0] ✅ Table extracted batteryCellComposition: ${value}`)
+          } else if (label === 'gps' && !productData.attributes.gps) {
+            productData.attributes.gps = value
+            log(`[v0] ✅ Table extracted gps: ${value}`)
+          } else if ((label === 'shape' || label.includes('case shape')) && !productData.attributes.shape) {
+            productData.attributes.shape = value
+            log(`[v0] ✅ Table extracted shape: ${value}`)
+          } else if ((label.includes('screen size') || label.includes('display size')) && !productData.attributes.screenSize) {
+            productData.attributes.screenSize = value
+            log(`[v0] ✅ Table extracted screenSize: ${value}`)
+          } else if (label.includes('special feature') && !productData.attributes.specialFeatures) {
+            productData.attributes.specialFeatures = value
+            log(`[v0] ✅ Table extracted specialFeatures: ${value}`)
+          }
+        }
+      }
+      
+      // ALTERNATIVE: Look for spans with product info (Amazon's newer format)
+      // Pattern: <span class="a-size-base a-text-bold">Label</span> ... <span>Value</span>
+      const spanPairs = htmlContent.match(/<span[^>]*>([^<]{3,50})<\/span>\s*<\/td>\s*<td[^>]*>\s*<span[^>]*>([^<]+)<\/span>/gi)
+      if (spanPairs) {
+        for (const pair of spanPairs) {
+          const labelMatch = pair.match(/<span[^>]*>([^<]{3,50})<\/span>\s*<\/td>/i)
+          const valueMatch = pair.match(/<td[^>]*>\s*<span[^>]*>([^<]+)<\/span>/i)
+          if (labelMatch && valueMatch) {
+            const label = labelMatch[1].trim().toLowerCase()
+            const value = decodeHtmlEntities(valueMatch[1].trim())
+            
+            if (label.includes('operating system') && !productData.attributes.operatingSystem) {
+              productData.attributes.operatingSystem = value
+              log(`[v0] ✅ Span extracted operatingSystem: ${value}`)
+            } else if (label.includes('memory') && label.includes('capacity') && !productData.attributes.memoryStorageCapacity) {
+              productData.attributes.memoryStorageCapacity = value
+              log(`[v0] ✅ Span extracted memoryStorageCapacity: ${value}`)
+            } else if (label.includes('battery capacity') && !productData.attributes.batteryCapacity) {
+              productData.attributes.batteryCapacity = value
+              log(`[v0] ✅ Span extracted batteryCapacity: ${value}`)
+            } else if (label.includes('connectivity') && !productData.attributes.connectivityTechnology) {
+              productData.attributes.connectivityTechnology = value
+              log(`[v0] ✅ Span extracted connectivityTechnology: ${value}`)
+            }
+          }
+        }
+      }
+      
+      // Log what specifications were extracted
+      const extractedSpecs = Object.entries(productData.attributes)
+        .filter(([key, value]) => value && [
+          // Audio/Headphones
+          'earPlacement', 'formFactor', 'impedance', 'noiseControl', 'connectivity', 'wirelessType', 'batteryLife',
+          // Watch/Wearables
+          'operatingSystem', 'memoryStorageCapacity', 'batteryCapacity', 'connectivityTechnology', 
+          'wirelessCommunicationStandard', 'batteryCellComposition', 'gps', 'shape', 'screenSize', 
+          'displayType', 'waterResistance',
+          // General tech specs
+          'wattage', 'powerSource', 'controlMethod', 'specialFeatures'
+        ].includes(key))
+        .map(([key, value]) => `${key}: ${value}`)
+      
+      if (extractedSpecs.length > 0) {
+        log(`[v0] 📋 Extracted technical specifications: ${extractedSpecs.join(', ')}`)
+      } else {
+        log("[v0] ⚠️ No technical specifications found in product details table")
+        // Log a sample of the HTML to help debug
+        const techSpecSection = htmlContent.match(/productDetails_techSpec_section[\s\S]{0,2000}/i)
+        if (techSpecSection) {
+          log(`[v0] 🔍 Found tech spec section: ${techSpecSection[0].substring(0, 500)}...`)
+        }
+      }
+      
+    } catch (error) {
+      log(`[v0] Error extracting technical specifications: ${error}`)
     }
   }
 

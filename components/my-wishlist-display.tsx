@@ -87,15 +87,15 @@ export function MyWishlistDisplay() {
           return {
             id: item.id,
             webLink: item.product_url || "#",
-            quantity: item.quantity || 1,
-            productImageUrl: item.product_image || "/placeholder.svg",
-            giftName: item.product_name || "Untitled Item",
-            currentPrice: item.product_price || 0,
+            quantity: 1,
+            productImageUrl: item.image_url || "/placeholder.svg",
+            giftName: item.title || "Untitled Item",
+            currentPrice: item.list_price ? item.list_price / 100 : 0, // Convert from cents
             storeName,
             description: item.description || "",
-            category: item.category || undefined,
+            category: undefined,
             attributes: {}, // Can be extended later
-            stockStatus: item.stock_status || "Unknown",
+            stockStatus: "In Stock",
             addedDate: item.created_at ? new Date(item.created_at).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
           }
         })

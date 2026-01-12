@@ -60,6 +60,11 @@ interface ProductAttributes {
   earPlacement?: string
   formFactor?: string
   noiseControl?: string
+  impedance?: string
+  connectivity?: string
+  wirelessType?: string
+  compatibleDevices?: string
+  batteryLife?: string
   configurationOptions?: string[]
   model?: string
   modelName?: string
@@ -108,6 +113,8 @@ export default function AdminAffiliateProductsPage() {
   const [extractedProduct, setExtractedProduct] = useState<any>(null)
   // Custom fields for product specifications
   const [customFields, setCustomFields] = useState<Array<{name: string, value: string}>>([])
+  // Product attributes (Brand, Color, Ear Placement, etc.)
+  const [productAttributes, setProductAttributes] = useState<Array<{name: string, value: string}>>([])
   // Custom badges for product
   const [customBadges, setCustomBadges] = useState<Array<{name: string, enabled: boolean}>>([])
   // Temporary string values to preserve decimal points while typing
@@ -213,6 +220,7 @@ export default function AdminAffiliateProductsPage() {
     setExtractedProduct(null) // Clear extracted product widget
     setCustomFields([]) // Clear custom fields
     setCustomBadges([]) // Clear custom badges
+    setProductAttributes([]) // Clear product attributes
   }
 
   const handleOpenAddModal = () => {
@@ -275,6 +283,11 @@ export default function AdminAffiliateProductsPage() {
         earPlacement: null,
         formFactor: null,
         noiseControl: null,
+        impedance: null,
+        connectivity: null,
+        wirelessType: null,
+        compatibleDevices: null,
+        batteryLife: null,
         // NOTE: color, size, style are intentionally excluded
       },
     })
@@ -282,6 +295,17 @@ export default function AdminAffiliateProductsPage() {
     setCustomFields(product.attributes?.customFields || [])
     // Load custom badges from product attributes
     setCustomBadges(product.attributes?.customBadges || [])
+    // Load product attributes as key-value pairs
+    const attrPairs: Array<{name: string, value: string}> = []
+    if (product.attributes) {
+      const excludeKeys = ['customFields', 'customBadges', 'configurationOptions', 'model']
+      for (const [key, value] of Object.entries(product.attributes)) {
+        if (!excludeKeys.includes(key) && value && typeof value === 'string') {
+          attrPairs.push({ name: key, value: value })
+        }
+      }
+    }
+    setProductAttributes(attrPairs)
     setIsEditModalOpen(true)
   }
 
@@ -355,20 +379,49 @@ export default function AdminAffiliateProductsPage() {
       */
 
       // Regular extraction (AI-based or scraping via ScraperAPI) - works for all sites including Amazon
-      const response = await fetch("/api/ai/extract-product", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ productUrl: url }),
-      })
+      console.log("[Admin] Starting product extraction for URL:", url)
+      
+      let response: Response
+      try {
+        response = await fetch("/api/ai/extract-product", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ productUrl: url }),
+        })
+      } catch (fetchError) {
+        console.error("[Admin] Network error - could not reach API:", fetchError)
+        toast.error("Network error - could not reach server", {
+          description: "Make sure the development server is running (npm run dev)"
+        })
+        setIsExtracting(false)
+        return
+      }
+
+      console.log("[Admin] Response received:", response.status, response.statusText)
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: "Unknown error" }))
-        console.error("[Admin] Product extraction error:", errorData)
+        const responseText = await response.text()
+        console.log("[Admin] Response text length:", responseText.length)
+        console.log("[Admin] Response text:", responseText.substring(0, 1000))
+        
+        let errorData: any = { error: "Unknown error" }
+        try {
+          if (responseText && responseText.trim()) {
+            errorData = JSON.parse(responseText)
+          } else {
+            errorData = { error: `Server returned empty response with status ${response.status}` }
+          }
+        } catch {
+          errorData = { error: "Failed to parse error response", details: responseText.substring(0, 500) }
+        }
+        console.error("[Admin] Product extraction FAILED")
+        console.error("[Admin] Status:", response.status, response.statusText)
+        console.error("[Admin] Error Data:", JSON.stringify(errorData, null, 2))
         toast.error(
-          errorData.error || "Failed to extract product details",
-          { description: errorData.suggestion || errorData.message || errorData.details }
+          errorData.error || `Failed to extract product details (${response.status})`,
+          { description: errorData.suggestion || errorData.message || errorData.details || response.statusText }
         )
         setIsExtracting(false)
         return
@@ -381,8 +434,23 @@ export default function AdminAffiliateProductsPage() {
         const extracted = data.productData || data
         
         // DEBUG: Log the full extracted data to see what attributes are available
-        console.log('[Admin] Full extracted data from API:', JSON.stringify(extracted, null, 2))
+        console.log('[Admin] ========== EXTRACTION DEBUG ==========')
+        console.log('[Admin] Full extracted data from API:', extracted)
+        console.log('[Admin] All top-level keys:', Object.keys(extracted))
         console.log('[Admin] extracted.attributes:', extracted.attributes)
+        if (extracted.attributes) {
+          console.log('[Admin] All attribute keys:', Object.keys(extracted.attributes))
+          // Log each attribute value
+          for (const [key, value] of Object.entries(extracted.attributes)) {
+            if (value) console.log(`[Admin] Attr: ${key} = ${value}`)
+          }
+        }
+        // Check for specs in various locations
+        console.log('[Admin] extracted.productSpecifications:', extracted.productSpecifications)
+        console.log('[Admin] extracted.specs:', extracted.specs)
+        console.log('[Admin] extracted.specifications:', extracted.specifications)
+        console.log('[Admin] extracted.technicalDetails:', extracted.technicalDetails)
+        console.log('[Admin] =========================================')
         
         // Store extracted product details for widget display
         const sourceValue = extracted.storeName || extracted.source || extractSourceFromUrl(url) || ""
@@ -393,17 +461,23 @@ export default function AdminAffiliateProductsPage() {
         const ratingValue = extracted.rating || extracted.averageRating || null
         const reviewCountValue = extracted.reviewCount || extracted.numReviews || null
         
-        // Filter out color, size, style, and variant-related properties from extracted attributes
+        // Filter out ALL variant-related properties from extracted attributes
+        // Variant options (Color, Size, Style, Configuration) will be selected in "Add to My Wishlist" modal
+        // Only keep static product specifications here
         let filteredAttributes = null
         if (extracted.attributes) {
-          const excludedKeys = [
-            'color', 'size', 'style', 
+          const variantKeys = [
+            // Variant options - these are selectable, not static specs
+            'color', 'size', 'style', 'configuration',
+            // Variant-related arrays and options
             'colorVariants', 'sizeOptions', 'combinedVariants', 'styleOptions',
-            'styleName', 'patternName'
+            'styleName', 'patternName', 'configurationOptions',
+            // Internal fields
+            'customFields', 'customBadges', 'model'
           ]
           const restAttributes: Record<string, any> = {}
           for (const [key, value] of Object.entries(extracted.attributes)) {
-            if (!excludedKeys.includes(key) && value !== null && value !== undefined && value !== '') {
+            if (!variantKeys.includes(key) && value !== null && value !== undefined && value !== '') {
               restAttributes[key] = value
             }
           }
@@ -430,6 +504,162 @@ export default function AdminAffiliateProductsPage() {
           // Include filtered product attributes (excluding color, size, style)
           attributes: filteredAttributes,
         })
+        
+        // Auto-populate productAttributes from extracted data
+        // Only include STATIC product specifications, NOT variant options
+        const attrPairs: Array<{name: string, value: string}> = []
+        
+        // Variant options to exclude - these are selectable in "Add to My Wishlist" modal
+        const variantOptionsToExclude = [
+          'color', 'size', 'style', 'configuration',
+          'colorVariants', 'sizeOptions', 'combinedVariants', 'styleOptions',
+          'styleName', 'patternName', 'configurationOptions',
+          'customFields', 'customBadges', 'model'
+        ]
+        
+        // Helper to add attribute if valid (only static specs, not variants)
+        const addAttr = (name: string, value: any) => {
+          if (!variantOptionsToExclude.includes(name) && value && !attrPairs.find(p => p.name === name)) {
+            const strValue = typeof value === 'string' ? value : String(value)
+            if (strValue && strValue !== 'null' && strValue !== 'undefined' && strValue.trim() !== '') {
+              attrPairs.push({ name, value: strValue })
+            }
+          }
+        }
+        
+        // 1. Get from filteredAttributes (already processed)
+        if (filteredAttributes && Object.keys(filteredAttributes).length > 0) {
+          for (const [key, value] of Object.entries(filteredAttributes)) {
+            addAttr(key, value)
+          }
+        }
+        
+        // 2. Check extracted.attributes directly
+        if (extracted.attributes) {
+          for (const [key, value] of Object.entries(extracted.attributes)) {
+            addAttr(key, value)
+          }
+        }
+        
+        // 3. Check top-level extracted properties for STATIC product specifications only
+        // Excluded: color, size, style, configuration (these are variant options)
+        const staticSpecAttrs = [
+          // General
+          'brand', 'modelName', 'manufacturer', 'countryOfOrigin', 'weight', 'dimensions', 'itemWeight',
+          // Audio/Headphones
+          'impedance', 'earPlacement', 'formFactor', 'noiseControl', 'connectivity', 'wirelessType', 
+          'compatibleDevices', 'batteryLife', 'capacity', 'material', 'wattage', 'voltage', 'powerSource', 
+          'controlMethod', 'specialFeature', 'specialFeatures',
+          // Watch/Wearables specific
+          'operatingSystem', 'memoryStorageCapacity', 'batteryCapacity', 'connectivityTechnology',
+          'wirelessCommunicationStandard', 'batteryCellComposition', 'gps', 'shape', 'screenSize',
+          'displayType', 'waterResistance', 'sensorType', 'bandMaterial', 'caseMaterial',
+          // Electronics general
+          'processorType', 'ramSize', 'storageCapacity', 'resolution', 'refreshRate'
+        ]
+        for (const attrName of staticSpecAttrs) {
+          // Check multiple locations for each attribute
+          const value = extracted[attrName] || extracted.attributes?.[attrName]
+          addAttr(attrName, value)
+        }
+        
+        // 4. Check for productSpecifications or specs object in MULTIPLE locations
+        const specsLocations = [
+          extracted.productSpecifications,
+          extracted.specs,
+          extracted.specifications,
+          extracted.technicalDetails,
+          extracted.techSpecs,
+          extracted.productDetails,
+          extracted.details,
+        ].filter(Boolean)
+        
+        for (const specs of specsLocations) {
+          if (specs && typeof specs === 'object') {
+            for (const [key, value] of Object.entries(specs)) {
+              // Map common spec names to our attribute names
+              const keyLower = key.toLowerCase().replace(/\s+/g, '')
+              const keyOriginal = key.replace(/\s+/g, ' ').trim()
+              
+              // Skip variant options
+              if (keyLower === 'color' || keyLower === 'size' || keyLower === 'style' || keyLower === 'configuration') continue
+              
+              // General attributes
+              if (keyLower.includes('brand')) addAttr('brand', value)
+              else if (keyLower.includes('impedance')) addAttr('impedance', value)
+              else if (keyLower.includes('earplacement') || keyLower.includes('ear_placement')) addAttr('earPlacement', value)
+              else if (keyLower.includes('formfactor') || keyLower.includes('form_factor')) addAttr('formFactor', value)
+              else if (keyLower.includes('noisecontrol')) addAttr('noiseControl', value)
+              // Watch/Wearables specific
+              else if (keyLower.includes('operatingsystem') || keyLower === 'os') addAttr('operatingSystem', value)
+              else if (keyLower.includes('memorystoragecapacity') || keyLower.includes('storagecapacity') || keyLower.includes('internalmemory')) addAttr('memoryStorageCapacity', value)
+              else if (keyLower.includes('batterycapacity')) addAttr('batteryCapacity', value)
+              else if (keyLower.includes('batterycellcomposition') || keyLower.includes('batterytype')) addAttr('batteryCellComposition', value)
+              else if (keyLower.includes('connectivitytechnology')) addAttr('connectivityTechnology', value)
+              else if (keyLower.includes('wirelesscommunication') || keyLower.includes('wirelessstandard')) addAttr('wirelessCommunicationStandard', value)
+              else if (keyLower === 'gps' || keyLower.includes('gpstype')) addAttr('gps', value)
+              else if (keyLower === 'shape' || keyLower.includes('caseshape')) addAttr('shape', value)
+              else if (keyLower.includes('screensize') || keyLower.includes('displaysize')) addAttr('screenSize', value)
+              else if (keyLower.includes('displaytype')) addAttr('displayType', value)
+              else if (keyLower.includes('waterresist')) addAttr('waterResistance', value)
+              // Connectivity
+              else if (keyLower.includes('connectivity') && !keyLower.includes('technology')) addAttr('connectivity', value)
+              else if (keyLower.includes('wireless') && !keyLower.includes('communication')) addAttr('wirelessType', value)
+              else if (keyLower.includes('compatible')) addAttr('compatibleDevices', value)
+              // Battery
+              else if (keyLower.includes('batterylife')) addAttr('batteryLife', value)
+              else if (keyLower.includes('battery') && !keyLower.includes('capacity') && !keyLower.includes('composition') && !keyLower.includes('cell')) addAttr('batteryLife', value)
+              // Other specs
+              else if (keyLower.includes('capacity') && !keyLower.includes('battery') && !keyLower.includes('storage') && !keyLower.includes('memory')) addAttr('capacity', value)
+              else if (keyLower.includes('material')) addAttr('material', value)
+              else if (keyLower.includes('wattage') || keyLower.includes('powersource')) addAttr('wattage', value)
+              else if (keyLower.includes('weight') || keyLower.includes('itemweight')) addAttr('itemWeight', value)
+              else if (keyLower.includes('specialfeature')) addAttr('specialFeature', value)
+              else if (keyLower.includes('dimension')) addAttr('dimensions', value)
+              else if (keyLower.includes('resolution')) addAttr('resolution', value)
+              // If none of the above matched, add with the original key name (cleaned up)
+              else {
+                // Only add if it's not a variant option and has a valid value
+                const cleanKey = keyOriginal.replace(/[^a-zA-Z0-9\s]/g, '').trim()
+                if (cleanKey && value && String(value).trim()) {
+                  addAttr(cleanKey, value)
+                }
+              }
+            }
+          }
+        }
+        
+        // 5. FALLBACK: Check ALL keys in extracted for any spec-like data
+        const specKeywords = ['operating', 'memory', 'storage', 'battery', 'connectivity', 'wireless', 'gps', 'screen', 'display', 'water', 'special', 'feature']
+        for (const [key, value] of Object.entries(extracted)) {
+          if (value && typeof value === 'string' && specKeywords.some(kw => key.toLowerCase().includes(kw))) {
+            const keyLower = key.toLowerCase()
+            if (!variantOptionsToExclude.includes(keyLower)) {
+              addAttr(key, value)
+            }
+          }
+        }
+        
+        console.log('[Admin] Static product specs (excluding variant options):', { 
+          filteredAttributes, 
+          extractedAttrs: extracted.attributes,
+          specs: extracted.productSpecifications || extracted.specs,
+          brand: extracted.brand || extracted.attributes?.brand,
+          earPlacement: extracted.attributes?.earPlacement,
+          formFactor: extracted.attributes?.formFactor,
+          impedance: extracted.attributes?.impedance,
+          noiseControl: extracted.attributes?.noiseControl,
+        })
+        console.log('[Admin] Product Attributes (static specs only):', attrPairs)
+        
+        if (attrPairs.length > 0) {
+          setProductAttributes(attrPairs)
+          console.log('[Admin] ✅ Auto-populated productAttributes:', attrPairs)
+        } else {
+          // Clear any existing attributes if none found
+          setProductAttributes([])
+          console.log('[Admin] ⚠️ No product attributes found to auto-populate')
+        }
         
         // Auto-fill form fields with extracted data
         setFormData((prev) => ({
@@ -667,6 +897,11 @@ export default function AdminAffiliateProductsPage() {
           // Remove color/size/style variants (we filter these out)
           const excludeKeys = ['color', 'size', 'style', 'sizeOptions', 'colorVariants', 'combinedVariants', 'styleOptions', 'styleName', 'patternName']
           excludeKeys.forEach(key => delete attrs[key])
+          
+          // Add product attributes from the dynamic list
+          productAttributes.filter(a => a.name && a.value).forEach(attr => {
+            attrs[attr.name] = attr.value
+          })
           
           // Add custom fields if any
           if (customFields.filter(f => f.name && f.value).length > 0) {
@@ -1861,89 +2096,62 @@ export default function AdminAffiliateProductsPage() {
                       </div>
                     </div>
 
-                    {/* Product Attributes Section - Displays extracted attributes (excluding color, size, style) */}
-                    {extractedProduct?.attributes && (() => {
-                      // Keys to exclude from display (variant-related + brand which is shown separately)
-                      const excludedKeys = ['color', 'size', 'style', 'sizeOptions', 'colorVariants', 'combinedVariants', 'styleOptions', 'styleName', 'patternName', 'brand']
-                      
-                      // Get all attribute entries
-                      const allEntries = Object.entries(extractedProduct.attributes)
-                      
-                      // Filter to non-excluded, non-empty values
-                      const filteredEntries = allEntries
-                        .filter(([key, value]) => 
-                          !excludedKeys.includes(key) && 
-                          value !== null && 
-                          value !== undefined && 
-                          value !== ''
-                        )
-                      
-                      if (filteredEntries.length === 0) {
-                        return null
-                      }
-                      
-                      return (
-                        <div className="bg-white rounded-xl p-3 sm:p-4 shadow-md border border-amber-200 w-full overflow-hidden">
-                          <label className="block text-xs sm:text-sm font-bold text-[#654321] mb-2 sm:mb-3">
-                            Product Attributes ({filteredEntries.length})
-                          </label>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
-                            {filteredEntries.map(([key, value]) => (
-                              <div key={key} className="group flex flex-col bg-amber-50 rounded-lg p-2 min-w-0 relative">
-                                <div className="flex items-center justify-between gap-1">
-                                  <span className="text-[10px] sm:text-xs font-semibold text-[#654321] capitalize truncate flex-1">
-                                    {key.replace(/([A-Z])/g, ' $1').trim()}
-                                  </span>
-                                  <div className="flex items-center gap-0.5">
-                                    {/* Edit Button */}
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const newValue = prompt(
-                                          `Edit ${key.replace(/([A-Z])/g, ' $1').trim()}:`,
-                                          typeof value === 'object' ? JSON.stringify(value) : String(value)
-                                        )
-                                        if (newValue !== null) {
-                                          setExtractedProduct({
-                                            ...extractedProduct,
-                                            attributes: {
-                                              ...extractedProduct.attributes,
-                                              [key]: newValue
-                                            }
-                                          })
-                                        }
-                                      }}
-                                      className="opacity-60 hover:opacity-100 transition-opacity p-0.5 sm:p-1 hover:bg-amber-200 rounded"
-                                      title={`Edit ${key.replace(/([A-Z])/g, ' $1').trim()}`}
-                                    >
-                                      <Edit2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#654321]" />
-                                    </button>
-                                    {/* Remove Button */}
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const { [key]: removed, ...restAttributes } = extractedProduct.attributes
-                                        setExtractedProduct({
-                                          ...extractedProduct,
-                                          attributes: restAttributes
-                                        })
-                                      }}
-                                      className="opacity-60 hover:opacity-100 transition-opacity p-0.5 sm:p-1 hover:bg-red-100 rounded"
-                                      title={`Remove ${key.replace(/([A-Z])/g, ' $1').trim()}`}
-                                    >
-                                      <Trash2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-red-500" />
-                                    </button>
-                                  </div>
-                                </div>
-                                <span className="text-[10px] sm:text-xs text-gray-700 break-words line-clamp-2" title={typeof value === 'object' ? JSON.stringify(value) : String(value)}>
-                                  {typeof value === 'object' ? JSON.stringify(value) : String(value)}
-                                </span>
-                              </div>
-                            ))}
+                    {/* Product Attributes Section */}
+                    <div className="bg-white rounded-xl p-4 shadow-md border border-amber-200">
+                      <label className="block text-sm font-bold text-[#654321] mb-3">Product Attributes</label>
+                      <div className="space-y-2">
+                        {productAttributes.map((attr, idx) => (
+                          <div key={idx} className="flex items-center gap-2">
+                            <Input
+                              value={attr.name || ''}
+                              onChange={(e) => {
+                                const newAttrs = [...productAttributes]
+                                newAttrs[idx] = { ...newAttrs[idx], name: e.target.value }
+                                setProductAttributes(newAttrs)
+                              }}
+                              className="w-40 h-8 text-sm font-medium border-gray-300 focus:border-amber-500"
+                              placeholder="Attribute name"
+                            />
+                            <Input
+                              value={attr.value || ''}
+                              onChange={(e) => {
+                                const newAttrs = [...productAttributes]
+                                newAttrs[idx] = { ...newAttrs[idx], value: e.target.value }
+                                setProductAttributes(newAttrs)
+                              }}
+                              className="flex-1 h-8 text-sm border-gray-300 focus:border-amber-500"
+                              placeholder="Enter value"
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const newAttrs = productAttributes.filter((_, i) => i !== idx)
+                                setProductAttributes(newAttrs)
+                              }}
+                              className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                            >
+                              ×
+                            </Button>
                           </div>
-                        </div>
-                      )
-                    })()}
+                        ))}
+                        {productAttributes.length === 0 && (
+                          <p className="text-sm text-gray-400 italic">No attributes extracted</p>
+                        )}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setProductAttributes([...productAttributes, { name: '', value: '' }])
+                          }}
+                          className="text-xs h-7 border-amber-400 text-amber-700 hover:bg-amber-50 mt-2"
+                        >
+                          + Add Field
+                        </Button>
+                      </div>
+                    </div>
 
                   </div>
                 </div>

@@ -7,6 +7,9 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { AddToWishlistModal } from "@/components/add-to-wishlist-modal"
+import { useAuth } from "@/lib/auth-context"
+
+const ADMIN_EMAIL = "wishbeeai@gmail.com"
 
 interface Gift {
   id: string
@@ -40,6 +43,7 @@ type ViewMode = "grid" | "list"
 
 export default function TrendingGiftsPage() {
   const router = useRouter()
+  const { user } = useAuth()
   const [gifts, setGifts] = useState<Gift[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
@@ -56,6 +60,9 @@ export default function TrendingGiftsPage() {
   const [removingGiftId, setRemovingGiftId] = useState<string | null>(null)
   const [selectedGiftForAttributes, setSelectedGiftForAttributes] = useState<Gift | null>(null)
   const [isAttributesModalOpen, setIsAttributesModalOpen] = useState(false)
+  
+  // Check if current user is admin
+  const isAdmin = user?.email?.toLowerCase().trim() === ADMIN_EMAIL.toLowerCase()
 
   // Get filtered attributes for a gift (excluding variant-related keys)
   const getFilteredAttributes = (gift: Gift) => {
@@ -562,7 +569,7 @@ export default function TrendingGiftsPage() {
             {filteredAndSortedGifts.map((gift) => (
               <div
                 key={gift.id}
-                className="bg-gradient-to-br from-white to-amber-50/30 rounded-2xl shadow-lg border border-[#DAA520]/30 overflow-hidden hover:shadow-2xl hover:border-[#DAA520]/60 transition-all duration-300 group"
+                className="bg-gradient-to-br from-white to-amber-50/30 rounded-2xl shadow-lg border border-[#DAA520]/30 overflow-hidden hover:shadow-2xl hover:border-[#DAA520]/60 transition-all duration-300 group flex flex-col h-full"
               >
                 {/* Image Section */}
                 <div className="relative overflow-hidden">
@@ -573,7 +580,7 @@ export default function TrendingGiftsPage() {
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                   {gift.category && (
-                    <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-sm text-[#654321] px-3 py-1 rounded-full text-xs font-bold shadow-md">
+                    <div className="absolute top-3 left-3 bg-gradient-to-r from-amber-100 to-orange-100 backdrop-blur-sm text-[#8B4513] px-3 py-1 rounded-full text-xs font-bold shadow-md border border-amber-200">
                       {gift.category}
                     </div>
                   )}
@@ -585,28 +592,48 @@ export default function TrendingGiftsPage() {
                 </div>
 
                 {/* Content Section */}
-                <div className="p-4">
-                  <h3 className="text-sm font-semibold text-[#654321] mb-1 line-clamp-2 group-hover:text-[#8B4513] transition-colors">{gift.giftName}</h3>
+                <div className="p-4 flex-grow flex flex-col">
+                  {/* Title - Fixed 2 lines with ellipsis */}
+                  <h3 className="text-sm font-semibold text-[#654321] mb-1 line-clamp-2 min-h-[2.5rem] group-hover:text-[#8B4513] transition-colors" title={gift.giftName}>{gift.giftName}</h3>
                   {gift.source && (
                     <p className="text-xs text-[#8B4513]/60 mb-1.5 flex items-center gap-1">
                       <span className="w-1 h-1 bg-[#DAA520] rounded-full"></span>
                       From {gift.source}
                     </p>
                   )}
-                  {/* Rating */}
+                  {/* Rating - Partial star fill */}
                   {gift.rating && gift.rating > 0 && (
                     <div className="flex items-center gap-2 mb-1.5 bg-amber-50/50 rounded-lg px-2 py-1 w-fit">
                       <div className="flex items-center gap-0.5">
-                        {[1, 2, 3, 4, 5].map((star) => {
-                          const starValue = (gift.rating || 0) - star
-                          const isFilled = starValue >= 0.5
+                        {[1, 2, 3, 4, 5].map((starPosition) => {
+                          const rating = gift.rating || 0
+                          const fillAmount = Math.max(0, Math.min(1, rating - (starPosition - 1)))
+                          const fillPercent = Math.round(fillAmount * 100)
+                          const gradientId = `star-grid-${gift.id}-${starPosition}`
+                          
                           return (
-                            <Star
-                              key={star}
-                              className={`w-3.5 h-3.5 ${
-                                isFilled ? "fill-[#F4C430] text-[#F4C430]" : "fill-gray-200 text-gray-300"
-                              }`}
-                            />
+                            <svg
+                              key={starPosition}
+                              className="w-3.5 h-3.5"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              xmlns="http://www.w3.org/2000/svg"
+                            >
+                              <defs>
+                                <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
+                                  <stop offset={`${fillPercent}%`} stopColor="#F4C430" />
+                                  <stop offset={`${fillPercent}%`} stopColor="#E5E7EB" />
+                                </linearGradient>
+                              </defs>
+                              <path
+                                d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"
+                                fill={`url(#${gradientId})`}
+                                stroke="#F4C430"
+                                strokeWidth="1"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </svg>
                           )
                         })}
                       </div>
@@ -617,26 +644,28 @@ export default function TrendingGiftsPage() {
                     </div>
                   )}
 
-                  {/* Badges */}
-                  {(gift.amazonChoice || gift.bestSeller || gift.overallPick) && (
-                    <div className="flex flex-wrap gap-1 mb-1.5">
-                      {gift.amazonChoice && (
-                        <span className="bg-gradient-to-r from-gray-900 to-black text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-sm">
-                          Amazon's Choice
-                        </span>
-                      )}
-                      {gift.bestSeller && (
-                        <span className="bg-gradient-to-r from-amber-600 to-orange-600 text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-sm">
-                          🔥 Best Seller
-                        </span>
-                      )}
-                      {gift.overallPick && (
-                        <span className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-sm">
-                          ⭐ Overall Pick
-                        </span>
-                      )}
-                    </div>
-                  )}
+                  {/* Badges - Fixed height container for alignment */}
+                  <div className="min-h-[28px] mb-1.5">
+                    {(gift.amazonChoice || gift.bestSeller || gift.overallPick) && (
+                      <div className="flex flex-wrap gap-1">
+                        {gift.amazonChoice && (
+                          <span className="bg-gradient-to-r from-gray-900 to-black text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-sm">
+                            Amazon's Choice
+                          </span>
+                        )}
+                        {gift.bestSeller && (
+                          <span className="bg-gradient-to-r from-amber-600 to-orange-600 text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-sm">
+                            🔥 Best Seller
+                          </span>
+                        )}
+                        {gift.overallPick && (
+                          <span className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-sm">
+                            ⭐ Overall Pick
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
 
                   {/* Price */}
                   <div className="mb-1">
@@ -655,48 +684,55 @@ export default function TrendingGiftsPage() {
                     </div>
                   </div>
 
-                {/* Product Specifications */}
-                {gift.attributes && Object.keys(gift.attributes).filter(key => 
-                  !['color', 'size', 'style', 'brand', 'sizeOptions', 'colorVariants', 'combinedVariants', 'styleOptions', 'styleName', 'patternName'].includes(key) &&
-                  gift.attributes![key] !== null && 
-                  gift.attributes![key] !== undefined && 
-                  gift.attributes![key] !== ''
-                ).length > 0 && (
-                  <div className="bg-gradient-to-r from-[#6B4423]/5 to-[#8B5A3C]/5 rounded-lg p-3 border border-[#8B5A3C]/10">
-                    <p className="text-[10px] font-bold text-[#6B4423] uppercase tracking-wider mb-2 flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 bg-[#DAA520] rounded-full"></span>
-                      Specifications
-                    </p>
-                    <div className="flex flex-col gap-1.5">
-                      {Object.entries(gift.attributes)
-                        .filter(([key, value]) => 
-                          !['color', 'size', 'style', 'brand', 'sizeOptions', 'colorVariants', 'combinedVariants', 'styleOptions', 'styleName', 'patternName'].includes(key) &&
-                          value !== null && value !== undefined && value !== ''
-                        )
-                        .slice(0, 5)
-                        .map(([key, value]) => (
-                          <div key={key} className="flex items-center text-[11px]">
-                            <span className="font-semibold text-[#6B4423] capitalize min-w-[90px]">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
-                            <span className="text-[#654321] truncate flex-1" title={String(value)}>{String(value)}</span>
-                          </div>
-                        ))
-                      }
-                      {getFilteredAttributes(gift).length > 5 && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setSelectedGiftForAttributes(gift)
-                            setIsAttributesModalOpen(true)
-                          }}
-                          className="text-left text-[11px] font-bold text-[#DAA520] hover:text-[#B8860B] cursor-pointer transition-colors mt-1"
-                        >
-                          +{getFilteredAttributes(gift).length - 5} more →
-                        </button>
-                      )}
-                    </div>
+                {/* Spacer to push content to bottom */}
+                <div className="flex-grow"></div>
+
+                {/* Product Specifications - Fixed height for alignment */}
+                <div className="bg-gradient-to-r from-[#6B4423]/5 to-[#8B5A3C]/5 rounded-lg p-3 border border-[#8B5A3C]/10 mt-auto h-[175px] flex flex-col">
+                  <p className="text-[10px] font-bold text-[#6B4423] uppercase tracking-wider mb-2 flex items-center gap-1 flex-shrink-0">
+                    <span className="w-1.5 h-1.5 bg-[#DAA520] rounded-full"></span>
+                    Specifications
+                  </p>
+                  <div className="flex-1 flex flex-col justify-start overflow-hidden">
+                    {gift.attributes && Object.keys(gift.attributes).filter(key => 
+                      !['color', 'size', 'style', 'brand', 'sizeOptions', 'colorVariants', 'combinedVariants', 'styleOptions', 'styleName', 'patternName'].includes(key) &&
+                      gift.attributes![key] !== null && 
+                      gift.attributes![key] !== undefined && 
+                      gift.attributes![key] !== ''
+                    ).length > 0 ? (
+                      <div className="flex flex-col gap-1">
+                        {Object.entries(gift.attributes)
+                          .filter(([key, value]) => 
+                            !['color', 'size', 'style', 'brand', 'sizeOptions', 'colorVariants', 'combinedVariants', 'styleOptions', 'styleName', 'patternName'].includes(key) &&
+                            value !== null && value !== undefined && value !== ''
+                          )
+                          .slice(0, 5)
+                          .map(([key, value]) => (
+                            <div key={key} className="flex items-center text-[10px] h-[16px]">
+                              <span className="font-semibold text-[#6B4423] capitalize w-[85px] flex-shrink-0 truncate">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
+                              <span className="text-[#654321] truncate flex-1" title={String(value)}>{String(value)}</span>
+                            </div>
+                          ))
+                        }
+                        {getFilteredAttributes(gift).length > 5 && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setSelectedGiftForAttributes(gift)
+                              setIsAttributesModalOpen(true)
+                            }}
+                            className="text-left text-[10px] font-bold text-[#DAA520] hover:text-[#B8860B] cursor-pointer transition-colors h-[16px]"
+                          >
+                            +{getFilteredAttributes(gift).length - 5} more specs →
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-[#8B5A3C]/50 italic">No specifications available</p>
+                    )}
                   </div>
-                )}
+                </div>
                 </div>
 
                 {/* Action Buttons */}
@@ -728,20 +764,22 @@ export default function TrendingGiftsPage() {
                     <Heart className="w-3.5 h-3.5" />
                     <span>Add to My Wishlist</span>
                   </button>
-                  <button
-                    type="button"
-                    className="w-full px-4 py-2 text-white bg-gradient-to-r from-[#DC2626] to-[#EF4444] hover:from-[#EF4444] hover:to-[#DC2626] rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                    onClick={(e) => handleRemoveGift(e, gift)}
-                    disabled={removingGiftId === gift.id}
-                    title="Remove from Trending Gifts"
-                  >
-                    {removingGiftId === gift.id ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <Trash2 className="w-3.5 h-3.5" />
-                    )}
-                    <span>Remove</span>
-                  </button>
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      className="w-full px-4 py-2 text-red-600 hover:bg-red-50 bg-transparent border border-red-200 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={(e) => handleRemoveGift(e, gift)}
+                      disabled={removingGiftId === gift.id}
+                      title="Remove from Trending Gifts"
+                    >
+                      {removingGiftId === gift.id ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-3.5 h-3.5" />
+                      )}
+                      <span>Remove from Trending Gifts</span>
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -769,66 +807,88 @@ export default function TrendingGiftsPage() {
                   <div className="flex-1">
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex-1">
-                        <h3 className="text-lg font-bold text-[#654321] mb-1">{gift.giftName}</h3>
+                        {/* Title - Fixed 2 lines with ellipsis */}
+                        <h3 className="text-lg font-bold text-[#654321] mb-1 line-clamp-2 min-h-[3.5rem]" title={gift.giftName}>{gift.giftName}</h3>
                         {gift.source && <p className="text-sm text-[#8B4513]/70 mb-2">From {gift.source}</p>}
-                        {/* Product Specifications - List View */}
-                        {gift.attributes && Object.keys(gift.attributes).filter(key => 
-                          !['color', 'size', 'style', 'brand', 'sizeOptions', 'colorVariants', 'combinedVariants', 'styleOptions', 'styleName', 'patternName'].includes(key) &&
-                          gift.attributes![key] !== null && gift.attributes![key] !== undefined && gift.attributes![key] !== ''
-                        ).length > 0 && (
-                          <div className="mb-2">
-                            <p className="text-xs font-semibold text-[#6B4423] uppercase tracking-wide mb-1">Specifications</p>
-                            <div className="flex flex-col gap-1">
-                            {Object.entries(gift.attributes)
-                              .filter(([key, value]) => 
-                                !['color', 'size', 'style', 'brand', 'sizeOptions', 'colorVariants', 'combinedVariants', 'styleOptions', 'styleName', 'patternName'].includes(key) &&
-                                value !== null && value !== undefined && value !== ''
-                              )
-                              .slice(0, 5) // Show max 5 specs in card
-                              .map(([key, value]) => (
-                                <div key={key} className="flex items-center text-xs">
-                                  <span className="font-semibold text-[#6B4423] capitalize min-w-[120px]">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
-                                  <span className="text-[#654321] truncate" title={String(value)}>{String(value)}</span>
-                                </div>
-                              ))
-                            }
-                            {getFilteredAttributes(gift).length > 5 && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  setSelectedGiftForAttributes(gift)
-                                  setIsAttributesModalOpen(true)
-                                }}
-                                className="text-left text-xs font-semibold text-[#8B5A3C] hover:text-[#6B4423] cursor-pointer transition-colors"
-                              >
-                                +{getFilteredAttributes(gift).length - 5} more specifications
-                              </button>
-                            )}
+                        {/* Product Specifications - List View - Fixed height */}
+                        <div className="mb-2 h-[140px] bg-gradient-to-r from-[#6B4423]/5 to-[#8B5A3C]/5 rounded-lg p-2 border border-[#8B5A3C]/10 overflow-hidden">
+                          <p className="text-xs font-semibold text-[#6B4423] uppercase tracking-wide mb-1">Specifications</p>
+                          {gift.attributes && Object.keys(gift.attributes).filter(key => 
+                            !['color', 'size', 'style', 'brand', 'sizeOptions', 'colorVariants', 'combinedVariants', 'styleOptions', 'styleName', 'patternName'].includes(key) &&
+                            gift.attributes![key] !== null && gift.attributes![key] !== undefined && gift.attributes![key] !== ''
+                          ).length > 0 ? (
+                            <div className="flex flex-col gap-0.5">
+                              {Object.entries(gift.attributes)
+                                .filter(([key, value]) => 
+                                  !['color', 'size', 'style', 'brand', 'sizeOptions', 'colorVariants', 'combinedVariants', 'styleOptions', 'styleName', 'patternName'].includes(key) &&
+                                  value !== null && value !== undefined && value !== ''
+                                )
+                                .slice(0, 5)
+                                .map(([key, value]) => (
+                                  <div key={key} className="flex items-center text-[11px] h-[16px]">
+                                    <span className="font-semibold text-[#6B4423] capitalize w-[120px] flex-shrink-0 truncate">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
+                                    <span className="text-[#654321] truncate" title={String(value)}>{String(value)}</span>
+                                  </div>
+                                ))
+                              }
+                              {getFilteredAttributes(gift).length > 5 && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setSelectedGiftForAttributes(gift)
+                                    setIsAttributesModalOpen(true)
+                                  }}
+                                  className="text-left text-[11px] font-semibold text-[#DAA520] hover:text-[#B8860B] cursor-pointer transition-colors h-[16px]"
+                                >
+                                  +{getFilteredAttributes(gift).length - 5} more specs →
+                                </button>
+                              )}
                             </div>
-                          </div>
-                        )}
+                          ) : (
+                            <p className="text-xs text-[#8B5A3C]/50 italic">No specifications available</p>
+                          )}
+                        </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-4 flex-wrap">
                       {gift.category && (
-                        <span className="bg-gradient-to-r from-amber-100 to-orange-100 text-[#8B4513] px-2 py-1 rounded-full text-xs font-semibold">
+                        <span className="bg-gradient-to-r from-amber-100 to-orange-100 text-[#8B4513] px-3 py-1 rounded-full text-xs font-bold border border-amber-200">
                           {gift.category}
                         </span>
                       )}
                       {gift.rating && gift.rating > 0 && (
                         <div className="flex items-center gap-2">
                           <div className="flex items-center gap-0.5">
-                            {[1, 2, 3, 4, 5].map((star) => {
-                              const starValue = (gift.rating || 0) - star
-                              const isFilled = starValue >= 1 || (starValue > 0 && starValue >= 0.5)
+                            {[1, 2, 3, 4, 5].map((starPosition) => {
+                              const rating = gift.rating || 0
+                              const fillAmount = Math.max(0, Math.min(1, rating - (starPosition - 1)))
+                              const fillPercent = Math.round(fillAmount * 100)
+                              const gradientId = `star-list-${gift.id}-${starPosition}`
+                              
                               return (
-                                <Star
-                                  key={star}
-                                  className={`w-4 h-4 ${
-                                    isFilled ? "fill-[#F4C430] text-[#F4C430]" : "fill-gray-200 text-gray-300"
-                                  }`}
-                                />
+                                <svg
+                                  key={starPosition}
+                                  className="w-4 h-4"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  xmlns="http://www.w3.org/2000/svg"
+                                >
+                                  <defs>
+                                    <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
+                                      <stop offset={`${fillPercent}%`} stopColor="#F4C430" />
+                                      <stop offset={`${fillPercent}%`} stopColor="#E5E7EB" />
+                                    </linearGradient>
+                                  </defs>
+                                  <path
+                                    d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"
+                                    fill={`url(#${gradientId})`}
+                                    stroke="#F4C430"
+                                    strokeWidth="1"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  />
+                                </svg>
                               )
                             })}
                           </div>
@@ -899,23 +959,22 @@ export default function TrendingGiftsPage() {
                       <Heart className="w-4 h-4" />
                       <span>Add to My Wishlist</span>
                     </button>
-                    <button
-                      type="button"
-                      style={{
-                        background: 'linear-gradient(to right, #DC2626, #EF4444)',
-                      }}
-                      className="w-full px-4 py-2 text-white rounded-lg font-semibold hover:shadow-lg transition-all flex items-center justify-center gap-1.5 border-0 hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-                      onClick={(e) => handleRemoveGift(e, gift)}
-                      disabled={removingGiftId === gift.id}
-                      title="Remove from Trending Gifts"
-                    >
-                      {removingGiftId === gift.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="w-4 h-4" />
-                      )}
-                      <span>Remove</span>
-                    </button>
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        className="w-full px-4 py-2 text-red-600 hover:bg-red-50 bg-transparent border border-red-200 rounded-lg font-semibold transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                        onClick={(e) => handleRemoveGift(e, gift)}
+                        disabled={removingGiftId === gift.id}
+                        title="Remove from Trending Gifts"
+                      >
+                        {removingGiftId === gift.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
+                        <span>Remove from Trending Gifts</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -947,30 +1006,28 @@ export default function TrendingGiftsPage() {
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header - Same style as Home Page header */}
-              <div className="bg-gradient-to-r from-[#6B4423] via-[#8B5A3C] to-[#6B4423] p-4 border-b-2 border-[#4A2F1A]">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 pr-4">
-                    <h3 className="text-lg font-bold text-[#F5DEB3] line-clamp-2">
-                      {selectedGiftForAttributes.giftName}
-                    </h3>
-                    <p className="text-sm text-[#DAA520] mt-1 font-semibold">Product Specifications</p>
-                  </div>
-                  <button
-                    onClick={() => {
-                      setIsAttributesModalOpen(false)
-                      setSelectedGiftForAttributes(null)
-                    }}
-                    className="p-1 hover:bg-[#4A2F1A] rounded-full transition-colors"
-                  >
-                    <X className="w-5 h-5 text-[#F5DEB3]" />
-                  </button>
+              <div className="bg-gradient-to-r from-[#6B4423] via-[#8B5A3C] to-[#6B4423] p-4 border-b-2 border-[#4A2F1A] relative">
+                <button
+                  onClick={() => {
+                    setIsAttributesModalOpen(false)
+                    setSelectedGiftForAttributes(null)
+                  }}
+                  className="absolute right-3 top-3 p-1 hover:bg-[#4A2F1A] rounded-full transition-colors"
+                >
+                  <X className="w-5 h-5 text-[#F5DEB3]" />
+                </button>
+                <div className="text-center px-8">
+                  <h3 className="text-lg font-bold text-[#F5DEB3] line-clamp-2">
+                    {selectedGiftForAttributes.giftName}
+                  </h3>
+                  <p className="text-sm text-[#DAA520] mt-1 font-semibold">Additional Specifications</p>
                 </div>
               </div>
 
-              {/* Attributes List */}
+              {/* Attributes List - Only show specs not displayed in card (after first 5) */}
               <div className="p-4 overflow-y-auto max-h-[60vh] bg-gradient-to-b from-[#F5F1E8] to-white">
                 <div className="grid grid-cols-1 gap-3">
-                  {getFilteredAttributes(selectedGiftForAttributes).map(([key, value]) => (
+                  {getFilteredAttributes(selectedGiftForAttributes).slice(5).map(([key, value]) => (
                     <div 
                       key={key} 
                       className="bg-gradient-to-r from-[#6B4423]/10 via-[#8B5A3C]/10 to-[#6B4423]/10 rounded-lg p-3 border border-[#8B5A3C]/20"
@@ -985,18 +1042,15 @@ export default function TrendingGiftsPage() {
                   ))}
                 </div>
 
-                {getFilteredAttributes(selectedGiftForAttributes).length === 0 && (
+                {getFilteredAttributes(selectedGiftForAttributes).slice(5).length === 0 && (
                   <div className="text-center py-8 text-[#8B5A3C]">
-                    No specifications available for this product.
+                    No additional specifications available.
                   </div>
                 )}
               </div>
 
-              {/* Footer */}
-              <div className="h-[120px] w-full bg-gradient-to-r from-[#6B4423] via-[#8B5A3C] to-[#6B4423] border-t-2 border-[#4A2F1A] flex items-center justify-center">
-                <span className="text-xs text-[#DAA520] font-medium">
-                  {getFilteredAttributes(selectedGiftForAttributes).length} specifications
-                </span>
+              {/* Footer - 512 x 50 */}
+              <div className="w-[512px] h-[50px] bg-gradient-to-r from-[#6B4423] via-[#8B5A3C] to-[#6B4423] border-t-2 border-[#4A2F1A]">
               </div>
             </div>
           </div>

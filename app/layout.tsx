@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import { Poppins, Inter, Shadows_Into_Light, Kalam, Dancing_Script, Pacifico } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import { Toaster } from "@/components/ui/toaster"
+import { Toaster as SonnerToaster } from "sonner"
 import { AuthProvider } from "@/lib/auth-context"
 import "./globals.css"
 
@@ -77,6 +78,17 @@ export default function RootLayout({
         <AuthProvider>
           {children}
           <Toaster />
+          <SonnerToaster 
+            position="top-right" 
+            richColors 
+            closeButton
+            toastOptions={{
+              style: {
+                background: '#F5F1E8',
+                border: '1px solid #DAA520',
+              },
+            }}
+          />
           <Analytics />
         </AuthProvider>
       </body>
