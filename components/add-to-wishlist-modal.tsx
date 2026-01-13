@@ -1,9 +1,11 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
+import { ToastAction } from "@/components/ui/toast"
 import {
   Loader2,
   CheckCircle,
@@ -11,6 +13,8 @@ import {
   ArrowRight,
   X,
   Heart,
+  Plus,
+  Trash2,
 } from "lucide-react"
 
 interface Gift {
@@ -62,10 +66,12 @@ const addAffiliateTag = (url: string): string => {
 
 export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModalProps) {
   const { toast } = useToast()
+  const router = useRouter()
   const [step, setStep] = useState<1 | 2>(1)
   const [extractedProduct, setExtractedProduct] = useState<ExtractedProduct | null>(null)
   const [isExtracting, setIsExtracting] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const savingRef = useRef(false) // Extra protection against double submissions
   const [hasOpenedRetailer, setHasOpenedRetailer] = useState(false)
   const [variantPreference, setVariantPreference] = useState<"Ideal" | "Alternative" | "Nice to have" | "">("")
   const [preferenceError, setPreferenceError] = useState<string>("")
@@ -77,11 +83,14 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
   
   // I Wish preference options (Green) - dynamic key-value store
   const [likeAttributes, setLikeAttributes] = useState<Record<string, string>>({})
-  const [likeSelected, setLikeSelected] = useState(true) // Expanded by default
+  const [likeSelected, setLikeSelected] = useState(true) // Expanded by default (required)
 
   // Alternative preference options (Orange) - dynamic key-value store
   const [altAttributes, setAltAttributes] = useState<Record<string, string>>({})
-  const [altSelected, setAltSelected] = useState(true) // Expanded by default
+  const [altSelected, setAltSelected] = useState(false) // Collapsed by default (optional)
+  
+  // Ok to Buy section - collapsed by default
+  const [okToBuyExpanded, setOkToBuyExpanded] = useState(false)
   
   // Legacy state for backward compatibility (will be deprecated)
   const [likeSize, setLikeSize] = useState("")
@@ -94,13 +103,15 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
   const [altConfiguration, setAltConfiguration] = useState("")
   
   // Track which preference is awaiting extension data
-  const [awaitingExtensionFor, setAwaitingExtensionFor] = useState<"like" | "alt" | null>(null)
+  const [awaitingExtensionFor, setAwaitingExtensionFor] = useState<"like" | "alt" | "ok" | null>(null)
   
   // Clipped product data from extension - separate for each preference
   const [likeClippedImage, setLikeClippedImage] = useState<string | null>(null)
   const [likeClippedTitle, setLikeClippedTitle] = useState<string | null>(null)
   const [altClippedImage, setAltClippedImage] = useState<string | null>(null)
   const [altClippedTitle, setAltClippedTitle] = useState<string | null>(null)
+  const [okClippedImage, setOkClippedImage] = useState<string | null>(null)
+  const [okClippedTitle, setOkClippedTitle] = useState<string | null>(null)
   
   // Ok to buy preference options (Coral)
   const [okSize, setOkSize] = useState("")
@@ -108,6 +119,15 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
   const [okStyle, setOkStyle] = useState("")
   const [okConfiguration, setOkConfiguration] = useState("")
   const [okSelected, setOkSelected] = useState(false)
+  const [okAttributes, setOkAttributes] = useState<Record<string, string>>({})
+
+  // Custom fields and notes for I Wish
+  const [likeCustomFields, setLikeCustomFields] = useState<Array<{ id: string; key: string; value: string }>>([])
+  const [likeNotes, setLikeNotes] = useState("")
+  
+  // Custom fields and notes for Alternative
+  const [altCustomFields, setAltCustomFields] = useState<Array<{ id: string; key: string; value: string }>>([])
+  const [altNotes, setAltNotes] = useState("")
 
   // Reset when modal closes
   useEffect(() => {
@@ -119,6 +139,9 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
       setLikeClippedTitle(null)
       setAltClippedImage(null)
       setAltClippedTitle(null)
+      setOkClippedImage(null)
+      setOkClippedTitle(null)
+      setOkAttributes({})
       setVariantPreference("")
       setPreferenceError("")
       setPastedUrl("")
@@ -126,23 +149,29 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
       setAvailableAttributes([])
       setLikeAttributes({})
       setAltAttributes({})
+      // Reset custom fields and notes
+      setLikeCustomFields([])
+      setLikeNotes("")
+      setAltCustomFields([])
+      setAltNotes("")
       // Reset I Like options (legacy)
       setLikeSize("")
       setLikeColor("")
       setLikeStyle("")
       setLikeConfiguration("")
-      setLikeSelected(true) // Keep expanded by default
+      setLikeSelected(true) // Keep expanded by default (required)
       // Reset Alternative options (legacy)
       setAltSize("")
       setAltColor("")
       setAltStyle("")
       setAltConfiguration("")
-      setAltSelected(true) // Keep expanded by default
+      setAltSelected(false) // Collapsed by default (optional)
       // Reset Ok to buy options
       setOkSize("")
       setOkColor("")
       setOkStyle("")
       setOkConfiguration("")
+      setOkToBuyExpanded(false) // Collapsed by default
       setOkSelected(false)
       // Reset awaiting extension state
       setAwaitingExtensionFor(null)
@@ -250,8 +279,9 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
               
               console.log('[Modal] ✅ Filled I wish fields with extension data:', normalizedAttributes)
               toast({
-                title: "Options Received! 🐝",
+                title: "🐝 Options Received!",
                 description: "I Wish options auto-filled from Wishbee extension.",
+                variant: "warm",
               })
             } else if (awaitingExtensionFor === "alt") {
               console.log('[Modal] ========== ALTERNATIVE DATA RECEIVED ==========')
@@ -284,8 +314,42 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
               console.log('[Modal] === END ALTERNATIVE ===')
               
               toast({
-                title: "Options Received! 🐝",
+                title: "🐝 Options Received!",
                 description: "Alternative options auto-filled from Wishbee extension.",
+                variant: "warm",
+              })
+            } else if (awaitingExtensionFor === "ok") {
+              console.log('[Modal] ========== OK TO BUY DATA RECEIVED ==========')
+              console.log('[Modal] OK - Image URL:', data.image)
+              console.log('[Modal] OK - Timestamp:', data.timestamp)
+              
+              // Update clipped image and title for Ok to Buy
+              if (data.image) {
+                console.log('[Modal] ✅ Setting okClippedImage:', data.image)
+                setOkClippedImage(data.image)
+              }
+              if (data.title) {
+                console.log('[Modal] Setting okClippedTitle:', data.title.substring(0, 50))
+                setOkClippedTitle(data.title)
+              }
+              
+              // Auto-fill Ok to Buy fields with normalized attributes
+              setOkAttributes(normalizedAttributes)
+              
+              // Also set legacy fields for backward compatibility
+              if (normalizedAttributes['Size']) setOkSize(normalizedAttributes['Size'])
+              if (normalizedAttributes['Color']) setOkColor(normalizedAttributes['Color'])
+              if (normalizedAttributes['Style']) setOkStyle(normalizedAttributes['Style'])
+              if (normalizedAttributes['Configuration']) setOkConfiguration(normalizedAttributes['Configuration'])
+              setOkSelected(true)
+              
+              console.log('[Modal] ✅ Filled Ok to Buy fields with extension data:', normalizedAttributes)
+              console.log('[Modal] === END OK TO BUY ===')
+              
+              toast({
+                title: "🐝 Options Received!",
+                description: "Ok to Buy options auto-filled from Wishbee extension.",
+                variant: "warm",
               })
             }
             
@@ -308,6 +372,10 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
                 if (data.image) setAltClippedImage(data.image)
                 if (data.title) setAltClippedTitle(data.title)
                 setAltSelected(true)
+              } else if (awaitingExtensionFor === "ok") {
+                if (data.image) setOkClippedImage(data.image)
+                if (data.title) setOkClippedTitle(data.title)
+                setOkSelected(true)
               }
               setAwaitingExtensionFor(null)
               toast({
@@ -511,6 +579,12 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
   }
 
   const handleAddToWishlist = async () => {
+    // Prevent multiple submissions using both state and ref
+    if (isSaving || savingRef.current) {
+      console.log('[AddToWishlist] Already saving, ignoring duplicate call')
+      return
+    }
+
     if (!extractedProduct || !gift) {
       toast({
         title: "Error",
@@ -526,7 +600,10 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
       return
     }
 
+    // Set both state and ref to prevent double submissions
+    savingRef.current = true
     setIsSaving(true)
+    console.log('[AddToWishlist] Starting to add product:', extractedProduct.productName)
 
     try {
       // Get or create a default wishlist
@@ -558,32 +635,53 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
         throw new Error("Failed to get or create wishlist")
       }
 
-      // Build preference options object
+      // Helper to validate and clean option values (filter out garbage data)
+      const cleanOptionValue = (value: string | null | undefined): string | null => {
+        if (!value) return null
+        const str = value.toString().trim()
+        // Filter out garbage: too long, contains invalid patterns
+        if (str.length > 100) return null
+        if (str.length === 0) return null
+        const garbagePatterns = [
+          'stars', 'rating', 'review', 'cart', 'slide', 'percent', 
+          'protection plan', 'about this', 'add to', 'widget', 
+          'feedback', 'out of 5', 'customer', 'items in'
+        ]
+        const lowerStr = str.toLowerCase()
+        if (garbagePatterns.some(p => lowerStr.includes(p))) return null
+        return str
+      }
+
+      // Build preference options object with cleaned values
       const preferenceOptions = {
         iLike: likeSelected ? {
-          size: likeSize || null,
-          color: likeColor || null,
-          style: likeStyle || null,
-          configuration: likeConfiguration || null,
+          size: cleanOptionValue(likeSize),
+          color: cleanOptionValue(likeColor),
+          style: cleanOptionValue(likeStyle),
+          configuration: cleanOptionValue(likeConfiguration),
+          customFields: likeCustomFields.filter(f => f.key && f.value).map(f => ({ key: f.key, value: f.value })),
+          notes: likeNotes.trim() || null,
         } : null,
         alternative: altSelected ? {
-          size: altSize || null,
-          color: altColor || null,
-          style: altStyle || null,
-          configuration: altConfiguration || null,
+          size: cleanOptionValue(altSize),
+          color: cleanOptionValue(altColor),
+          style: cleanOptionValue(altStyle),
+          configuration: cleanOptionValue(altConfiguration),
+          customFields: altCustomFields.filter(f => f.key && f.value).map(f => ({ key: f.key, value: f.value })),
+          notes: altNotes.trim() || null,
         } : null,
         okToBuy: okSelected ? {
-          size: okSize || null,
-          color: okColor || null,
-          style: okStyle || null,
-          configuration: okConfiguration || null,
+          size: cleanOptionValue(okSize),
+          color: cleanOptionValue(okColor),
+          style: cleanOptionValue(okStyle),
+          configuration: cleanOptionValue(okConfiguration),
         } : null,
       }
 
       // Determine primary preference (priority: I Wish > Alternative > Ok to buy)
       const primaryPreference = likeSelected ? "Ideal" : altSelected ? "Alternative" : "Nice to have"
 
-      // Prepare wishlist item data
+      // Prepare wishlist item data - include ALL relevant fields from gift
       const wishlistItemData = {
         wishlistId,
         productName: extractedProduct.productName,
@@ -600,23 +698,61 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
         quantity: 1,
         preferenceOptions: JSON.stringify(preferenceOptions),
         variantPreference: primaryPreference,
+        // Include rating and reviews from gift
+        review_star: gift.rating || null,
+        review_count: gift.reviewCount || null,
+        // Include badges and original price in description data
+        badges: {
+          amazonChoice: gift.amazonChoice || false,
+          bestSeller: gift.bestSeller || false,
+          overallPick: gift.overallPick || false,
+        },
+        originalPrice: gift.originalPrice || null,
+        // Include specifications from gift attributes
+        specifications: gift.attributes || null,
       }
 
+      console.log('[AddToWishlist] Sending API request...')
       const response = await fetch("/api/wishlists/items", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(wishlistItemData),
       })
 
+      console.log('[AddToWishlist] API response status:', response.status)
+
       if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || "Failed to add to wishlist")
+        const errorData = await response.json()
+        
+        // Handle duplicate product case (409 Conflict)
+        if (response.status === 409) {
+          toast({
+            title: "🐝 Already in Wishlist",
+            description: "This product is already in your wishlist",
+            className: "bg-gradient-to-r from-[#FEF3C7] via-[#FDE68A] to-[#FCD34D] border-2 border-[#F59E0B] text-[#92400E]",
+          })
+          onClose()
+          return
+        }
+        
+        throw new Error(errorData.error || "Failed to add to wishlist")
       }
+      
+      console.log('[AddToWishlist] Successfully added to wishlist')
 
       toast({
         title: "✓ Added to My Wishlist",
-        description: `${extractedProduct.productName} has been added to your wishlist!`,
+        description: `${extractedProduct.productName.length > 50 ? extractedProduct.productName.substring(0, 50) + '...' : extractedProduct.productName} has been added!`,
         variant: "success",
+        action: (
+          <ToastAction
+            altText="View Wishlist"
+            onClick={() => router.push('/wishlist')}
+            className="bg-black text-white hover:bg-gray-800 border-black"
+          >
+            View Wishlist
+          </ToastAction>
+        ),
       })
 
       onClose()
@@ -628,6 +764,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
         variant: "destructive",
       })
     } finally {
+      savingRef.current = false
       setIsSaving(false)
     }
   }
@@ -665,9 +802,9 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
               </div>
             ) : (
               <>
-                {/* Product Name */}
+                {/* Product Name - 2 lines max with ellipsis */}
                 {extractedProduct && (
-                  <p className="text-sm font-bold text-[#4A2F1A] line-clamp-3 mb-4">
+                  <p className="text-sm font-bold text-[#4A2F1A] line-clamp-2 mb-4" title={extractedProduct.productName}>
                     {extractedProduct.productName}
                   </p>
                 )}
@@ -677,7 +814,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
                 <div className="space-y-3">
                   <p className="text-xs text-[#6B4423] mb-2">Select your preferred options for each preference level:</p>
 
-{/* I Wish Option Card - Golden Honey (Primary Brand Color) */}
+{/* I Wish Option Card - Golden Honey (Primary Brand Color) - REQUIRED */}
                   <div
                     className={`rounded-lg border-2 transition-all duration-200 ${
                       likeSelected
@@ -686,9 +823,12 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
                     }`}
                   >
                     <div className="w-full p-3 flex items-center justify-between">
-                      <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321]">
-                        ⭐ I Wish
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-gradient-to-r from-[#B8860B] via-[#DAA520] to-[#F4C430] text-white flex items-center gap-1 shadow-sm">
+                          <Heart className="w-3 h-3 fill-red-500 text-red-500" /> I Wish
+                        </span>
+                        <span className="text-[10px] text-red-500 font-medium">* Required</span>
+                      </div>
                       <button
                         type="button"
                         onClick={() => {
@@ -699,17 +839,17 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
                             setAwaitingExtensionFor("like")
                           }
                         }}
-                        className="text-xs text-[#DAA520] font-semibold hover:underline flex items-center gap-1"
+                        className="text-[10px] text-[#4A2F1A] font-medium hover:underline flex items-center gap-1"
                       >
-                        <ExternalLink className="w-3 h-3" />
-                        Select
+                        <ExternalLink className="w-2.5 h-2.5" />
+                        Select on Retailer
                       </button>
                     </div>
                     
                     {likeSelected && (
                       <div className="px-3 pb-3 space-y-2">
                         <p className="text-[10px] text-[#8B6914] bg-[#DAA520]/10 px-2 py-1 rounded-md border border-[#DAA520]/20 italic mb-2">
-                          💡 Click Select to open the product page → choose your preferred options → use the Wishbee extension to clip and auto-fill the information below.
+                          💡 Click Select on Retailer to open the product page → choose your preferred options → use the Wishbee extension to clip and auto-fill the information below.
                           {awaitingExtensionFor === "like" && " ⏳ Waiting for extension..."}
                         </p>
                         {/* Product Image & Options Row */}
@@ -743,11 +883,79 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
                             )}
                           </div>
                         </div>
+
+                        {/* Custom Fields Section */}
+                        {likeCustomFields.length > 0 && (
+                          <div className="space-y-1.5 mt-2">
+                            {likeCustomFields.map((field) => (
+                              <div key={field.id} className="flex items-center gap-2">
+                                <input
+                                  type="text"
+                                  value={field.key}
+                                  onChange={(e) => setLikeCustomFields(prev => 
+                                    prev.map(f => f.id === field.id ? { ...f, key: e.target.value } : f)
+                                  )}
+                                  placeholder="Field name"
+                                  className="w-20 px-2 py-1 text-xs border border-[#DAA520]/30 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-[#DAA520] text-[#4A2F1A]"
+                                />
+                                <input
+                                  type="text"
+                                  value={field.value}
+                                  onChange={(e) => setLikeCustomFields(prev => 
+                                    prev.map(f => f.id === field.id ? { ...f, value: e.target.value } : f)
+                                  )}
+                                  placeholder="Value"
+                                  className="flex-1 px-2 py-1 text-xs border border-[#DAA520]/30 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-[#DAA520] text-[#4A2F1A]"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setLikeCustomFields(prev => prev.filter(f => f.id !== field.id))}
+                                  className="p-1 text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Add Custom Field Button */}
+                        <button
+                          type="button"
+                          onClick={() => setLikeCustomFields(prev => [...prev, { id: Date.now().toString(), key: '', value: '' }])}
+                          className="flex items-center gap-1 text-[10px] text-[#8B6914] hover:text-[#654321] font-medium mt-1"
+                        >
+                          <Plus className="w-3 h-3" />
+                          Add Custom Field
+                        </button>
+
+                        {/* Notes Section */}
+                        <div className="mt-2">
+                          <div className="flex items-center justify-between mb-1">
+                            <Label className="text-xs text-[#6B4423] font-medium">Notes</Label>
+                            {likeNotes && (
+                              <button
+                                type="button"
+                                onClick={() => setLikeNotes("")}
+                                className="p-0.5 text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                          <textarea
+                            value={likeNotes}
+                            onChange={(e) => setLikeNotes(e.target.value)}
+                            placeholder="Add any special notes or instructions..."
+                            className="w-full px-2 py-1.5 text-xs border border-[#DAA520]/30 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-[#DAA520] text-[#4A2F1A] resize-none"
+                            rows={2}
+                          />
+                        </div>
                       </div>
                     )}
                   </div>
 
-{/* Alternative Option Card - Warm Amber */}
+{/* Alternative Option Card - Warm Amber - OPTIONAL */}
                   <div
                     className={`rounded-lg border-2 transition-all duration-200 ${
                       altSelected
@@ -755,13 +963,20 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
                         : "border-[#8B5A3C]/20 bg-white/50 hover:border-[#D97706]/50"
                     }`}
                   >
-                    <div className="w-full p-3 flex items-center justify-between">
-                      <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-gradient-to-r from-[#D97706] to-[#F59E0B] text-white">
-                        ✓ Alternative
-                      </span>
+                    <div 
+                      className="w-full p-3 flex items-center justify-between cursor-pointer"
+                      onClick={() => setAltSelected(!altSelected)}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-gradient-to-r from-[#D97706] to-[#F59E0B] text-white">
+                          ✓ Alternative
+                        </span>
+                        <span className="text-[10px] text-gray-500 font-medium">Optional</span>
+                      </div>
                       <button
                         type="button"
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation()
                           if (extractedProduct?.productLink) {
                             const url = addAffiliateTag(extractedProduct.productLink)
                             window.open(url, '_blank')
@@ -769,17 +984,17 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
                             setAwaitingExtensionFor("alt")
                           }
                         }}
-                        className="text-xs text-[#D97706] font-semibold hover:underline flex items-center gap-1"
+                        className="text-[10px] text-[#4A2F1A] font-medium hover:underline flex items-center gap-1"
                       >
-                        <ExternalLink className="w-3 h-3" />
-                        Select
+                        <ExternalLink className="w-2.5 h-2.5" />
+                        Select on Retailer
                       </button>
                     </div>
                     
                     {altSelected && (
                       <div className="px-3 pb-3 space-y-2">
                         <p className="text-[10px] text-[#92400E] bg-[#D97706]/10 px-2 py-1 rounded-md border border-[#D97706]/20 italic mb-2">
-                          💡 Click Select to open the product page → choose your preferred options → use the Wishbee extension to clip and auto-fill the information below.
+                          💡 If the primary option is unavailable, this is an acceptable alternative.
                           {awaitingExtensionFor === "alt" && " ⏳ Waiting for extension..."}
                         </p>
                         {/* Product Image & Options Row */}
@@ -813,18 +1028,83 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
                             )}
                           </div>
                         </div>
+                        
+                        {/* Custom Fields Section for Alternative */}
+                        {altCustomFields.length > 0 && (
+                          <div className="space-y-1.5 mt-2">
+                            {altCustomFields.map((field) => (
+                              <div key={field.id} className="flex items-center gap-2">
+                                <input
+                                  type="text"
+                                  value={field.key}
+                                  onChange={(e) => setAltCustomFields(prev => prev.map(f => f.id === field.id ? { ...f, key: e.target.value } : f))}
+                                  placeholder="Field name"
+                                  className="w-24 px-2 py-1 text-xs border border-[#D97706]/30 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-[#D97706] text-[#4A2F1A]"
+                                />
+                                <input
+                                  type="text"
+                                  value={field.value}
+                                  onChange={(e) => setAltCustomFields(prev => prev.map(f => f.id === field.id ? { ...f, value: e.target.value } : f))}
+                                  placeholder="Value"
+                                  className="flex-1 px-2 py-1 text-xs border border-[#D97706]/30 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-[#D97706] text-[#4A2F1A]"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setAltCustomFields(prev => prev.filter(f => f.id !== field.id))}
+                                  className="p-1 text-red-500 hover:text-red-700 transition-colors"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Add Custom Field Button for Alternative */}
+                        <button
+                          type="button"
+                          onClick={() => setAltCustomFields(prev => [...prev, { id: Date.now().toString(), key: '', value: '' }])}
+                          className="flex items-center gap-1 text-[10px] text-[#92400E] hover:text-[#78350F] font-medium mt-1"
+                        >
+                          <Plus className="w-3 h-3" />
+                          Add Custom Field
+                        </button>
+
+                        {/* Notes Section for Alternative */}
+                        <div className="mt-2">
+                          <div className="flex items-center justify-between mb-1">
+                            <Label className="text-xs text-[#6B4423] font-medium">Notes</Label>
+                            {altNotes && (
+                              <button
+                                type="button"
+                                onClick={() => setAltNotes("")}
+                                className="p-0.5 text-red-500 hover:text-red-700 transition-colors"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                          <textarea
+                            value={altNotes}
+                            onChange={(e) => setAltNotes(e.target.value)}
+                            placeholder="Add any special notes or instructions..."
+                            className="w-full px-2 py-1.5 text-xs border border-[#D97706]/30 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-[#D97706] text-[#4A2F1A] resize-none"
+                            rows={2}
+                          />
+                        </div>
                       </div>
                     )}
                   </div>
 
-{/* Ok to Buy Option Card - Warm Terracotta */}
-                  <div className="rounded-lg border-2 border-[#C2410C] bg-gradient-to-r from-[#C2410C]/15 to-[#EA580C]/15">
+{/* Ok to Buy Option Card - Warm Terracotta - Simple info only */}
+                  <div className="rounded-lg border-2 border-[#8B5A3C]/20 bg-white/50">
                     <div className="w-full p-3">
-                      <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-gradient-to-r from-[#C2410C] to-[#EA580C] text-white">
-                        💫 Ok to buy
-                      </span>
-                    </div>
-                    <div className="px-3 pb-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-gradient-to-r from-[#C2410C] to-[#EA580C] text-white">
+                          💫 Ok to Buy
+                        </span>
+                        <span className="text-[10px] text-gray-500 font-medium">Optional</span>
+                      </div>
                       <p className="text-[10px] text-[#9A3412] bg-[#C2410C]/10 px-2 py-1.5 rounded-md border border-[#C2410C]/20 italic">
                         💡 You may purchase this product from another retailer, as long as it aligns with the "I Wish" or "Alternative" preferences.
                       </p>

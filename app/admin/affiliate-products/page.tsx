@@ -889,13 +889,15 @@ export default function AdminAffiliateProductsPage() {
           : (formData.productLink || extractedProduct.productLink || "").trim() || undefined,
         amazonChoice: extractedProduct?.amazonChoice ?? formData.amazonChoice,
         bestSeller: extractedProduct?.bestSeller ?? formData.bestSeller,
-        // Include ALL product specifications/attributes dynamically (excluding color, size, style variants)
+        // Include ALL product specifications/attributes dynamically
         attributes: (() => {
           // Start with all extracted attributes
           const attrs: Record<string, any> = { ...extractedProduct.attributes }
           
-          // Remove color/size/style variants (we filter these out)
-          const excludeKeys = ['color', 'size', 'style', 'sizeOptions', 'colorVariants', 'combinedVariants', 'styleOptions', 'styleName', 'patternName']
+          // Remove single-value color/size/style (not useful for display)
+          // BUT KEEP the variant arrays (colorVariants, sizeOptions, styleOptions, combinedVariants)
+          // so we can determine if product has multiple options to choose from
+          const excludeKeys = ['color', 'size', 'style', 'styleName', 'patternName']
           excludeKeys.forEach(key => delete attrs[key])
           
           // Add product attributes from the dynamic list

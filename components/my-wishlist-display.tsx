@@ -4,10 +4,30 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Sparkles, Share2, Trash2, ShoppingCart, AlertCircle, Plus } from "lucide-react"
+import { Sparkles, Share2, Trash2, ShoppingCart, AlertCircle, Plus, Pencil, X, Check, ExternalLink, Heart } from "lucide-react"
 import Image from "next/image"
 import { useToast } from "@/hooks/use-toast"
 import Link from "next/link"
+
+interface PreferenceOption {
+  [key: string]: string | null | undefined | Array<{ key: string; value: string }>  // Dynamic variant keys
+  image?: string | null
+  title?: string | null
+  customFields?: Array<{ key: string; value: string }>
+  notes?: string | null
+}
+
+interface PreferenceOptions {
+  iLike?: PreferenceOption | null
+  alternative?: PreferenceOption | null
+  okToBuy?: PreferenceOption | null
+}
+
+interface Badges {
+  amazonChoice?: boolean
+  bestSeller?: boolean
+  overallPick?: boolean
+}
 
 interface WishlistItem {
   id: string
@@ -15,7 +35,8 @@ interface WishlistItem {
   quantity: number
   productImageUrl: string
   giftName: string
-  currentPrice: number
+  currentPrice: number      // Sale price (what you pay)
+  originalPrice?: number    // List price (original/strikethrough price)
   storeName: string
   description: string
   category?: string
@@ -24,6 +45,12 @@ interface WishlistItem {
   }
   stockStatus: string
   addedDate: string
+  preferenceType?: string   // "Ideal", "Alternative", "Nice to have"
+  preferenceOptions?: PreferenceOptions
+  rating?: number           // Star rating (0-5)
+  reviewCount?: number      // Number of reviews
+  badges?: Badges           // Amazon badges
+  specifications?: Record<string, any>  // Product specifications
 }
 
 interface AIInsight {
@@ -39,6 +66,15 @@ export function MyWishlistDisplay() {
   const [aiInsights, setAiInsights] = useState<AIInsight | null>(null)
   const [isLoadingInsights, setIsLoadingInsights] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  
+  // State for editing I Wish preferences
+  const [editingItemId, setEditingItemId] = useState<string | null>(null)
+  const [editedPreferences, setEditedPreferences] = useState<{
+    color: string
+    size: string
+    style: string
+    configuration: string
+  }>({ color: '', size: '', style: '', configuration: '' })
 
   // Fetch wishlist items from database
   useEffect(() => {
@@ -72,17 +108,42 @@ export function MyWishlistDisplay() {
 
         // Transform database items to component format
         const transformedItems: WishlistItem[] = dbItems.map((item: any) => {
-          // Extract store name from URL
-          let storeName = "Unknown Store"
+          // Parse description field for stored metadata
+          let descriptionData: any = {}
           try {
-            if (item.product_url) {
+            if (item.description) {
+              descriptionData = JSON.parse(item.description)
+            }
+          } catch (e) {
+            // Not JSON, keep as string
+            descriptionData = { text: item.description }
+          }
+
+          // Extract store name from description data or URL
+          let storeName = descriptionData.storeName || "Unknown Store"
+          if (storeName === "Unknown Store" && item.product_url) {
+            try {
               const urlObj = new URL(item.product_url)
               storeName = urlObj.hostname.replace("www.", "").split(".")[0]
               storeName = storeName.charAt(0).toUpperCase() + storeName.slice(1)
+            } catch (e) {
+              // Keep default storeName
             }
-          } catch (e) {
-            // Keep default storeName
+          } else {
+            // Capitalize store name
+            storeName = storeName.charAt(0).toUpperCase() + storeName.slice(1)
           }
+
+          // Get prices - list_price is the current/sale price, originalPrice from description is the list price
+          const currentPrice = item.list_price ? item.list_price / 100 : 0
+          const originalPrice = descriptionData.originalPrice ? descriptionData.originalPrice : undefined
+          
+          // Get rating and review count from API response
+          const rating = item.review_star || null
+          const reviewCount = item.review_count || null
+          
+          // Get badges from description data
+          const badges = descriptionData.badges || undefined
 
           return {
             id: item.id,
@@ -90,13 +151,20 @@ export function MyWishlistDisplay() {
             quantity: 1,
             productImageUrl: item.image_url || "/placeholder.svg",
             giftName: item.title || "Untitled Item",
-            currentPrice: item.list_price ? item.list_price / 100 : 0, // Convert from cents
+            currentPrice,
+            originalPrice,
             storeName,
-            description: item.description || "",
+            description: descriptionData.text || "",
             category: undefined,
-            attributes: {}, // Can be extended later
+            attributes: {},
             stockStatus: "In Stock",
             addedDate: item.created_at ? new Date(item.created_at).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
+            preferenceType: descriptionData.preferenceType,
+            preferenceOptions: descriptionData.preferenceOptions,
+            rating,
+            reviewCount,
+            badges,
+            specifications: descriptionData.specifications || undefined,
           }
         })
 
@@ -185,8 +253,9 @@ export function MyWishlistDisplay() {
       if (response.ok) {
         setWishlistItems((prev) => prev.filter((item) => item.id !== id))
         toast({
-          title: "Item Removed",
-          description: "Item removed from your wishlist",
+          title: "🗑️ Item Removed Successfully",
+          description: "The item has been removed from your wishlist. You can always add it back later!",
+          className: "bg-gradient-to-r from-gray-800 to-gray-900 text-white border-none shadow-xl",
         })
         // Insights will be updated automatically via useEffect when wishlistItems changes
       } else {
@@ -195,11 +264,86 @@ export function MyWishlistDisplay() {
     } catch (error) {
       console.error("Error deleting item:", error)
       toast({
-        title: "Delete Failed",
-        description: "Could not remove item from wishlist",
+        title: "❌ Delete Failed",
+        description: "Could not remove item from wishlist. Please try again.",
         variant: "destructive",
       })
     }
+  }
+
+  // Start editing I Wish preferences for an item
+  const startEditingPreferences = (item: WishlistItem) => {
+    setEditingItemId(item.id)
+    const iLike = item.preferenceOptions?.iLike
+    setEditedPreferences({
+      color: iLike?.color || '',
+      size: iLike?.size || '',
+      style: iLike?.style || '',
+      configuration: iLike?.configuration || '',
+    })
+  }
+
+  // Cancel editing
+  const cancelEditingPreferences = () => {
+    setEditingItemId(null)
+    setEditedPreferences({ color: '', size: '', style: '', configuration: '' })
+  }
+
+  // Save edited preferences
+  const saveEditedPreferences = async (itemId: string) => {
+    try {
+      // Find the item
+      const item = wishlistItems.find(i => i.id === itemId)
+      if (!item) return
+
+      // Build updated preference options
+      const updatedPreferenceOptions = {
+        ...item.preferenceOptions,
+        iLike: {
+          ...item.preferenceOptions?.iLike,
+          color: editedPreferences.color || null,
+          size: editedPreferences.size || null,
+          style: editedPreferences.style || null,
+          configuration: editedPreferences.configuration || null,
+        }
+      }
+
+      // Update via API
+      const response = await fetch(`/api/wishlist-items/${itemId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ preferenceOptions: updatedPreferenceOptions }),
+      })
+
+      if (response.ok) {
+        // Update local state
+        setWishlistItems(prev => prev.map(i => 
+          i.id === itemId 
+            ? { ...i, preferenceOptions: updatedPreferenceOptions }
+            : i
+        ))
+        setEditingItemId(null)
+        toast({
+          title: "✅ Preferences Updated!",
+          description: "Your I Wish options have been saved.",
+          variant: "warm",
+        })
+      } else {
+        throw new Error("Failed to update")
+      }
+    } catch (error) {
+      console.error("Error updating preferences:", error)
+      toast({
+        title: "Error",
+        description: "Could not update preferences. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // Remove a single preference option
+  const removePreferenceOption = (key: string) => {
+    setEditedPreferences(prev => ({ ...prev, [key]: '' }))
   }
 
   const handleBuyNow = async (item: WishlistItem) => {
@@ -268,103 +412,517 @@ export function MyWishlistDisplay() {
       {/* Wishlist Items Grid */}
       {wishlistItems.length === 0 ? (
         <Card className="p-12 text-center">
-          <p className="text-sm sm:text-base md:text-lg text-gray-500 mb-4">Your wishlist is empty</p>
-          <Button className="bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-white hover:opacity-90 text-xs sm:text-sm">
-            Add Your First Item
-          </Button>
+          <p className="text-sm sm:text-base md:text-lg text-gray-500">Your wishlist is empty</p>
         </Card>
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {wishlistItems.map((item) => (
-            <Card key={item.id} className="overflow-hidden hover:shadow-xl transition-shadow flex flex-col h-full">
-              <div className="relative h-64 bg-gray-100">
-                <Image
-                  src={item.productImageUrl || "/placeholder.svg"}
-                  alt={item.giftName}
-                  fill
-                  className="object-contain p-2"
-                />
-                {item.stockStatus === "Low Stock" && (
-                  <Badge className="absolute top-3 right-3 bg-orange-500 text-white text-[9px] sm:text-xs">
-                    <AlertCircle className="w-2.5 h-2.5 sm:w-3 sm:h-3 mr-1" />
-                    Low Stock
-                  </Badge>
-                )}
-              </div>
-
-              {/* Product Details */}
-              <div className="p-5 flex flex-col h-full">
-                <div className="h-16 mb-3">
-                  <h3 className="font-bold text-sm sm:text-base md:text-lg text-gray-900 line-clamp-2 leading-tight">
+            <Card key={item.id} className="overflow-hidden hover:shadow-2xl transition-all duration-300 flex flex-col h-full bg-gradient-to-br from-orange-50/80 via-amber-50/60 to-yellow-50/80 border border-[#DAA520]/20 hover:border-[#DAA520]/40">
+              {/* Product Details - Image moved to I Wish and Alternative sections */}
+              <div className="p-4 flex flex-col h-full">
+                {/* Product Title - 2 lines max */}
+                <div className="h-11 mb-1.5">
+                  <h3 className="font-bold text-sm text-[#5D4037] line-clamp-2 leading-tight">
                     {item.giftName}
                   </h3>
                 </div>
 
-                {/* Store name and quantity on same line */}
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-xs sm:text-sm text-gray-500 truncate">{item.storeName}</p>
-                  <Badge className="bg-green-100 text-green-800 border-green-200 text-[9px] sm:text-xs">
-                    Qty: {item.quantity}
-                  </Badge>
+                {/* Store name */}
+                <div className="mb-1.5">
+                  <span className="text-xs text-[#8B6914] font-medium">{item.storeName}</span>
                 </div>
 
-                {/* Price */}
-                <div className="mb-3">
-                  <span className="text-lg sm:text-xl md:text-2xl font-bold text-black">
-                    ${item.currentPrice.toFixed(2)}
-                  </span>
-                </div>
-
-                {/* Description - Fixed height */}
-                <div className="h-12 mb-3">
-                  <p className="text-xs sm:text-sm text-gray-600 line-clamp-2">{item.description}</p>
-                </div>
-
-                <div className="bg-gray-50 rounded-lg p-3 mb-3 min-h-[180px]">
-                  <h4 className="text-[9px] sm:text-xs font-semibold text-gray-700 uppercase mb-2">
-                    Product Details {item.category && `(${item.category})`}
-                  </h4>
-                  <div className="grid grid-cols-2 gap-2 text-[9px] sm:text-xs">
-                    {Object.entries(item.attributes)
-                      .filter(([_, value]) => value !== null && value !== "")
-                      .map(([key, value]) => (
-                        <div
-                          key={key}
-                          className={key === "Care Instructions" || key === "Compatibility" ? "col-span-2" : ""}
-                        >
-                          <span className="font-semibold text-gray-700">{key}:</span>{" "}
-                          <span className="text-gray-600">{value}</span>
+                {/* Stars and Review Count - Same styling as Trending Gifts */}
+                {(item.rating || item.reviewCount) && (
+                  <div className="flex items-center gap-2 mb-1.5 bg-amber-50/50 rounded-lg px-2 py-1 w-fit">
+                    {item.rating && (
+                      <>
+                        <div className="flex items-center gap-0.5">
+                          {[1, 2, 3, 4, 5].map((starPosition) => {
+                            const rating = item.rating || 0
+                            const fillAmount = Math.max(0, Math.min(1, rating - (starPosition - 1)))
+                            const fillPercent = Math.round(fillAmount * 100)
+                            const gradientId = `star-wishlist-${item.id}-${starPosition}`
+                            
+                            return (
+                              <svg
+                                key={starPosition}
+                                className="w-3.5 h-3.5"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                xmlns="http://www.w3.org/2000/svg"
+                              >
+                                <defs>
+                                  <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
+                                    <stop offset={`${fillPercent}%`} stopColor="#F4C430" />
+                                    <stop offset={`${fillPercent}%`} stopColor="#E5E7EB" />
+                                  </linearGradient>
+                                </defs>
+                                <path
+                                  d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"
+                                  fill={`url(#${gradientId})`}
+                                  stroke="#F4C430"
+                                  strokeWidth="1"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                              </svg>
+                            )
+                          })}
                         </div>
-                      ))}
+                        <span className="text-sm font-bold text-[#654321]">{item.rating.toFixed(1)}</span>
+                      </>
+                    )}
+                    {item.reviewCount && (
+                      <span className="text-xs text-[#8B6914]">({item.reviewCount.toLocaleString()})</span>
+                    )}
+                  </div>
+                )}
+
+                {/* Badges */}
+                {item.badges && (item.badges.amazonChoice || item.badges.bestSeller || item.badges.overallPick) && (
+                  <div className="flex flex-wrap gap-1 mb-1.5">
+                    {item.badges.amazonChoice && (
+                      <span className="text-[10px] bg-gradient-to-r from-gray-900 to-black text-white px-2.5 py-1 rounded-full font-bold shadow-sm">
+                        Amazon's Choice
+                      </span>
+                    )}
+                    {item.badges.bestSeller && (
+                      <span className="text-[10px] text-white px-2.5 py-1 rounded-full font-bold shadow-sm" style={{ backgroundColor: '#D14900' }}>
+                        #1 Best Seller
+                      </span>
+                    )}
+                    {item.badges.overallPick && (
+                      <span className="text-[10px] bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-2.5 py-1 rounded-full font-bold shadow-sm">
+                        ⭐ Overall Pick
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Price - List Price and Sale Price */}
+                <div className="mb-2 bg-gradient-to-r from-[#FEF3C7]/50 to-[#FDE68A]/30 rounded-lg px-2 py-1.5">
+                  <div className="flex items-baseline gap-2 flex-wrap">
+                    {item.originalPrice && item.originalPrice > item.currentPrice ? (
+                      <>
+                        <span className="text-xs text-[#92400E]/60 line-through">
+                          ${item.originalPrice.toFixed(2)}
+                        </span>
+                        <span className="text-lg font-bold bg-gradient-to-r from-[#B45309] to-[#D97706] bg-clip-text text-transparent">
+                          ${item.currentPrice.toFixed(2)}
+                        </span>
+                        <span className="bg-gradient-to-r from-[#DC2626] to-[#EF4444] text-white font-semibold text-[9px] px-1.5 py-0.5 rounded-full shadow-sm">
+                          -{Math.round(((item.originalPrice - item.currentPrice) / item.originalPrice) * 100)}% OFF
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-lg font-bold text-[#8B4513]">
+                        ${item.currentPrice.toFixed(2)}
+                      </span>
+                    )}
                   </div>
                 </div>
 
-                <div className="space-y-4 mt-auto pt-2">
+                {/* Specifications - Matches Trending Gifts UI */}
+                {item.specifications && (() => {
+                  // Keys to exclude from specifications (variant keys, arrays, garbage, model)
+                  const excludeKeys = ['color', 'size', 'style', 'configuration', 'pattern', 'colorVariants', 'sizeOptions', 'styleOptions', 'combinedVariants', 'customFields', 'customBadges', 'model', 'modelnumber', 'modelname', 'brand']
+                  
+                  // Helper to check if a spec value is valid (not garbage)
+                  const isValidSpec = (key: string, value: any): boolean => {
+                    if (!value) return false
+                    const lowerKey = key.toLowerCase()
+                    if (excludeKeys.includes(lowerKey)) return false
+                    if (lowerKey.includes('model')) return false // Exclude any key containing "model"
+                    const str = value.toString().trim()
+                    if (str.length === 0 || str.length > 150) return false
+                    // Filter garbage patterns
+                    const garbagePatterns = [
+                      'div:', 'linear-gradient', 'background:', '#000', 'transparent',
+                      'stars', 'rating', 'review', 'cart', 'slide', 'percent',
+                      'protection plan', 'about this', 'add to', 'widget',
+                      'out of 5', 'customer', 'first-child', ':after', ':before'
+                    ]
+                    const lowerStr = str.toLowerCase()
+                    if (garbagePatterns.some(p => lowerStr.includes(p))) return false
+                    return true
+                  }
+                  
+                  const validSpecs = Object.entries(item.specifications)
+                    .filter(([key, value]) => isValidSpec(key, value))
+                  
+                  if (validSpecs.length === 0) return null
+                  
+                  const displaySpecs = validSpecs.slice(0, 5)
+                  const moreCount = validSpecs.length - 5
+                  
+                  return (
+                    <div className="bg-gradient-to-r from-[#6B4423]/5 to-[#8B5A3C]/5 rounded-lg p-3 border border-[#8B5A3C]/10 mb-3">
+                      <p className="text-[10px] font-bold text-[#6B4423] uppercase tracking-wider mb-2 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 bg-[#DAA520] rounded-full"></span>
+                        Specifications
+                      </p>
+                      <div className="flex flex-col gap-1">
+                        {displaySpecs.map(([key, value]) => (
+                          <div key={key} className="flex items-center text-[10px]">
+                            <span className="font-semibold text-[#6B4423] capitalize w-[100px] flex-shrink-0 truncate">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
+                            <span className="text-[#654321] truncate flex-1" title={String(value)}>{String(value)}</span>
+                          </div>
+                        ))}
+                      </div>
+                      {moreCount > 0 && (
+                        <p className="text-[10px] font-bold text-[#DAA520] mt-2">+{moreCount} more specs →</p>
+                      )}
+                    </div>
+                  )
+                })()}
+
+                {/* Choose Your Preferred Options - Matches /wishlist/add page UI */}
+                {item.preferenceOptions && (() => {
+                  // Keys to exclude from display (these are metadata, not variant options)
+                  const excludeKeys = ['image', 'title', 'customFields', 'notes']
+                  
+                  // Helper to check if a value is valid (not garbage data)
+                  const isValidValue = (value: any): boolean => {
+                    if (!value) return false
+                    const str = value.toString().trim()
+                    // Filter out garbage: too long, contains "stars", "ratings", "reviews", etc.
+                    if (str.length > 100) return false
+                    if (str.length === 0) return false
+                    const garbagePatterns = [
+                      'stars', 'rating', 'review', 'cart', 'slide', 'percent', 
+                      'protection plan', 'about this', 'add to', 'widget', 
+                      'feedback', 'out of 5', 'customer'
+                    ]
+                    const lowerStr = str.toLowerCase()
+                    if (garbagePatterns.some(p => lowerStr.includes(p))) return false
+                    return true
+                  }
+                  
+                  // Helper to get valid entries only (exclude metadata, keep variant options)
+                  const getValidEntries = (opt: Record<string, any> | null | undefined) => {
+                    if (!opt) return []
+                    return Object.entries(opt)
+                      .filter(([key, value]) => !excludeKeys.includes(key) && isValidValue(value) && typeof value === 'string')
+                  }
+                  
+                  const iLikeEntries = getValidEntries(item.preferenceOptions.iLike)
+                  const altEntries = getValidEntries(item.preferenceOptions.alternative)
+                  const okToBuyEntries = getValidEntries(item.preferenceOptions.okToBuy)
+                  
+                  // Always show this section (Ok to Buy always displays with its description)
+                  
+                  return (
+                    <div className="bg-gradient-to-br from-[#FEF7ED] via-[#FFF7ED] to-[#FFFBEB] border-2 border-[#DAA520]/30 rounded-xl p-3 mb-3 shadow-sm">
+                      {/* Header - matches /gifts/trending modal */}
+                      <div className="flex items-center gap-2 mb-3 pb-2 border-b border-[#DAA520]/20">
+                        <Heart className="w-4 h-4 text-[#DC2626] fill-[#DC2626]" />
+                        <h4 className="text-xs font-bold text-[#8B4513]">Choose Your Preferred Options</h4>
+                      </div>
+
+                      <div className="space-y-2">
+                        {/* I Wish Section - With image on left */}
+                        <div className="rounded-lg border-2 border-[#B8860B] bg-gradient-to-r from-[#DAA520]/30 to-[#F4C430]/25 shadow-md p-2.5">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gradient-to-r from-[#B8860B] via-[#DAA520] to-[#F4C430] text-white flex items-center gap-1 shadow-sm">
+                                ❤️ I Wish
+                              </span>
+                              <span className="text-[9px] text-red-500 font-medium">* Required</span>
+                            </div>
+                            {/* Edit/Save/Cancel buttons */}
+                            {editingItemId === item.id ? (
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => saveEditedPreferences(item.id)}
+                                  className="p-1 bg-green-500 hover:bg-green-600 text-white rounded-full transition-colors"
+                                  title="Save"
+                                >
+                                  <Check className="w-3 h-3" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={cancelEditingPreferences}
+                                  className="p-1 bg-gray-400 hover:bg-gray-500 text-white rounded-full transition-colors"
+                                  title="Cancel"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => startEditingPreferences(item)}
+                                className="p-1 bg-[#DAA520] hover:bg-[#B8860B] text-white rounded-full transition-colors"
+                                title="Edit preferences"
+                              >
+                                <Pencil className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                          
+                          {/* Image + Options Row */}
+                          <div className="flex gap-3">
+                            {/* Product Image - Left Panel */}
+                            {(item.preferenceOptions?.iLike?.image || item.productImageUrl) && (
+                              <div className="flex-shrink-0">
+                                <Image
+                                  src={item.preferenceOptions?.iLike?.image || item.productImageUrl || "/placeholder.svg"}
+                                  alt={item.preferenceOptions?.iLike?.title || item.giftName}
+                                  width={80}
+                                  height={80}
+                                  className="object-contain rounded-lg bg-white border border-[#DAA520]/20"
+                                />
+                              </div>
+                            )}
+                            
+                            {/* Options - Right Panel */}
+                            <div className="flex-1 min-w-0">
+                              {/* Edit Mode */}
+                          {editingItemId === item.id ? (
+                            <div className="space-y-2">
+                              {/* Color */}
+                              <div className="flex items-center gap-2">
+                                <label className="text-[10px] font-semibold text-[#6B4423] w-20">Color:</label>
+                                <input
+                                  type="text"
+                                  value={editedPreferences.color}
+                                  onChange={(e) => setEditedPreferences(prev => ({ ...prev, color: e.target.value }))}
+                                  className="flex-1 text-[10px] px-2 py-1 border border-[#DAA520]/30 rounded bg-white focus:outline-none focus:border-[#DAA520]"
+                                  placeholder="e.g., Silver Aluminum Case"
+                                />
+                                {editedPreferences.color && (
+                                  <button
+                                    type="button"
+                                    onClick={() => removePreferenceOption('color')}
+                                    className="p-0.5 text-red-500 hover:text-red-700 transition-colors"
+                                    title="Remove"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                )}
+                              </div>
+                              {/* Size */}
+                              <div className="flex items-center gap-2">
+                                <label className="text-[10px] font-semibold text-[#6B4423] w-20">Size:</label>
+                                <input
+                                  type="text"
+                                  value={editedPreferences.size}
+                                  onChange={(e) => setEditedPreferences(prev => ({ ...prev, size: e.target.value }))}
+                                  className="flex-1 text-[10px] px-2 py-1 border border-[#DAA520]/30 rounded bg-white focus:outline-none focus:border-[#DAA520]"
+                                  placeholder="e.g., 42mm + S/M"
+                                />
+                                {editedPreferences.size && (
+                                  <button
+                                    type="button"
+                                    onClick={() => removePreferenceOption('size')}
+                                    className="p-0.5 text-red-500 hover:text-red-700 transition-colors"
+                                    title="Remove"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                )}
+                              </div>
+                              {/* Style */}
+                              <div className="flex items-center gap-2">
+                                <label className="text-[10px] font-semibold text-[#6B4423] w-20">Style:</label>
+                                <input
+                                  type="text"
+                                  value={editedPreferences.style}
+                                  onChange={(e) => setEditedPreferences(prev => ({ ...prev, style: e.target.value }))}
+                                  className="flex-1 text-[10px] px-2 py-1 border border-[#DAA520]/30 rounded bg-white focus:outline-none focus:border-[#DAA520]"
+                                  placeholder="e.g., Sport Band"
+                                />
+                                {editedPreferences.style && (
+                                  <button
+                                    type="button"
+                                    onClick={() => removePreferenceOption('style')}
+                                    className="p-0.5 text-red-500 hover:text-red-700 transition-colors"
+                                    title="Remove"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                )}
+                              </div>
+                              {/* Configuration */}
+                              <div className="flex items-center gap-2">
+                                <label className="text-[10px] font-semibold text-[#6B4423] w-20">Config:</label>
+                                <input
+                                  type="text"
+                                  value={editedPreferences.configuration}
+                                  onChange={(e) => setEditedPreferences(prev => ({ ...prev, configuration: e.target.value }))}
+                                  className="flex-1 text-[10px] px-2 py-1 border border-[#DAA520]/30 rounded bg-white focus:outline-none focus:border-[#DAA520]"
+                                  placeholder="e.g., GPS + Cellular"
+                                />
+                                {editedPreferences.configuration && (
+                                  <button
+                                    type="button"
+                                    onClick={() => removePreferenceOption('configuration')}
+                                    className="p-0.5 text-red-500 hover:text-red-700 transition-colors"
+                                    title="Remove"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          ) : (
+                            /* Display Mode */
+                            iLikeEntries.length > 0 ? (
+                              <div className="flex flex-wrap gap-1.5">
+                                {iLikeEntries.map(([key, value]) => (
+                                  <span key={key} className="text-[10px] bg-white text-[#4A2F1A] px-2 py-1 rounded-lg border border-[#DAA520]/30 shadow-sm">
+                                    <span className="font-semibold capitalize text-[#6B4423]">{key}:</span> {value}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-[10px] text-[#8B6914] bg-[#DAA520]/10 px-2 py-1 rounded-md border border-[#DAA520]/20 italic">
+                                💡 Click the edit icon to add your preferences.
+                              </p>
+                            )
+                          )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Alternative Section - With image on left */}
+                        <div className="rounded-lg border-2 border-[#D97706] bg-gradient-to-r from-[#D97706]/15 to-[#F59E0B]/15 p-2.5">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gradient-to-r from-[#D97706] to-[#F59E0B] text-white shadow-sm">
+                                ✓ Alternative
+                              </span>
+                              <span className="text-[9px] text-gray-500 font-medium">Optional</span>
+                            </div>
+                            {/* Select on Retailer button - matches /gifts/trending modal */}
+                            <a
+                              href={item.webLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[10px] text-[#4A2F1A] font-medium hover:underline flex items-center gap-1"
+                            >
+                              <ExternalLink className="w-2.5 h-2.5" />
+                              Select on Retailer
+                            </a>
+                          </div>
+                          
+                          {/* Instructions */}
+                          <p className="text-[9px] text-[#92400E] bg-[#D97706]/10 px-2 py-1.5 rounded-md border border-[#D97706]/20 italic mb-2">
+                            💡 Click Select on Retailer to open the product page → choose your preferred options → use the Wishbee extension to clip and auto-fill the information below.
+                          </p>
+                          
+                          {/* Image + Options Row */}
+                          <div className="flex gap-3">
+                            {/* Product Image - Left Panel (only show if alternative has image) */}
+                            {item.preferenceOptions?.alternative?.image && (
+                              <div className="flex-shrink-0">
+                                <Image
+                                  src={item.preferenceOptions.alternative.image}
+                                  alt={item.preferenceOptions.alternative.title || "Alternative option"}
+                                  width={80}
+                                  height={80}
+                                  className="object-contain rounded-lg bg-white border border-[#D97706]/20"
+                                />
+                              </div>
+                            )}
+                            
+                            {/* Options - Right Panel */}
+                            <div className="flex-1 min-w-0">
+                              {/* Display existing alternative entries */}
+                              {altEntries.length > 0 && (
+                                <div className="flex flex-wrap gap-1.5 mb-2">
+                                  {altEntries.map(([key, value]) => (
+                                    <span key={key} className="text-[10px] bg-white text-[#4A2F1A] px-2 py-1 rounded-lg border border-[#D97706]/30 shadow-sm">
+                                      <span className="font-semibold capitalize text-[#6B4423]">{key}:</span> {value}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                              
+                              {altEntries.length === 0 && !item.preferenceOptions?.alternative?.image && (
+                                <p className="text-[10px] text-[#92400E] italic mb-2">
+                                  No alternative options selected yet.
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          
+                          {/* Custom Fields Section */}
+                          <div className="mt-2 pt-2 border-t border-[#D97706]/20">
+                            <button
+                              type="button"
+                              className="flex items-center gap-1 text-[9px] font-semibold text-[#D97706] hover:text-[#B45309] transition-colors"
+                            >
+                              <Plus className="w-3 h-3" />
+                              Add Custom Field
+                            </button>
+                          </div>
+                          
+                          {/* Notes Section */}
+                          <div className="mt-2">
+                            <label className="text-[9px] font-semibold text-[#6B4423] mb-1 block">Notes:</label>
+                            <textarea
+                              placeholder="Add any special notes or instructions..."
+                              className="w-full text-[10px] px-2 py-1.5 border border-[#D97706]/30 rounded bg-white/80 focus:outline-none focus:border-[#D97706] resize-none"
+                              rows={2}
+                              readOnly
+                            />
+                          </div>
+                        </div>
+
+                        {/* Ok to Buy Section - Matches modal/add page styling */}
+                        <div className="rounded-lg border-2 border-[#8B5A3C]/20 bg-white/50 p-2.5">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gradient-to-r from-[#C2410C] to-[#EA580C] text-white shadow-sm">
+                              💫 Ok to Buy
+                            </span>
+                          </div>
+                          <p className="text-[9px] text-[#9A3412] bg-[#C2410C]/10 px-2 py-1.5 rounded-md border border-[#C2410C]/20 italic">
+                            💡 You may purchase this product from another retailer, as long as it aligns with the "I Wish" or "Alternative" preferences.
+                          </p>
+                          {okToBuyEntries.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 mt-2">
+                              {okToBuyEntries.map(([key, value]) => (
+                                <span key={key} className="text-[10px] bg-white text-[#4A2F1A] px-2 py-1 rounded-lg border border-[#C2410C]/20 shadow-sm">
+                                  <span className="font-semibold capitalize text-[#6B4423]">{key}:</span> {value}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })()}
+
+                <div className="space-y-3 mt-auto pt-3">
                   <div className="grid grid-cols-2 gap-2">
                     <Button
                       onClick={() => handleBuyNow(item)}
-                      className="bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-white hover:opacity-90 text-xs sm:text-sm"
+                      className="bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] hover:from-[#F4C430] hover:to-[#DAA520] transition-all shadow-md hover:shadow-lg text-xs sm:text-sm font-semibold"
                     >
                       <ShoppingCart className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
                       Buy Now
                     </Button>
                     <Button
                       onClick={() => handleShare(item)}
-                      className="bg-gradient-to-r from-orange-400 via-rose-400 to-pink-500 text-white hover:from-orange-500 hover:via-rose-500 hover:to-pink-600 transition-all text-xs sm:text-sm"
+                      className="bg-gradient-to-r from-[#EA580C] via-[#F97316] to-[#FB923C] text-white hover:from-[#C2410C] hover:via-[#EA580C] hover:to-[#F97316] transition-all shadow-md hover:shadow-lg text-xs sm:text-sm font-semibold"
                     >
                       <Share2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
                       Share
                     </Button>
                   </div>
 
-                  <Button
+                  <button
+                    type="button"
                     onClick={() => handleDelete(item.id)}
-                    variant="ghost"
-                    className="w-full text-red-600 hover:bg-red-50 text-xs sm:text-sm"
+                    className="w-full px-4 py-2 text-red-600 hover:bg-red-50 bg-transparent border border-red-200 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5"
                   >
-                    <Trash2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                    Remove from Wishlist
-                  </Button>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Remove from Wishlist</span>
+                  </button>
                 </div>
               </div>
             </Card>

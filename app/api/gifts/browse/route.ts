@@ -1,5 +1,5 @@
 // Import store at module level to ensure shared state
-import { getTrendingGifts } from '../trending-gifts/store'
+import { getTrendingGifts } from '../../trending-gifts/store'
 
 export async function GET(req: Request) {
   try {

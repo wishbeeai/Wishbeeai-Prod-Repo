@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { z } from "zod"
+import { isModalPending } from "../save-variants/route"
 
 // Schema for extension item data
 const extensionItemSchema = z.object({
@@ -22,6 +23,21 @@ const extensionItemSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
+    // Check if modal is waiting for this data (prevents duplicate adds)
+    // When user is using the modal's "Select on Retailer" flow, we only save variants
+    // The actual add to wishlist happens when they click "Add to My Wishlist" in the modal
+    if (isModalPending()) {
+      console.log("[Extension Add Item] Modal is pending - skipping add (modal will handle it)")
+      return NextResponse.json(
+        {
+          success: true,
+          skipped: true,
+          message: "Item captured for modal selection. Add to wishlist from the modal.",
+        },
+        { status: 200 }
+      )
+    }
+
     // Log request headers for debugging (in development only)
     if (process.env.NODE_ENV === "development") {
       console.log("[Extension Add Item] Request headers:", {
@@ -122,6 +138,27 @@ export async function POST(req: NextRequest) {
       else if (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://')) {
         imageUrl = null
       }
+    }
+
+    // Check for duplicate product URL in the same wishlist before inserting
+    const { data: existingItem } = await supabase
+      .from('wishlist_items')
+      .select('id')
+      .eq('wishlist_id', wishlistId)
+      .eq('product_url', validated.url)
+      .single()
+    
+    if (existingItem) {
+      console.log('[Extension Add Item] Duplicate product detected, skipping')
+      return NextResponse.json(
+        {
+          success: true,
+          skipped: true,
+          message: 'This product is already in your wishlist',
+          existingItemId: existingItem.id,
+        },
+        { status: 200 }
+      )
     }
 
     // Insert wishlist item

@@ -40,14 +40,47 @@ export async function POST(request: NextRequest) {
       color,
       size,
       variantPreference,
+      preferenceOptions,
       category,
       quantity,
+      
+      // Sale price (if different from list price)
+      sale_price,
+      salePrice,
+      
+      // Badges and original price
+      badges,
+      originalPrice,
+      
+      // Specifications
+      specifications,
     } = body;
 
     const wishlistIdValue = wishlistId || wishlist_id;
     
     if (!wishlistIdValue) {
       return NextResponse.json({ error: 'wishlistId is required' }, { status: 400 });
+    }
+
+    // Check for duplicate product URL in the same wishlist
+    const productUrlValue = product_url || productUrl;
+    if (productUrlValue) {
+      const { data: existingItem } = await supabase
+        .from('wishlist_items')
+        .select('id')
+        .eq('wishlist_id', wishlistIdValue)
+        .eq('product_url', productUrlValue)
+        .single();
+      
+      if (existingItem) {
+        console.log('[API] Duplicate product detected, updating instead of creating new');
+        // Update the existing item instead of creating a duplicate
+        // For now, just return a message
+        return NextResponse.json({ 
+          error: 'This product is already in your wishlist',
+          existingItemId: existingItem.id 
+        }, { status: 409 }); // 409 Conflict
+      }
     }
 
     // Build insert object - prefer new Amazon format if available
@@ -68,15 +101,54 @@ export async function POST(request: NextRequest) {
     insertData.source = source || 'amazon';
     insertData.price_snapshot_at = price_snapshot_at ? new Date(price_snapshot_at) : new Date();
 
-    // Add variant and preference information to description field as JSON
-    if (color || size || variantPreference) {
-      const variantInfo: any = {}
-      if (color) variantInfo.color = color
-      if (size) variantInfo.size = size
-      if (variantPreference) variantInfo.variantPreference = variantPreference
-      
-      insertData.description = JSON.stringify(variantInfo)
+    // Store variant preference and options in description field as JSON
+    // This includes: preference type (I Wish/Alternative/Ok to buy), selected options, store name
+    const descriptionData: any = {}
+    
+    // Add preference type
+    if (variantPreference) {
+      descriptionData.preferenceType = variantPreference
     }
+    
+    // Add selected options from preferenceOptions
+    if (preferenceOptions) {
+      try {
+        const options = typeof preferenceOptions === 'string' ? JSON.parse(preferenceOptions) : preferenceOptions
+        descriptionData.preferenceOptions = options
+      } catch (e) {
+        console.error('Error parsing preferenceOptions:', e)
+      }
+    }
+    
+    // Add individual color/size if provided (legacy support)
+    if (color) descriptionData.color = color
+    if (size) descriptionData.size = size
+    
+    // Store source as store name
+    descriptionData.storeName = source || 'amazon'
+    
+    // Store sale price if different from list price
+    const salePriceValue = sale_price || salePrice
+    if (salePriceValue) {
+      descriptionData.salePrice = salePriceValue
+    }
+    
+    // Store badges
+    if (badges) {
+      descriptionData.badges = badges
+    }
+    
+    // Store original price (list price before discount)
+    if (originalPrice) {
+      descriptionData.originalPrice = originalPrice
+    }
+    
+    // Store specifications (product attributes)
+    if (specifications && typeof specifications === 'object') {
+      descriptionData.specifications = specifications
+    }
+    
+    insertData.description = JSON.stringify(descriptionData)
 
     // Note: category, quantity, priority, stock_status don't exist in the database
 

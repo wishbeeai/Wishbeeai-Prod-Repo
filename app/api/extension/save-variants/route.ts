@@ -12,6 +12,7 @@ interface VariantData {
   price?: number
   timestamp: number
   retrieved: boolean
+  isModalPending?: boolean // Flag to indicate modal is waiting for this data
 }
 
 // Use global object to survive hot reloads in development
@@ -27,6 +28,15 @@ if (!global.variantStore) {
 }
 
 const variantStore = global.variantStore
+
+// Export helper to check if modal is pending (used by add-item route)
+export function isModalPending(): boolean {
+  const latest = variantStore.get('latest')
+  if (!latest) return false
+  // Check if recent (within 30 seconds) and not yet retrieved
+  const isRecent = Date.now() - latest.timestamp < 30000
+  return isRecent && latest.isModalPending === true && !latest.retrieved
+}
 
 // CORS headers for extension
 const corsHeaders = {
@@ -90,7 +100,8 @@ export async function POST(req: NextRequest) {
       title: title || undefined,
       price: price || undefined,
       timestamp: now,
-      retrieved: false
+      retrieved: false,
+      isModalPending: true // Modal is waiting for this data - prevent add-item from duplicating
     }
     
     variantStore.set(storeKey, dataToStore)

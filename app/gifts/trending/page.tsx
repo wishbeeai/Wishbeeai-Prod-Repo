@@ -128,6 +128,203 @@ export default function TrendingGiftsPage() {
     }
   }
 
+  // Check if product has MULTIPLE selectable variant options
+  // Only show modal if the product has actual choices to make (multiple colors, sizes, etc.)
+  const hasVariantOptions = (gift: Gift): boolean => {
+    // Check 1: Amazon URL with variant indicator (th=1 means variant selection page)
+    // This is the most reliable indicator that a product has selectable variants
+    if (gift.productLink?.includes('amazon.') && gift.productLink?.includes('th=1')) {
+      console.log('[hasVariantOptions] Amazon product with th=1 (variant page) - showing modal')
+      return true
+    }
+    
+    // Check 2: Product name patterns that typically have variants
+    const productName = gift.giftName?.toLowerCase() || ''
+    const variantProductPatterns = [
+      'apple watch',
+      'airpods',
+      'iphone',
+      'ipad',
+      'macbook',
+      'galaxy watch',
+      'galaxy buds',
+      'echo dot',
+      'kindle',
+      'fire tv',
+    ]
+    if (gift.productLink?.includes('amazon.') && variantProductPatterns.some(p => productName.includes(p))) {
+      console.log('[hasVariantOptions] Known variant product pattern - showing modal')
+      return true
+    }
+    
+    // Check 3: Stored variant arrays
+    if (gift.attributes) {
+      // Check for colorVariants array with MULTIPLE options
+      const colorVariants = gift.attributes?.colorVariants
+      if (Array.isArray(colorVariants) && colorVariants.length > 1) {
+        console.log('[hasVariantOptions] Multiple color variants found - showing modal')
+        return true
+      }
+      
+      // Check for sizeOptions array with MULTIPLE options
+      const sizeOptions = gift.attributes?.sizeOptions
+      if (Array.isArray(sizeOptions) && sizeOptions.length > 1) {
+        console.log('[hasVariantOptions] Multiple size options found - showing modal')
+        return true
+      }
+      
+      // Check for styleOptions array with MULTIPLE options
+      const styleOptions = gift.attributes?.styleOptions
+      if (Array.isArray(styleOptions) && styleOptions.length > 1) {
+        console.log('[hasVariantOptions] Multiple style options found - showing modal')
+        return true
+      }
+      
+      // Check for combinedVariants array with MULTIPLE options
+      const combinedVariants = gift.attributes?.combinedVariants
+      if (Array.isArray(combinedVariants) && combinedVariants.length > 1) {
+        console.log('[hasVariantOptions] Multiple combined variants found - showing modal')
+        return true
+      }
+    }
+    
+    // No variant indicators found - add directly without modal
+    console.log('[hasVariantOptions] No variant indicators - adding directly')
+    return false
+  }
+
+  // Add product directly to wishlist (for products without variant options)
+  const [isAddingToWishlist, setIsAddingToWishlist] = useState(false)
+  
+  const handleAddToWishlistDirect = async (gift: Gift) => {
+    if (isAddingToWishlist) return
+    
+    setIsAddingToWishlist(true)
+    try {
+      // Get or create a default wishlist
+      let wishlistId: string | null = null
+
+      const wishlistsResponse = await fetch("/api/wishlists")
+      if (wishlistsResponse.ok) {
+        const { wishlists } = await wishlistsResponse.json()
+        if (wishlists && wishlists.length > 0) {
+          wishlistId = wishlists[0].id
+        } else {
+          const createResponse = await fetch("/api/wishlists", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              title: "My Wishlist",
+              description: "Default wishlist",
+              isPublic: false,
+            }),
+          })
+          if (createResponse.ok) {
+            const { wishlist } = await createResponse.json()
+            wishlistId = wishlist.id
+          }
+        }
+      }
+
+      if (!wishlistId) {
+        throw new Error("Failed to get or create wishlist")
+      }
+
+      // Prepare wishlist item data (no preferences needed for products without variants)
+      const wishlistItemData = {
+        wishlistId,
+        productName: gift.giftName,
+        productUrl: gift.productLink,
+        productPrice: gift.targetAmount,
+        productImage: gift.image,
+        title: gift.giftName,
+        product_url: gift.productLink,
+        image_url: gift.image,
+        list_price: Math.round(gift.targetAmount * 100),
+        currency: "USD",
+        source: gift.source?.toLowerCase() || "amazon",
+        category: gift.category || null,
+        quantity: 1,
+        // No variant preferences needed
+        preferenceOptions: JSON.stringify({
+          iLike: null,
+          alternative: null,
+          okToBuy: null,
+        }),
+        variantPreference: "Ideal",
+      }
+
+      const response = await fetch("/api/wishlists/items", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(wishlistItemData),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        
+        // Handle duplicate product case (409 Conflict)
+        if (response.status === 409) {
+          toast("🐝 Already in Wishlist", {
+            description: "This product is already in your wishlist",
+            action: {
+              label: "View Wishlist",
+              onClick: () => router.push('/wishlist'),
+            },
+            style: {
+              background: 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 50%, #FCD34D 100%)',
+              border: '2px solid #F59E0B',
+              color: '#92400E',
+            },
+            actionButtonStyle: {
+              backgroundColor: '#D97706',
+              color: 'white',
+            },
+            duration: 4000,
+          })
+          return
+        }
+        
+        throw new Error(errorData.error || "Failed to add to wishlist")
+      }
+
+      toast.success("Added to My Wishlist! 🐝", {
+        description: `${gift.giftName.length > 50 ? gift.giftName.substring(0, 50) + '...' : gift.giftName}`,
+        action: {
+          label: "View Wishlist",
+          onClick: () => router.push('/wishlist'),
+        },
+        actionButtonStyle: {
+          backgroundColor: 'black',
+          color: 'white',
+        },
+        duration: 5000,
+      })
+    } catch (error) {
+      console.error("[TrendingGifts] Add to wishlist error:", error)
+      toast.error("Failed to add to wishlist", {
+        description: error instanceof Error ? error.message : "Something went wrong",
+        duration: 4000,
+      })
+    } finally {
+      setIsAddingToWishlist(false)
+    }
+  }
+
+  // Handle "Add to Wishlist" button click - checks for variants
+  const handleAddToWishlistClick = (e: React.MouseEvent, gift: Gift) => {
+    e.stopPropagation()
+    
+    if (hasVariantOptions(gift)) {
+      // Product has variant options - open modal
+      setSelectedGiftForWishlist(gift)
+      setIsWishlistModalOpen(true)
+    } else {
+      // No variant options - add directly to wishlist
+      handleAddToWishlistDirect(gift)
+    }
+  }
+
   // Fetch gifts from API
   useEffect(() => {
     async function fetchGifts() {
@@ -654,8 +851,8 @@ export default function TrendingGiftsPage() {
                           </span>
                         )}
                         {gift.bestSeller && (
-                          <span className="bg-gradient-to-r from-amber-600 to-orange-600 text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-sm">
-                            🔥 Best Seller
+                          <span className="text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-sm" style={{ backgroundColor: '#D14900' }}>
+                            #1 Best Seller
                           </span>
                         )}
                         {gift.overallPick && (
@@ -754,14 +951,15 @@ export default function TrendingGiftsPage() {
                   </button>
                   <button
                     type="button"
-                    className="w-full px-4 py-2 bg-gradient-to-r from-[#DAA520] to-[#F4C430] hover:from-[#F4C430] hover:to-[#DAA520] text-[#8B4513] rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 shadow-sm hover:shadow-md"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setSelectedGiftForWishlist(gift)
-                      setIsWishlistModalOpen(true)
-                    }}
+                    className="w-full px-4 py-2 bg-gradient-to-r from-[#DAA520] to-[#F4C430] hover:from-[#F4C430] hover:to-[#DAA520] text-[#8B4513] rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 shadow-sm hover:shadow-md disabled:opacity-50"
+                    onClick={(e) => handleAddToWishlistClick(e, gift)}
+                    disabled={isAddingToWishlist}
                   >
-                    <Heart className="w-3.5 h-3.5" />
+                    {isAddingToWishlist ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Heart className="w-3.5 h-3.5" />
+                    )}
                     <span>Add to My Wishlist</span>
                   </button>
                   {isAdmin && (
@@ -906,8 +1104,8 @@ export default function TrendingGiftsPage() {
                             </span>
                           )}
                           {gift.bestSeller && (
-                            <span className="bg-gradient-to-r from-gray-800 to-gray-900 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                              Best Seller
+                            <span className="text-white text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ backgroundColor: '#D14900' }}>
+                              #1 Best Seller
                             </span>
                           )}
                           {gift.overallPick && (
@@ -949,14 +1147,15 @@ export default function TrendingGiftsPage() {
                     </Button>
                     <button
                       type="button"
-                      className="w-full bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#3B2F0F] rounded-lg font-semibold hover:shadow-lg transition-all flex items-center justify-center gap-1.5 px-4 py-2 border-0 hover:opacity-90"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setSelectedGiftForWishlist(gift)
-                        setIsWishlistModalOpen(true)
-                      }}
+                      className="w-full bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#3B2F0F] rounded-lg font-semibold hover:shadow-lg transition-all flex items-center justify-center gap-1.5 px-4 py-2 border-0 hover:opacity-90 disabled:opacity-50"
+                      onClick={(e) => handleAddToWishlistClick(e, gift)}
+                      disabled={isAddingToWishlist}
                     >
-                      <Heart className="w-4 h-4" />
+                      {isAddingToWishlist ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Heart className="w-4 h-4" />
+                      )}
                       <span>Add to My Wishlist</span>
                     </button>
                     {isAdmin && (
