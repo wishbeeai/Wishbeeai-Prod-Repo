@@ -1,19 +1,23 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { createClient as createServiceClient } from "@supabase/supabase-js"
 import { z } from "zod"
 import { isModalPending } from "../save-variants/route"
 
-// CORS headers for extension
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Session-Token',
-  'Access-Control-Allow-Credentials': 'true',
+// Helper to get CORS headers with dynamic origin
+function getCorsHeaders(req: NextRequest) {
+  const origin = req.headers.get('origin') || '*'
+  return {
+    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Session-Token, X-User-Email',
+    'Access-Control-Allow-Credentials': 'true',
+  }
 }
 
 // Handle OPTIONS for CORS preflight
-export async function OPTIONS() {
-  return NextResponse.json({}, { headers: corsHeaders })
+export async function OPTIONS(req: NextRequest) {
+  return NextResponse.json({}, { headers: getCorsHeaders(req) })
 }
 
 // Schema for extension item data
@@ -35,6 +39,8 @@ const extensionItemSchema = z.object({
 // Need to map from extension format to database format
 
 export async function POST(req: NextRequest) {
+  const corsHeaders = getCorsHeaders(req)
+  
   try {
     // Check if modal is waiting for this data (prevents duplicate adds)
     // When user is using the modal's "Select on Retailer" flow, we only save variants
@@ -51,30 +57,70 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Log request headers for debugging (in development only)
-    if (process.env.NODE_ENV === "development") {
-      console.log("[Extension Add Item] Request headers:", {
-        cookie: req.headers.get("cookie") ? "present" : "missing",
-        origin: req.headers.get("origin"),
-        referer: req.headers.get("referer"),
+    // Log request headers for debugging
+    console.log("[Extension Add Item] Request headers:", {
+      cookie: req.headers.get("cookie") ? "present" : "missing",
+      origin: req.headers.get("origin"),
+      authorization: req.headers.get("authorization") ? "present" : "missing",
+      sessionToken: req.headers.get("x-session-token") ? "present" : "missing",
+      userEmail: req.headers.get("x-user-email") ? "present" : "missing",
+    })
+
+    let user: any = null
+    let supabase: any = null
+
+    // Try multiple authentication methods
+    
+    // Method 1: Check for Authorization header with access token
+    const authHeader = req.headers.get("authorization")
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      const accessToken = authHeader.substring(7)
+      console.log("[Extension Add Item] Trying Bearer token auth...")
+      
+      // Create a Supabase client with the access token
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      
+      const tokenClient = createServiceClient(supabaseUrl, supabaseAnonKey, {
+        global: {
+          headers: {
+            Authorization: `Bearer ${accessToken}`
+          }
+        }
       })
+      
+      const { data: { user: tokenUser }, error: tokenError } = await tokenClient.auth.getUser()
+      if (tokenUser && !tokenError) {
+        user = tokenUser
+        supabase = tokenClient
+        console.log("[Extension Add Item] Bearer token auth successful:", user.email)
+      } else {
+        console.log("[Extension Add Item] Bearer token auth failed:", tokenError?.message)
+      }
     }
 
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError) {
-      console.error("[Extension Add Item] Auth error:", JSON.stringify(authError, null, 2))
-      return NextResponse.json(
-        { error: "Authentication failed", details: authError.message },
-        { status: 401, headers: corsHeaders }
-      )
-    }
-    
+    // Method 2: Try cookie-based auth (for requests from the website)
     if (!user) {
-      console.error("[Extension Add Item] No user found - cookies may not be set")
+      console.log("[Extension Add Item] Trying cookie-based auth...")
+      supabase = await createClient()
+      const { data: { user: cookieUser }, error: authError } = await supabase.auth.getUser()
+      
+      if (cookieUser && !authError) {
+        user = cookieUser
+        console.log("[Extension Add Item] Cookie auth successful:", user.email)
+      } else {
+        console.log("[Extension Add Item] Cookie auth failed:", authError?.message)
+      }
+    }
+
+    // If still no user, return unauthorized
+    if (!user) {
+      console.error("[Extension Add Item] All auth methods failed")
       return NextResponse.json(
-        { error: "Unauthorized", details: "Please log in to Wishbee.ai in your browser first" },
+        { 
+          error: "Unauthorized", 
+          details: "Please log in to Wishbee.ai. If using the extension, make sure you're logged in and the extension has your access token." 
+        },
         { status: 401, headers: corsHeaders }
       )
     }

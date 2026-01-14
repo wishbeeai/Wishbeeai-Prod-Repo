@@ -38,17 +38,20 @@ export function isModalPending(): boolean {
   return isRecent && latest.isModalPending === true && !latest.retrieved
 }
 
-// CORS headers for extension
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Session-Token',
-  'Access-Control-Allow-Credentials': 'true',
+// Helper to get CORS headers with dynamic origin
+function getCorsHeaders(req: NextRequest) {
+  const origin = req.headers.get('origin') || '*'
+  return {
+    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Session-Token, X-User-Email',
+    'Access-Control-Allow-Credentials': 'true',
+  }
 }
 
 // Handle OPTIONS for CORS preflight
-export async function OPTIONS() {
-  return NextResponse.json({}, { headers: corsHeaders })
+export async function OPTIONS(req: NextRequest) {
+  return NextResponse.json({}, { headers: getCorsHeaders(req) })
 }
 
 // Helper function to check if image is a color swatch or placeholder (not a product image)
@@ -95,6 +98,8 @@ function isSwatchOrPlaceholderImage(imageUrl: string | undefined): boolean {
 
 // POST - Save variants from extension
 export async function POST(req: NextRequest) {
+  const corsHeaders = getCorsHeaders(req)
+  
   try {
     const body = await req.json()
     const { variants, specifications, url, timestamp, sessionToken, image, title, price } = body
@@ -179,6 +184,8 @@ export async function POST(req: NextRequest) {
 
 // GET - Retrieve variants for the modal
 export async function GET(req: NextRequest) {
+  const corsHeaders = getCorsHeaders(req)
+  
   try {
     // Try multiple keys: user ID first, then session token, then "latest"
     let storeKey = 'latest'
