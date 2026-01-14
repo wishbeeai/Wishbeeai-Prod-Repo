@@ -3,6 +3,19 @@ import { createClient } from "@/lib/supabase/server"
 import { z } from "zod"
 import { isModalPending } from "../save-variants/route"
 
+// CORS headers for extension
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Session-Token',
+  'Access-Control-Allow-Credentials': 'true',
+}
+
+// Handle OPTIONS for CORS preflight
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders })
+}
+
 // Schema for extension item data
 const extensionItemSchema = z.object({
   title: z.string().min(1).max(500),
@@ -34,7 +47,7 @@ export async function POST(req: NextRequest) {
           skipped: true,
           message: "Item captured for modal selection. Add to wishlist from the modal.",
         },
-        { status: 200 }
+        { status: 200, headers: corsHeaders }
       )
     }
 
@@ -54,7 +67,7 @@ export async function POST(req: NextRequest) {
       console.error("[Extension Add Item] Auth error:", JSON.stringify(authError, null, 2))
       return NextResponse.json(
         { error: "Authentication failed", details: authError.message },
-        { status: 401 }
+        { status: 401, headers: corsHeaders }
       )
     }
     
@@ -62,7 +75,7 @@ export async function POST(req: NextRequest) {
       console.error("[Extension Add Item] No user found - cookies may not be set")
       return NextResponse.json(
         { error: "Unauthorized", details: "Please log in to Wishbee.ai in your browser first" },
-        { status: 401 }
+        { status: 401, headers: corsHeaders }
       )
     }
 
@@ -157,13 +170,28 @@ export async function POST(req: NextRequest) {
           message: 'This product is already in your wishlist',
           existingItemId: existingItem.id,
         },
-        { status: 200 }
+        { status: 200, headers: corsHeaders }
       )
+    }
+
+    // Determine source from URL
+    let source = 'other'
+    try {
+      const urlObj = new URL(validated.url)
+      const hostname = urlObj.hostname.toLowerCase()
+      if (hostname.includes('amazon')) source = 'amazon'
+      else if (hostname.includes('target')) source = 'target'
+      else if (hostname.includes('walmart')) source = 'walmart'
+      else if (hostname.includes('bestbuy')) source = 'bestbuy'
+      else if (hostname.includes('etsy')) source = 'etsy'
+      else if (hostname.includes('ebay')) source = 'ebay'
+      else source = 'other'
+    } catch (e) {
+      source = 'other'
     }
 
     // Insert wishlist item
     // Map to actual database schema: title, list_price (in cents), image_url, product_url
-    // Note: source column has check constraint - use 'amazon' or allowed value
     const insertData: any = {
       wishlist_id: wishlistId,
       title: validated.title,
@@ -171,7 +199,7 @@ export async function POST(req: NextRequest) {
       list_price: validated.price ? Math.round(validated.price * 100) : null, // Convert to cents
       image_url: imageUrl,
       currency: 'USD', // Default currency
-      source: 'amazon', // Use 'amazon' to satisfy check constraint (or check allowed values)
+      source: source,
       price_snapshot_at: new Date(),
     }
     
@@ -198,7 +226,7 @@ export async function POST(req: NextRequest) {
         item,
         message: "Item added to wishlist successfully",
       },
-      { status: 201 }
+      { status: 201, headers: corsHeaders }
     )
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -207,7 +235,7 @@ export async function POST(req: NextRequest) {
           error: "Validation failed",
           details: error.errors,
         },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       )
     }
 
@@ -276,7 +304,7 @@ export async function POST(req: NextRequest) {
         details: actualError, // Include actual error for debugging
         message: error instanceof Error ? error.message : String(error), // Also include simple message
       },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     )
   }
 }

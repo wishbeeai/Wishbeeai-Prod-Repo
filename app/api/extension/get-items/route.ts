@@ -1,6 +1,19 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 
+// CORS headers for extension
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Session-Token',
+  'Access-Control-Allow-Credentials': 'true',
+}
+
+// Handle OPTIONS for CORS preflight
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders })
+}
+
 /**
  * GET /api/extension/get-items
  * Get all wishlist items for the authenticated user (for browser extension)
@@ -14,14 +27,14 @@ export async function GET(req: NextRequest) {
       console.error("[Extension Get Items] Auth error:", authError)
       return NextResponse.json(
         { error: "Authentication failed", details: authError.message },
-        { status: 401 }
+        { status: 401, headers: corsHeaders }
       )
     }
     
     if (!user) {
       return NextResponse.json(
         { error: "Unauthorized" },
-        { status: 401 }
+        { status: 401, headers: corsHeaders }
       )
     }
 
@@ -38,13 +51,13 @@ export async function GET(req: NextRequest) {
     }
 
     if (!wishlists || wishlists.length === 0) {
-      return NextResponse.json({ items: [] })
+      return NextResponse.json({ items: [] }, { headers: corsHeaders })
     }
 
     const wishlistIds = wishlists.map((w) => w.id).filter((id) => id)
 
     if (wishlistIds.length === 0) {
-      return NextResponse.json({ items: [] })
+      return NextResponse.json({ items: [] }, { headers: corsHeaders })
     }
 
     // Get all items from all wishlists
@@ -88,7 +101,7 @@ export async function GET(req: NextRequest) {
       }
     })
 
-    return NextResponse.json({ items: formattedItems })
+    return NextResponse.json({ items: formattedItems }, { headers: corsHeaders })
   } catch (error) {
     console.error("[Extension Get Items] ===== ERROR =====")
     console.error("[Extension Get Items] Error Type:", error?.constructor?.name || typeof error)
@@ -106,7 +119,7 @@ export async function GET(req: NextRequest) {
         error: errorMessage,
         details: process.env.NODE_ENV === "development" ? (error instanceof Error ? error.stack : String(error)) : undefined,
       },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     )
   }
 }
