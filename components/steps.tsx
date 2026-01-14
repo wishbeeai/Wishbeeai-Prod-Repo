@@ -62,12 +62,12 @@ export function Steps() {
           <div className="text-center mb-6 sm:mb-8">
             <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-[#8B4513] mb-4 relative inline-block font-[family-name:var(--font-shadows)]">
               How it works
-              <img
-                src="/images/singlerealbee.png"
-                alt="Wishbee"
-                className="absolute -right-10 sm:-right-12 -top-1 sm:top-0 w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 animate-bounce object-contain"
+              <span
+                className="absolute -right-12 top-0 text-3xl sm:text-4xl animate-bounce"
                 style={{ animationDuration: "3s" }}
-              />
+              >
+                🐝
+              </span>
             </h2>
             <div className="relative inline-block">
               {/* Hand-drawn arrow curve */}
