@@ -208,9 +208,8 @@ export async function PUT(
     
     // Always update these fields if provided
     if (body.productName !== undefined) {
-      // Create a short and understandable title from the product name
-      const shortTitle = createShortTitle(body.productName.trim(), 10)
-      updateData.productName = shortTitle || body.productName.trim()
+      // Use the full product name (no truncation)
+      updateData.productName = body.productName.trim()
     }
     if (body.image !== undefined) updateData.image = body.image
     if (body.category !== undefined) updateData.category = body.category

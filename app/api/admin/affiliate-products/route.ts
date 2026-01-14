@@ -184,13 +184,13 @@ export async function POST(req: NextRequest) {
       console.log('[API POST] Saving attributes:', JSON.stringify(attributes, null, 2))
     }
 
-    // Create a short and understandable title from the product name
-    const shortTitle = body.productName ? createShortTitle(body.productName, 10) : body.productName
-    
+    // Use the full product name (no truncation)
+    const fullProductName = body.productName ? body.productName.trim() : body.productName
+
     // Create new product
     const newProduct = {
       id: Date.now().toString(),
-      productName: shortTitle || body.productName,
+      productName: fullProductName || body.productName,
       image: body.image || "/placeholder.svg",
       category: body.category,
       source: body.source,

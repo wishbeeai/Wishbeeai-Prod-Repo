@@ -42,6 +42,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import Link from "next/link"
 
 interface ProductAttributes {
@@ -298,15 +299,27 @@ export default function AdminAffiliateProductsPage() {
     // Load product attributes as key-value pairs (with unique ids for stable React keys)
     const attrPairs: Array<{id: string, name: string, value: string}> = []
     let editAttrCounter = 0
+    
+    // Helper to format attribute name with first letter caps and spaces
+    const formatAttrName = (name: string): string => {
+      const words = name.replace(/([A-Z])/g, ' $1').trim()
+      return words.split(' ').map(word => 
+        word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+      ).join(' ')
+    }
+    
     if (product.attributes) {
       const excludeKeys = ['customFields', 'customBadges', 'configurationOptions', 'model']
       for (const [key, value] of Object.entries(product.attributes)) {
         if (!excludeKeys.includes(key) && value && typeof value === 'string') {
-          attrPairs.push({ id: `edit-attr-${Date.now()}-${editAttrCounter++}`, name: key, value: value })
+          // Format the attribute name with proper capitalization
+          const formattedName = formatAttrName(key)
+          attrPairs.push({ id: `edit-attr-${Date.now()}-${editAttrCounter++}`, name: formattedName, value: value })
         }
       }
     }
-    setProductAttributes(attrPairs)
+    // Limit to maximum 8 product attributes
+    setProductAttributes(attrPairs.slice(0, 8))
     setIsEditModalOpen(true)
   }
 
@@ -512,19 +525,33 @@ export default function AdminAffiliateProductsPage() {
         let attrIdCounter = 0
         
         // Variant options to exclude - these are selectable in "Add to My Wishlist" modal
+        // NOTE: 'brand' is excluded because there's a separate Product Brand field
         const variantOptionsToExclude = [
           'color', 'size', 'style', 'configuration',
           'colorVariants', 'sizeOptions', 'combinedVariants', 'styleOptions',
           'styleName', 'patternName', 'configurationOptions',
-          'customFields', 'customBadges', 'model'
+          'customFields', 'customBadges', 'model', 'brand'
         ]
+        
+        // Helper to format attribute name with first letter caps and spaces
+        // e.g., "itemWeight" -> "Item Weight", "coffeeMakerType" -> "Coffee Maker Type"
+        const formatAttrName = (name: string): string => {
+          // Split camelCase into words
+          const words = name.replace(/([A-Z])/g, ' $1').trim()
+          // Capitalize first letter of each word
+          return words.split(' ').map(word => 
+            word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+          ).join(' ')
+        }
         
         // Helper to add attribute if valid (only static specs, not variants)
         const addAttr = (name: string, value: any) => {
           if (!variantOptionsToExclude.includes(name) && value && !attrPairs.find(p => p.name === name)) {
             const strValue = typeof value === 'string' ? value : String(value)
             if (strValue && strValue !== 'null' && strValue !== 'undefined' && strValue.trim() !== '') {
-              attrPairs.push({ id: `attr-${Date.now()}-${attrIdCounter++}`, name, value: strValue })
+              // Format the attribute name with proper capitalization
+              const formattedName = formatAttrName(name)
+              attrPairs.push({ id: `attr-${Date.now()}-${attrIdCounter++}`, name: formattedName, value: strValue })
             }
           }
         }
@@ -545,9 +572,10 @@ export default function AdminAffiliateProductsPage() {
         
         // 3. Check top-level extracted properties for STATIC product specifications only
         // Excluded: color, size, style, configuration (these are variant options)
+        // NOTE: 'brand' is excluded because there's a separate Product Brand field
         const staticSpecAttrs = [
-          // General
-          'brand', 'modelName', 'manufacturer', 'countryOfOrigin', 'weight', 'dimensions', 'itemWeight',
+          // General (brand excluded - has dedicated field)
+          'modelName', 'manufacturer', 'countryOfOrigin', 'weight', 'dimensions', 'itemWeight',
           // Audio/Headphones
           'impedance', 'earPlacement', 'formFactor', 'noiseControl', 'connectivity', 'wirelessType', 
           'compatibleDevices', 'batteryLife', 'capacity', 'material', 'wattage', 'voltage', 'powerSource', 
@@ -557,7 +585,13 @@ export default function AdminAffiliateProductsPage() {
           'wirelessCommunicationStandard', 'batteryCellComposition', 'gps', 'shape', 'screenSize',
           'displayType', 'waterResistance', 'sensorType', 'bandMaterial', 'caseMaterial',
           // Electronics general
-          'processorType', 'ramSize', 'storageCapacity', 'resolution', 'refreshRate'
+          'processorType', 'ramSize', 'storageCapacity', 'resolution', 'refreshRate',
+          // Kitchen/Appliances - Amazon Product Overview attributes
+          'coffeeMakerType', 'filterType', 'finishType', 'numberOfSettings', 'productDimensions',
+          'maximumPressure', 'heatingElement', 'includedComponents', 'waterTankCapacity',
+          // Additional Amazon Product Overview attributes
+          'outputWattage', 'inputVoltage', 'itemModelNumber', 'asin', 'upc', 'productType',
+          'numberOfItems', 'numberOfPieces', 'assemblyRequired', 'batteryRequired', 'batteriesIncluded'
         ]
         for (const attrName of staticSpecAttrs) {
           // Check multiple locations for each attribute
@@ -583,12 +617,11 @@ export default function AdminAffiliateProductsPage() {
               const keyLower = key.toLowerCase().replace(/\s+/g, '')
               const keyOriginal = key.replace(/\s+/g, ' ').trim()
               
-              // Skip variant options
-              if (keyLower === 'color' || keyLower === 'size' || keyLower === 'style' || keyLower === 'configuration') continue
+              // Skip variant options and brand (brand has a dedicated field)
+              if (keyLower === 'color' || keyLower === 'size' || keyLower === 'style' || keyLower === 'configuration' || keyLower.includes('brand')) continue
               
               // General attributes
-              if (keyLower.includes('brand')) addAttr('brand', value)
-              else if (keyLower.includes('impedance')) addAttr('impedance', value)
+              if (keyLower.includes('impedance')) addAttr('impedance', value)
               else if (keyLower.includes('earplacement') || keyLower.includes('ear_placement')) addAttr('earPlacement', value)
               else if (keyLower.includes('formfactor') || keyLower.includes('form_factor')) addAttr('formFactor', value)
               else if (keyLower.includes('noisecontrol')) addAttr('noiseControl', value)
@@ -613,12 +646,28 @@ export default function AdminAffiliateProductsPage() {
               else if (keyLower.includes('battery') && !keyLower.includes('capacity') && !keyLower.includes('composition') && !keyLower.includes('cell')) addAttr('batteryLife', value)
               // Other specs
               else if (keyLower.includes('capacity') && !keyLower.includes('battery') && !keyLower.includes('storage') && !keyLower.includes('memory')) addAttr('capacity', value)
-              else if (keyLower.includes('material')) addAttr('material', value)
-              else if (keyLower.includes('wattage') || keyLower.includes('powersource')) addAttr('wattage', value)
+              else if (keyLower.includes('material') && !keyLower.includes('band') && !keyLower.includes('case')) addAttr('material', value)
+              else if (keyLower.includes('wattage') || keyLower.includes('outputwattage')) addAttr('wattage', value)
+              else if (keyLower.includes('powersource')) addAttr('powerSource', value)
               else if (keyLower.includes('weight') || keyLower.includes('itemweight')) addAttr('itemWeight', value)
               else if (keyLower.includes('specialfeature')) addAttr('specialFeature', value)
-              else if (keyLower.includes('dimension')) addAttr('dimensions', value)
+              else if (keyLower.includes('dimension') || keyLower.includes('productdimension')) addAttr('productDimensions', value)
               else if (keyLower.includes('resolution')) addAttr('resolution', value)
+              // Kitchen/Appliances - Amazon Product Overview
+              else if (keyLower.includes('coffeemakertype') || keyLower.includes('coffee maker type')) addAttr('coffeeMakerType', value)
+              else if (keyLower.includes('filtertype') || keyLower.includes('filter type')) addAttr('filterType', value)
+              else if (keyLower.includes('finishtype') || keyLower.includes('finish type')) addAttr('finishType', value)
+              else if (keyLower.includes('controlmethod') || keyLower.includes('control method') || keyLower.includes('controltype')) addAttr('controlMethod', value)
+              else if (keyLower.includes('numberofsettings')) addAttr('numberOfSettings', value)
+              else if (keyLower.includes('maximumpressure') || keyLower.includes('pressure')) addAttr('maximumPressure', value)
+              else if (keyLower.includes('heatingelement')) addAttr('heatingElement', value)
+              else if (keyLower.includes('includedcomponents') || keyLower.includes('included components')) addAttr('includedComponents', value)
+              else if (keyLower.includes('watertankcapacity') || keyLower.includes('water tank')) addAttr('waterTankCapacity', value)
+              else if (keyLower.includes('voltage') || keyLower.includes('inputvoltage')) addAttr('voltage', value)
+              else if (keyLower.includes('modelnumber') || keyLower.includes('model number') || keyLower.includes('itemmodelnumber')) addAttr('itemModelNumber', value)
+              else if (keyLower.includes('producttype') || keyLower.includes('product type')) addAttr('productType', value)
+              else if (keyLower.includes('manufacturer')) addAttr('manufacturer', value)
+              else if (keyLower.includes('countryoforigin') || keyLower.includes('country of origin')) addAttr('countryOfOrigin', value)
               // If none of the above matched, add with the original key name (cleaned up)
               else {
                 // Only add if it's not a variant option and has a valid value
@@ -653,10 +702,12 @@ export default function AdminAffiliateProductsPage() {
           noiseControl: extracted.attributes?.noiseControl,
         })
         console.log('[Admin] Product Attributes (static specs only):', attrPairs)
-        
+
         if (attrPairs.length > 0) {
-          setProductAttributes(attrPairs)
-          console.log('[Admin] ✅ Auto-populated productAttributes:', attrPairs)
+          // Limit to maximum 8 product attributes
+          const limitedAttrPairs = attrPairs.slice(0, 8)
+          setProductAttributes(limitedAttrPairs)
+          console.log('[Admin] ✅ Auto-populated productAttributes (max 8):', limitedAttrPairs)
         } else {
           // Clear any existing attributes if none found
           setProductAttributes([])
@@ -1280,9 +1331,24 @@ export default function AdminAffiliateProductsPage() {
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="font-bold text-[#654321] text-sm sm:text-base mb-1.5 line-clamp-2 leading-tight">
-                            {product.productName}
-                          </div>
+                          <Tooltip delayDuration={100}>
+                            <TooltipTrigger asChild>
+                              <button 
+                                type="button"
+                                className="font-bold text-[#654321] text-sm sm:text-base mb-1.5 line-clamp-2 leading-tight cursor-pointer min-h-[2.5rem] text-left w-full bg-transparent border-0 p-0 hover:text-[#8B4513] transition-colors"
+                                title={product.productName}
+                              >
+                                {product.productName}
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent 
+                              className="max-w-[500px] bg-[#4A2F1A] text-white text-sm p-3 rounded-lg shadow-xl z-[9999]"
+                              side="top"
+                              sideOffset={8}
+                            >
+                              <p className="break-words whitespace-normal leading-relaxed">{product.productName}</p>
+                            </TooltipContent>
+                          </Tooltip>
                           <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-gradient-to-r from-amber-100 to-orange-100 rounded-full whitespace-nowrap">
                             <Package className="w-3 h-3 text-[#DAA520] flex-shrink-0" />
                             <span className="text-xs font-semibold text-[#8B4513] truncate max-w-[150px]">{product.category}</span>

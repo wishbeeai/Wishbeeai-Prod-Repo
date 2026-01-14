@@ -54,6 +54,16 @@ function decodeHtmlEntities(text: string | null | undefined): string {
     .replace(/&nbsp;/g, ' ')
     .replace(/&#160;/g, ' ')
     .replace(/&#xA0;/g, ' ')
+    // Remove directional marks (left-to-right, right-to-left)
+    .replace(/&lrm;/g, '')
+    .replace(/&rlm;/g, '')
+    .replace(/&#8206;/g, '')
+    .replace(/&#8207;/g, '')
+    .replace(/&#x200E;/g, '')
+    .replace(/&#x200F;/g, '')
+    // Also remove the actual Unicode characters for LRM/RLM
+    .replace(/\u200E/g, '')
+    .replace(/\u200F/g, '')
     // Decode numeric entities
     .replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(parseInt(dec, 10)))
     // Decode hex entities
@@ -476,6 +486,17 @@ async function extractWithoutAI(
       powerSource: null,
       controlMethod: null,
       specialFeatures: null,
+      // Kitchen/Appliances - Amazon Product Overview attributes
+      itemWeight: null,
+      productDimensions: null,
+      coffeeMakerType: null,
+      filterType: null,
+      finishType: null,
+      numberOfSettings: null,
+      maximumPressure: null,
+      includedComponents: null,
+      waterTankCapacity: null,
+      countryOfOrigin: null,
     },
   }
 
@@ -4101,17 +4122,31 @@ async function extractWithoutAI(
           /<ul[^>]*class=["'][^"']*features[^"']*["'][^>]*>([\s\S]*?)<\/ul>/i,
           /(?:built-in|includes|features)[^>]*>([^<]+(?:grinder|frother|steamer|filter|timer)[^<]*)</i,
         ]
-        
+
         for (const pattern of featurePatterns) {
           const match = htmlContent.match(pattern)
           if (match && match[1]) {
             const featuresText = match[1]
+            
+            // Skip if it looks like CSS (contains CSS-like patterns)
+            if (featuresText.includes('background:') || 
+                featuresText.includes('linear-gradient') || 
+                featuresText.includes('rgba(') ||
+                featuresText.includes('#000') ||
+                featuresText.includes('transform:') ||
+                featuresText.includes('::before') ||
+                featuresText.includes('::after') ||
+                featuresText.includes(':first-child')) {
+              console.log("[v0] ⚠️ Skipping kitchen features - looks like CSS content")
+              continue
+            }
+            
             const features = featuresText
               .split(/[,\n]/)
               .map(f => f.trim().replace(/<[^>]+>/g, ''))
-              .filter(f => f.length > 0 && f.length < 50)
+              .filter(f => f.length > 0 && f.length < 50 && !f.includes('{') && !f.includes('}'))
               .slice(0, 5)
-            
+
             if (features.length > 0) {
               productData.attributes.features = features.join(", ")
               console.log("[v0] Extracted features for Kitchen Appliance:", productData.attributes.features)
@@ -5028,18 +5063,35 @@ async function extractWithoutAI(
       /features["']?\s*[:=]\s*\[([^\]]+)\]/i,
       /<ul[^>]*class=["'][^"']*features[^"']*["'][^>]*>([\s\S]*?)<\/ul>/i,
     ]
-    
+
     for (const pattern of featuresPatterns) {
       const match = htmlContent.match(pattern)
       if (match && match[1]) {
         // Extract list items or comma-separated values
         const featuresText = match[1]
+        
+        // Skip if it looks like CSS (contains CSS-like patterns)
+        if (featuresText.includes('background:') || 
+            featuresText.includes('linear-gradient') || 
+            featuresText.includes('rgba(') ||
+            featuresText.includes('#000') ||
+            featuresText.includes('transform:') ||
+            featuresText.includes('transition:') ||
+            featuresText.includes('::before') ||
+            featuresText.includes('::after') ||
+            featuresText.includes(':first-child') ||
+            featuresText.includes(':after') ||
+            featuresText.includes(':before')) {
+          console.log("[v0] ⚠️ Skipping features - looks like CSS content")
+          continue
+        }
+        
         const features = featuresText
           .split(/[,\n]/)
-          .map(f => f.trim())
-          .filter(f => f.length > 0 && f.length < 50)
+          .map(f => f.trim().replace(/<[^>]+>/g, '')) // Remove HTML tags
+          .filter(f => f.length > 0 && f.length < 50 && !f.includes('{') && !f.includes('}') && !f.includes(':') && !f.includes('#'))
           .slice(0, 5) // Limit to 5 features
-        
+
         if (features.length > 0) {
           productData.attributes.features = features.join(", ")
           console.log("[v0] Extracted features from HTML:", productData.attributes.features)
@@ -6565,6 +6617,8 @@ async function extractWithoutAI(
         'brand': 'brand',
         'model': 'model',
         'model name': 'model',
+        'item model number': 'model',
+        'manufacturer': 'brand',
         // Audio/Headphones
         'ear placement': 'earPlacement',
         'form factor': 'formFactor',
@@ -6599,8 +6653,28 @@ async function extractWithoutAI(
         'voltage': 'voltage',
         'power source': 'powerSource',
         'control method': 'controlMethod',
+        'control type': 'controlMethod',
         'special features': 'specialFeatures',
         'special feature': 'specialFeatures',
+        // Kitchen/Appliances - Amazon Product Overview
+        'capacity': 'capacity',
+        'material': 'material',
+        'item weight': 'itemWeight',
+        'product dimensions': 'productDimensions',
+        'item dimensions': 'productDimensions',
+        'coffee maker type': 'coffeeMakerType',
+        'filter type': 'filterType',
+        'finish type': 'finishType',
+        'number of settings': 'numberOfSettings',
+        'maximum pressure': 'maximumPressure',
+        'included components': 'includedComponents',
+        'components included': 'includedComponents',
+        'water tank capacity': 'waterTankCapacity',
+        'reservoir capacity': 'waterTankCapacity',
+        // Additional common attributes
+        'country of origin': 'countryOfOrigin',
+        'output wattage': 'wattage',
+        'input voltage': 'voltage',
       }
       
       // Pattern 1: Extract from key-value table rows (th/td or span pairs)

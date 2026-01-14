@@ -791,8 +791,15 @@ export default function TrendingGiftsPage() {
 
                 {/* Content Section */}
                 <div className="p-4 flex-grow flex flex-col">
-                  {/* Title - Fixed 2 lines with ellipsis */}
-                  <h3 className="text-sm font-semibold text-[#654321] mb-1 line-clamp-2 min-h-[2.5rem] group-hover:text-[#8B4513] transition-colors" title={gift.giftName}>{gift.giftName}</h3>
+                  {/* Title - Fixed 2 lines with ellipsis, tooltip on hover */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <h3 className="text-sm font-semibold text-[#654321] mb-1 line-clamp-2 min-h-[2.5rem] group-hover:text-[#8B4513] transition-colors cursor-pointer">{gift.giftName}</h3>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-[300px] bg-[#4A2F1A] text-white text-xs p-2 rounded-lg shadow-lg">
+                      <p>{gift.giftName}</p>
+                    </TooltipContent>
+                  </Tooltip>
                   {gift.source && (
                     <p className="text-xs text-[#8B4513]/60 mb-1.5 flex items-center gap-1">
                       <span className="w-1 h-1 bg-[#DAA520] rounded-full"></span>
@@ -1014,8 +1021,15 @@ export default function TrendingGiftsPage() {
                   <div className="flex-1">
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex-1">
-                        {/* Title - Fixed 2 lines with ellipsis */}
-                        <h3 className="text-lg font-bold text-[#654321] mb-1 line-clamp-2 min-h-[3.5rem]" title={gift.giftName}>{gift.giftName}</h3>
+                        {/* Title - Fixed 2 lines with ellipsis, tooltip on hover */}
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <h3 className="text-lg font-bold text-[#654321] mb-1 line-clamp-2 min-h-[3.5rem] cursor-pointer">{gift.giftName}</h3>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-[400px] bg-[#4A2F1A] text-white text-sm p-3 rounded-lg shadow-lg">
+                            <p>{gift.giftName}</p>
+                          </TooltipContent>
+                        </Tooltip>
                         {gift.source && <p className="text-sm text-[#8B4513]/70 mb-2">From {gift.source}</p>}
                         {/* Product Specifications - List View - Fixed height */}
                         <div className="mb-2 h-[140px] bg-gradient-to-r from-[#6B4423]/5 to-[#8B5A3C]/5 rounded-lg p-2 border border-[#8B5A3C]/10 overflow-hidden">
