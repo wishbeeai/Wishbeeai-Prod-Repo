@@ -2,12 +2,13 @@
 
 import { useState, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Search, Filter, Star, TrendingUp, SlidersHorizontal, Grid3x3, List, X, Heart, Trash2, Loader2, ExternalLink } from "lucide-react"
+import { ArrowLeft, Search, Filter, Star, TrendingUp, SlidersHorizontal, Grid3x3, List, X, Heart, Trash2, Loader2, ExternalLink, Info } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { AddToWishlistModal } from "@/components/add-to-wishlist-modal"
 import { useAuth } from "@/lib/auth-context"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 
 const ADMIN_EMAIL = "wishbeeai@gmail.com"
 
@@ -773,7 +774,7 @@ export default function TrendingGiftsPage() {
                   <img
                     src={gift.image || gift.bannerImage || "/placeholder.svg"}
                     alt={gift.giftName}
-                    className="w-full h-52 object-cover group-hover:scale-110 transition-transform duration-500"
+                    className="w-full h-52 object-contain bg-white group-hover:scale-110 transition-transform duration-500"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                   {gift.category && (
@@ -838,6 +839,14 @@ export default function TrendingGiftsPage() {
                       {gift.reviewCount && gift.reviewCount > 0 && (
                         <span className="text-xs text-gray-500">({gift.reviewCount.toLocaleString()})</span>
                       )}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600 cursor-help ml-1" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-[220px] bg-[#4A2F1A] text-white text-xs p-2 rounded-lg shadow-lg">
+                          <p>Ratings, reviews, and prices are shown as captured when the item was added and may change on the retailer's website.</p>
+                        </TooltipContent>
+                      </Tooltip>
                     </div>
                   )}
 
@@ -994,7 +1003,7 @@ export default function TrendingGiftsPage() {
                     <img
                       src={gift.image || gift.bannerImage || "/placeholder.svg"}
                       alt={gift.giftName}
-                      className="w-32 h-32 object-cover rounded-lg border-2 border-[#DAA520] group-hover:scale-105 transition-transform duration-300"
+                      className="w-32 h-32 object-contain bg-white rounded-lg border-2 border-[#DAA520] group-hover:scale-105 transition-transform duration-300"
                     />
                     {gift.originalPrice && gift.originalPrice > gift.targetAmount && (
                       <div className="absolute top-2 left-2 bg-gradient-to-r from-red-500 to-rose-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg">
@@ -1094,6 +1103,14 @@ export default function TrendingGiftsPage() {
                           {gift.reviewCount && gift.reviewCount > 0 && (
                             <span className="text-sm text-gray-500">({gift.reviewCount.toLocaleString()} reviews)</span>
                           )}
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600 cursor-help ml-1" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-[220px] bg-[#4A2F1A] text-white text-xs p-2 rounded-lg shadow-lg">
+                              <p>Ratings, reviews, and prices are shown as captured when the item was added and may change on the retailer's website.</p>
+                            </TooltipContent>
+                          </Tooltip>
                         </div>
                       )}
                       {(gift.amazonChoice || gift.bestSeller || gift.overallPick) && (

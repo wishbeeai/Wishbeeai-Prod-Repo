@@ -51,6 +51,48 @@ export async function OPTIONS() {
   return NextResponse.json({}, { headers: corsHeaders })
 }
 
+// Helper function to check if image is a color swatch or placeholder (not a product image)
+function isSwatchOrPlaceholderImage(imageUrl: string | undefined): boolean {
+  if (!imageUrl) return true
+  const url = imageUrl.toLowerCase()
+  
+  // Amazon color swatch and placeholder patterns
+  // Be careful not to filter out valid product images!
+  const invalidPatterns = [
+    /_us\d{2}_/i,         // _US40_, etc. (very small - 2 digit thumbnails)
+    /_sx\d{2}_/i,         // _SX38_, etc. (very small)
+    /_sy\d{2}_/i,         // _SY38_, etc. (very small)
+    /_ss\d{2}_/i,         // _SS40_, etc. (very small)
+    /swatch/i,            // Contains "swatch"
+    /\+\+/,               // Contains ++ (like 01++SjnuXRL)
+    /transparent/i,       // Transparent placeholder
+    /blank/i,             // Blank image
+    /placeholder/i,       // Placeholder
+    /spacer/i,            // Spacer image
+    /pixel/i,             // Tracking pixel
+  ]
+  
+  // Check if URL matches any invalid pattern
+  if (invalidPatterns.some(pattern => pattern.test(url))) {
+    console.log('[save-variants] Rejected image - matches invalid pattern:', url.substring(0, 60))
+    return true
+  }
+  
+  // Check if image ID looks like a placeholder
+  const imageIdMatch = url.match(/\/images\/i\/([^.]+)\./i)
+  if (imageIdMatch && imageIdMatch[1]) {
+    const imageId = imageIdMatch[1]
+    // Valid Amazon product images have IDs like 41XxYzAbCdE, 71ABcDeFgHi (start with digits 3-9)
+    // Placeholders often start with 0 and have weird characters like 01++SjnuXRL
+    if (imageId.startsWith('0') && (imageId.includes('+') || imageId.length < 8)) {
+      console.log('[save-variants] Rejected placeholder image ID:', imageId)
+      return true
+    }
+  }
+  
+  return false
+}
+
 // POST - Save variants from extension
 export async function POST(req: NextRequest) {
   try {
@@ -63,7 +105,11 @@ export async function POST(req: NextRequest) {
     Object.entries(variants || {}).forEach(([key, value]) => {
       console.log(`[save-variants] ✅ ${key}: ${value}`)
     })
-    console.log('[save-variants] Image:', image?.substring(0, 50))
+    console.log('[save-variants] Raw Image:', image?.substring(0, 80))
+    
+    // Filter out swatch/placeholder images
+    const validImage = isSwatchOrPlaceholderImage(image) ? undefined : image
+    console.log('[save-variants] Valid Image:', validImage ? validImage.substring(0, 80) : 'REJECTED (swatch/placeholder)')
     console.log('[save-variants] ================================================')
 
     if (!variants || typeof variants !== 'object') {
@@ -90,13 +136,13 @@ export async function POST(req: NextRequest) {
     // Clear any old data first to ensure fresh data
     variantStore.clear()
     
-    // Store variants with fresh timestamp
+    // Store variants with fresh timestamp (use validImage, not raw image)
     const now = Date.now()
     const dataToStore: VariantData = {
       variants,
       specifications: specifications || {},
       url: url || '',
-      image: image || undefined,
+      image: validImage, // Use filtered image (undefined if swatch/placeholder)
       title: title || undefined,
       price: price || undefined,
       timestamp: now,
@@ -111,7 +157,7 @@ export async function POST(req: NextRequest) {
 
     console.log('[save-variants] ========== POST RECEIVED ==========')
     console.log('[save-variants] POST - Key:', storeKey)
-    console.log('[save-variants] POST - Received image:', image ? image.substring(0, 80) : 'NONE')
+    console.log('[save-variants] POST - Stored image:', validImage ? validImage.substring(0, 80) : 'NONE (filtered out)')
     console.log('[save-variants] POST - Variants:', JSON.stringify(variants))
     console.log('[save-variants] POST - Specifications:', JSON.stringify(specifications || {}))
     console.log('[save-variants] POST - Store size after save:', variantStore.size)

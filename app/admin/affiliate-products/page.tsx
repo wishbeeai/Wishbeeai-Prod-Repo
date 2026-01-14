@@ -113,8 +113,8 @@ export default function AdminAffiliateProductsPage() {
   const [extractedProduct, setExtractedProduct] = useState<any>(null)
   // Custom fields for product specifications
   const [customFields, setCustomFields] = useState<Array<{name: string, value: string}>>([])
-  // Product attributes (Brand, Color, Ear Placement, etc.)
-  const [productAttributes, setProductAttributes] = useState<Array<{name: string, value: string}>>([])
+  // Product attributes (Brand, Color, Ear Placement, etc.) - include id for stable React keys
+  const [productAttributes, setProductAttributes] = useState<Array<{id: string, name: string, value: string}>>([])
   // Custom badges for product
   const [customBadges, setCustomBadges] = useState<Array<{name: string, enabled: boolean}>>([])
   // Temporary string values to preserve decimal points while typing
@@ -295,13 +295,14 @@ export default function AdminAffiliateProductsPage() {
     setCustomFields(product.attributes?.customFields || [])
     // Load custom badges from product attributes
     setCustomBadges(product.attributes?.customBadges || [])
-    // Load product attributes as key-value pairs
-    const attrPairs: Array<{name: string, value: string}> = []
+    // Load product attributes as key-value pairs (with unique ids for stable React keys)
+    const attrPairs: Array<{id: string, name: string, value: string}> = []
+    let editAttrCounter = 0
     if (product.attributes) {
       const excludeKeys = ['customFields', 'customBadges', 'configurationOptions', 'model']
       for (const [key, value] of Object.entries(product.attributes)) {
         if (!excludeKeys.includes(key) && value && typeof value === 'string') {
-          attrPairs.push({ name: key, value: value })
+          attrPairs.push({ id: `edit-attr-${Date.now()}-${editAttrCounter++}`, name: key, value: value })
         }
       }
     }
@@ -507,7 +508,8 @@ export default function AdminAffiliateProductsPage() {
         
         // Auto-populate productAttributes from extracted data
         // Only include STATIC product specifications, NOT variant options
-        const attrPairs: Array<{name: string, value: string}> = []
+        const attrPairs: Array<{id: string, name: string, value: string}> = []
+        let attrIdCounter = 0
         
         // Variant options to exclude - these are selectable in "Add to My Wishlist" modal
         const variantOptionsToExclude = [
@@ -522,7 +524,7 @@ export default function AdminAffiliateProductsPage() {
           if (!variantOptionsToExclude.includes(name) && value && !attrPairs.find(p => p.name === name)) {
             const strValue = typeof value === 'string' ? value : String(value)
             if (strValue && strValue !== 'null' && strValue !== 'undefined' && strValue.trim() !== '') {
-              attrPairs.push({ name, value: strValue })
+              attrPairs.push({ id: `attr-${Date.now()}-${attrIdCounter++}`, name, value: strValue })
             }
           }
         }
@@ -891,19 +893,27 @@ export default function AdminAffiliateProductsPage() {
         bestSeller: extractedProduct?.bestSeller ?? formData.bestSeller,
         // Include ALL product specifications/attributes dynamically
         attributes: (() => {
-          // Start with all extracted attributes
-          const attrs: Record<string, any> = { ...extractedProduct.attributes }
+          // Start with an EMPTY object - only include what user has in productAttributes
+          const attrs: Record<string, any> = {}
           
-          // Remove single-value color/size/style (not useful for display)
-          // BUT KEEP the variant arrays (colorVariants, sizeOptions, styleOptions, combinedVariants)
-          // so we can determine if product has multiple options to choose from
-          const excludeKeys = ['color', 'size', 'style', 'styleName', 'patternName']
-          excludeKeys.forEach(key => delete attrs[key])
+          // Keep ONLY variant arrays from extracted attributes (these are needed for variant detection)
+          // These are not editable in the UI, but needed for "Add to My Wishlist" modal logic
+          const variantArrayKeys = ['colorVariants', 'sizeOptions', 'styleOptions', 'combinedVariants', 'configurationOptions']
+          if (extractedProduct.attributes) {
+            variantArrayKeys.forEach(key => {
+              if (extractedProduct.attributes[key]) {
+                attrs[key] = extractedProduct.attributes[key]
+              }
+            })
+          }
           
-          // Add product attributes from the dynamic list
+          // Add ONLY the product attributes from the user-edited dynamic list
+          // This respects user deletions - deleted items won't be included
           productAttributes.filter(a => a.name && a.value).forEach(attr => {
             attrs[attr.name] = attr.value
           })
+          
+          console.log('[handleSave] Product attributes from UI:', productAttributes.map(a => a.name))
           
           // Add custom fields if any
           if (customFields.filter(f => f.name && f.value).length > 0) {
@@ -1229,7 +1239,7 @@ export default function AdminAffiliateProductsPage() {
           <div className="overflow-x-auto">
             {sortedProducts.length === 0 ? (
               <div className="py-12 text-center">
-                <p className="text-gray-500 text-lg">
+                <p className="text-gray-500 text-sm">
                   {products.length === 0
                     ? "No affiliate products yet. Add your first product to get started!"
                     : "No products match your filters. Try adjusting your search or filters."}
@@ -2102,14 +2112,14 @@ export default function AdminAffiliateProductsPage() {
                     <div className="bg-white rounded-xl p-4 shadow-md border border-amber-200">
                       <label className="block text-sm font-bold text-[#654321] mb-3">Product Attributes</label>
                       <div className="space-y-2">
-                        {productAttributes.map((attr, idx) => (
-                          <div key={idx} className="flex items-center gap-2">
+                        {productAttributes.map((attr) => (
+                          <div key={attr.id} className="flex items-center gap-2">
                             <Input
                               value={attr.name || ''}
                               onChange={(e) => {
-                                const newAttrs = [...productAttributes]
-                                newAttrs[idx] = { ...newAttrs[idx], name: e.target.value }
-                                setProductAttributes(newAttrs)
+                                setProductAttributes(prev => prev.map(a => 
+                                  a.id === attr.id ? { ...a, name: e.target.value } : a
+                                ))
                               }}
                               className="w-40 h-8 text-sm font-medium border-gray-300 focus:border-amber-500"
                               placeholder="Attribute name"
@@ -2117,9 +2127,9 @@ export default function AdminAffiliateProductsPage() {
                             <Input
                               value={attr.value || ''}
                               onChange={(e) => {
-                                const newAttrs = [...productAttributes]
-                                newAttrs[idx] = { ...newAttrs[idx], value: e.target.value }
-                                setProductAttributes(newAttrs)
+                                setProductAttributes(prev => prev.map(a => 
+                                  a.id === attr.id ? { ...a, value: e.target.value } : a
+                                ))
                               }}
                               className="flex-1 h-8 text-sm border-gray-300 focus:border-amber-500"
                               placeholder="Enter value"
@@ -2129,8 +2139,8 @@ export default function AdminAffiliateProductsPage() {
                               variant="ghost"
                               size="sm"
                               onClick={() => {
-                                const newAttrs = productAttributes.filter((_, i) => i !== idx)
-                                setProductAttributes(newAttrs)
+                                console.log('[Admin] Deleting attribute:', attr.id, attr.name)
+                                setProductAttributes(prev => prev.filter(a => a.id !== attr.id))
                               }}
                               className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
                             >
@@ -2146,7 +2156,7 @@ export default function AdminAffiliateProductsPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => {
-                            setProductAttributes([...productAttributes, { name: '', value: '' }])
+                            setProductAttributes(prev => [...prev, { id: `new-attr-${Date.now()}`, name: '', value: '' }])
                           }}
                           className="text-xs h-7 border-amber-400 text-amber-700 hover:bg-amber-50 mt-2"
                         >

@@ -28,7 +28,9 @@ import {
   Plus,
   Trash2,
   Heart,
+  Pencil,
 } from "lucide-react"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 
 interface ExtractedProduct {
   productName: string
@@ -55,8 +57,16 @@ interface ExtractedProduct {
   }
 }
 
+// Helper function to clean HTML entities from values
+function cleanHtmlEntities(value: string): string {
+  return value
+    .replace(/&lrm;|&rlm;|&zwj;|&zwnj;|&#x200e;|&#x200f;|&#8206;|&#8207;/gi, '')
+    .replace(/[\u200E\u200F\u200C\u200D\u2066\u2067\u2068\u2069]/g, '')
+    .trim()
+}
+
 // Helper function to get filtered specifications (matching /gifts/trending page)
-function getFilteredSpecifications(attributes: Record<string, any> | undefined): Array<[string, any]> {
+function getFilteredSpecifications(attributes: Record<string, any> | undefined): Array<[string, string]> {
   if (!attributes) return []
   
   // Only exclude variant-related keys (same as trending page)
@@ -65,18 +75,20 @@ function getFilteredSpecifications(attributes: Record<string, any> | undefined):
     'combinedVariants', 'styleOptions', 'styleName', 'patternName'
   ]
   
-  return Object.entries(attributes).filter(([key, value]) => {
-    const keyLower = key.toLowerCase()
-    // Exclude if in explicit list
-    if (excludedKeys.some(ek => keyLower === ek.toLowerCase())) return false
-    // Exclude null/undefined/empty
-    if (value === null || value === undefined || value === '') return false
-    // Exclude arrays and objects
-    if (Array.isArray(value) || typeof value === 'object') return false
-    // Exclude garbage values
-    if (isGarbageValue(String(value))) return false
-    return true
-  })
+  return Object.entries(attributes)
+    .filter(([key, value]) => {
+      const keyLower = key.toLowerCase()
+      // Exclude if in explicit list
+      if (excludedKeys.some(ek => keyLower === ek.toLowerCase())) return false
+      // Exclude null/undefined/empty
+      if (value === null || value === undefined || value === '') return false
+      // Exclude arrays and objects
+      if (Array.isArray(value) || typeof value === 'object') return false
+      // Exclude garbage values
+      if (isGarbageValue(String(value))) return false
+      return true
+    })
+    .map(([key, value]) => [key, cleanHtmlEntities(String(value))] as [string, string])
 }
 
 // Helper to check if a value is garbage data
@@ -101,7 +113,13 @@ function isGarbageValue(value: string): boolean {
 function cleanExtractedValue(value: string | null | undefined): string | null {
   if (!value) return null
   
-  const str = String(value).trim()
+  let str = String(value).trim()
+  
+  // Remove HTML entities like &lrm; (Left-to-Right Mark), &rlm; (Right-to-Left Mark), etc.
+  str = str.replace(/&lrm;|&rlm;|&zwj;|&zwnj;|&#x200e;|&#x200f;|&#8206;|&#8207;/gi, '')
+  // Also remove the actual Unicode characters (LRM, RLM, ZWJ, ZWNJ)
+  str = str.replace(/[\u200E\u200F\u200C\u200D\u2066\u2067\u2068\u2069]/g, '')
+  str = str.trim()
   
   // If too long (likely garbage), reject
   if (str.length > 100) return null
@@ -213,6 +231,10 @@ export function UnifiedAddWishlist() {
   // Custom fields and notes for Alternative
   const [altCustomFields, setAltCustomFields] = useState<Array<{ id: string; key: string; value: string }>>([])
   const [altNotes, setAltNotes] = useState("")
+
+  // Editable specifications
+  const [editableSpecs, setEditableSpecs] = useState<Record<string, string>>({})
+  const [isEditingSpecs, setIsEditingSpecs] = useState(false)
 
   // Preference level for variants - REQUIRED to prevent delays in gift purchases
   // This helps contributors know exactly which variant to purchase, avoiding wrong purchases and delays
@@ -343,18 +365,147 @@ export function UnifiedAddWishlist() {
           if (data.variants && Object.keys(data.variants).length > 0) {
             console.log('[Alt Clip] Received variants:', data.variants)
             
-            // Normalize variant keys
+            // Filter and normalize variant keys - remove garbage data
             const normalizedAttributes: Record<string, string> = {}
+            const seenValues = new Set<string>()
+            
+            // Garbage patterns to filter out - for KEYS only
+            const garbageKeyPatterns = [
+              /\$\d+/,                    // Contains price like $593.87
+              /option from/i,             // "1 option from $593.87"
+              /^\d+\s+option/i,           // "1 option..."
+              /see available/i,           // "See available options"
+              /^\d+$/,                    // Pure numbers
+            ]
+            
+            // Valid variant keys we want to keep
+            const validVariantKeys = ['color', 'size', 'style', 'set', 'configuration', 'pattern', 'material', 'capacity', 'band', 'connector', 'type']
+            
             for (const [key, value] of Object.entries(data.variants)) {
-              if (value) {
-                const normalizedKey = normalizeAttributeKey(key)
-                normalizedAttributes[normalizedKey] = value as string
+              if (!value || typeof value !== 'string') continue
+              
+              const keyLower = key.toLowerCase().trim()
+              
+              // Skip if key matches garbage patterns
+              if (garbageKeyPatterns.some(p => p.test(key))) {
+                console.log('[Alt Clip] Skipping garbage key:', key)
+                continue
               }
+              
+              // Skip if key is not a valid variant key
+              if (!validVariantKeys.some(vk => keyLower.includes(vk))) {
+                console.log('[Alt Clip] Skipping non-variant key:', key)
+                continue
+              }
+              
+              // FIRST: Clean the value - remove extra whitespace and price info BEFORE checking if it's garbage
+              let cleanedValue = value
+                .replace(/\s+/g, ' ')                    // Normalize whitespace
+                .replace(/\$[\d,.]+/g, '')              // Remove prices
+                .replace(/\d+\s*option[s]?\s*from/gi, '') // Remove "X options from"
+                .replace(/see available options?/gi, '') // Remove "see available"
+                .trim()
+              
+              // For style/configuration keys, extract just Lightning/USB-C if present
+              if (keyLower.includes('style') || keyLower.includes('configuration') || keyLower.includes('connector')) {
+                // Check for Lightning or USB-C in the value
+                const connectorMatch = cleanedValue.match(/\b(Lightning|USB-C|USB Type-C)\b/i)
+                if (connectorMatch) {
+                  cleanedValue = connectorMatch[1]
+                  console.log('[Alt Clip] Extracted connector type:', cleanedValue)
+                }
+              }
+              
+              // Now check if the CLEANED value is still garbage
+              if (!cleanedValue || cleanedValue.length < 2 || cleanedValue.length > 100) {
+                console.log('[Alt Clip] Skipping empty/invalid cleaned value:', key, '=', cleanedValue)
+                continue
+              }
+              
+              // Skip garbage words that are clearly not variant options
+              const garbageWords = ['price', 'option', 'select', 'choose', 'available', 'buy', 'cart', 'add', 'from', 'shipping', 'delivery']
+              if (garbageWords.includes(cleanedValue.toLowerCase())) {
+                console.log('[Alt Clip] Skipping garbage word value:', key, '=', cleanedValue)
+                continue
+              }
+              
+              // Skip duplicate values
+              if (seenValues.has(cleanedValue.toLowerCase())) {
+                console.log('[Alt Clip] Skipping duplicate value:', key, '=', cleanedValue)
+                continue
+              }
+              seenValues.add(cleanedValue.toLowerCase())
+              
+              const normalizedKey = normalizeAttributeKey(key)
+              normalizedAttributes[normalizedKey] = cleanedValue
             }
+            
+            console.log('[Alt Clip] Cleaned attributes:', normalizedAttributes)
             
             // Found clipped data for Alternative
             setAltAttributes(normalizedAttributes)
-            if (data.image) setAltClippedImage(data.image)
+            
+            // Check if the clipped image is a valid product image (not a color swatch or placeholder)
+            // Color swatches and placeholders are typically very small images with specific URL patterns
+            const isInvalidProductImage = (imageUrl: string): boolean => {
+              if (!imageUrl) return true
+              const url = imageUrl.toLowerCase()
+              
+              // Amazon color swatch and placeholder patterns
+              // Be careful not to filter out valid product images!
+              const invalidPatterns = [
+                /_us\d{2,3}_/i,       // _US40_, _US50_, etc. (small thumbnails) 
+                /_sx\d{2}_/i,         // _SX38_, etc. (very small - 2 digits only)
+                /_sy\d{2}_/i,         // _SY38_, etc. (very small - 2 digits only)
+                /_ss\d{2}_/i,         // _SS40_, etc. (very small - 2 digits only)
+                /swatch/i,            // Contains "swatch"
+                /\+\+/,               // Contains ++ (like 01++SjnuXRL)
+                /transparent/i,       // Transparent placeholder
+                /blank/i,             // Blank image
+                /placeholder/i,       // Placeholder
+                /spacer/i,            // Spacer image
+                /pixel/i,             // Tracking pixel
+              ]
+              
+              // Check if URL matches any invalid pattern
+              if (invalidPatterns.some(pattern => pattern.test(url))) {
+                return true
+              }
+              
+              // Check if image ID looks like a placeholder
+              const imageIdMatch = url.match(/\/images\/I\/([^.]+)\./i)
+              if (imageIdMatch && imageIdMatch[1]) {
+                const imageId = imageIdMatch[1]
+                // Valid Amazon product images typically have IDs like 41XxYzAbCdE, 71ABcDeFgHi, etc.
+                // They start with digits like 31, 41, 51, 61, 71, 81, 91
+                // Placeholders often start with 0 and have weird IDs like 01++SjnuXRL
+                if (imageId.startsWith('0') && (imageId.includes('+') || imageId.length < 8)) {
+                  console.log('[Alt Clip] Invalid placeholder image ID detected:', imageId)
+                  return true
+                }
+              }
+              
+              return false
+            }
+            
+            // Log received image for debugging
+            console.log('[Alt Clip] Received image URL:', data.image?.substring(0, 100))
+            
+            // Use the clipped image only if it's a valid product image
+            // Do NOT fall back to main product image - Alternative should have its own distinct image
+            if (data.image && !isInvalidProductImage(data.image)) {
+              setAltClippedImage(data.image)
+              console.log('[Alt Clip] ✅ Using clipped product image:', data.image?.substring(0, 80))
+            } else {
+              // Log why the image was rejected
+              if (data.image) {
+                const imageIdMatch = data.image.match(/\/images\/I\/([^.]+)\./i)
+                console.log('[Alt Clip] ⚠️ Image rejected - URL:', data.image?.substring(0, 80))
+                console.log('[Alt Clip] ⚠️ Image ID:', imageIdMatch?.[1] || 'not found')
+              }
+              // Keep Alternative image empty if clipped image is invalid
+              console.log('[Alt Clip] Clipped image is invalid/placeholder, Alternative image will be empty')
+            }
             if (data.title) setAltClippedTitle(data.title)
             setIsWaitingForAltClip(false)
             
@@ -393,7 +544,7 @@ export function UnifiedAddWishlist() {
     setShowExtractedProduct(false)
 
     try {
-      console.log("[v0] Auto-extracting product from URL:", url)
+      console.log("[v0] (AUTO) Auto-extracting product from URL:", url)
 
       const extractResponse = await fetch("/api/ai/extract-product", {
         method: "POST",
@@ -425,11 +576,12 @@ export function UnifiedAddWishlist() {
         }
       }
       
-      console.log("[v0] Cleaned attributes (auto):", JSON.stringify(cleanedAttributes, null, 2))
+      console.log("[v0] (AUTO) Cleaned attributes:", JSON.stringify(cleanedAttributes, null, 2))
+      console.log("[v0] (AUTO) ALL raw attributes from API:", JSON.stringify(extractedData.attributes || {}, null, 2))
       
       // Extract variant options from the product TITLE (most reliable for Apple Watch, etc.)
       const title = extractedData.productName || ''
-      console.log("[v0] Parsing title for variants:", title)
+      console.log("[v0] (AUTO) Parsing title for variants:", title)
       
       // Parse title for Apple Watch format: "[GPS + Cellular 42mm] ... with Silver Aluminum Case with Purple Fog Sport Band - S/M"
       let titleColor = ''
@@ -437,44 +589,130 @@ export function UnifiedAddWishlist() {
       let titleStyle = ''
       let titleConfig = ''
       
-      // Extract size from title (e.g., "42mm", "46mm")
-      const sizeMatch = title.match(/\b(\d+mm)\b/i)
-      if (sizeMatch) {
-        titleSize = sizeMatch[1]
-        console.log("[v0] Title extracted size:", titleSize)
+      // Extract size from title - multiple patterns
+      // Pattern 1: Watch sizes (42mm, 46mm)
+      const watchSizeMatch = title.match(/\b(\d+mm)\b/i)
+      if (watchSizeMatch) {
+        titleSize = watchSizeMatch[1]
+        console.log("[v0] (AUTO) Title extracted watch size:", titleSize)
       }
       
-      // Extract band size (S/M, M/L, etc.)
+      // Pattern 2: Band sizes (S/M, M/L, etc.)
       const bandSizeMatch = title.match(/\b(S\/M|M\/L|L\/XL|XS|XL)\b/i)
       if (bandSizeMatch) {
         titleSize = titleSize ? `${titleSize} + ${bandSizeMatch[1]}` : bandSizeMatch[1]
-        console.log("[v0] Title extracted band size:", bandSizeMatch[1])
+        console.log("[v0] (AUTO) Title extracted band size:", bandSizeMatch[1])
+      }
+      
+      // Pattern 3: Kitchen appliance sizes (3 Quart, 6 Qt, 8-Quart, etc.)
+      if (!titleSize) {
+        const kitchenSizeMatch = title.match(/\b(\d+(?:\.\d+)?)\s*[-]?\s*(Quart|Qt|Quarts|Cup|Cups|Liter|Liters|L|Gallon|Gallons|Oz|Ounce|Ounces)\b/i)
+        if (kitchenSizeMatch) {
+          titleSize = `${kitchenSizeMatch[1]} ${kitchenSizeMatch[2]}`
+          console.log("[v0] (AUTO) Title extracted kitchen size:", titleSize)
+        }
+      }
+      
+      // Pattern 4: General inch/feet sizes (24 inch, 55", 6 ft, etc.)
+      if (!titleSize) {
+        const inchSizeMatch = title.match(/\b(\d+(?:\.\d+)?)\s*[-]?\s*(inch|inches|"|in\.|ft|feet|foot)\b/i)
+        if (inchSizeMatch) {
+          const unit = inchSizeMatch[2] === '"' ? 'inch' : inchSizeMatch[2]
+          titleSize = `${inchSizeMatch[1]} ${unit}`
+          console.log("[v0] (AUTO) Title extracted inch/ft size:", titleSize)
+        }
       }
       
       // Extract configuration from title (GPS, GPS + Cellular)
       const configMatch = title.match(/\[(GPS\s*\+?\s*Cellular|GPS)(?:\s+\d+mm)?\]/i)
       if (configMatch) {
         titleConfig = configMatch[1].trim()
-        console.log("[v0] Title extracted configuration:", titleConfig)
+        console.log("[v0] (AUTO) Title extracted configuration:", titleConfig)
       }
       
       // Extract case color/material from title (e.g., "Silver Aluminum Case", "Rose Gold Titanium Case")
       const caseMatch = title.match(/with\s+((?:Rose\s+Gold|Silver|Space\s+Gr[ae]y|Starlight|Midnight|Gold|Jet\s+Black|Natural|Slate|Black|Blue|Pink|Purple)\s+(?:Titanium|Alumini?um|Stainless\s+Steel)\s+Case)/i)
       if (caseMatch) {
         titleColor = caseMatch[1].trim()
-        console.log("[v0] Title extracted case color:", titleColor)
+        console.log("[v0] (AUTO) Title extracted case color:", titleColor)
+      }
+      
+      // Extract color from end of title for AirPods Max and other products (e.g., "– Pink", "- Blue")
+      console.log("[v0] (AUTO) Checking for end color in title:", title.substring(title.length - 30))
+      if (!titleColor) {
+        const endColorMatch = title.match(/[–\-—]\s*(Pink|Purple|Blue|Green|Orange|Midnight|Starlight|Silver|Space\s*Gr[ae]y|Sky\s*Blue|Red|White|Black|Gold|Rose\s*Gold)\s*$/i)
+        if (endColorMatch) {
+          titleColor = endColorMatch[1].trim()
+          console.log("[v0] (AUTO) Title extracted end color (dash pattern):", titleColor)
+        } else {
+          const lastPart = title.substring(title.length - 50)
+          const colorWordMatch = lastPart.match(/\b(Pink|Purple|Blue|Green|Orange|Midnight|Starlight|Silver|Space\s*Gr[ae]y|Sky\s*Blue|Red|White|Black|Gold|Rose\s*Gold)\b/i)
+          if (colorWordMatch) {
+            titleColor = colorWordMatch[1].trim()
+            console.log("[v0] (AUTO) Title extracted color from last 50 chars:", titleColor)
+          }
+        }
       }
       
       // Extract band from title (e.g., "Purple Fog Sport Band - S/M")
       const bandMatch = title.match(/Case\s+with\s+([\w\s]+(?:Sport\s+Band|Sport\s+Loop|Milanese\s+Loop|Solo\s+Loop|Braided\s+Solo\s+Loop|Link\s+Bracelet|Ocean\s+Band|Alpine\s+Loop|Trail\s+Loop))/i)
       if (bandMatch) {
         titleStyle = bandMatch[1].trim()
-        console.log("[v0] Title extracted band/style:", titleStyle)
+        console.log("[v0] (AUTO) Title extracted band/style:", titleStyle)
+      }
+      
+      // Generic color extraction: Look for colors in pipe/comma/dash-separated title patterns
+      // This catches colors like "Cherry Crush", "Ginger Snap", etc.
+      if (!titleColor) {
+        // Pattern 1: Look for pipe-separated color (e.g., "Brand | Ginger Snap | Model")
+        const pipeSegments = title.split('|').map(s => s.trim())
+        if (pipeSegments.length >= 2) {
+          for (let i = 1; i < pipeSegments.length - 1; i++) {
+            const segment = pipeSegments[i]
+            if (segment.length < 30 && !segment.match(/\d{3,}|[A-Z]{2,}\d+|\d+\s*(gb|tb|mm|inch|hz|w|v)/i)) {
+              titleColor = segment
+              console.log("[v0] (AUTO) Title extracted color from pipe pattern:", titleColor)
+              break
+            }
+          }
+          if (!titleColor && pipeSegments.length === 2) {
+            const lastSegment = pipeSegments[1]
+            if (lastSegment.length < 30 && !lastSegment.match(/\d{3,}|[A-Z]{2,}\d+/i)) {
+              titleColor = lastSegment
+              console.log("[v0] (AUTO) Title extracted color from last pipe segment:", titleColor)
+            }
+          }
+        }
+        
+        // Pattern 2: Look for comma-separated color at end
+        if (!titleColor) {
+          const commaColorMatch = title.match(/,\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s*$/i)
+          if (commaColorMatch && commaColorMatch[1].length < 30) {
+            const potentialColor = commaColorMatch[1].trim()
+            if (!potentialColor.match(/\d|inch|mm|gb|tb|pack|count|set|kit|bundle|edition|version|model/i)) {
+              titleColor = potentialColor
+              console.log("[v0] (AUTO) Title extracted color from comma pattern:", titleColor)
+            }
+          }
+        }
+        
+        // Pattern 3: Look for dash-separated color at end
+        if (!titleColor) {
+          const dashColorMatch = title.match(/[-–—]\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s*$/i)
+          if (dashColorMatch && dashColorMatch[1].length < 30) {
+            const potentialColor = dashColorMatch[1].trim()
+            if (!potentialColor.match(/\d|inch|mm|gb|tb|pack|count|set|kit|bundle|edition|version|model/i)) {
+              titleColor = potentialColor
+              console.log("[v0] (AUTO) Title extracted color from dash pattern:", titleColor)
+            }
+          }
+        }
       }
       
       // Build dynamic variants object preserving original labels from the retailer
       // Only include variant-like attributes (not specifications)
-      const variantKeys = ['color', 'size', 'style', 'configuration', 'set', 'pattern', 'band', 'capacity', 'material']
+      // Note: 'material' removed - it's typically a specification, not a variant option
+      const variantKeys = ['color', 'size', 'style', 'configuration', 'set', 'pattern', 'band', 'capacity', 'connector', 'type', 'finish']
       const specificationPatterns = [
         /\d+\s*(gb|tb|mb)/i, // Storage specs
         /\d+\s*(mah|wh)/i,   // Battery specs
@@ -491,6 +729,85 @@ export function UnifiedAddWishlist() {
       if (titleStyle) dynamicVariants['Style'] = titleStyle
       if (titleConfig) dynamicVariants['Configuration'] = titleConfig
       
+      // If no size from title, check API attributes for size/Size/sizeValue
+      if (!dynamicVariants['Size']) {
+        const apiSize = attrs.size || attrs.Size || attrs.sizeValue || attrs.size_name
+        if (apiSize && typeof apiSize === 'string' && apiSize.length < 100) {
+          dynamicVariants['Size'] = apiSize.trim()
+          console.log("[v0] (AUTO) Size from API attributes:", dynamicVariants['Size'])
+        }
+      }
+      
+      // Check for connector type in title (Lightning vs USB-C for AirPods, etc.)
+      const connectorMatch = title.match(/\b(Lightning|USB-C|USB Type-C)\b/i)
+      if (connectorMatch && !dynamicVariants['Style']) {
+        dynamicVariants['Style'] = connectorMatch[1]
+        console.log("[v0] (AUTO) Title extracted connector style:", connectorMatch[1])
+      }
+      
+      // For AirPods Max and other Apple products, detect style from URL or set default
+      // AirPods Max Lightning: B08PZJ8FZ8, B0DGJJDFPR (various colors)
+      // AirPods Max USB-C: B0DGJ7XCRM, B0DGJRXCK5 (various colors)
+      const titleLower = title.toLowerCase()
+      const isAirPodsMax = titleLower.includes('airpods max')
+      const isAppleProduct = titleLower.includes('apple') || titleLower.includes('airpods') || titleLower.includes('iphone') || titleLower.includes('ipad') || titleLower.includes('macbook')
+      
+      console.log("[v0] Product detection - isAirPodsMax:", isAirPodsMax, "isAppleProduct:", isAppleProduct)
+      
+      if (isAirPodsMax) {
+        // Detect color from ASIN for AirPods Max
+        // Lightning ASINs: Pink, Space Gray, Silver, Green, Sky Blue
+        // USB-C ASINs: Midnight, Starlight, Blue, Orange, Purple
+        const airPodsMaxColors: Record<string, string> = {
+          // Lightning versions
+          'B08PZJ8FZ8': 'Pink',
+          'B08PZD76NP': 'Space Gray',
+          'B08PZJN7BD': 'Silver',
+          'B08PZHMKX5': 'Green',
+          'B08PZG12P3': 'Sky Blue',
+          // USB-C versions
+          'B0DGJ7XCRM': 'Midnight',
+          'B0DGJRXCK5': 'Starlight',
+          'B0DGJNZK82': 'Blue',
+          'B0DGJJZZ61': 'Orange',
+          'B0DGJS6LC2': 'Purple',
+          'B0DGJPB4F9': 'Pink',
+          'B0DGJTXWL3': 'Space Gray',
+          'B0DGJMT8GL': 'Silver',
+        }
+        
+        // Detect color from ASIN
+        if (!dynamicVariants['Color']) {
+          for (const [asin, color] of Object.entries(airPodsMaxColors)) {
+            if (url.includes(asin)) {
+              dynamicVariants['Color'] = color
+              console.log("[v0] AirPods Max color from ASIN:", color)
+              break
+            }
+          }
+        }
+        
+        // Always set Style for AirPods Max
+        if (!dynamicVariants['Style']) {
+          const usbCAsins = ['B0DGJ7XCRM', 'B0DGJRXCK5', 'B0DGJNZK82', 'B0DGJJZZ61', 'B0DGJS6LC2', 'B0DGJPB4F9', 'B0DGJTXWL3', 'B0DGJMT8GL']
+          const isUSBC = usbCAsins.some(asin => url.includes(asin))
+          dynamicVariants['Style'] = isUSBC ? 'USB-C' : 'Lightning'
+          console.log("[v0] AirPods Max default style:", dynamicVariants['Style'])
+        }
+        
+        // Always set default AppleCare for AirPods Max
+        if (!dynamicVariants['Set']) {
+          dynamicVariants['Set'] = 'Without AppleCare+'
+          console.log("[v0] AirPods Max default AppleCare:", dynamicVariants['Set'])
+        }
+      } else if (isAppleProduct) {
+        // For other Apple products, also set default AppleCare if not detected
+        if (!dynamicVariants['Set']) {
+          dynamicVariants['Set'] = 'Without AppleCare+'
+          console.log("[v0] Apple product default AppleCare:", dynamicVariants['Set'])
+        }
+      }
+      
       // Check for AppleCare/Set in title
       if (title.toLowerCase().includes('without applecare')) {
         dynamicVariants['Set'] = 'Without AppleCare+'
@@ -501,27 +818,123 @@ export function UnifiedAddWishlist() {
         }
       }
       
+      // Check URL for AppleCare indication (Amazon encodes this in th= parameter sometimes)
+      // Also check if URL contains keywords indicating AppleCare selection
+      const urlLower = url.toLowerCase()
+      if (!dynamicVariants['Set']) {
+        if (urlLower.includes('without') && urlLower.includes('applecare')) {
+          dynamicVariants['Set'] = 'Without AppleCare+'
+          console.log("[v0] Found 'Without AppleCare' in URL")
+        } else if (urlLower.includes('applecare')) {
+          dynamicVariants['Set'] = 'With AppleCare+'
+          console.log("[v0] Found 'AppleCare' in URL")
+        }
+      }
+      
+      // FIRST: Search ALL attributes for AppleCare values (regardless of key name)
+      // Also search for keys that contain protection/warranty/plan/set/applecare
+      console.log("[v0] Searching all attributes for AppleCare variants...")
+      const protectionKeyPatterns = ['set', 'protection', 'warranty', 'applecare', 'plan', 'care', 'coverage']
+      
+      for (const [key, value] of Object.entries(attrs)) {
+        if (!value || typeof value !== 'string') continue
+        const keyLower = key.toLowerCase()
+        const valueLower = value.toLowerCase()
+        
+        // Check if the KEY contains protection-related terms
+        const isProtectionKey = protectionKeyPatterns.some(pattern => keyLower.includes(pattern))
+        
+        // Check if this value contains AppleCare information OR if key is protection-related
+        if (valueLower.includes('applecare') || valueLower.includes('without applecare') || isProtectionKey) {
+          const cleanedValue = value
+            .replace(/&lrm;|&rlm;|&zwj;|&zwnj;|&#x200e;|&#x200f;|&#8206;|&#8207;/gi, '')
+            .replace(/[\u200E\u200F\u200C\u200D\u2066\u2067\u2068\u2069]/g, '')
+            .trim()
+          if (cleanedValue && !dynamicVariants['Set']) {
+            // Use the original key from the retailer if it's a meaningful protection key
+            const displayKey = isProtectionKey ? key : 'Set'
+            dynamicVariants[displayKey] = cleanedValue
+            console.log(`[v0] Found protection/AppleCare variant - key: '${key}', value:`, cleanedValue)
+          }
+        }
+      }
+      
+      // Garbage values to filter out from variants
+      const garbageStyleValues = ['square', 'rectangle', 'round', 'oval', 'diamond', 'circle', 'triangle', 'form', 'shape']
+      const garbageValueWords = ['price', 'option', 'select', 'choose', 'available', 'buy', 'cart', 'add', 'from', 'shipping', 'delivery', 'base', 'default', 'standard', 'basic', 'regular', 'normal', 'original', 'main']
+      const garbageColorValues = ['base', 'default', 'standard', 'basic', 'regular', 'normal', 'original', 'main', 'primary', 'secondary', 'none', 'n/a', 'na', 'other', 'misc', 'classic']
+      
       // Add attributes from API that look like variants (preserving their original keys)
       for (const [key, value] of Object.entries(attrs)) {
         if (!value || typeof value !== 'string') continue
         const keyLower = key.toLowerCase()
+        const valueLower = value.toLowerCase()
         
-        // Skip if we already have this from title extraction
-        if (dynamicVariants[key] || dynamicVariants[keyLower]) continue
+        // Skip if we already have this from title extraction or AppleCare detection
+        if (dynamicVariants[key] || dynamicVariants[keyLower] || dynamicVariants[key.charAt(0).toUpperCase() + key.slice(1)]) continue
+        
+        // Skip garbage values for style
+        if (keyLower.includes('style') && garbageStyleValues.includes(valueLower)) {
+          console.log(`[v0] Skipping garbage style value: ${value}`)
+          continue
+        }
+        
+        // Skip garbage values for color
+        if (keyLower.includes('color') && garbageColorValues.includes(valueLower)) {
+          console.log(`[v0] Skipping garbage color value: ${value}`)
+          continue
+        }
+        
+        // Skip garbage values that are clearly not variant options
+        if (garbageValueWords.includes(valueLower) || valueLower.length < 2 || valueLower.length > 100) {
+          console.log(`[v0] Skipping garbage value (auto): ${key}=${value}`)
+          continue
+        }
+        
+        // Skip values containing price patterns
+        if (/\$[\d,.]+/.test(value) || /\d+\s*option/i.test(value)) {
+          console.log(`[v0] Skipping price-containing value (auto): ${key}=${value}`)
+          continue
+        }
         
         // Check if this looks like a variant key
         const isVariantKey = variantKeys.some(vk => keyLower.includes(vk))
         
         // Skip if value looks like a specification
         const isSpecValue = specificationPatterns.some(pattern => pattern.test(value))
-        
+
         if (isVariantKey && !isSpecValue) {
-          dynamicVariants[key] = value
+          // Clean HTML entities like &lrm; from values
+          const cleanedValue = value
+            .replace(/&lrm;|&rlm;|&zwj;|&zwnj;|&#x200e;|&#x200f;|&#8206;|&#8207;/gi, '')
+            .replace(/[\u200E\u200F\u200C\u200D\u2066\u2067\u2068\u2069]/g, '')
+            .trim()
+          if (cleanedValue) {
+            dynamicVariants[key] = cleanedValue
+          }
         }
       }
       
+      // Also check for Set/AppleCare by specific key names (fallback)
+      if (!dynamicVariants['Set']) {
+        const setKeys = ['set', 'Set', 'appleCare', 'AppleCare', 'protection', 'Protection', 'warranty', 'Warranty', 'plan', 'Plan']
+        for (const setKey of setKeys) {
+          if (attrs[setKey] && typeof attrs[setKey] === 'string') {
+            const cleanedSetValue = String(attrs[setKey])
+              .replace(/&lrm;|&rlm;|&zwj;|&zwnj;|&#x200e;|&#x200f;|&#8206;|&#8207;/gi, '')
+              .replace(/[\u200E\u200F\u200C\u200D\u2066\u2067\u2068\u2069]/g, '')
+              .trim()
+            if (cleanedSetValue) {
+              dynamicVariants['Set'] = cleanedSetValue
+              console.log(`[v0] Found Set from key '${setKey}':`, cleanedSetValue)
+              break
+            }
+          }
+        }
+      }
+
       setIWishVariants(dynamicVariants)
-      
+
       console.log("[v0] Final I Wish variants (auto):", dynamicVariants)
 
       setFormData({
@@ -537,12 +950,40 @@ export function UnifiedAddWishlist() {
         buyLink: extractedData.productLink || url,
       })
 
+      // Log rating from API for debugging - IMPORTANT: Rating must match what API returns
+      console.log("[v0] ⭐ API returned rating:", extractedData.rating, "reviewCount:", extractedData.reviewCount)
+      console.log("[v0] ⭐ Full extractedData:", JSON.stringify({
+        rating: extractedData.rating,
+        reviewCount: extractedData.reviewCount,
+        reviewStar: extractedData.reviewStar,
+        attributes: extractedData.attributes ? { rating: extractedData.attributes.rating } : null
+      }))
+      
+      // CRITICAL: Validate rating is reasonable (if API returns garbage, log it)
+      if (extractedData.rating && (extractedData.rating < 1 || extractedData.rating > 5)) {
+        console.error("[v0] ⚠️ INVALID RATING FROM API:", extractedData.rating)
+      }
+
       // Set extracted product with all cleaned attributes
+      // IMPORTANT: Preserve the exact rating from the API - do not modify it
       setExtractedProduct({
         ...extractedData,
-        attributes: cleanedAttributes
+        attributes: cleanedAttributes,
+        // Ensure rating is preserved exactly as received from API
+        rating: extractedData.rating,
+        reviewCount: extractedData.reviewCount,
       })
+      console.log("[v0] ⭐ Set extractedProduct with rating:", extractedData.rating)
       setShowExtractedProduct(true)
+      
+      // Initialize editable specifications from extracted attributes
+      const specs = getFilteredSpecifications(cleanedAttributes)
+      const specsObj: Record<string, string> = {}
+      specs.forEach(([key, value]) => {
+        specsObj[key] = value
+      })
+      setEditableSpecs(specsObj)
+      setIsEditingSpecs(false)
 
       toast({
         title: "🐝 Product Extracted!",
@@ -621,7 +1062,7 @@ export function UnifiedAddWishlist() {
       
       // Extract variant options from the product TITLE (most reliable for Apple Watch, etc.)
       const title = extractedData.productName || ''
-      console.log("[v0] Parsing title for variants:", title)
+      console.log("[v0] (MANUAL) Parsing title for variants:", title)
       
       // Parse title for Apple Watch format: "[GPS + Cellular 42mm] ... with Silver Aluminum Case with Purple Fog Sport Band - S/M"
       let titleColor = ''
@@ -629,44 +1070,130 @@ export function UnifiedAddWishlist() {
       let titleStyle = ''
       let titleConfig = ''
       
-      // Extract size from title (e.g., "42mm", "46mm")
-      const sizeMatch = title.match(/\b(\d+mm)\b/i)
-      if (sizeMatch) {
-        titleSize = sizeMatch[1]
-        console.log("[v0] Title extracted size:", titleSize)
+      // Extract size from title - multiple patterns
+      // Pattern 1: Watch sizes (42mm, 46mm)
+      const watchSizeMatch = title.match(/\b(\d+mm)\b/i)
+      if (watchSizeMatch) {
+        titleSize = watchSizeMatch[1]
+        console.log("[v0] (MANUAL) Title extracted watch size:", titleSize)
       }
       
-      // Extract band size (S/M, M/L, etc.)
+      // Pattern 2: Band sizes (S/M, M/L, etc.)
       const bandSizeMatch = title.match(/\b(S\/M|M\/L|L\/XL|XS|XL)\b/i)
       if (bandSizeMatch) {
         titleSize = titleSize ? `${titleSize} + ${bandSizeMatch[1]}` : bandSizeMatch[1]
-        console.log("[v0] Title extracted band size:", bandSizeMatch[1])
+        console.log("[v0] (MANUAL) Title extracted band size:", bandSizeMatch[1])
+      }
+      
+      // Pattern 3: Kitchen appliance sizes (3 Quart, 6 Qt, 8-Quart, etc.)
+      if (!titleSize) {
+        const kitchenSizeMatch = title.match(/\b(\d+(?:\.\d+)?)\s*[-]?\s*(Quart|Qt|Quarts|Cup|Cups|Liter|Liters|L|Gallon|Gallons|Oz|Ounce|Ounces)\b/i)
+        if (kitchenSizeMatch) {
+          titleSize = `${kitchenSizeMatch[1]} ${kitchenSizeMatch[2]}`
+          console.log("[v0] (MANUAL) Title extracted kitchen size:", titleSize)
+        }
+      }
+      
+      // Pattern 4: General inch/feet sizes (24 inch, 55", 6 ft, etc.)
+      if (!titleSize) {
+        const inchSizeMatch = title.match(/\b(\d+(?:\.\d+)?)\s*[-]?\s*(inch|inches|"|in\.|ft|feet|foot)\b/i)
+        if (inchSizeMatch) {
+          const unit = inchSizeMatch[2] === '"' ? 'inch' : inchSizeMatch[2]
+          titleSize = `${inchSizeMatch[1]} ${unit}`
+          console.log("[v0] (MANUAL) Title extracted inch/ft size:", titleSize)
+        }
       }
       
       // Extract configuration from title (GPS, GPS + Cellular)
       const configMatch = title.match(/\[(GPS\s*\+?\s*Cellular|GPS)(?:\s+\d+mm)?\]/i)
       if (configMatch) {
         titleConfig = configMatch[1].trim()
-        console.log("[v0] Title extracted configuration:", titleConfig)
+        console.log("[v0] (MANUAL) Title extracted configuration:", titleConfig)
       }
       
       // Extract case color/material from title (e.g., "Silver Aluminum Case", "Rose Gold Titanium Case")
       const caseMatch = title.match(/with\s+((?:Rose\s+Gold|Silver|Space\s+Gr[ae]y|Starlight|Midnight|Gold|Jet\s+Black|Natural|Slate|Black|Blue|Pink|Purple)\s+(?:Titanium|Alumini?um|Stainless\s+Steel)\s+Case)/i)
       if (caseMatch) {
         titleColor = caseMatch[1].trim()
-        console.log("[v0] Title extracted case color:", titleColor)
+        console.log("[v0] (MANUAL) Title extracted case color:", titleColor)
+      }
+      
+      // Extract color from end of title for AirPods Max and other products (e.g., "– Pink", "- Blue")
+      console.log("[v0] (MANUAL) Checking for end color in title:", title.substring(title.length - 30))
+      if (!titleColor) {
+        const endColorMatch = title.match(/[–\-—]\s*(Pink|Purple|Blue|Green|Orange|Midnight|Starlight|Silver|Space\s*Gr[ae]y|Sky\s*Blue|Red|White|Black|Gold|Rose\s*Gold)\s*$/i)
+        if (endColorMatch) {
+          titleColor = endColorMatch[1].trim()
+          console.log("[v0] (MANUAL) Title extracted end color (dash pattern):", titleColor)
+        } else {
+          const lastPart = title.substring(title.length - 50)
+          const colorWordMatch = lastPart.match(/\b(Pink|Purple|Blue|Green|Orange|Midnight|Starlight|Silver|Space\s*Gr[ae]y|Sky\s*Blue|Red|White|Black|Gold|Rose\s*Gold)\b/i)
+          if (colorWordMatch) {
+            titleColor = colorWordMatch[1].trim()
+            console.log("[v0] (MANUAL) Title extracted color from last 50 chars:", titleColor)
+          }
+        }
       }
       
       // Extract band from title (e.g., "Purple Fog Sport Band - S/M")
       const bandMatch = title.match(/Case\s+with\s+([\w\s]+(?:Sport\s+Band|Sport\s+Loop|Milanese\s+Loop|Solo\s+Loop|Braided\s+Solo\s+Loop|Link\s+Bracelet|Ocean\s+Band|Alpine\s+Loop|Trail\s+Loop))/i)
       if (bandMatch) {
         titleStyle = bandMatch[1].trim()
-        console.log("[v0] Title extracted band/style:", titleStyle)
+        console.log("[v0] (MANUAL) Title extracted band/style:", titleStyle)
+      }
+      
+      // Generic color extraction: Look for colors in pipe/comma/dash-separated title patterns
+      // This catches colors like "Cherry Crush", "Ginger Snap", etc.
+      if (!titleColor) {
+        // Pattern 1: Look for pipe-separated color (e.g., "Brand | Ginger Snap | Model")
+        const pipeSegments = title.split('|').map(s => s.trim())
+        if (pipeSegments.length >= 2) {
+          for (let i = 1; i < pipeSegments.length - 1; i++) {
+            const segment = pipeSegments[i]
+            if (segment.length < 30 && !segment.match(/\d{3,}|[A-Z]{2,}\d+|\d+\s*(gb|tb|mm|inch|hz|w|v)/i)) {
+              titleColor = segment
+              console.log("[v0] (MANUAL) Title extracted color from pipe pattern:", titleColor)
+              break
+            }
+          }
+          if (!titleColor && pipeSegments.length === 2) {
+            const lastSegment = pipeSegments[1]
+            if (lastSegment.length < 30 && !lastSegment.match(/\d{3,}|[A-Z]{2,}\d+/i)) {
+              titleColor = lastSegment
+              console.log("[v0] (MANUAL) Title extracted color from last pipe segment:", titleColor)
+            }
+          }
+        }
+        
+        // Pattern 2: Look for comma-separated color at end
+        if (!titleColor) {
+          const commaColorMatch = title.match(/,\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s*$/i)
+          if (commaColorMatch && commaColorMatch[1].length < 30) {
+            const potentialColor = commaColorMatch[1].trim()
+            if (!potentialColor.match(/\d|inch|mm|gb|tb|pack|count|set|kit|bundle|edition|version|model/i)) {
+              titleColor = potentialColor
+              console.log("[v0] (MANUAL) Title extracted color from comma pattern:", titleColor)
+            }
+          }
+        }
+        
+        // Pattern 3: Look for dash-separated color at end
+        if (!titleColor) {
+          const dashColorMatch = title.match(/[-–—]\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s*$/i)
+          if (dashColorMatch && dashColorMatch[1].length < 30) {
+            const potentialColor = dashColorMatch[1].trim()
+            if (!potentialColor.match(/\d|inch|mm|gb|tb|pack|count|set|kit|bundle|edition|version|model/i)) {
+              titleColor = potentialColor
+              console.log("[v0] (MANUAL) Title extracted color from dash pattern:", titleColor)
+            }
+          }
+        }
       }
       
       // Build dynamic variants object preserving original labels from the retailer
       // Only include variant-like attributes (not specifications)
-      const variantKeys = ['color', 'size', 'style', 'configuration', 'set', 'pattern', 'band', 'capacity', 'material']
+      // Note: 'material' removed - it's typically a specification, not a variant option
+      const variantKeys = ['color', 'size', 'style', 'configuration', 'set', 'pattern', 'band', 'capacity', 'connector', 'type', 'finish']
       const specificationPatterns = [
         /\d+\s*(gb|tb|mb)/i, // Storage specs
         /\d+\s*(mah|wh)/i,   // Battery specs
@@ -683,6 +1210,51 @@ export function UnifiedAddWishlist() {
       if (titleStyle) dynamicVariants['Style'] = titleStyle
       if (titleConfig) dynamicVariants['Configuration'] = titleConfig
       
+      // If no size from title, check API attributes for size/Size/sizeValue
+      if (!dynamicVariants['Size']) {
+        const apiSize = attrs.size || attrs.Size || attrs.sizeValue || attrs.size_name
+        if (apiSize && typeof apiSize === 'string' && apiSize.length < 100) {
+          dynamicVariants['Size'] = apiSize.trim()
+          console.log("[v0] (MANUAL) Size from API attributes:", dynamicVariants['Size'])
+        }
+      }
+      
+      // Check for connector type in title (Lightning vs USB-C for AirPods, etc.)
+      const connectorMatch = title.match(/\b(Lightning|USB-C|USB Type-C)\b/i)
+      if (connectorMatch && !dynamicVariants['Style']) {
+        dynamicVariants['Style'] = connectorMatch[1]
+        console.log("[v0] (MANUAL) Title extracted connector style:", connectorMatch[1])
+      }
+      
+      // For AirPods Max and other Apple products, detect style from URL or set default
+      const titleLower = title.toLowerCase()
+      const isAirPodsMax = titleLower.includes('airpods max')
+      const isAppleProduct = titleLower.includes('apple') || titleLower.includes('airpods') || titleLower.includes('iphone') || titleLower.includes('ipad') || titleLower.includes('macbook')
+      
+      console.log("[v0] Product detection (manual) - isAirPodsMax:", isAirPodsMax, "isAppleProduct:", isAppleProduct)
+      
+      if (isAirPodsMax) {
+        // Always set Style for AirPods Max
+        if (!dynamicVariants['Style']) {
+          const usbCAsins = ['B0DGJ7XCRM', 'B0DGJRXCK5', 'B0DGJNZK82', 'B0DGJJZZ61', 'B0DGJS6LC2', 'B0DGJPB4F9', 'B0DGJTXWL3', 'B0DGJMT8GL']
+          const isUSBC = usbCAsins.some(asin => productInput.includes(asin))
+          dynamicVariants['Style'] = isUSBC ? 'USB-C' : 'Lightning'
+          console.log("[v0] AirPods Max default style:", dynamicVariants['Style'])
+        }
+        
+        // Always set default AppleCare for AirPods Max
+        if (!dynamicVariants['Set']) {
+          dynamicVariants['Set'] = 'Without AppleCare+'
+          console.log("[v0] AirPods Max default AppleCare:", dynamicVariants['Set'])
+        }
+      } else if (isAppleProduct) {
+        // For other Apple products, also set default AppleCare if not detected
+        if (!dynamicVariants['Set']) {
+          dynamicVariants['Set'] = 'Without AppleCare+'
+          console.log("[v0] Apple product default AppleCare:", dynamicVariants['Set'])
+        }
+      }
+      
       // Check for AppleCare/Set in title
       if (title.toLowerCase().includes('without applecare')) {
         dynamicVariants['Set'] = 'Without AppleCare+'
@@ -693,27 +1265,116 @@ export function UnifiedAddWishlist() {
         }
       }
       
+      // Check URL for AppleCare indication
+      const urlLower = productInput.toLowerCase()
+      if (!dynamicVariants['Set']) {
+        if (urlLower.includes('without') && urlLower.includes('applecare')) {
+          dynamicVariants['Set'] = 'Without AppleCare+'
+          console.log("[v0] Found 'Without AppleCare' in URL")
+        } else if (urlLower.includes('applecare')) {
+          dynamicVariants['Set'] = 'With AppleCare+'
+          console.log("[v0] Found 'AppleCare' in URL")
+        }
+      }
+      
+      // FIRST: Search ALL attributes for AppleCare values (regardless of key name)
+      // Also search for keys that contain protection/warranty/plan/set/applecare
+      console.log("[v0] Searching all attributes for AppleCare variants (manual extract)...")
+      const protectionKeyPatterns = ['set', 'protection', 'warranty', 'applecare', 'plan', 'care', 'coverage']
+      
+      for (const [key, value] of Object.entries(attrs)) {
+        if (!value || typeof value !== 'string') continue
+        const keyLower = key.toLowerCase()
+        const valueLower = value.toLowerCase()
+        
+        // Check if the KEY contains protection-related terms
+        const isProtectionKey = protectionKeyPatterns.some(pattern => keyLower.includes(pattern))
+        
+        // Check if this value contains AppleCare information OR if key is protection-related
+        if (valueLower.includes('applecare') || valueLower.includes('without applecare') || isProtectionKey) {
+          const cleanedValue = value
+            .replace(/&lrm;|&rlm;|&zwj;|&zwnj;|&#x200e;|&#x200f;|&#8206;|&#8207;/gi, '')
+            .replace(/[\u200E\u200F\u200C\u200D\u2066\u2067\u2068\u2069]/g, '')
+            .trim()
+          if (cleanedValue && !dynamicVariants['Set']) {
+            // Use the original key from the retailer if it's a meaningful protection key
+            const displayKey = isProtectionKey ? key : 'Set'
+            dynamicVariants[displayKey] = cleanedValue
+            console.log(`[v0] Found protection/AppleCare variant - key: '${key}', value:`, cleanedValue)
+          }
+        }
+      }
+      
+      // Garbage values to filter out from variants
+      const garbageStyleValues = ['square', 'rectangle', 'round', 'oval', 'diamond', 'circle', 'triangle', 'form', 'shape']
+      const garbageValueWords = ['price', 'option', 'select', 'choose', 'available', 'buy', 'cart', 'add', 'from', 'shipping', 'delivery', 'base', 'default', 'standard', 'basic', 'regular', 'normal', 'original', 'main']
+      const garbageColorValues = ['base', 'default', 'standard', 'basic', 'regular', 'normal', 'original', 'main', 'primary', 'secondary', 'none', 'n/a', 'na', 'other', 'misc', 'classic']
+      
       // Add attributes from API that look like variants (preserving their original keys)
       for (const [key, value] of Object.entries(attrs)) {
         if (!value || typeof value !== 'string') continue
         const keyLower = key.toLowerCase()
+        const valueLower = value.toLowerCase()
         
-        // Skip if we already have this from title extraction
-        if (dynamicVariants[key] || dynamicVariants[keyLower]) continue
+        // Skip if we already have this from title extraction or AppleCare detection
+        if (dynamicVariants[key] || dynamicVariants[keyLower] || dynamicVariants[key.charAt(0).toUpperCase() + key.slice(1)]) continue
+        
+        // Skip garbage values for style
+        if (keyLower.includes('style') && garbageStyleValues.includes(valueLower)) {
+          console.log(`[v0] Skipping garbage style value: ${value}`)
+          continue
+        }
+        
+        // Skip garbage values that are clearly not variant options
+        if (garbageValueWords.includes(valueLower) || valueLower.length < 2 || valueLower.length > 100) {
+          console.log(`[v0] Skipping garbage value: ${key}=${value}`)
+          continue
+        }
+        
+        // Skip values containing price patterns
+        if (/\$[\d,.]+/.test(value) || /\d+\s*option/i.test(value)) {
+          console.log(`[v0] Skipping price-containing value: ${key}=${value}`)
+          continue
+        }
         
         // Check if this looks like a variant key
         const isVariantKey = variantKeys.some(vk => keyLower.includes(vk))
         
         // Skip if value looks like a specification
         const isSpecValue = specificationPatterns.some(pattern => pattern.test(value))
-        
+
         if (isVariantKey && !isSpecValue) {
-          dynamicVariants[key] = value
+          // Clean HTML entities like &lrm; from values
+          const cleanedValue = value
+            .replace(/&lrm;|&rlm;|&zwj;|&zwnj;|&#x200e;|&#x200f;|&#8206;|&#8207;/gi, '')
+            .replace(/[\u200E\u200F\u200C\u200D\u2066\u2067\u2068\u2069]/g, '')
+            .trim()
+          if (cleanedValue) {
+            dynamicVariants[key] = cleanedValue
+          }
         }
       }
       
+      // Also check for Set/AppleCare by specific key names (fallback)
+      if (!dynamicVariants['Set']) {
+        const setKeys = ['set', 'Set', 'appleCare', 'AppleCare', 'protection', 'Protection', 'warranty', 'Warranty', 'plan', 'Plan']
+        for (const setKey of setKeys) {
+          if (attrs[setKey] && typeof attrs[setKey] === 'string') {
+            const cleanedSetValue = String(attrs[setKey])
+              .replace(/&lrm;|&rlm;|&zwj;|&zwnj;|&#x200e;|&#x200f;|&#8206;|&#8207;/gi, '')
+              .replace(/[\u200E\u200F\u200C\u200D\u2066\u2067\u2068\u2069]/g, '')
+              .trim()
+            if (cleanedSetValue) {
+              dynamicVariants['Set'] = cleanedSetValue
+              console.log(`[v0] Found Set from key '${setKey}':`, cleanedSetValue)
+              break
+            }
+          }
+        }
+      }
+
       setIWishVariants(dynamicVariants)
-      
+
       console.log("[v0] Final I Wish variants:", dynamicVariants)
 
       setFormData({
@@ -729,12 +1390,40 @@ export function UnifiedAddWishlist() {
         buyLink: extractedData.productLink || productInput,
       })
 
+      // Log rating from API for debugging - IMPORTANT: Rating must match what API returns
+      console.log("[v0] ⭐ API returned rating (manual):", extractedData.rating, "reviewCount:", extractedData.reviewCount)
+      console.log("[v0] ⭐ Full extractedData (manual):", JSON.stringify({
+        rating: extractedData.rating,
+        reviewCount: extractedData.reviewCount,
+        reviewStar: extractedData.reviewStar,
+        attributes: extractedData.attributes ? { rating: extractedData.attributes.rating } : null
+      }))
+      
+      // CRITICAL: Validate rating is reasonable (if API returns garbage, log it)
+      if (extractedData.rating && (extractedData.rating < 1 || extractedData.rating > 5)) {
+        console.error("[v0] ⚠️ INVALID RATING FROM API (manual):", extractedData.rating)
+      }
+
       // Set extracted product with all cleaned attributes
+      // IMPORTANT: Preserve the exact rating from the API - do not modify it
       setExtractedProduct({
         ...extractedData,
-        attributes: cleanedAttributes
+        attributes: cleanedAttributes,
+        // Ensure rating is preserved exactly as received from API
+        rating: extractedData.rating,
+        reviewCount: extractedData.reviewCount,
       })
+      console.log("[v0] ⭐ Set extractedProduct with rating (manual):", extractedData.rating)
       setShowExtractedProduct(true)
+      
+      // Initialize editable specifications from extracted attributes
+      const specs = getFilteredSpecifications(cleanedAttributes)
+      const specsObj: Record<string, string> = {}
+      specs.forEach(([key, value]) => {
+        specsObj[key] = value
+      })
+      setEditableSpecs(specsObj)
+      setIsEditingSpecs(false)
 
       toast({
         title: "🐝 Product Extracted!",
@@ -1129,7 +1818,7 @@ export function UnifiedAddWishlist() {
           bestSeller: extractedProduct.bestSeller || extractedProduct.attributes?.bestSeller || false,
           overallPick: extractedProduct.overallPick || extractedProduct.attributes?.overallPick || false,
         },
-        specifications: extractedProduct.attributes || null,
+        specifications: Object.keys(editableSpecs).length > 0 ? editableSpecs : (extractedProduct.attributes || null),
       }
 
       // Save to wishlist
@@ -1211,6 +1900,9 @@ export function UnifiedAddWishlist() {
     setIsExtractingVariants(false)
     // Reset I Wish variants
     setIWishVariants({})
+    // Reset editable specifications
+    setEditableSpecs({})
+    setIsEditingSpecs(false)
     // Reset Alternative data
     setAltClippedImage(null)
     setAltClippedTitle(null)
@@ -1436,63 +2128,8 @@ export function UnifiedAddWishlist() {
       {showExtractedProduct && extractedProduct && (
         <CardContent className="p-3 sm:p-6 border-t-2 border-gray-100">
           <div className="bg-gradient-to-br from-orange-50/80 via-amber-50/60 to-yellow-50/80 rounded-xl shadow-lg border-2 border-[#DAA520]/30 overflow-hidden hover:shadow-2xl transition-all duration-300">
-            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 p-3 sm:p-4">
-              {/* Product Image - Top on mobile, Left Side on larger screens */}
-              <div className="relative w-full sm:w-48 md:w-56 lg:w-64 h-48 sm:h-48 md:h-56 lg:h-64 bg-gradient-to-br from-white via-orange-50/30 to-amber-50/50 flex-shrink-0 rounded-lg overflow-hidden group border border-[#DAA520]/20">
-                {!extractedProduct.imageUrl && (
-                  <label
-                    htmlFor="product-image-upload"
-                    className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-200 transition-colors z-10"
-                  >
-                    <Package className="w-12 h-12 text-gray-400 mb-2" />
-                    <span className="text-xs text-gray-600 text-center px-2">
-                      {isUploadingImage ? "Uploading..." : "Click to upload image"}
-                    </span>
-                    <input
-                      id="product-image-upload"
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                      className="hidden"
-                      disabled={isUploadingImage}
-                    />
-                  </label>
-                )}
-
-                {extractedProduct.imageUrl && (
-                  <>
-                    <img
-                      src={extractedProduct.imageUrl || "/placeholder.svg"}
-                      alt={extractedProduct.productName}
-                      className="w-full h-full object-contain p-1 sm:p-2"
-                      crossOrigin="anonymous"
-                      onError={(e) => {
-                        e.currentTarget.src = "/placeholder.svg"
-                      }}
-                    />
-                    {/* Upload overlay on hover */}
-                    <label
-                      htmlFor="product-image-upload"
-                      className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                    >
-                      <div className="text-white text-center">
-                        <Upload className="w-6 h-6 mx-auto mb-1" />
-                        <span className="text-xs">Change Image</span>
-                      </div>
-                      <input
-                        id="product-image-upload"
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageUpload}
-                        className="hidden"
-                        disabled={isUploadingImage}
-                      />
-                    </label>
-                  </>
-                )}
-              </div>
-
-              {/* Product Content - Below image on mobile, Right Side on larger screens */}
+            <div className="flex flex-col gap-3 sm:gap-4 p-3 sm:p-4">
+              {/* Product Content - No left panel image, images only in I Wish and Alternative sections */}
               <div className="flex-1 min-w-0 flex flex-col">
                 {/* Product Title - 2 lines with ellipsis */}
                 <h3 className="text-sm font-bold text-[#5D4037] mb-1.5 line-clamp-2">
@@ -1595,30 +2232,68 @@ export function UnifiedAddWishlist() {
                   </div>
                 </div>
 
-                {/* Product Specifications - Matches Trending Gifts UI */}
-                {extractedProduct.attributes && getFilteredSpecifications(extractedProduct.attributes).length > 0 && (
+                {/* Product Specifications - Editable with Edit/Remove icons */}
+                {Object.keys(editableSpecs).length > 0 && (
                   <div className="bg-gradient-to-r from-[#6B4423]/5 to-[#8B5A3C]/5 rounded-lg p-3 border border-[#8B5A3C]/10 mb-3">
-                    <p className="text-[10px] font-bold text-[#6B4423] uppercase tracking-wider mb-2 flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 bg-[#DAA520] rounded-full"></span>
-                      Specifications
-                    </p>
-                    <div className="flex flex-col gap-1">
-                      {getFilteredSpecifications(extractedProduct.attributes)
-                        .slice(0, 5)
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-[10px] font-bold text-[#6B4423] uppercase tracking-wider flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 bg-[#DAA520] rounded-full"></span>
+                        Specifications
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingSpecs(!isEditingSpecs)}
+                        className="p-1 bg-[#DAA520] hover:bg-[#B8860B] text-white rounded-full transition-colors"
+                        title={isEditingSpecs ? "Done editing" : "Edit specifications"}
+                      >
+                        {isEditingSpecs ? <Check className="w-3 h-3" /> : <Pencil className="w-3 h-3" />}
+                      </button>
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      {Object.entries(editableSpecs)
+                        .slice(0, isEditingSpecs ? undefined : 5)
                         .map(([key, value]) => (
-                          <div key={key} className="flex items-center text-[10px]">
-                            <span className="font-semibold text-[#6B4423] capitalize w-[100px] flex-shrink-0 truncate">
-                              {key.replace(/([A-Z])/g, ' $1').trim()}:
-                            </span>
-                            <span className="text-[#654321] truncate flex-1" title={String(value)}>
-                              {String(value)}
-                            </span>
+                          <div key={key} className="flex items-center gap-2 text-[10px]">
+                            {isEditingSpecs ? (
+                              <>
+                                <span className="font-semibold text-[#6B4423] capitalize w-[100px] flex-shrink-0 truncate">
+                                  {key.replace(/([A-Z])/g, ' $1').trim()}:
+                                </span>
+                                <input
+                                  type="text"
+                                  value={value}
+                                  onChange={(e) => setEditableSpecs(prev => ({ ...prev, [key]: e.target.value }))}
+                                  className="flex-1 px-2 py-1 text-xs border border-[#8B5A3C]/30 rounded bg-white focus:outline-none focus:border-[#DAA520]"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const newSpecs = { ...editableSpecs }
+                                    delete newSpecs[key]
+                                    setEditableSpecs(newSpecs)
+                                  }}
+                                  className="p-1 text-red-500 hover:text-red-700 transition-colors"
+                                  title="Remove specification"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <span className="font-semibold text-[#6B4423] capitalize w-[100px] flex-shrink-0 truncate">
+                                  {key.replace(/([A-Z])/g, ' $1').trim()}:
+                                </span>
+                                <span className="text-[#654321] truncate flex-1" title={String(value)}>
+                                  {String(value)}
+                                </span>
+                              </>
+                            )}
                           </div>
                         ))
                       }
-                      {getFilteredSpecifications(extractedProduct.attributes).length > 5 && (
+                      {!isEditingSpecs && Object.keys(editableSpecs).length > 5 && (
                         <p className="text-[10px] font-bold text-[#DAA520] mt-1">
-                          +{getFilteredSpecifications(extractedProduct.attributes).length - 5} more specs
+                          +{Object.keys(editableSpecs).length - 5} more specs
                         </p>
                       )}
                     </div>
@@ -1750,7 +2425,7 @@ export function UnifiedAddWishlist() {
                       </div>
                     </div>
 
-                    {/* Alternative Option Card - Matches modal style */}
+                    {/* Alternative Option Card - Same UI as I Wish */}
                     <div className="rounded-lg border-2 border-[#D97706] bg-gradient-to-r from-[#D97706]/15 to-[#F59E0B]/15 p-3">
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
@@ -1771,6 +2446,10 @@ export function UnifiedAddWishlist() {
                         </a>
                       </div>
                       
+                      <p className="text-[10px] text-[#92400E] bg-[#D97706]/10 px-2 py-1 rounded-md border border-[#D97706]/20 italic mb-2">
+                        💡 Click Select on Retailer to open the product page → choose your preferred options → use the Wishbee extension to clip and auto-fill the information below.
+                      </p>
+                      
                       {/* Waiting for extension clip */}
                       {isWaitingForAltClip && !altClippedImage && Object.keys(altAttributes).length === 0 && (
                         <div className="flex items-center gap-2 text-[10px] text-[#92400E] bg-[#D97706]/10 px-2 py-1.5 rounded-md border border-[#D97706]/20 mb-2">
@@ -1779,45 +2458,53 @@ export function UnifiedAddWishlist() {
                         </div>
                       )}
 
-                      {/* Display clipped Alternative data */}
-                      {(altClippedImage || Object.keys(altAttributes).length > 0) && (
-                        <div className="flex gap-2 mb-2 bg-white/50 rounded-lg p-2 border border-[#D97706]/20">
-                          {altClippedImage && (
-                            <img 
-                              src={altClippedImage} 
-                              alt="Alternative" 
-                              className="w-12 h-12 object-contain rounded border border-[#D97706]/20"
-                            />
-                          )}
-                          <div className="flex-1 min-w-0">
-                            {altClippedTitle && (
-                              <p className="text-[10px] font-semibold text-[#654321] line-clamp-1 mb-1">{altClippedTitle}</p>
-                            )}
-                            <div className="flex flex-wrap gap-1">
+                      {/* Product Image & Options Row - Only show when clipped from extension */}
+                      <div className="flex gap-3">
+                        {/* Only show image if clipped from extension - no default image */}
+                        {altClippedImage && (
+                          <img 
+                            src={altClippedImage} 
+                            alt={altClippedTitle || 'Alternative product'}
+                            className="w-16 h-16 object-contain rounded-lg bg-white border border-[#D97706]/20 flex-shrink-0"
+                          />
+                        )}
+                        <div className="flex-1 space-y-1.5">
+                          {/* Show editable variant fields - only when clipped from extension */}
+                          {Object.keys(altAttributes).length > 0 ? (
+                            <>
                               {Object.entries(altAttributes).map(([key, value]) => (
-                                <span key={key} className="text-[9px] bg-[#D97706]/10 text-[#92400E] px-1.5 py-0.5 rounded border border-[#D97706]/20">
-                                  <span className="font-semibold">{key}:</span> {value}
-                                </span>
+                                <div key={key} className="flex items-center gap-2">
+                                  <label className="text-xs text-[#6B4423] w-20 font-medium truncate" title={key}>
+                                    {key}:
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={value}
+                                    onChange={(e) => setAltAttributes(prev => ({ ...prev, [key]: e.target.value }))}
+                                    className="flex-1 text-xs px-2 py-1 border border-[#D97706]/30 rounded bg-white/80 focus:outline-none focus:border-[#D97706]"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const newAttrs = { ...altAttributes }
+                                      delete newAttrs[key]
+                                      setAltAttributes(newAttrs)
+                                    }}
+                                    className="p-0.5 text-red-500 hover:text-red-700 transition-colors"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </div>
                               ))}
+                            </>
+                          ) : (
+                            /* No options clipped yet - show message */
+                            <div className="text-[10px] text-[#92400E] italic py-2">
+                              ℹ️ No alternative options selected yet. Click "Select on Retailer" and clip your preferred alternative.
                             </div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setAltClippedImage(null)
-                              setAltClippedTitle(null)
-                              setAltAttributes({})
-                            }}
-                            className="p-1 text-red-500 hover:bg-red-50 rounded-full transition-colors self-start"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
+                          )}
                         </div>
-                      )}
-
-                      <p className="text-[10px] text-[#92400E] bg-[#D97706]/10 px-2 py-1 rounded-md border border-[#D97706]/20 italic mb-2">
-                        💡 If the primary option is unavailable, this is an acceptable alternative.
-                      </p>
+                      </div>
                       
                       {/* Custom Fields Section for Alternative */}
                       {altCustomFields.length > 0 && (

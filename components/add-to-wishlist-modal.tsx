@@ -25,6 +25,13 @@ interface Gift {
   targetAmount: number
   source?: string
   category?: string
+  rating?: number
+  reviewCount?: number
+  amazonChoice?: boolean
+  bestSeller?: boolean
+  overallPick?: boolean
+  originalPrice?: number
+  attributes?: Record<string, any>
 }
 
 interface AddToWishlistModalProps {
@@ -219,7 +226,10 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
             console.log('[Modal] VARIANTS RECEIVED - awaitingExtensionFor:', awaitingExtensionFor)
             console.log('[Modal] Is this for I Wish?', awaitingExtensionFor === "like")
             console.log('[Modal] Is this for Alternative?', awaitingExtensionFor === "alt")
-            console.log('[Modal] Variants:', JSON.stringify(data.variants))
+            console.log('[Modal] Raw variants from extension:', JSON.stringify(data.variants))
+            console.log('[Modal] Variant keys:', Object.keys(data.variants))
+            console.log('[Modal] Has size?', 'size' in data.variants, data.variants.size)
+            console.log('[Modal] Has Size?', 'Size' in data.variants, data.variants.Size)
             console.log('[Modal] Image:', data.image?.substring(0, 80))
             console.log('[Modal] ========================================')
             
@@ -231,6 +241,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
             for (const [key, value] of Object.entries(data.variants)) {
               if (value) {
                 const normalizedKey = normalizeAttributeKey(key)
+                console.log(`[Modal] Normalizing: ${key} -> ${normalizedKey} = ${value}`)
                 normalizedAttributes[normalizedKey] = value as string
               }
             }
@@ -243,7 +254,8 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
               ...preferredOrder.filter(k => normalizedAttributes[k]),
               ...Object.keys(normalizedAttributes).filter(k => !preferredOrder.includes(k))
             ]
-            console.log('[Modal] Normalized attribute keys:', attrKeys)
+            console.log('[Modal] Preferred order check - Size in normalized?', 'Size' in normalizedAttributes, normalizedAttributes['Size'])
+            console.log('[Modal] Final attribute keys to display:', attrKeys)
             console.log('[Modal] Normalized attributes:', JSON.stringify(normalizedAttributes))
             
             // ALWAYS update available attributes with the NEW product's variants
@@ -854,15 +866,13 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
                         </p>
                         {/* Product Image & Options Row */}
                         <div className="flex gap-3">
-                          {/* Only show image if clipped from extension - no default fallback */}
-                          {likeClippedImage && (
-                            <img
-                              key={likeClippedImage}
-                              src={likeClippedImage}
-                              alt={likeClippedTitle || 'Selected product'}
-                              className="w-16 h-16 object-contain rounded-lg bg-white border border-[#DAA520]/20 flex-shrink-0"
-                            />
-                          )}
+                          {/* Show clipped image if available, otherwise show main product image */}
+                          <img
+                            key={likeClippedImage || extractedProduct?.imageUrl || gift?.image}
+                            src={likeClippedImage || extractedProduct?.imageUrl || gift?.image || "/placeholder.svg"}
+                            alt={likeClippedTitle || extractedProduct?.productName || 'Selected product'}
+                            className="w-16 h-16 object-contain rounded-lg bg-white border border-[#DAA520]/20 flex-shrink-0"
+                          />
                           <div className="flex-1 space-y-1.5">
                             {/* Dynamic attributes based on product - only show detected variants */}
                             {availableAttributes.length > 0 && (
@@ -999,15 +1009,13 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
                         </p>
                         {/* Product Image & Options Row */}
                         <div className="flex gap-3">
-                          {/* Only show image if clipped from extension - no default fallback */}
-                          {altClippedImage && (
-                            <img
-                              key={altClippedImage}
-                              src={altClippedImage}
-                              alt={altClippedTitle || 'Selected product'}
-                              className="w-16 h-16 object-contain rounded-lg bg-white border border-[#D97706]/20 flex-shrink-0"
-                            />
-                          )}
+                          {/* Show clipped image if available, otherwise show main product image */}
+                          <img
+                            key={altClippedImage || extractedProduct?.imageUrl || gift?.image}
+                            src={altClippedImage || extractedProduct?.imageUrl || gift?.image || "/placeholder.svg"}
+                            alt={altClippedTitle || extractedProduct?.productName || 'Selected product'}
+                            className="w-16 h-16 object-contain rounded-lg bg-white border border-[#D97706]/20 flex-shrink-0"
+                          />
                           <div className="flex-1 space-y-1.5">
                             {/* Dynamic attributes based on product */}
                             {availableAttributes.length > 0 && (

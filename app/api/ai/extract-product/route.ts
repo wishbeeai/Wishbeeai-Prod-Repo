@@ -4186,6 +4186,70 @@ async function extractWithoutAI(
         }
       }
       
+      // Extract ALL Amazon variant dimensions from twister data and selected elements
+      // This captures Style (Lightning/USB-C), Set (AppleCare), Configuration, etc.
+      if (hostname.includes('amazon.com') && htmlContent) {
+        console.log("[v0] 🔍 Extracting Amazon variant dimensions (style, set, configuration)...")
+        
+        // Pattern 1: Look for selected dimension values in JavaScript
+        const selectedDimensionPatterns = [
+          // Selected style/connector (Lightning, USB-C)
+          /"style_name"\s*:\s*\{[^}]*"selected"\s*:\s*true[^}]*"value"\s*:\s*"([^"]+)"/i,
+          /"style_name"\s*:\s*"([^"]+)"/i,
+          /selectedDimensions[^}]*style_name[^}]*:\s*"([^"]+)"/i,
+          // Selected configuration (AppleCare)
+          /"configuration_name"\s*:\s*\{[^}]*"selected"\s*:\s*true[^}]*"value"\s*:\s*"([^"]+)"/i,
+          /"configuration_name"\s*:\s*"([^"]+)"/i,
+          /selectedDimensions[^}]*configuration_name[^}]*:\s*"([^"]+)"/i,
+        ]
+        
+        // Extract style if not already set
+        if (!productData.attributes.style) {
+          const stylePatterns = [
+            /"style_name"\s*:\s*"([^"]+)"/i,
+            /style_name['"]\s*:\s*['"](Lightning|USB-C|USB Type-C)['"]/i,
+            /<span[^>]*data-csa-c-dimension-name=["']style_name["'][^>]*data-csa-c-dimension-value=["']([^"']+)["']/i,
+            /<span[^>]*class=["'][^"']*selection["'][^>]*>[\s]*Style:[\s]*([^<]+)</i,
+            /twisterSwatchWrapper[\s\S]{0,500}?selected[\s\S]{0,200}?(Lightning|USB-C|USB Type-C)/i,
+          ]
+          
+          for (const pattern of stylePatterns) {
+            const match = htmlContent.match(pattern)
+            if (match && match[1]) {
+              const style = match[1].trim()
+              if (style && style.length < 50 && !style.toLowerCase().includes('select')) {
+                productData.attributes.style = style
+                console.log("[v0] ✅ Extracted Style from Amazon variant:", productData.attributes.style)
+                break
+              }
+            }
+          }
+        }
+        
+        // Extract set/configuration (AppleCare) if not already set
+        if (!productData.attributes.set) {
+          const setPatterns = [
+            /"configuration_name"\s*:\s*"([^"]+)"/i,
+            /configuration_name['"]\s*:\s*['"]([^'"]*(?:AppleCare|Without|Protection)[^'"]*)['"]/i,
+            /<span[^>]*data-csa-c-dimension-name=["']configuration_name["'][^>]*data-csa-c-dimension-value=["']([^"']+)["']/i,
+            /<span[^>]*class=["'][^"']*selection["'][^>]*>[\s]*Set:[\s]*([^<]+)</i,
+            /twisterSwatchWrapper[\s\S]{0,500}?selected[\s\S]{0,200}?(Without AppleCare\+|With AppleCare\+[^<]*)/i,
+          ]
+          
+          for (const pattern of setPatterns) {
+            const match = htmlContent.match(pattern)
+            if (match && match[1]) {
+              const set = match[1].trim()
+              if (set && set.length < 100 && !set.toLowerCase().includes('select')) {
+                productData.attributes.set = set
+                console.log("[v0] ✅ Extracted Set from Amazon variant:", productData.attributes.set)
+                break
+              }
+            }
+          }
+        }
+      }
+      
       // Extract Kindle-specific variant options from product name and HTML
       // CRITICAL: Always extract these attributes for Amazon products when selected
       if (hostname.includes('amazon.com')) {
@@ -4254,6 +4318,81 @@ async function extractWithoutAI(
               productData.attributes.size = match[1] + 'GB'
               console.log("[v0] Extracted storage size from HTML:", productData.attributes.size)
               break
+            }
+          }
+        }
+        
+        // Extract Style/Connector type for Apple products (Lightning vs USB-C)
+        if (!productData.attributes.style && productName) {
+          const connectorMatch = productName.match(/\b(Lightning|USB-C|USB Type-C)\b/i)
+          if (connectorMatch) {
+            productData.attributes.style = connectorMatch[1]
+            console.log("[v0] ✅ Extracted Style/Connector:", productData.attributes.style)
+          }
+        }
+        
+        // Extract AppleCare/Protection Plan selection for Apple products
+        // This is a variant selector on Amazon for Apple products (AirPods, Apple Watch, iPhone, etc.)
+        if (!productData.attributes.set && htmlContent) {
+          log("[v0] 🔍 Checking for AppleCare/Protection Plan variant...")
+          
+          // Check if this is an Apple product
+          const isAppleProduct = productName.includes('apple') || 
+                                 productName.includes('airpods') || 
+                                 productName.includes('iphone') || 
+                                 productName.includes('ipad') || 
+                                 productName.includes('macbook') ||
+                                 productName.includes('watch')
+          
+          if (isAppleProduct) {
+            // Look for AppleCare in title/description first
+            if (searchText.includes('without applecare')) {
+              productData.attributes.set = 'Without AppleCare+'
+              console.log("[v0] ✅ Extracted Set: Without AppleCare+ (from title/description)")
+            } else if (searchText.includes('with applecare+ (2 years)') || searchText.includes('applecare+ (2 years)')) {
+              productData.attributes.set = 'With AppleCare+ (2 Years)'
+              console.log("[v0] ✅ Extracted Set: With AppleCare+ (2 Years)")
+            } else if (searchText.includes('with applecare+') || searchText.includes('applecare+')) {
+              productData.attributes.set = 'With AppleCare+'
+              console.log("[v0] ✅ Extracted Set: With AppleCare+")
+            }
+            
+            // If not found in text, check HTML for selected AppleCare option
+            if (!productData.attributes.set) {
+              // Amazon uses configuration_name dimension for AppleCare
+              const appleCarePatterns = [
+                /<span[^>]*class=["'][^"']*twisterSwatchWrapper[^"']*["'][^>]*>[\s\S]{0,500}?(?:Without|With)\s*AppleCare/i,
+                /configuration_name["']?\s*[:=]\s*["']?([^"'<>]*(?:Without|With)\s*AppleCare[^"'<>]*)["']?/i,
+                /selectedDimensions[\s\S]{0,200}?(?:Without|With)\s*AppleCare[^"']*/i,
+                /<option[^>]*selected[^>]*>([^<]*(?:Without|With)\s*AppleCare[^<]*)<\/option>/i,
+                /a-button-selected[\s\S]{0,200}?(?:Without|With)\s*AppleCare[^<]*/i,
+              ]
+              
+              for (const pattern of appleCarePatterns) {
+                const match = htmlContent.match(pattern)
+                if (match) {
+                  const appleCareText = match[1] || match[0]
+                  if (appleCareText.toLowerCase().includes('without')) {
+                    productData.attributes.set = 'Without AppleCare+'
+                  } else if (appleCareText.toLowerCase().includes('2 years') || appleCareText.toLowerCase().includes('2 year')) {
+                    productData.attributes.set = 'With AppleCare+ (2 Years)'
+                  } else {
+                    productData.attributes.set = 'With AppleCare+'
+                  }
+                  console.log("[v0] ✅ Extracted Set from HTML:", productData.attributes.set)
+                  break
+                }
+              }
+            }
+            
+            // Default for Apple products if we still don't have a value
+            // Check URL for hints about the selection
+            if (!productData.attributes.set && finalUrl) {
+              const urlLower = finalUrl.toLowerCase()
+              if (urlLower.includes('without') && (urlLower.includes('applecare') || urlLower.includes('care'))) {
+                productData.attributes.set = 'Without AppleCare+'
+                console.log("[v0] ✅ Extracted Set from URL: Without AppleCare+")
+              }
             }
           }
         }

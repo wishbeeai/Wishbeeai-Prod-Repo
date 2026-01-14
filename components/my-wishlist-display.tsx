@@ -4,10 +4,11 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Sparkles, Share2, Trash2, ShoppingCart, AlertCircle, Plus, Pencil, X, Check, ExternalLink, Heart } from "lucide-react"
+import { Sparkles, Share2, Trash2, ShoppingCart, AlertCircle, Plus, Pencil, X, Check, ExternalLink, Heart, Info } from "lucide-react"
 import Image from "next/image"
 import { useToast } from "@/hooks/use-toast"
 import Link from "next/link"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 
 interface PreferenceOption {
   [key: string]: string | null | undefined | Array<{ key: string; value: string }>  // Dynamic variant keys
@@ -476,6 +477,14 @@ export function MyWishlistDisplay() {
                     {item.reviewCount && (
                       <span className="text-xs text-[#8B6914]">({item.reviewCount.toLocaleString()})</span>
                     )}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600 cursor-help ml-1" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-[220px] bg-[#4A2F1A] text-white text-xs p-2 rounded-lg shadow-lg">
+                        <p>Ratings, reviews, and prices are shown as captured when the item was added and may change on the retailer's website.</p>
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
                 )}
 
