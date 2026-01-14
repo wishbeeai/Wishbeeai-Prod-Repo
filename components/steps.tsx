@@ -63,8 +63,8 @@ export function Steps() {
             <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-[#8B4513] mb-4 relative inline-block font-[family-name:var(--font-shadows)]">
               How it works
               <span
-                className="absolute -right-12 top-0 text-3xl sm:text-4xl animate-bounce"
-                style={{ animationDuration: "3s" }}
+                className="absolute -right-12 top-0 text-3xl sm:text-4xl animate-bounce drop-shadow-none"
+                style={{ animationDuration: "3s", background: "transparent" }}
               >
                 🐝
               </span>
