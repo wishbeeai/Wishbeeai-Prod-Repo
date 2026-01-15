@@ -102,7 +102,10 @@ export async function POST(req: NextRequest) {
   
   try {
     const body = await req.json()
-    const { variants, specifications, url, timestamp, sessionToken, image, title, price } = body
+    const { variants, specifications, url, timestamp, sessionToken, image, imageUrl, title, price } = body
+
+    // Support both 'image' and 'imageUrl' field names from extension
+    const rawImage = image || imageUrl || body.productImage || body.img
 
     console.log('[save-variants] ========== NEW VARIANT DATA RECEIVED ==========')
     console.log('[save-variants] URL:', url?.substring(0, 80))
@@ -110,10 +113,13 @@ export async function POST(req: NextRequest) {
     Object.entries(variants || {}).forEach(([key, value]) => {
       console.log(`[save-variants] ✅ ${key}: ${value}`)
     })
-    console.log('[save-variants] Raw Image:', image?.substring(0, 80))
+    console.log('[save-variants] Body keys:', Object.keys(body).join(', '))
+    console.log('[save-variants] Raw Image (image field):', image?.substring?.(0, 80) || 'undefined')
+    console.log('[save-variants] Raw Image (imageUrl field):', imageUrl?.substring?.(0, 80) || 'undefined')
+    console.log('[save-variants] Combined Raw Image:', rawImage?.substring?.(0, 80) || 'undefined')
     
     // Filter out swatch/placeholder images
-    const validImage = isSwatchOrPlaceholderImage(image) ? undefined : image
+    const validImage = isSwatchOrPlaceholderImage(rawImage) ? undefined : rawImage
     console.log('[save-variants] Valid Image:', validImage ? validImage.substring(0, 80) : 'REJECTED (swatch/placeholder)')
     console.log('[save-variants] ================================================')
 
@@ -229,17 +235,20 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ variants: null }, { headers: corsHeaders })
     }
 
-    // Only return if not already retrieved (prevent duplicate processing)
-    if (stored.retrieved) {
-      console.log('[save-variants] GET - Data already retrieved, returning null')
-      console.log('[save-variants] GET - Stored timestamp:', stored.timestamp)
+    // Allow data to be retrieved multiple times within 30 seconds
+    // Only mark as fully retrieved after 30 seconds to allow modal retries
+    const timeSinceStore = Date.now() - stored.timestamp
+    if (stored.retrieved && timeSinceStore > 30000) {
+      console.log('[save-variants] GET - Data already retrieved and expired, returning null')
+      console.log('[save-variants] GET - Stored timestamp:', stored.timestamp, 'Age:', timeSinceStore, 'ms')
       return NextResponse.json({ variants: null }, { headers: corsHeaders })
     }
     
     console.log('[save-variants] GET - Fresh data found, returning...')
     console.log('[save-variants] GET - Image URL:', stored.image?.substring(0, 100))
+    console.log('[save-variants] GET - Already retrieved before?', stored.retrieved, 'Age:', timeSinceStore, 'ms')
 
-    // Mark as retrieved
+    // Mark as retrieved but allow re-retrieval for 30 seconds
     stored.retrieved = true
     variantStore.set(storeKey, stored)
     
@@ -250,11 +259,11 @@ export async function GET(req: NextRequest) {
       variantStore.set('latest', latestStored)
     }
     
-    // Delete after 10 seconds
+    // Delete after 60 seconds (give more time for retries)
     setTimeout(() => {
       variantStore.delete(storeKey)
       variantStore.delete('latest')
-    }, 10 * 1000)
+    }, 60 * 1000)
 
     console.log('[save-variants] GET - Returning data:')
     console.log('[save-variants] GET - Has image:', !!stored.image, stored.image?.substring(0, 80))

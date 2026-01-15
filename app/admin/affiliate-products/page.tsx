@@ -23,6 +23,9 @@ import {
   Loader2,
   Heart,
   ExternalLink,
+  SlidersHorizontal,
+  X,
+  Check,
 } from "lucide-react"
 import { toast } from "sonner"
 import {
@@ -55,7 +58,12 @@ interface ProductAttributes {
   controlMethod?: string
   operationMode?: string
   specialFeature?: string
-  // NOTE: color, size, style are intentionally excluded from product attributes
+  // Variant options - may be present in API response but excluded from display
+  color?: string
+  size?: string
+  style?: string
+  configuration?: string
+  set?: string
   brand?: string
   // Audio product attributes
   earPlacement?: string
@@ -71,6 +79,8 @@ interface ProductAttributes {
   modelName?: string
   // Custom badges
   customBadges?: Array<{name: string, enabled: boolean}>
+  // Custom fields
+  customFields?: Array<{name: string, value: string}>
 }
 
 interface AffiliateProduct {
@@ -112,6 +122,18 @@ export default function AdminAffiliateProductsPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [isExtracting, setIsExtracting] = useState(false)
   const [extractedProduct, setExtractedProduct] = useState<any>(null)
+  // Variant options extracted from URL (color, size, style, set/configuration) - displayed in "Selected Options" layout
+  const [variantOptions, setVariantOptions] = useState<{color?: string, size?: string, style?: string, set?: string}>({})
+  // State for editing variant options
+  const [editingOption, setEditingOption] = useState<'style' | 'color' | 'size' | 'set' | null>(null)
+  const [editOptionValue, setEditOptionValue] = useState('')
+  // Custom variant options (user-added fields beyond Style, Color, Size, Set)
+  const [customVariantOptions, setCustomVariantOptions] = useState<Array<{id: string, name: string, value: string}>>([])
+  const [isAddingCustomOption, setIsAddingCustomOption] = useState(false)
+  const [newOptionName, setNewOptionName] = useState('')
+  const [newOptionValue, setNewOptionValue] = useState('')
+  const [editingCustomOptionId, setEditingCustomOptionId] = useState<string | null>(null)
+  const [editCustomOptionValue, setEditCustomOptionValue] = useState('')
   // Custom fields for product specifications
   const [customFields, setCustomFields] = useState<Array<{name: string, value: string}>>([])
   // Product attributes (Brand, Color, Ear Placement, etc.) - include id for stable React keys
@@ -219,6 +241,15 @@ export default function AdminAffiliateProductsPage() {
       bestSeller: false,
     })
     setExtractedProduct(null) // Clear extracted product widget
+    setVariantOptions({}) // Clear variant options (Selected Options display)
+    setEditingOption(null) // Clear editing state
+    setEditOptionValue('') // Clear editing value
+    setCustomVariantOptions([]) // Clear custom variant options
+    setIsAddingCustomOption(false) // Clear add option form
+    setNewOptionName('') // Clear new option name
+    setNewOptionValue('') // Clear new option value
+    setEditingCustomOptionId(null) // Clear editing custom option
+    setEditCustomOptionValue('') // Clear editing custom option value
     setCustomFields([]) // Clear custom fields
     setCustomBadges([]) // Clear custom badges
     setProductAttributes([]) // Clear product attributes
@@ -474,6 +505,89 @@ export default function AdminAffiliateProductsPage() {
         const originalPriceValue = extracted.originalPrice || extracted.listPrice || null
         const ratingValue = extracted.rating || extracted.averageRating || null
         const reviewCountValue = extracted.reviewCount || extracted.numReviews || null
+        
+        // Capture variant options (color, size, style) from extracted data for "I Wish" display
+        // Helper to validate variant option values (filter out garbage)
+        const isValidVariantValue = (value: any): boolean => {
+          if (!value || typeof value !== 'string') return false
+          const trimmed = value.trim()
+          // Reject if empty, too long, or contains garbage patterns
+          if (trimmed.length === 0 || trimmed.length > 50) return false
+          // Reject CSS-like content, HTML, scripts, or special characters
+          if (trimmed.includes('{') || trimmed.includes('}') || trimmed.includes('<') || trimmed.includes('>')) return false
+          if (trimmed.includes('function') || trimmed.includes('var ') || trimmed.includes('const ')) return false
+          if (trimmed.includes('undefined') || trimmed.includes('null') || trimmed.includes('NaN')) return false
+          if (trimmed.includes('px') || trimmed.includes('rem') || trimmed.includes('rgb')) return false
+          if (trimmed.includes('http') || trimmed.includes('www.')) return false
+          // Reject if mostly numbers/special chars (except sizes like "XL", "42mm")
+          const alphaCount = (trimmed.match(/[a-zA-Z]/g) || []).length
+          if (alphaCount < 1) return false
+          return true
+        }
+        
+        const extractedVariants: {color?: string, size?: string, style?: string, set?: string} = {}
+        
+        // Helper to get a string value (handles arrays by taking first element)
+        const getStringValue = (val: any): string | undefined => {
+          if (!val) return undefined
+          if (typeof val === 'string') return val
+          if (Array.isArray(val) && val.length > 0) {
+            // For arrays, take the first element if it's a string
+            const first = val[0]
+            if (typeof first === 'string') return first
+            if (typeof first === 'object' && first !== null) {
+              // Handle objects like {displayName: "value"}
+              return first.displayName || first.value || first.name || String(first)
+            }
+          }
+          return undefined
+        }
+        
+        // Log all potential variant sources for debugging
+        console.log('[Admin] ===== VARIANT OPTIONS DEBUG =====')
+        console.log('[Admin] extracted.attributes?.color:', extracted.attributes?.color)
+        console.log('[Admin] extracted.color:', extracted.color)
+        console.log('[Admin] extracted.attributes?.size:', extracted.attributes?.size)
+        console.log('[Admin] extracted.size:', extracted.size)
+        console.log('[Admin] extracted.attributes?.style:', extracted.attributes?.style)
+        console.log('[Admin] extracted.style:', extracted.style)
+        console.log('[Admin] extracted.attributes?.set:', extracted.attributes?.set)
+        console.log('[Admin] extracted.set:', extracted.set)
+        console.log('[Admin] extracted.attributes?.configuration:', extracted.attributes?.configuration)
+        console.log('[Admin] extracted.configuration:', extracted.configuration)
+        console.log('[Admin] ===================================')
+        
+        // Get values, handling arrays properly
+        const colorVal = getStringValue(extracted.attributes?.color) || getStringValue(extracted.color)
+        const sizeVal = getStringValue(extracted.attributes?.size) || getStringValue(extracted.size)
+        const styleVal = getStringValue(extracted.attributes?.style) || getStringValue(extracted.style)
+        const setVal = getStringValue(extracted.attributes?.set) || getStringValue(extracted.set) || 
+                       getStringValue(extracted.attributes?.configuration) || getStringValue(extracted.configuration)
+        
+        console.log('[Admin] colorVal (processed):', colorVal, 'isValid:', isValidVariantValue(colorVal))
+        console.log('[Admin] sizeVal (processed):', sizeVal, 'isValid:', isValidVariantValue(sizeVal))
+        console.log('[Admin] styleVal (processed):', styleVal, 'isValid:', isValidVariantValue(styleVal))
+        console.log('[Admin] setVal (processed):', setVal, 'isValid:', isValidVariantValue(setVal))
+        
+        // Additional validation: reject shape values for style (e.g., "SQUARE" is shape, not style)
+        const isValidStyleValue = (val: string | undefined): boolean => {
+          if (!val || !isValidVariantValue(val)) return false
+          const lower = val.toLowerCase()
+          // Reject shape-related values
+          if (lower === 'square' || lower === 'round' || lower === 'rectangle' || lower.includes('shape')) {
+            console.log('[Admin] ⚠️ Rejected shape value for style:', val)
+            return false
+          }
+          return true
+        }
+        
+        if (isValidVariantValue(colorVal)) extractedVariants.color = colorVal!.trim()
+        if (isValidVariantValue(sizeVal)) extractedVariants.size = sizeVal!.trim()
+        if (isValidStyleValue(styleVal)) extractedVariants.style = styleVal!.trim()
+        if (isValidVariantValue(setVal)) extractedVariants.set = setVal!.trim()
+        
+        setVariantOptions(extractedVariants)
+        console.log('[Admin] Final extracted variant options for I Wish display:', extractedVariants)
         
         // Filter out ALL variant-related properties from extracted attributes
         // Variant options (Color, Size, Style, Configuration) will be selected in "Add to My Wishlist" modal
@@ -942,6 +1056,11 @@ export default function AdminAffiliateProductsPage() {
           : (formData.productLink || extractedProduct.productLink || "").trim() || undefined,
         amazonChoice: extractedProduct?.amazonChoice ?? formData.amazonChoice,
         bestSeller: extractedProduct?.bestSeller ?? formData.bestSeller,
+        // Include variant options (Style, Color, Size, Set) as top-level fields
+        style: variantOptions.style || undefined,
+        color: variantOptions.color || undefined,
+        size: variantOptions.size || undefined,
+        set: variantOptions.set || undefined,
         // Include ALL product specifications/attributes dynamically
         attributes: (() => {
           // Start with an EMPTY object - only include what user has in productAttributes
@@ -1686,6 +1805,378 @@ export default function AdminAffiliateProductsPage() {
                         )}
                       </div>
                     </div>
+                    
+                    {/* Selected Options - Variant Options from URL */}
+                    {(variantOptions.style || variantOptions.color || variantOptions.size || variantOptions.set || editingOption || customVariantOptions.length > 0 || isAddingCustomOption || extractedProduct) && (
+                      <div className="bg-gradient-to-br from-[#FEF7ED] via-[#FFF7ED] to-[#FFFBEB] border-2 border-[#DAA520]/40 rounded-xl p-4 shadow-lg">
+                        <div className="flex items-center gap-2 mb-3 pb-2 border-b border-[#DAA520]/20">
+                          <SlidersHorizontal className="w-4 h-4 text-[#DAA520]" />
+                          <h4 className="text-sm font-bold text-[#8B4513]">Selected Options</h4>
+                          <span className="text-[10px] text-gray-500 ml-auto">Variant options from URL</span>
+                        </div>
+                        <div className="space-y-2">
+                          {/* Style Option - Only show if has value or being edited */}
+                          {(variantOptions.style || editingOption === 'style') && (
+                            <div className="flex items-center gap-2 group">
+                              <span className="text-xs font-semibold text-[#654321] min-w-[50px]">Style:</span>
+                              {editingOption === 'style' ? (
+                                <div className="flex items-center gap-1 flex-1">
+                                  <Input
+                                    value={editOptionValue}
+                                    onChange={(e) => setEditOptionValue(e.target.value)}
+                                    className="h-7 text-xs flex-1"
+                                    placeholder="e.g., USB-C, Lightning"
+                                    autoFocus
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault()
+                                      e.stopPropagation()
+                                      setVariantOptions({ ...variantOptions, style: editOptionValue || undefined })
+                                      setEditingOption(null)
+                                      setEditOptionValue('')
+                                    }}
+                                    className="p-1 hover:bg-green-100 rounded"
+                                  >
+                                    <Check className="w-3 h-3 text-green-600" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingOption(null); setEditOptionValue('') }}
+                                    className="p-1 hover:bg-red-100 rounded"
+                                  >
+                                    <X className="w-3 h-3 text-red-500" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <>
+                                  <span className="px-2 py-1 bg-[#DAA520]/20 text-[#654321] text-xs font-medium rounded-md border border-[#DAA520]/30 flex-1">
+                                    {variantOptions.style}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingOption('style'); setEditOptionValue(variantOptions.style || '') }}
+                                    className="p-1 hover:bg-amber-100 rounded"
+                                    title="Edit Style"
+                                  >
+                                    <Edit2 className="w-3 h-3 text-[#F59E0B]" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setVariantOptions(prev => ({ ...prev, style: undefined })) }}
+                                    className="p-1 hover:bg-red-100 rounded"
+                                    title="Delete Style"
+                                  >
+                                    <Trash2 className="w-3 h-3 text-red-500" />
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          )}
+                          
+                          {/* Color Option - Only show if has value or being edited */}
+                          {(variantOptions.color || editingOption === 'color') && (
+                            <div className="flex items-center gap-2 group">
+                              <span className="text-xs font-semibold text-[#654321] min-w-[50px]">Color:</span>
+                              {editingOption === 'color' ? (
+                                <div className="flex items-center gap-1 flex-1">
+                                  <Input
+                                    value={editOptionValue}
+                                    onChange={(e) => setEditOptionValue(e.target.value)}
+                                    className="h-7 text-xs flex-1"
+                                    placeholder="e.g., Orange, Blue, Black"
+                                    autoFocus
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault()
+                                      e.stopPropagation()
+                                      setVariantOptions({ ...variantOptions, color: editOptionValue || undefined })
+                                      setEditingOption(null)
+                                      setEditOptionValue('')
+                                    }}
+                                    className="p-1 hover:bg-green-100 rounded"
+                                  >
+                                    <Check className="w-3 h-3 text-green-600" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingOption(null); setEditOptionValue('') }}
+                                    className="p-1 hover:bg-red-100 rounded"
+                                  >
+                                    <X className="w-3 h-3 text-red-500" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <>
+                                  <span className="px-2 py-1 bg-[#DAA520]/20 text-[#654321] text-xs font-medium rounded-md border border-[#DAA520]/30 flex-1">
+                                    {variantOptions.color}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingOption('color'); setEditOptionValue(variantOptions.color || '') }}
+                                    className="p-1 hover:bg-amber-100 rounded"
+                                    title="Edit Color"
+                                  >
+                                    <Edit2 className="w-3 h-3 text-[#F59E0B]" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setVariantOptions(prev => ({ ...prev, color: undefined })) }}
+                                    className="p-1 hover:bg-red-100 rounded"
+                                    title="Delete Color"
+                                  >
+                                    <Trash2 className="w-3 h-3 text-red-500" />
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          )}
+                          
+                          {/* Size Option - Only show if has value or being edited */}
+                          {(variantOptions.size || editingOption === 'size') && (
+                            <div className="flex items-center gap-2 group">
+                              <span className="text-xs font-semibold text-[#654321] min-w-[50px]">Size:</span>
+                              {editingOption === 'size' ? (
+                                <div className="flex items-center gap-1 flex-1">
+                                  <Input
+                                    value={editOptionValue}
+                                    onChange={(e) => setEditOptionValue(e.target.value)}
+                                    className="h-7 text-xs flex-1"
+                                    placeholder="e.g., Small, Medium, Large"
+                                    autoFocus
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault()
+                                      e.stopPropagation()
+                                      setVariantOptions({ ...variantOptions, size: editOptionValue || undefined })
+                                      setEditingOption(null)
+                                      setEditOptionValue('')
+                                    }}
+                                    className="p-1 hover:bg-green-100 rounded"
+                                  >
+                                    <Check className="w-3 h-3 text-green-600" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingOption(null); setEditOptionValue('') }}
+                                    className="p-1 hover:bg-red-100 rounded"
+                                  >
+                                    <X className="w-3 h-3 text-red-500" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <>
+                                  <span className="px-2 py-1 bg-[#DAA520]/20 text-[#654321] text-xs font-medium rounded-md border border-[#DAA520]/30 flex-1">
+                                    {variantOptions.size}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingOption('size'); setEditOptionValue(variantOptions.size || '') }}
+                                    className="p-1 hover:bg-amber-100 rounded"
+                                    title="Edit Size"
+                                  >
+                                    <Edit2 className="w-3 h-3 text-[#F59E0B]" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setVariantOptions(prev => ({ ...prev, size: undefined })) }}
+                                    className="p-1 hover:bg-red-100 rounded"
+                                    title="Delete Size"
+                                  >
+                                    <Trash2 className="w-3 h-3 text-red-500" />
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          )}
+                          
+                          {/* Set Option - Only show if has value or being edited */}
+                          {(variantOptions.set || editingOption === 'set') && (
+                            <div className="flex items-center gap-2 group">
+                              <span className="text-xs font-semibold text-[#654321] min-w-[50px]">Set:</span>
+                              {editingOption === 'set' ? (
+                                <div className="flex items-center gap-1 flex-1">
+                                  <Input
+                                    value={editOptionValue}
+                                    onChange={(e) => setEditOptionValue(e.target.value)}
+                                    className="h-7 text-xs flex-1"
+                                    placeholder="e.g., With AppleCare+, Bundle"
+                                    autoFocus
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault()
+                                      e.stopPropagation()
+                                      setVariantOptions({ ...variantOptions, set: editOptionValue || undefined })
+                                      setEditingOption(null)
+                                      setEditOptionValue('')
+                                    }}
+                                    className="p-1 hover:bg-green-100 rounded"
+                                  >
+                                    <Check className="w-3 h-3 text-green-600" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingOption(null); setEditOptionValue('') }}
+                                    className="p-1 hover:bg-red-100 rounded"
+                                  >
+                                    <X className="w-3 h-3 text-red-500" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <>
+                                  <span className="px-2 py-1 bg-[#DAA520]/20 text-[#654321] text-xs font-medium rounded-md border border-[#DAA520]/30 flex-1">
+                                    {variantOptions.set}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingOption('set'); setEditOptionValue(variantOptions.set || '') }}
+                                    className="p-1 hover:bg-amber-100 rounded"
+                                    title="Edit Set"
+                                  >
+                                    <Edit2 className="w-3 h-3 text-[#F59E0B]" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setVariantOptions(prev => ({ ...prev, set: undefined })) }}
+                                    className="p-1 hover:bg-red-100 rounded"
+                                    title="Delete Set"
+                                  >
+                                    <Trash2 className="w-3 h-3 text-red-500" />
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          )}
+                          
+                          {/* Custom Variant Options */}
+                          {customVariantOptions.map((option) => (
+                            <div key={option.id} className="flex items-center gap-2 group">
+                              <span className="text-xs font-semibold text-[#654321] min-w-[50px] truncate" title={option.name}>
+                                {option.name}:
+                              </span>
+                              {editingCustomOptionId === option.id ? (
+                                <div className="flex items-center gap-1 flex-1">
+                                  <Input
+                                    value={editCustomOptionValue}
+                                    onChange={(e) => setEditCustomOptionValue(e.target.value)}
+                                    className="h-7 text-xs flex-1"
+                                    placeholder={`Enter ${option.name.toLowerCase()}`}
+                                    autoFocus
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault()
+                                      e.stopPropagation()
+                                      setCustomVariantOptions(prev => 
+                                        prev.map(opt => opt.id === option.id ? { ...opt, value: editCustomOptionValue } : opt)
+                                      )
+                                      setEditingCustomOptionId(null)
+                                      setEditCustomOptionValue('')
+                                    }}
+                                    className="p-1 hover:bg-green-100 rounded"
+                                  >
+                                    <Check className="w-3 h-3 text-green-600" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingCustomOptionId(null); setEditCustomOptionValue('') }}
+                                    className="p-1 hover:bg-red-100 rounded"
+                                  >
+                                    <X className="w-3 h-3 text-red-500" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <>
+                                  <span className="px-2 py-1 bg-[#DAA520]/20 text-[#654321] text-xs font-medium rounded-md border border-[#DAA520]/30 flex-1 truncate" title={option.value}>
+                                    {option.value || <span className="text-gray-400 italic">Not set</span>}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingCustomOptionId(option.id); setEditCustomOptionValue(option.value) }}
+                                    className="p-1 hover:bg-amber-100 rounded"
+                                    title={`Edit ${option.name}`}
+                                  >
+                                    <Edit2 className="w-3 h-3 text-[#F59E0B]" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setCustomVariantOptions(prev => prev.filter(opt => opt.id !== option.id)) }}
+                                    className="p-1 hover:bg-red-100 rounded"
+                                    title={`Delete ${option.name}`}
+                                  >
+                                    <Trash2 className="w-3 h-3 text-red-500" />
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          ))}
+                          
+                          {/* Add New Option Form */}
+                          {isAddingCustomOption ? (
+                            <div className="flex items-center gap-2 mt-2 pt-2 border-t border-[#DAA520]/20">
+                              <Input
+                                value={newOptionName}
+                                onChange={(e) => setNewOptionName(e.target.value)}
+                                className="h-7 text-xs w-20"
+                                placeholder="Name"
+                                autoFocus
+                              />
+                              <Input
+                                value={newOptionValue}
+                                onChange={(e) => setNewOptionValue(e.target.value)}
+                                className="h-7 text-xs flex-1"
+                                placeholder="Value"
+                              />
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                  if (newOptionName.trim()) {
+                                    setCustomVariantOptions(prev => [...prev, {
+                                      id: Date.now().toString(),
+                                      name: newOptionName.trim(),
+                                      value: newOptionValue.trim()
+                                    }])
+                                    setNewOptionName('')
+                                    setNewOptionValue('')
+                                    setIsAddingCustomOption(false)
+                                  }
+                                }}
+                                className="p-1 hover:bg-green-100 rounded"
+                                disabled={!newOptionName.trim()}
+                              >
+                                <Check className="w-3 h-3 text-green-600" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsAddingCustomOption(false); setNewOptionName(''); setNewOptionValue('') }}
+                                className="p-1 hover:bg-red-100 rounded"
+                              >
+                                <X className="w-3 h-3 text-red-500" />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsAddingCustomOption(true) }}
+                              className="flex items-center gap-1 text-xs text-[#8B4513] hover:text-[#654321] font-medium mt-2 pt-2 border-t border-[#DAA520]/20"
+                            >
+                              <Plus className="w-3 h-3" />
+                              Add Field
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                   
                   {/* Right Column */}

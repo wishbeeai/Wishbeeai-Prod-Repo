@@ -4222,60 +4222,284 @@ async function extractWithoutAI(
       }
       
       // Extract ALL Amazon variant dimensions from twister data and selected elements
-      // This captures Style (Lightning/USB-C), Set (AppleCare), Configuration, etc.
+      // This captures Color, Style (Lightning/USB-C), Set (AppleCare), Configuration, etc.
       if (hostname.includes('amazon.com') && htmlContent) {
-        console.log("[v0] 🔍 Extracting Amazon variant dimensions (style, set, configuration)...")
+        console.log("[v0] 🔍 Extracting Amazon variant dimensions (color, style, set, configuration)...")
         
-        // Pattern 1: Look for selected dimension values in JavaScript
-        const selectedDimensionPatterns = [
-          // Selected style/connector (Lightning, USB-C)
-          /"style_name"\s*:\s*\{[^}]*"selected"\s*:\s*true[^}]*"value"\s*:\s*"([^"]+)"/i,
-          /"style_name"\s*:\s*"([^"]+)"/i,
-          /selectedDimensions[^}]*style_name[^}]*:\s*"([^"]+)"/i,
-          // Selected configuration (AppleCare)
-          /"configuration_name"\s*:\s*\{[^}]*"selected"\s*:\s*true[^}]*"value"\s*:\s*"([^"]+)"/i,
-          /"configuration_name"\s*:\s*"([^"]+)"/i,
-          /selectedDimensions[^}]*configuration_name[^}]*:\s*"([^"]+)"/i,
-        ]
-        
-        // Extract style if not already set
-        if (!productData.attributes.style) {
-          const stylePatterns = [
-            /"style_name"\s*:\s*"([^"]+)"/i,
-            /style_name['"]\s*:\s*['"](Lightning|USB-C|USB Type-C)['"]/i,
-            /<span[^>]*data-csa-c-dimension-name=["']style_name["'][^>]*data-csa-c-dimension-value=["']([^"']+)["']/i,
-            /<span[^>]*class=["'][^"']*selection["'][^>]*>[\s]*Style:[\s]*([^<]+)</i,
-            /twisterSwatchWrapper[\s\S]{0,500}?selected[\s\S]{0,200}?(Lightning|USB-C|USB Type-C)/i,
+        // Extract COLOR from Amazon's dimension system (color_name)
+        // This is critical for products like AirPods Max where color is a variant selector
+        // IMPORTANT: We want the SELECTED color, not just any color mentioned on the page
+        if (!productData.attributes.color) {
+          console.log("[v0] 🎨 Attempting to extract SELECTED color from Amazon dimension data...")
+
+          // Known color names to validate against
+          const knownColors = [
+            'orange', 'blue', 'green', 'red', 'black', 'white', 'silver', 'gold', 'rose',
+            'pink', 'purple', 'midnight', 'starlight', 'space gray', 'space grey', 'graphite',
+            'sky blue', 'sunset', 'midnight blue', 'product red', 'yellow', 'coral', 'navy',
+            'grey', 'gray', 'brown', 'beige', 'cream', 'tan', 'burgundy', 'maroon', 'teal',
+            'turquoise', 'olive', 'lavender', 'violet', 'bronze', 'copper', 'platinum', 'titanium'
           ]
           
-          for (const pattern of stylePatterns) {
+          // Words that are NOT colors (reject these early)
+          const notColors = [
+            'price', 'style', 'size', 'set', 'configuration', 'bundle', 'pack', 'quantity',
+            'option', 'select', 'choose', 'click', 'buy', 'add', 'cart', 'shipping', 'delivery',
+            'stock', 'available', 'unavailable', 'sold', 'out', 'new', 'used', 'renewed',
+            'applecare', 'protection', 'warranty', 'plan', 'year', 'month', 'day'
+          ]
+
+          const colorDimensionPatterns = [
+            // HIGHEST PRIORITY: selectedVariations JSON (most reliable for selected color)
+            /"selectedVariations"\s*:\s*\{[^}]*"color_name"\s*:\s*"([^"]+)"/i,
+            // Pattern 2: variation_color_name with selection class (visible selected color)
+            /<span[^>]*id=["']variation_color_name["'][^>]*>[\s\S]*?<span[^>]*class=["'][^"']*selection["'][^>]*>([^<]+)</i,
+            /variation_color_name[\s\S]{0,300}?selection[^>]*>[\s]*([^<]+)</i,
+            // Pattern 3: Color selection text in UI
+            /<span[^>]*class=["'][^"']*selection["'][^>]*>[\s]*(?:Color|Colour):?\s*([^<]+)</i,
+            // Pattern 4: data-csa-c-dimension attributes (Amazon's CSA tracking)
+            /<span[^>]*data-csa-c-dimension-name=["']color_name["'][^>]*data-csa-c-dimension-value=["']([^"']+)["']/i,
+            /<[^>]*data-csa-c-dimension-name=["']color_name["'][^>]*>[\s\S]*?data-csa-c-dimension-value=["']([^"']+)["']/i,
+            // Pattern 5: Selected color swatch (swatchSelect class = currently selected)
+            /<li[^>]*class=["'][^"']*swatchSelect[^"']*["'][^>]*>[\s\S]*?<img[^>]*alt=["']([^"']+)["']/i,
+            /<li[^>]*class=["'][^"']*swatchSelect[^"']*["'][^>]*data-defaultasin[^>]*>[\s\S]*?alt=["']([^"']+)["']/i,
+            // Pattern 6: selectedDimensions in JavaScript
+            /selectedDimensions[^}]*color_name[^}]*:\s*"([^"]+)"/i,
+            // Pattern 7: color_name in various JSON contexts (lower priority - might not be selected)
+            /"color_name"\s*:\s*"([^"]+)"/i,
+            /color_name['"]\s*:\s*['"]([^'"]+)['"]/i,
+          ]
+          
+          for (const pattern of colorDimensionPatterns) {
             const match = htmlContent.match(pattern)
             if (match && match[1]) {
-              const style = match[1].trim()
-              if (style && style.length < 50 && !style.toLowerCase().includes('select')) {
-                productData.attributes.style = style
-                console.log("[v0] ✅ Extracted Style from Amazon variant:", productData.attributes.style)
+              let color = decodeHtmlEntities(match[1].trim())
+              const colorLower = color.toLowerCase()
+              
+              // Validate: must be reasonable length, not a placeholder, not contain junk
+              // FIRST: Check if it's in the notColors list
+              const isNotColor = notColors.some(nc => colorLower === nc || colorLower.includes(nc))
+              if (isNotColor) {
+                console.log("[v0] ⚠️ Rejected non-color word:", color)
+                continue
+              }
+              
+              if (!color || 
+                  color.length < 2 || 
+                  color.length > 50 || 
+                  colorLower.includes('$') ||         // Reject price values
+                  color.match(/^[0-9]+$/) ||
+                  color.match(/^\d+\.\d+$/) ||        // Reject decimal numbers
+                  color.includes('{') ||
+                  color.includes('<') ||
+                  color.includes('[') ||
+                  color.includes('(')) {
+                console.log("[v0] ⚠️ Rejected invalid color value:", color)
+                continue
+              }
+              
+              // Check if this is ACTUALLY a known color (must match exactly, not just pattern)
+              const isKnownColor = knownColors.some(kc => colorLower === kc || colorLower.includes(kc))
+              
+              if (isKnownColor) {
+                // Capitalize first letter of each word
+                color = color.split(' ').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')
+                productData.attributes.color = color
+                console.log("[v0] ✅ Extracted Color from Amazon dimension data:", productData.attributes.color)
+                break
+              } else {
+                console.log("[v0] ⚠️ Color value doesn't look like a known color:", color)
+              }
+            }
+          }
+          
+          // FALLBACK: If no valid color found, try to extract from product title
+          if (!productData.attributes.color) {
+            const productTitle = (productData.productName || '')
+            const titleLower = productTitle.toLowerCase()
+            console.log("[v0] 🔍 Checking product title for color:", productTitle)
+            
+            // Apple device colors
+            const appleColors = [
+              { match: 'orange', formatted: 'Orange' },
+              { match: 'blue', formatted: 'Blue' },
+              { match: 'sky blue', formatted: 'Sky Blue' },
+              { match: 'midnight', formatted: 'Midnight' },
+              { match: 'starlight', formatted: 'Starlight' },
+              { match: 'space gray', formatted: 'Space Gray' },
+              { match: 'space grey', formatted: 'Space Gray' },
+              { match: 'silver', formatted: 'Silver' },
+              { match: 'gold', formatted: 'Gold' },
+              { match: 'rose gold', formatted: 'Rose Gold' },
+              { match: 'pink', formatted: 'Pink' },
+              { match: 'green', formatted: 'Green' },
+              { match: 'red', formatted: 'Red' },
+              { match: 'product red', formatted: 'Product Red' },
+              { match: 'purple', formatted: 'Purple' },
+              { match: 'white', formatted: 'White' },
+              { match: 'black', formatted: 'Black' },
+              { match: 'graphite', formatted: 'Graphite' },
+            ]
+            
+            for (const colorInfo of appleColors) {
+              if (titleLower.includes(colorInfo.match)) {
+                productData.attributes.color = colorInfo.formatted
+                console.log("[v0] ✅ Extracted Color from product title:", productData.attributes.color)
                 break
               }
             }
           }
         }
-        
-        // Extract set/configuration (AppleCare) if not already set
+
+        // Extract STYLE from Amazon's dimension system (style_name) - e.g., USB-C, Lightning
+        // For Apple products, style specifically means connector type (not shape)
+        if (!productData.attributes.style) {
+          const productNameLower = (productData.productName || '').toLowerCase()
+          // Detect Apple audio products (including AirPods Max which may show as "Apple Headphones")
+          const isAppleAudioProduct = productNameLower.includes('airpods') || 
+                                      productNameLower.includes('earpods') ||
+                                      productNameLower.includes('beats') ||
+                                      (productNameLower.includes('apple') && productNameLower.includes('headphones')) ||
+                                      (productNameLower.includes('apple') && productNameLower.includes('max'))
+          
+          // For Apple audio products, only accept connector types as style
+          const validConnectorTypes = ['lightning', 'usb-c', 'usb type-c', 'type-c', 'usb c', '3.5mm', 'wireless']
+          
+          const stylePatterns = [
+            // Pattern 1: data-csa-c-dimension attributes (HIGHEST PRIORITY)
+            /<span[^>]*data-csa-c-dimension-name=["']style_name["'][^>]*data-csa-c-dimension-value=["']([^"']+)["']/i,
+            /<[^>]*data-csa-c-dimension-name=["']style_name["'][^>]*>[\s\S]*?data-csa-c-dimension-value=["']([^"']+)["']/i,
+            // Pattern 2: JavaScript dimension data with selectedVariations
+            /"selectedVariations"\s*:\s*\{[^}]*"style_name"\s*:\s*"([^"]+)"/i,
+            /selectedDimensions[^}]*style_name[^}]*:\s*"([^"]+)"/i,
+            // Pattern 3: style_name in various JSON contexts
+            /"style_name"\s*:\s*"([^"]+)"/i,
+            /style_name['"]\s*:\s*['"](Lightning|USB-C|USB Type-C|Type-C)['"]/i,
+            // Pattern 4: Style selection text in UI
+            /<span[^>]*class=["'][^"']*selection["'][^>]*>[\s]*Style:?\s*([^<]+)</i,
+            /variation_style_name[\s\S]{0,300}?selection[^>]*>[\s]*([^<]+)</i,
+            // Pattern 5: Selected swatch with connector type
+            /twisterSwatchWrapper[\s\S]{0,500}?selected[\s\S]{0,200}?(Lightning|USB-C|USB Type-C|Type-C)/i,
+            /<li[^>]*class=["'][^"']*swatchSelect[^"']*["'][^>]*>[\s\S]*?(Lightning|USB-C|USB Type-C)/i,
+            // Pattern 6: Direct connector type mentions in twister/variation areas
+            /id=["']variation_style_name["'][\s\S]{0,500}?(USB-C|USB Type-C|Lightning)/i,
+            /variation_style[\s\S]{0,300}?(USB-C|USB Type-C|Lightning)/i,
+            // Pattern 7: Inline dimension values in JavaScript
+            /"dimensionValuesDisplayData"[\s\S]{0,2000}?"style_name"[\s\S]{0,200}?"([^"]+)"/i,
+            // Pattern 8: Amazon's twister data inline
+            /twister-plus-inline-twister-card[\s\S]{0,1000}?(USB-C|USB Type-C|Lightning)/i,
+          ]
+          
+          for (const pattern of stylePatterns) {
+            const match = htmlContent.match(pattern)
+            if (match && match[1]) {
+              const style = decodeHtmlEntities(match[1].trim())
+              const styleLower = style.toLowerCase()
+              
+              // Reject invalid values
+              if (!style || 
+                  style.length > 50 || 
+                  styleLower.includes('select') ||
+                  styleLower.includes('choose') ||
+                  styleLower === 'square' ||        // This is shape, not style
+                  styleLower === 'round' ||         // This is shape, not style
+                  styleLower === 'rectangle' ||    // This is shape, not style
+                  styleLower.includes('shape')) {
+                console.log("[v0] ⚠️ Rejected invalid style value:", style)
+                continue
+              }
+              
+              // For Apple audio products, only accept connector types
+              if (isAppleAudioProduct) {
+                const isValidConnector = validConnectorTypes.some(ct => styleLower.includes(ct))
+                if (!isValidConnector) {
+                  console.log("[v0] ⚠️ Rejected non-connector style for Apple audio:", style)
+                  continue
+                }
+              }
+              
+              // Format connector types with proper casing
+              let formattedStyle = style
+              if (styleLower.includes('usb-c') || styleLower === 'usb c' || styleLower === 'usbc') {
+                formattedStyle = 'USB-C'
+              } else if (styleLower.includes('usb type-c') || styleLower.includes('type-c') || styleLower.includes('type c')) {
+                formattedStyle = 'USB Type-C'
+              } else if (styleLower === 'lightning') {
+                formattedStyle = 'Lightning'
+              } else if (styleLower === '3.5mm') {
+                formattedStyle = '3.5mm'
+              } else if (styleLower === 'wireless') {
+                formattedStyle = 'Wireless'
+              } else {
+                // Capitalize first letter of each word for other styles
+                formattedStyle = style.split(' ').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')
+              }
+              
+              productData.attributes.style = formattedStyle
+              console.log("[v0] ✅ Extracted Style from Amazon variant:", productData.attributes.style)
+              break
+            }
+          }
+          
+          // FALLBACK: If no style found from patterns, check product name for connector type
+          if (!productData.attributes.style && isAppleAudioProduct) {
+            const productTitle = (productData.productName || '').toLowerCase()
+            console.log("[v0] 🔍 Checking product title for connector type:", productTitle)
+            
+            if (productTitle.includes('usb-c') || productTitle.includes('usb c') || productTitle.includes('usbc')) {
+              productData.attributes.style = 'USB-C'
+              console.log("[v0] ✅ Extracted Style from product title: USB-C")
+            } else if (productTitle.includes('usb type-c') || productTitle.includes('type-c')) {
+              productData.attributes.style = 'USB Type-C'
+              console.log("[v0] ✅ Extracted Style from product title: USB Type-C")
+            } else if (productTitle.includes('lightning')) {
+              productData.attributes.style = 'Lightning'
+              console.log("[v0] ✅ Extracted Style from product title: Lightning")
+            }
+          }
+          
+          // FALLBACK 2: Check HTML content for explicit USB-C or Lightning mentions near product info
+          if (!productData.attributes.style && isAppleAudioProduct && htmlContent) {
+            // Look for USB-C or Lightning in the product title area of the HTML
+            const titleAreaMatch = htmlContent.match(/id=["']?productTitle["']?[^>]*>[\s\S]{0,500}?(USB-C|USB Type-C|Lightning)/i)
+            if (titleAreaMatch && titleAreaMatch[1]) {
+              const connector = titleAreaMatch[1]
+              if (connector.toLowerCase().includes('usb')) {
+                productData.attributes.style = 'USB-C'
+              } else {
+                productData.attributes.style = 'Lightning'
+              }
+              console.log("[v0] ✅ Extracted Style from HTML title area:", productData.attributes.style)
+            }
+          }
+        }
+
+        // Extract SET/CONFIGURATION from Amazon's dimension system (configuration_name) - e.g., AppleCare
         if (!productData.attributes.set) {
           const setPatterns = [
-            /"configuration_name"\s*:\s*"([^"]+)"/i,
-            /configuration_name['"]\s*:\s*['"]([^'"]*(?:AppleCare|Without|Protection)[^'"]*)['"]/i,
+            // Pattern 1: data-csa-c-dimension attributes
             /<span[^>]*data-csa-c-dimension-name=["']configuration_name["'][^>]*data-csa-c-dimension-value=["']([^"']+)["']/i,
-            /<span[^>]*class=["'][^"']*selection["'][^>]*>[\s]*Set:[\s]*([^<]+)</i,
-            /twisterSwatchWrapper[\s\S]{0,500}?selected[\s\S]{0,200}?(Without AppleCare\+|With AppleCare\+[^<]*)/i,
+            /<[^>]*data-csa-c-dimension-name=["']configuration_name["'][^>]*>[\s\S]*?data-csa-c-dimension-value=["']([^"']+)["']/i,
+            // Pattern 2: JavaScript dimension data
+            /"configuration_name"\s*:\s*"([^"]+)"/i,
+            /configuration_name['"]\s*:\s*['"]([^'"]*(?:AppleCare|Without|With|Protection)[^'"]*)['"]/i,
+            /selectedDimensions[^}]*configuration_name[^}]*:\s*"([^"]+)"/i,
+            /"selectedVariations"\s*:\s*\{[^}]*"configuration_name"\s*:\s*"([^"]+)"/i,
+            // Pattern 3: Configuration selection text
+            /<span[^>]*class=["'][^"']*selection["'][^>]*>[\s]*(?:Set|Configuration):?\s*([^<]+)</i,
+            /variation_configuration_name[\s\S]{0,300}?selection[^>]*>[\s]*([^<]+)</i,
+            // Pattern 4: Selected swatch with AppleCare
+            /twisterSwatchWrapper[\s\S]{0,500}?selected[\s\S]{0,200}?(Without AppleCare\+?|With AppleCare\+?[^<]*)/i,
           ]
           
           for (const pattern of setPatterns) {
             const match = htmlContent.match(pattern)
             if (match && match[1]) {
-              const set = match[1].trim()
-              if (set && set.length < 100 && !set.toLowerCase().includes('select')) {
+              const set = decodeHtmlEntities(match[1].trim())
+              if (set && 
+                  set.length < 100 && 
+                  !set.toLowerCase().includes('select') &&
+                  !set.toLowerCase().includes('choose')) {
                 productData.attributes.set = set
                 console.log("[v0] ✅ Extracted Set from Amazon variant:", productData.attributes.set)
                 break
@@ -4283,6 +4507,12 @@ async function extractWithoutAI(
             }
           }
         }
+        
+        console.log("[v0] 📋 Final variant extraction results:", {
+          color: productData.attributes.color || 'not found',
+          style: productData.attributes.style || 'not found',
+          set: productData.attributes.set || 'not found'
+        })
       }
       
       // Extract Kindle-specific variant options from product name and HTML
@@ -4427,6 +4657,27 @@ async function extractWithoutAI(
               if (urlLower.includes('without') && (urlLower.includes('applecare') || urlLower.includes('care'))) {
                 productData.attributes.set = 'Without AppleCare+'
                 console.log("[v0] ✅ Extracted Set from URL: Without AppleCare+")
+              }
+            }
+            
+            // FALLBACK: For Apple products that typically have AppleCare as an option,
+            // default to "Without AppleCare+" if we couldn't detect the actual selection
+            // This applies to: AirPods, AirPods Pro, AirPods Max, Apple Watch, iPhone, iPad, MacBook
+            if (!productData.attributes.set) {
+              const hasAppleCareOption = productName.includes('airpods') || 
+                                         productName.includes('apple watch') ||
+                                         productName.includes('iphone') ||
+                                         productName.includes('ipad') ||
+                                         productName.includes('macbook') ||
+                                         productName.includes('mac mini') ||
+                                         productName.includes('imac') ||
+                                         productName.includes('apple tv') ||
+                                         productName.includes('homepod')
+              
+              if (hasAppleCareOption) {
+                // Default to Without AppleCare+ since this is the most common selection
+                productData.attributes.set = 'Without AppleCare+'
+                console.log("[v0] ✅ Defaulting Set to: Without AppleCare+ (Apple product with AppleCare option)")
               }
             }
           }
@@ -7132,6 +7383,24 @@ async function extractWithoutAI(
       }
     }
   }
+  
+  // Promote key variant options to top-level for easier access
+  // These are the user-selected options from variant selectors (Color, Style, Set/Configuration)
+  if (productData.attributes?.color && !productData.color) {
+    productData.color = productData.attributes.color
+  }
+  if (productData.attributes?.style && !productData.style) {
+    productData.style = productData.attributes.style
+  }
+  if (productData.attributes?.set && !productData.set) {
+    productData.set = productData.attributes.set
+  }
+  
+  console.log("[v0] 🎯 FINAL VARIANT OPTIONS in response:", {
+    color: productData.color || productData.attributes?.color || 'not set',
+    style: productData.style || productData.attributes?.style || 'not set',
+    set: productData.set || productData.attributes?.set || 'not set'
+  })
   
   return NextResponse.json(productData);
 }

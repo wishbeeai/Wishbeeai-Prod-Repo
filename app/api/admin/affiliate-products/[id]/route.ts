@@ -1,144 +1,54 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { updateProduct, deleteProduct } from "../store"
 
 const ADMIN_EMAIL = "wishbeeai@gmail.com"
 
-// Helper function to create a short and understandable title
-function createShortTitle(fullTitle: string, maxWords: number = 10): string {
-  if (!fullTitle) return ""
-  
-  // Decode HTML entities
-  let cleanTitle = fullTitle
-    .replace(/&amp;/g, '&')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&#34;/g, '"')
-    .replace(/&#x27;/g, "'")
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&#x2F;/g, '/')
-    .replace(/&#x60;/g, '`')
-    .replace(/&nbsp;/g, ' ')
-    .trim()
-  
-  // Remove common unnecessary phrases and patterns
-  const removePatterns = [
-    /\(newest\s+model\)/gi,
-    /\(latest\s+version\)/gi,
-    /\(updated\)/gi,
-    /–\s*20%\s+faster/gi,
-    /–\s*\d+%\s+faster/gi,
-    /with\s+new\s+\d+["']\s+/gi,
-    /weeks?\s+of\s+battery\s+life/gi,
-    /battery\s+life[^–]*/gi,
-    /glare-free\s+display/gi,
-    /new\s+\d+["']/gi,
-    /\s*–\s*[^–]+$/g, // Remove trailing dash sections
-    /\s*\|\s*[^|]+$/g, // Remove trailing pipe sections
-  ]
-  
-  for (const pattern of removePatterns) {
-    cleanTitle = cleanTitle.replace(pattern, ' ').trim()
-  }
-  
-  // Split into words
-  let words = cleanTitle.split(/\s+/).filter(w => w.length > 0)
-  
-  // Remove common filler words if title is too long
-  const fillerWords = new Set([
-    'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with',
-    'by', 'from', 'up', 'about', 'into', 'through', 'during', 'including', 'against',
-    'all', 'can', 'her', 'was', 'one', 'our', 'out', 'day', 'get', 'has', 'him', 'his',
-    'how', 'its', 'may', 'new', 'now', 'old', 'see', 'two', 'who', 'way', 'use', 'her'
-  ])
-  
-  // Extract brand (usually first 1-2 words if capitalized)
-  let brandWords: string[] = []
-  let productWords: string[] = []
-  let inBrand = true
-  
-  for (let i = 0; i < words.length; i++) {
-    const word = words[i]
-    // Check if word starts with capital (likely brand) or is a known brand pattern
-    if (inBrand && (i < 2 || /^[A-Z]/.test(word) || /^(Ninja|Amazon|Apple|Samsung|Sony|LG|Dell|HP|Lenovo|Canon|Nikon)/i.test(word))) {
-      brandWords.push(word)
-      if (i >= 1) inBrand = false // Usually brand is 1-2 words
-    } else {
-      productWords.push(word)
-      inBrand = false
-    }
-  }
-  
-  // If no brand detected, use first word as potential brand
-  if (brandWords.length === 0 && words.length > 0) {
-    brandWords.push(words[0])
-    productWords = words.slice(1)
-  }
-  
-  // Keep important words: brand, key product name, important specs (numbers, sizes, models)
-  const importantWords: string[] = [...brandWords]
-  
-  for (let i = 0; i < productWords.length && importantWords.length < maxWords; i++) {
-    const word = productWords[i]
-    const lowerWord = word.toLowerCase()
-    
-    // Always include if it's a number, size, model, or important feature
-    if (
-      /\d/.test(word) || // Contains numbers
-      /^[A-Z]/.test(word) || // Starts with capital (likely important)
-      /^(Pro|XL|L|M|S|Plus|Max|Mini|Ultra|Premium|Deluxe|Standard)/i.test(word) || // Key descriptors
-      !fillerWords.has(lowerWord) // Not a filler word
-    ) {
-      importantWords.push(word)
-    }
-  }
-  
-  // Limit to maxWords
-  let finalWords = importantWords.slice(0, maxWords)
-  
-  // Join and clean up
-  let result = finalWords.join(' ')
-    .replace(/[\s\-–—,;:]+$/g, '') // Remove trailing punctuation and whitespace
-    .replace(/^[\s\-–—,;:]+/g, '') // Remove leading punctuation and whitespace
-    .replace(/\s+/g, ' ') // Normalize multiple spaces to single space
-    .trim()
-  
-  // If result is empty or too short, use original truncated version
-  if (result.length < 10) {
-    result = words.slice(0, maxWords).join(' ')
-      .replace(/[\s\-–—,;:]+$/g, '')
-      .replace(/^[\s\-–—,;:]+/g, '')
-      .replace(/\s+/g, ' ')
-      .trim()
-  }
-  
-  return result
-}
-
-// GET handler for testing - verify route is accessible
+// GET handler - get single product
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> | { id: string } }
 ) {
   console.log(`[GET API] Route handler called`)
   try {
+    const supabase = await createClient()
     const resolvedParams = params instanceof Promise ? await params : params
     const productId = resolvedParams.id
     
-    const { getProducts } = await import("../store")
-    const allProducts = getProducts()
-    // Convert both IDs to strings for comparison to handle type mismatches
-    const product = allProducts.find(p => String(p.id) === String(productId))
-    
-    if (product) {
-      return NextResponse.json({ product })
-    } else {
+    const { data: product, error } = await supabase
+      .from('affiliate_products')
+      .select('*')
+      .eq('id', productId)
+      .single()
+
+    if (error || !product) {
       return NextResponse.json(
-        { error: `Product not found. Available IDs: ${allProducts.map(p => p.id).join(", ")}` },
+        { error: "Product not found" },
         { status: 404 }
       )
     }
+
+    // Transform to frontend format
+    const transformedProduct = {
+      id: product.id,
+      productName: product.product_name,
+      image: product.image || "/placeholder.svg",
+      category: product.category,
+      source: product.source,
+      rating: product.rating || 0,
+      reviewCount: product.review_count || 0,
+      price: product.price,
+      originalPrice: product.original_price,
+      productLink: product.product_link || "",
+      amazonChoice: product.amazon_choice || false,
+      bestSeller: product.best_seller || false,
+      overallPick: false,
+      attributes: product.attributes || undefined,
+      tags: product.tags || undefined,
+      createdAt: product.created_at,
+      updatedAt: product.updated_at,
+    }
+
+    return NextResponse.json({ product: transformedProduct })
   } catch (error) {
     console.error("[GET API] Error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
@@ -167,26 +77,17 @@ export async function PUT(
     const resolvedParams = params instanceof Promise ? await params : params
     const productId = resolvedParams.id
 
-    console.log(`[PUT API] Received product ID: ${productId} (type: ${typeof productId})`)
+    console.log(`[PUT API] Received product ID: ${productId}`)
 
     if (!productId) {
-      console.log(`[PUT API] No product ID provided`)
       return NextResponse.json(
         { error: "Product ID is required" },
         { status: 400 }
       )
     }
 
-    // Import getProducts to check what products exist
-    const { getProducts } = await import("../store")
-    const allProducts = getProducts()
-    console.log(`[PUT API] Total products in store: ${allProducts.length}`)
-    console.log(`[PUT API] Available product IDs:`, allProducts.map(p => ({ id: p.id, idType: typeof p.id, idStr: String(p.id) })))
-
     const body = await req.json()
-    
     console.log(`[PUT] Received update request for product ID: ${productId}`)
-    console.log(`[PUT] Update payload:`, JSON.stringify(body, null, 2))
 
     // Validate required fields if provided
     if (body.productName !== undefined && (!body.productName || body.productName.trim() === "")) {
@@ -203,14 +104,10 @@ export async function PUT(
       )
     }
 
-    // Prepare update data
+    // Prepare update data for database
     const updateData: any = {}
     
-    // Always update these fields if provided
-    if (body.productName !== undefined) {
-      // Use the full product name (no truncation)
-      updateData.productName = body.productName.trim()
-    }
+    if (body.productName !== undefined) updateData.product_name = body.productName.trim()
     if (body.image !== undefined) updateData.image = body.image
     if (body.category !== undefined) updateData.category = body.category
     if (body.source !== undefined) updateData.source = body.source
@@ -220,7 +117,7 @@ export async function PUT(
     }
     if (body.reviewCount !== undefined) {
       const reviewCount = parseFloat(body.reviewCount)
-      updateData.reviewCount = (!isNaN(reviewCount) && reviewCount >= 0) ? reviewCount : 0
+      updateData.review_count = (!isNaN(reviewCount) && reviewCount >= 0) ? reviewCount : 0
     }
     if (body.price !== undefined) {
       const price = parseFloat(body.price)
@@ -230,28 +127,25 @@ export async function PUT(
     }
     if (body.originalPrice !== undefined) {
       if (body.originalPrice === null || body.originalPrice === "") {
-        updateData.originalPrice = undefined
+        updateData.original_price = null
       } else {
         const originalPrice = parseFloat(body.originalPrice)
         if (!isNaN(originalPrice) && originalPrice >= 0) {
-          updateData.originalPrice = originalPrice
+          updateData.original_price = originalPrice
         }
       }
     }
-    if (body.productLink !== undefined) updateData.productLink = body.productLink
-    if (body.amazonChoice !== undefined) updateData.amazonChoice = Boolean(body.amazonChoice)
-    if (body.bestSeller !== undefined) updateData.bestSeller = Boolean(body.bestSeller)
-    if (body.overallPick !== undefined) updateData.overallPick = Boolean(body.overallPick)
+    if (body.productLink !== undefined) updateData.product_link = body.productLink
+    if (body.amazonChoice !== undefined) updateData.amazon_choice = Boolean(body.amazonChoice)
+    if (body.bestSeller !== undefined) updateData.best_seller = Boolean(body.bestSeller)
+    if (body.overallPick !== undefined) updateData.overall_pick = Boolean(body.overallPick)
     
-    // Handle attributes - include ALL attributes EXCEPT color, size, style variants
-    // This dynamically includes all extracted attributes
+    // Handle attributes
     if (body.attributes !== undefined) {
       const attributes: any = {}
-      // Excluded keys (variant-related)
-      const excludedKeys = ['color', 'size', 'style', 'sizeOptions', 'colorVariants', 'combinedVariants', 'styleOptions', 'styleName', 'patternName']
+      const excludedKeys = ['sizeOptions', 'colorVariants', 'combinedVariants', 'styleOptions']
       
       if (body.attributes && typeof body.attributes === 'object') {
-        // Include ALL attributes except excluded ones
         Object.entries(body.attributes).forEach(([key, value]) => {
           if (!excludedKeys.includes(key) && value !== null && value !== undefined && value !== '') {
             attributes[key] = typeof value === 'string' ? value.trim() : value
@@ -259,93 +153,62 @@ export async function PUT(
         })
       }
       
-      console.log('[API PUT] Saving attributes:', JSON.stringify(attributes, null, 2))
-      updateData.attributes = Object.keys(attributes).length > 0 ? attributes : undefined
+      updateData.attributes = Object.keys(attributes).length > 0 ? attributes : null
     }
     
     // Handle tags
     if (body.tags !== undefined) {
       if (body.tags === null || (Array.isArray(body.tags) && body.tags.length === 0)) {
-        updateData.tags = undefined
+        updateData.tags = null
       } else if (Array.isArray(body.tags)) {
-        updateData.tags = body.tags.filter(tag => tag && tag.trim()).map(tag => tag.trim())
+        updateData.tags = body.tags.filter((tag: string) => tag && tag.trim()).map((tag: string) => tag.trim())
       }
     }
 
     console.log(`[PUT] Prepared update data:`, JSON.stringify(updateData, null, 2))
 
-    // Check if product exists before updating
-    const existingProduct = allProducts.find(p => String(p.id) === String(productId))
-    if (!existingProduct) {
-      console.log(`[PUT API] Product not found in store: ${productId}`)
-      console.log(`[PUT API] Available product IDs:`, allProducts.map(p => ({ id: p.id, type: typeof p.id, idStr: String(p.id) })))
-      console.log(`[PUT API] Searching for ID: "${productId}" (type: ${typeof productId})`)
-      
-      // If product doesn't exist, create it (upsert behavior for in-memory store)
-      // This handles the case where the server restarted and the store was cleared
-      console.log(`[PUT API] Product not found - creating new product with provided data (upsert)`)
-      const { addProduct } = await import("../store")
-      
-      // Create product from update data
-      const newProduct = {
-        id: productId,
-        productName: updateData.productName || body.productName || "Unknown Product",
-        image: updateData.image || body.image || "/placeholder.svg",
-        category: updateData.category || body.category || "General",
-        source: updateData.source || body.source || "Unknown",
-        rating: updateData.rating !== undefined ? updateData.rating : (body.rating || 0),
-        reviewCount: updateData.reviewCount !== undefined ? updateData.reviewCount : (body.reviewCount || 0),
-        price: updateData.price !== undefined ? updateData.price : parseFloat(body.price || 0),
-        originalPrice: updateData.originalPrice !== undefined ? updateData.originalPrice : (body.originalPrice ? parseFloat(body.originalPrice) : undefined),
-        productLink: updateData.productLink || body.productLink || "",
-        amazonChoice: updateData.amazonChoice !== undefined ? updateData.amazonChoice : (body.amazonChoice || false),
-        bestSeller: updateData.bestSeller !== undefined ? updateData.bestSeller : (body.bestSeller || false),
-        overallPick: updateData.overallPick !== undefined ? updateData.overallPick : (body.overallPick || false),
-        attributes: body.attributes || undefined,
-        tags: body.tags || undefined,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+    // Update in Supabase
+    const { data: updatedProduct, error } = await supabase
+      .from('affiliate_products')
+      .update(updateData)
+      .eq('id', productId)
+      .select()
+      .single()
+
+    if (error) {
+      console.error(`[PUT API] Database error:`, error)
+      if (error.code === 'PGRST116') {
+        return NextResponse.json({ error: "Product not found" }, { status: 404 })
       }
-      
-      const createdProduct = addProduct(newProduct)
-      console.log(`[PUT API] Created new product:`, createdProduct)
-      
-      // Now update it with the full update data
-      const updatedProduct = updateProduct(productId, updateData)
-      if (updatedProduct) {
-        console.log(`[PUT] Product created and updated successfully: ${productId}`)
-        return NextResponse.json({
-          success: true,
-          message: "Product created and updated successfully",
-          product: updatedProduct,
-        })
-      }
-      
-      // Fallback: return the created product
-      return NextResponse.json({
-        success: true,
-        message: "Product created successfully (update data applied)",
-        product: createdProduct,
-      })
+      return NextResponse.json({ error: "Failed to update product", details: error.message }, { status: 500 })
     }
 
-    // Update product (in production, update database)
-    const updatedProduct = updateProduct(productId, updateData)
-
-    if (!updatedProduct) {
-      console.log(`[PUT API] Update function returned null for product ID: ${productId}`)
-      return NextResponse.json(
-        { error: `Failed to update product. Product may have been deleted.` },
-        { status: 500 }
-      )
+    // Transform to frontend format
+    const responseProduct = {
+      id: updatedProduct.id,
+      productName: updatedProduct.product_name,
+      image: updatedProduct.image,
+      category: updatedProduct.category,
+      source: updatedProduct.source,
+      rating: updatedProduct.rating,
+      reviewCount: updatedProduct.review_count,
+      price: updatedProduct.price,
+      originalPrice: updatedProduct.original_price,
+      productLink: updatedProduct.product_link,
+      amazonChoice: updatedProduct.amazon_choice,
+      bestSeller: updatedProduct.best_seller,
+      overallPick: false,
+      attributes: updatedProduct.attributes,
+      tags: updatedProduct.tags,
+      createdAt: updatedProduct.created_at,
+      updatedAt: updatedProduct.updated_at,
     }
 
     console.log(`[PUT] Product updated successfully: ${productId}`)
-    console.log(`[PUT] Updated product:`, JSON.stringify(updatedProduct, null, 2))
     return NextResponse.json({
       success: true,
       message: "Product updated successfully",
-      product: updatedProduct,
+      product: responseProduct,
     })
   } catch (error) {
     console.error("[PUT API] Error updating affiliate product:", error)
@@ -383,41 +246,41 @@ export async function DELETE(
     console.log(`[DELETE API] Received product ID: ${productId}`)
 
     if (!productId) {
-      console.log(`[DELETE API] No product ID provided`)
       return NextResponse.json(
         { error: "Product ID is required" },
         { status: 400 }
       )
     }
 
-    // Import getProducts to check what products exist
-    const { getProducts } = await import("../store")
-    const allProducts = getProducts()
-    console.log(`[DELETE API] Available product IDs:`, allProducts.map(p => p.id))
-    console.log(`[DELETE API] Available product IDs (types):`, allProducts.map(p => ({ id: p.id, type: typeof p.id })))
-    console.log(`[DELETE API] Attempting to delete product with ID: ${productId} (type: ${typeof productId})`)
+    // Check if product exists first
+    const { data: existingProduct, error: fetchError } = await supabase
+      .from('affiliate_products')
+      .select('id')
+      .eq('id', productId)
+      .single()
 
-    // Delete product (in production, delete from database)
-    const deleted = deleteProduct(productId)
-
-    if (!deleted) {
-      console.log(`[DELETE API] Product not found in store: ${productId}`)
-      console.log(`[DELETE API] Product ID comparison check:`)
-      allProducts.forEach(p => {
-        const idStr = String(p.id)
-        const productIdStr = String(productId)
-        console.log(`[DELETE API] Comparing: "${idStr}" === "${productIdStr}" ? ${idStr === productIdStr}`)
-      })
+    if (fetchError || !existingProduct) {
+      console.log(`[DELETE API] Product not found: ${productId}`)
       return NextResponse.json(
-        { error: `Product not found. Available IDs: ${allProducts.map(p => p.id).join(", ")}` },
+        { error: "Product not found" },
         { status: 404 }
       )
     }
 
-    // Verify deletion by checking the store again
-    const remainingProducts = getProducts()
-    console.log(`[DELETE API] Products remaining after delete: ${remainingProducts.length}`)
-    console.log(`[DELETE API] Remaining product IDs:`, remainingProducts.map(p => p.id))
+    // Delete from Supabase
+    const { error } = await supabase
+      .from('affiliate_products')
+      .delete()
+      .eq('id', productId)
+
+    if (error) {
+      console.error(`[DELETE API] Database error:`, error)
+      return NextResponse.json(
+        { error: "Failed to delete product", details: error.message },
+        { status: 500 }
+      )
+    }
+
     console.log(`[DELETE API] Product deleted successfully: ${productId}`)
     return NextResponse.json({
       success: true,
@@ -432,5 +295,3 @@ export async function DELETE(
     )
   }
 }
-
-

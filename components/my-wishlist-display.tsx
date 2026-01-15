@@ -77,6 +77,15 @@ export function MyWishlistDisplay() {
     configuration: string
   }>({ color: '', size: '', style: '', configuration: '' })
 
+  // State for editing Alternative preferences
+  const [editingAltItemId, setEditingAltItemId] = useState<string | null>(null)
+  const [editedAltPreferences, setEditedAltPreferences] = useState<{
+    color: string
+    size: string
+    style: string
+    configuration: string
+  }>({ color: '', size: '', style: '', configuration: '' })
+
   // Fetch wishlist items from database
   useEffect(() => {
     const fetchWishlistItems = async () => {
@@ -347,6 +356,77 @@ export function MyWishlistDisplay() {
     setEditedPreferences(prev => ({ ...prev, [key]: '' }))
   }
 
+  // Start editing Alternative preferences for an item
+  const startEditingAltPreferences = (item: WishlistItem) => {
+    setEditingAltItemId(item.id)
+    const alt = item.preferenceOptions?.alternative
+    setEditedAltPreferences({
+      color: (alt?.color as string) || '',
+      size: (alt?.size as string) || '',
+      style: (alt?.style as string) || '',
+      configuration: (alt?.configuration as string) || '',
+    })
+  }
+
+  // Cancel editing Alternative
+  const cancelEditingAltPreferences = () => {
+    setEditingAltItemId(null)
+    setEditedAltPreferences({ color: '', size: '', style: '', configuration: '' })
+  }
+
+  // Save edited Alternative preferences
+  const saveEditedAltPreferences = async (itemId: string) => {
+    try {
+      const item = wishlistItems.find(i => i.id === itemId)
+      if (!item) return
+
+      const updatedPreferenceOptions = {
+        ...item.preferenceOptions,
+        alternative: {
+          ...item.preferenceOptions?.alternative,
+          color: editedAltPreferences.color || null,
+          size: editedAltPreferences.size || null,
+          style: editedAltPreferences.style || null,
+          configuration: editedAltPreferences.configuration || null,
+        }
+      }
+
+      const response = await fetch(`/api/wishlist-items/${itemId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ preferenceOptions: updatedPreferenceOptions }),
+      })
+
+      if (response.ok) {
+        setWishlistItems(prev => prev.map(i => 
+          i.id === itemId 
+            ? { ...i, preferenceOptions: updatedPreferenceOptions }
+            : i
+        ))
+        setEditingAltItemId(null)
+        toast({
+          title: "✅ Alternative Updated!",
+          description: "Your alternative options have been saved.",
+          variant: "warm",
+        })
+      } else {
+        throw new Error("Failed to update")
+      }
+    } catch (error) {
+      console.error("Error updating alternative preferences:", error)
+      toast({
+        title: "Error",
+        description: "Could not update alternative preferences. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // Remove a single Alternative preference option
+  const removeAltPreferenceOption = (key: string) => {
+    setEditedAltPreferences(prev => ({ ...prev, [key]: '' }))
+  }
+
   const handleBuyNow = async (item: WishlistItem) => {
     try {
       await fetch("/api/wishlist/track-purchase", {
@@ -615,7 +695,8 @@ export function MyWishlistDisplay() {
                       .filter(([key, value]) => !excludeKeys.includes(key) && isValidValue(value) && typeof value === 'string')
                   }
                   
-                  const iLikeEntries = getValidEntries(item.preferenceOptions.iLike)
+                  // Filter out 'size' from I Wish entries as requested
+                  const iLikeEntries = getValidEntries(item.preferenceOptions.iLike).filter(([key]) => key.toLowerCase() !== 'size')
                   const altEntries = getValidEntries(item.preferenceOptions.alternative)
                   const okToBuyEntries = getValidEntries(item.preferenceOptions.okToBuy)
                   
@@ -805,28 +886,59 @@ export function MyWishlistDisplay() {
                               </span>
                               <span className="text-[9px] text-gray-500 font-medium">Optional</span>
                             </div>
-                            {/* Select on Retailer button - matches /gifts/trending modal */}
-                            <a
-                              href={item.webLink}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-[10px] text-[#4A2F1A] font-medium hover:underline flex items-center gap-1"
-                            >
-                              <ExternalLink className="w-2.5 h-2.5" />
-                              Select on Retailer
-                            </a>
+                            {/* Edit/Save/Cancel and Select on Retailer buttons */}
+                            <div className="flex items-center gap-2">
+                              {editingAltItemId === item.id ? (
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => saveEditedAltPreferences(item.id)}
+                                    className="p-1 bg-green-500 hover:bg-green-600 text-white rounded-full transition-colors"
+                                    title="Save"
+                                  >
+                                    <Check className="w-3 h-3" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={cancelEditingAltPreferences}
+                                    className="p-1 bg-gray-400 hover:bg-gray-500 text-white rounded-full transition-colors"
+                                    title="Cancel"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => startEditingAltPreferences(item)}
+                                  className="p-1 bg-[#D97706] hover:bg-[#B45309] text-white rounded-full transition-colors"
+                                  title="Edit alternative preferences"
+                                >
+                                  <Pencil className="w-3 h-3" />
+                                </button>
+                              )}
+                              <a
+                                href={item.webLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[10px] text-[#4A2F1A] font-medium hover:underline flex items-center gap-1"
+                              >
+                                <ExternalLink className="w-2.5 h-2.5" />
+                                Select on Retailer
+                              </a>
+                            </div>
                           </div>
                           
                           {/* Instructions */}
                           <p className="text-[9px] text-[#92400E] bg-[#D97706]/10 px-2 py-1.5 rounded-md border border-[#D97706]/20 italic mb-2">
-                            💡 Click Select on Retailer to open the product page → choose your preferred options → use the Wishbee extension to clip and auto-fill the information below.
+                            To select different options, click <ExternalLink className="w-2.5 h-2.5 inline-block align-middle mx-0.5" /> Select on Retailer, choose your preferred options, and clip them using the Wishbee extension.
                           </p>
                           
                           {/* Image + Options Row */}
                           <div className="flex gap-3">
-                            {/* Product Image - Left Panel (only show if alternative has image) */}
-                            {item.preferenceOptions?.alternative?.image && (
-                              <div className="flex-shrink-0">
+                            {/* Product Image - Left Panel */}
+                            <div className="flex-shrink-0">
+                              {item.preferenceOptions?.alternative?.image ? (
                                 <Image
                                   src={item.preferenceOptions.alternative.image}
                                   alt={item.preferenceOptions.alternative.title || "Alternative option"}
@@ -834,50 +946,101 @@ export function MyWishlistDisplay() {
                                   height={80}
                                   className="object-contain rounded-lg bg-white border border-[#D97706]/20"
                                 />
-                              </div>
-                            )}
+                              ) : (
+                                <div className="w-20 h-20 rounded-lg bg-gradient-to-br from-amber-50 to-orange-50 border border-[#D97706]/20 flex items-center justify-center">
+                                  <span className="text-[#D97706] text-[9px] text-center px-1">Clip variant image</span>
+                                </div>
+                              )}
+                            </div>
                             
                             {/* Options - Right Panel */}
                             <div className="flex-1 min-w-0">
-                              {/* Display existing alternative entries */}
-                              {altEntries.length > 0 && (
-                                <div className="flex flex-wrap gap-1.5 mb-2">
-                                  {altEntries.map(([key, value]) => (
-                                    <span key={key} className="text-[10px] bg-white text-[#4A2F1A] px-2 py-1 rounded-lg border border-[#D97706]/30 shadow-sm">
-                                      <span className="font-semibold capitalize text-[#6B4423]">{key}:</span> {value}
-                                    </span>
-                                  ))}
+                              {/* Edit Mode */}
+                              {editingAltItemId === item.id ? (
+                                <div className="space-y-2">
+                                  {/* Color */}
+                                  <div className="flex items-center gap-2">
+                                    <label className="text-[10px] font-semibold text-[#6B4423] w-16">Color:</label>
+                                    <input
+                                      type="text"
+                                      value={editedAltPreferences.color}
+                                      onChange={(e) => setEditedAltPreferences(prev => ({ ...prev, color: e.target.value }))}
+                                      className="flex-1 text-[10px] px-2 py-1 border border-[#D97706]/30 rounded bg-white focus:outline-none focus:border-[#D97706]"
+                                      placeholder="e.g., Midnight"
+                                    />
+                                    {editedAltPreferences.color && (
+                                      <button
+                                        type="button"
+                                        onClick={() => removeAltPreferenceOption('color')}
+                                        className="p-0.5 text-red-500 hover:text-red-700 transition-colors"
+                                        title="Remove"
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </button>
+                                    )}
+                                  </div>
+                                  {/* Style */}
+                                  <div className="flex items-center gap-2">
+                                    <label className="text-[10px] font-semibold text-[#6B4423] w-16">Style:</label>
+                                    <input
+                                      type="text"
+                                      value={editedAltPreferences.style}
+                                      onChange={(e) => setEditedAltPreferences(prev => ({ ...prev, style: e.target.value }))}
+                                      className="flex-1 text-[10px] px-2 py-1 border border-[#D97706]/30 rounded bg-white focus:outline-none focus:border-[#D97706]"
+                                      placeholder="e.g., USB-C"
+                                    />
+                                    {editedAltPreferences.style && (
+                                      <button
+                                        type="button"
+                                        onClick={() => removeAltPreferenceOption('style')}
+                                        className="p-0.5 text-red-500 hover:text-red-700 transition-colors"
+                                        title="Remove"
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </button>
+                                    )}
+                                  </div>
+                                  {/* Configuration/Set */}
+                                  <div className="flex items-center gap-2">
+                                    <label className="text-[10px] font-semibold text-[#6B4423] w-16">Set:</label>
+                                    <input
+                                      type="text"
+                                      value={editedAltPreferences.configuration}
+                                      onChange={(e) => setEditedAltPreferences(prev => ({ ...prev, configuration: e.target.value }))}
+                                      className="flex-1 text-[10px] px-2 py-1 border border-[#D97706]/30 rounded bg-white focus:outline-none focus:border-[#D97706]"
+                                      placeholder="e.g., Without AppleCare+"
+                                    />
+                                    {editedAltPreferences.configuration && (
+                                      <button
+                                        type="button"
+                                        onClick={() => removeAltPreferenceOption('configuration')}
+                                        className="p-0.5 text-red-500 hover:text-red-700 transition-colors"
+                                        title="Remove"
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
-                              )}
-                              
-                              {altEntries.length === 0 && !item.preferenceOptions?.alternative?.image && (
-                                <p className="text-[10px] text-[#92400E] italic mb-2">
-                                  No alternative options selected yet.
-                                </p>
+                              ) : (
+                                /* Display Mode */
+                                <>
+                                  {altEntries.length > 0 ? (
+                                    <div className="flex flex-wrap gap-1.5 mb-2">
+                                      {altEntries.map(([key, value]) => (
+                                        <span key={key} className="text-[10px] bg-white text-[#4A2F1A] px-2 py-1 rounded-lg border border-[#D97706]/30 shadow-sm">
+                                          <span className="font-semibold capitalize text-[#6B4423]">{key}:</span> {value}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <p className="text-[10px] text-[#92400E] italic mb-2">
+                                      No alternative options selected yet. Click edit to add.
+                                    </p>
+                                  )}
+                                </>
                               )}
                             </div>
-                          </div>
-                          
-                          {/* Custom Fields Section */}
-                          <div className="mt-2 pt-2 border-t border-[#D97706]/20">
-                            <button
-                              type="button"
-                              className="flex items-center gap-1 text-[9px] font-semibold text-[#D97706] hover:text-[#B45309] transition-colors"
-                            >
-                              <Plus className="w-3 h-3" />
-                              Add Custom Field
-                            </button>
-                          </div>
-                          
-                          {/* Notes Section */}
-                          <div className="mt-2">
-                            <label className="text-[9px] font-semibold text-[#6B4423] mb-1 block">Notes:</label>
-                            <textarea
-                              placeholder="Add any special notes or instructions..."
-                              className="w-full text-[10px] px-2 py-1.5 border border-[#D97706]/30 rounded bg-white/80 focus:outline-none focus:border-[#D97706] resize-none"
-                              rows={2}
-                              readOnly
-                            />
                           </div>
                         </div>
 

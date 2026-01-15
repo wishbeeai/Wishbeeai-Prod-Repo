@@ -2447,7 +2447,7 @@ export function UnifiedAddWishlist() {
                       </div>
                       
                       <p className="text-[10px] text-[#92400E] bg-[#D97706]/10 px-2 py-1 rounded-md border border-[#D97706]/20 italic mb-2">
-                        💡 Click Select on Retailer to open the product page → choose your preferred options → use the Wishbee extension to clip and auto-fill the information below.
+                        To select different options, click <ExternalLink className="w-2.5 h-2.5 inline-block align-middle mx-0.5" /> Select on Retailer, choose your preferred options, and clip them using the Wishbee extension.
                       </p>
                       
                       {/* Waiting for extension clip */}

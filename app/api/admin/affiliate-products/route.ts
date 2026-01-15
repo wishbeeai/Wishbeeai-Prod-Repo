@@ -1,120 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { getProducts, addProduct } from "./store"
 
 const ADMIN_EMAIL = "wishbeeai@gmail.com"
-
-// Helper function to create a short and understandable title
-function createShortTitle(fullTitle: string, maxWords: number = 10): string {
-  if (!fullTitle) return ""
-  
-  // Decode HTML entities
-  let cleanTitle = fullTitle
-    .replace(/&amp;/g, '&')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&#34;/g, '"')
-    .replace(/&#x27;/g, "'")
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&#x2F;/g, '/')
-    .replace(/&#x60;/g, '`')
-    .replace(/&nbsp;/g, ' ')
-    .trim()
-  
-  // Remove common unnecessary phrases and patterns
-  const removePatterns = [
-    /\(newest\s+model\)/gi,
-    /\(latest\s+version\)/gi,
-    /\(updated\)/gi,
-    /–\s*20%\s+faster/gi,
-    /–\s*\d+%\s+faster/gi,
-    /with\s+new\s+\d+["']\s+/gi,
-    /weeks?\s+of\s+battery\s+life/gi,
-    /battery\s+life[^–]*/gi,
-    /glare-free\s+display/gi,
-    /new\s+\d+["']/gi,
-    /\s*–\s*[^–]+$/g, // Remove trailing dash sections
-    /\s*\|\s*[^|]+$/g, // Remove trailing pipe sections
-  ]
-  
-  for (const pattern of removePatterns) {
-    cleanTitle = cleanTitle.replace(pattern, ' ').trim()
-  }
-  
-  // Split into words
-  let words = cleanTitle.split(/\s+/).filter(w => w.length > 0)
-  
-  // Remove common filler words if title is too long
-  const fillerWords = new Set([
-    'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with',
-    'by', 'from', 'up', 'about', 'into', 'through', 'during', 'including', 'against',
-    'all', 'can', 'her', 'was', 'one', 'our', 'out', 'day', 'get', 'has', 'him', 'his',
-    'how', 'its', 'may', 'new', 'now', 'old', 'see', 'two', 'who', 'way', 'use', 'her'
-  ])
-  
-  // Extract brand (usually first 1-2 words if capitalized)
-  let brandWords: string[] = []
-  let productWords: string[] = []
-  let inBrand = true
-  
-  for (let i = 0; i < words.length; i++) {
-    const word = words[i]
-    // Check if word starts with capital (likely brand) or is a known brand pattern
-    if (inBrand && (i < 2 || /^[A-Z]/.test(word) || /^(Ninja|Amazon|Apple|Samsung|Sony|LG|Dell|HP|Lenovo|Canon|Nikon)/i.test(word))) {
-      brandWords.push(word)
-      if (i >= 1) inBrand = false // Usually brand is 1-2 words
-    } else {
-      productWords.push(word)
-      inBrand = false
-    }
-  }
-  
-  // If no brand detected, use first word as potential brand
-  if (brandWords.length === 0 && words.length > 0) {
-    brandWords.push(words[0])
-    productWords = words.slice(1)
-  }
-  
-  // Keep important words: brand, key product name, important specs (numbers, sizes, models)
-  const importantWords: string[] = [...brandWords]
-  
-  for (let i = 0; i < productWords.length && importantWords.length < maxWords; i++) {
-    const word = productWords[i]
-    const lowerWord = word.toLowerCase()
-    
-    // Always include if it's a number, size, model, or important feature
-    if (
-      /\d/.test(word) || // Contains numbers
-      /^[A-Z]/.test(word) || // Starts with capital (likely important)
-      /^(Pro|XL|L|M|S|Plus|Max|Mini|Ultra|Premium|Deluxe|Standard)/i.test(word) || // Key descriptors
-      !fillerWords.has(lowerWord) // Not a filler word
-    ) {
-      importantWords.push(word)
-    }
-  }
-  
-  // Limit to maxWords
-  let finalWords = importantWords.slice(0, maxWords)
-  
-  // Join and clean up
-  let result = finalWords.join(' ')
-    .replace(/[\s\-–—,;:]+$/g, '') // Remove trailing punctuation and whitespace
-    .replace(/^[\s\-–—,;:]+/g, '') // Remove leading punctuation and whitespace
-    .replace(/\s+/g, ' ') // Normalize multiple spaces to single space
-    .trim()
-  
-  // If result is empty or too short, use original truncated version
-  if (result.length < 10) {
-    result = words.slice(0, maxWords).join(' ')
-      .replace(/[\s\-–—,;:]+$/g, '')
-      .replace(/^[\s\-–—,;:]+/g, '')
-      .replace(/\s+/g, ' ')
-      .trim()
-  }
-  
-  return result
-}
 
 export async function GET(req: NextRequest) {
   console.log("[API] GET /api/admin/affiliate-products - Request received")
@@ -130,12 +17,44 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    console.log("[API] Admin access confirmed, fetching products...")
-    const products = getProducts()
-    console.log("[API] Products found:", products.length)
+    console.log("[API] Admin access confirmed, fetching products from database...")
+    
+    // Fetch from Supabase database
+    const { data: products, error } = await supabase
+      .from('affiliate_products')
+      .select('*')
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.error("[API] Database error:", error)
+      return NextResponse.json({ error: "Database error", details: error.message }, { status: 500 })
+    }
+
+    // Transform database format to frontend format
+    const transformedProducts = (products || []).map((p: any) => ({
+      id: p.id,
+      productName: p.product_name,
+      image: p.image || "/placeholder.svg",
+      category: p.category,
+      source: p.source,
+      rating: p.rating || 0,
+      reviewCount: p.review_count || 0,
+      price: p.price,
+      originalPrice: p.original_price,
+      productLink: p.product_link || "",
+      amazonChoice: p.amazon_choice || false,
+      bestSeller: p.best_seller || false,
+      overallPick: false,
+      attributes: p.attributes || undefined,
+      tags: p.tags || undefined,
+      createdAt: p.created_at,
+      updatedAt: p.updated_at,
+    }))
+
+    console.log("[API] Products found:", transformedProducts.length)
     return NextResponse.json({
-      products,
-      total: products.length,
+      products: transformedProducts,
+      total: transformedProducts.length,
     })
   } catch (error) {
     console.error("[API] Error fetching affiliate products:", error)
@@ -167,12 +86,11 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Build attributes object - include ALL attributes EXCEPT color, size, style variants
-    // This dynamically includes all extracted attributes
+    // Build attributes object - include ALL attributes including variant options
     const attributes: any = {}
     if (body.attributes && typeof body.attributes === 'object') {
-      // Excluded keys (variant-related)
-      const excludedKeys = ['color', 'size', 'style', 'sizeOptions', 'colorVariants', 'combinedVariants', 'styleOptions', 'styleName', 'patternName']
+      // Excluded keys (only multi-value arrays, not single variant selections)
+      const excludedKeys = ['sizeOptions', 'colorVariants', 'combinedVariants', 'styleOptions']
       
       // Include ALL attributes except excluded ones
       Object.entries(body.attributes).forEach(([key, value]) => {
@@ -183,38 +101,69 @@ export async function POST(req: NextRequest) {
       
       console.log('[API POST] Saving attributes:', JSON.stringify(attributes, null, 2))
     }
+    
+    // Add variant options from body directly (style, color, size, set)
+    if (body.style) attributes.style = body.style
+    if (body.color) attributes.color = body.color
+    if (body.size) attributes.size = body.size
+    if (body.set) attributes.set = body.set
 
     // Use the full product name (no truncation)
     const fullProductName = body.productName ? body.productName.trim() : body.productName
 
-    // Create new product
-    const newProduct = {
-      id: Date.now().toString(),
-      productName: fullProductName || body.productName,
-      image: body.image || "/placeholder.svg",
-      category: body.category,
-      source: body.source,
-      rating: body.rating || 0,
-      reviewCount: body.reviewCount || 0,
-      price: parseFloat(body.price),
-      originalPrice: body.originalPrice ? parseFloat(body.originalPrice) : undefined,
-      productLink: body.productLink || "",
-      amazonChoice: body.amazonChoice || false,
-      bestSeller: body.bestSeller || false,
-      overallPick: body.overallPick || false,
-      attributes: Object.keys(attributes).length > 0 ? attributes : undefined,
-      tags: body.tags && Array.isArray(body.tags) && body.tags.length > 0 ? body.tags : undefined,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+    // Insert into Supabase database
+    const { data: savedProduct, error } = await supabase
+      .from('affiliate_products')
+      .insert({
+        product_name: fullProductName,
+        image: body.image || "/placeholder.svg",
+        category: body.category,
+        source: body.source,
+        rating: body.rating || 0,
+        review_count: body.reviewCount || 0,
+        price: parseFloat(body.price),
+        original_price: body.originalPrice ? parseFloat(body.originalPrice) : null,
+        product_link: body.productLink || "",
+        amazon_choice: body.amazonChoice || false,
+        best_seller: body.bestSeller || false,
+        attributes: Object.keys(attributes).length > 0 ? attributes : null,
+        tags: body.tags && Array.isArray(body.tags) && body.tags.length > 0 ? body.tags : null,
+      })
+      .select()
+      .single()
+
+    if (error) {
+      console.error("[API] Database insert error:", error)
+      return NextResponse.json({ error: "Failed to save product", details: error.message }, { status: 500 })
     }
 
-    // Add to store (in production, insert into database)
-    const savedProduct = addProduct(newProduct)
+    // Transform to frontend format
+    const responseProduct = {
+      id: savedProduct.id,
+      productName: savedProduct.product_name,
+      image: savedProduct.image,
+      category: savedProduct.category,
+      source: savedProduct.source,
+      rating: savedProduct.rating,
+      reviewCount: savedProduct.review_count,
+      price: savedProduct.price,
+      originalPrice: savedProduct.original_price,
+      productLink: savedProduct.product_link,
+      amazonChoice: savedProduct.amazon_choice,
+      bestSeller: savedProduct.best_seller,
+      overallPick: false,
+      attributes: savedProduct.attributes,
+      tags: savedProduct.tags,
+      createdAt: savedProduct.created_at,
+      updatedAt: savedProduct.updated_at,
+    }
+
+    console.log("[API] Product saved successfully:", savedProduct.id)
 
     return NextResponse.json({
       success: true,
       message: "Product added successfully",
-      product: savedProduct,
+      product: responseProduct,
     })
   } catch (error) {
     console.error("Error creating affiliate product:", error)
@@ -224,4 +173,3 @@ export async function POST(req: NextRequest) {
     )
   }
 }
-
