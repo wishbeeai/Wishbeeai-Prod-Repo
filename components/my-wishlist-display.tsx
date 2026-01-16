@@ -123,10 +123,22 @@ export function MyWishlistDisplay() {
           try {
             if (item.description) {
               descriptionData = JSON.parse(item.description)
+              // Debug logging for preferences
+              console.log('[Wishlist] Item:', item.title?.substring(0, 30))
+              console.log('[Wishlist] Has preferenceOptions:', !!descriptionData.preferenceOptions)
+              if (descriptionData.preferenceOptions) {
+                console.log('[Wishlist] Has iLike:', !!descriptionData.preferenceOptions.iLike)
+                console.log('[Wishlist] Has alternative:', !!descriptionData.preferenceOptions.alternative)
+                if (descriptionData.preferenceOptions.alternative) {
+                  console.log('[Wishlist] Alternative image:', descriptionData.preferenceOptions.alternative.image?.substring(0, 60))
+                  console.log('[Wishlist] Alternative color:', descriptionData.preferenceOptions.alternative.color)
+                }
+              }
             }
           } catch (e) {
             // Not JSON, keep as string
             descriptionData = { text: item.description }
+            console.error('[Wishlist] Error parsing description:', e)
           }
 
           // Extract store name from description data or URL

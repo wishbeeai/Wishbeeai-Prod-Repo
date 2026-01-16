@@ -18,6 +18,7 @@ import {
   SlidersHorizontal,
   Pencil,
   Check,
+  Upload,
 } from "lucide-react"
 
 interface Gift {
@@ -35,12 +36,77 @@ interface Gift {
   overallPick?: boolean
   originalPrice?: number
   attributes?: Record<string, any>
+  preferenceOptions?: string | {
+    iLike?: {
+      image?: string
+      title?: string
+      size?: string
+      color?: string
+      style?: string
+      configuration?: string
+      customFields?: { key: string; value: string }[]
+      notes?: string
+    }
+    alternative?: {
+      image?: string
+      title?: string
+      size?: string
+      color?: string
+      style?: string
+      configuration?: string
+      customFields?: { key: string; value: string }[]
+      notes?: string
+    }
+    okToBuy?: {
+      image?: string
+      title?: string
+      size?: string
+      color?: string
+      style?: string
+      configuration?: string
+      customFields?: { key: string; value: string }[]
+      notes?: string
+    }
+  }
+}
+
+export interface PreferenceOptions {
+  iLike?: {
+    image?: string | null
+    title?: string | null
+    size?: string | null
+    color?: string | null
+    style?: string | null
+    configuration?: string | null
+    customFields?: { key: string; value: string }[]
+    notes?: string | null
+  } | null
+  alternative?: {
+    image?: string | null
+    title?: string | null
+    size?: string | null
+    color?: string | null
+    style?: string | null
+    configuration?: string | null
+    customFields?: { key: string; value: string }[]
+    notes?: string | null
+  } | null
+  okToBuy?: {
+    image?: string | null
+    title?: string | null
+    size?: string | null
+    color?: string | null
+    style?: string | null
+    configuration?: string | null
+  } | null
 }
 
 interface AddToWishlistModalProps {
   gift: Gift | null
   isOpen: boolean
   onClose: () => void
+  wishlistItemId?: string // If provided, this is an existing item that can be updated
+  onSavePreferences?: (preferences: PreferenceOptions) => void // Callback when preferences are saved
 }
 
 interface ExtractedProduct {
@@ -123,7 +189,7 @@ function isValidVariantValue(value: any): boolean {
     /^\$/,                            // Starts with dollar sign
     /\d+\.\d+\s*out\s*of/i,           // Rating pattern
     /reviews?/i,                      // Contains "review" or "reviews"
-    /stars?/i,                        // Contains "star" or "stars"
+    /\bstars?\b/i,                    // Contains standalone "star" or "stars" (not "Starlight")
     /^\d+\s+\d+/,                     // Starts with multiple numbers
     /selected\s*(color|style|size|set)/i, // "Selected Color is..."
     /tap\s*to/i,                      // "Tap to collapse"
@@ -139,9 +205,10 @@ function isValidVariantValue(value: any): boolean {
   // Must contain at least one letter
   if (!/[a-zA-Z]/.test(v)) return false
   
-  // Reject if too many words (valid sizes are typically 1-3 words)
+  // Reject if too many words (Apple Watch colors can have 8+ words like 
+  // "Natural Titanium Case with Light Blue Alpine Loop")
   const wordCount = v.split(/\s+/).length
-  if (wordCount > 5) return false
+  if (wordCount > 12) return false
   
   return true
 }
@@ -151,7 +218,7 @@ function getCleanVariantDisplay(value: string): string {
   return cleanVariantValue(value)
 }
 
-export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModalProps) {
+export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSavePreferences }: AddToWishlistModalProps) {
   const { toast } = useToast()
   const router = useRouter()
   const [step, setStep] = useState<1 | 2>(1)
@@ -159,6 +226,8 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
   const [isExtracting, setIsExtracting] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const savingRef = useRef(false) // Extra protection against double submissions
+  const likeImageInputRef = useRef<HTMLInputElement>(null) // Ref for I Wish image upload
+  const altImageInputRef = useRef<HTMLInputElement>(null) // Ref for Alternative image upload
   const [hasOpenedRetailer, setHasOpenedRetailer] = useState(false)
   const [variantPreference, setVariantPreference] = useState<"Ideal" | "Alternative" | "Nice to have" | "">("")
   const [preferenceError, setPreferenceError] = useState<string>("")
@@ -213,6 +282,12 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
   const [likeClippedTitle, setLikeClippedTitle] = useState<string | null>(null)
   const [altClippedImage, setAltClippedImage] = useState<string | null>(null)
   const [altClippedTitle, setAltClippedTitle] = useState<string | null>(null)
+  
+  // Image URL input states - for manually entering image URLs
+  const [showLikeImageInput, setShowLikeImageInput] = useState(false)
+  const [likeImageUrlInput, setLikeImageUrlInput] = useState("")
+  const [showAltImageInput, setShowAltImageInput] = useState(false)
+  const [altImageUrlInput, setAltImageUrlInput] = useState("")
   const [okClippedImage, setOkClippedImage] = useState<string | null>(null)
   const [okClippedTitle, setOkClippedTitle] = useState<string | null>(null)
   
@@ -234,35 +309,75 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
 
   // Pre-fill options from gift attributes OR extracted product when modal opens
   useEffect(() => {
-    // Source attributes from gift or extractedProduct
+    if (!isOpen) return
+    
+    // PRIORITY 1: Check top-level properties first (from admin affiliate products page)
+    // These are saved as: gift.color, gift.size, gift.style, gift.configuration
+    const topLevelColor = (gift as any)?.color || extractedProduct?.color
+    const topLevelSize = (gift as any)?.size || extractedProduct?.size
+    const topLevelStyle = (gift as any)?.style || extractedProduct?.style
+    const topLevelConfiguration = (gift as any)?.configuration || (gift as any)?.set || 
+                                   extractedProduct?.configuration || extractedProduct?.set
+    
+    console.log('[Modal] Pre-filling from top-level:', { 
+      color: topLevelColor, 
+      size: topLevelSize, 
+      style: topLevelStyle, 
+      configuration: topLevelConfiguration 
+    })
+    
+    // Set from top-level properties
+    if (topLevelColor && isValidVariantValue(topLevelColor)) {
+      setLikeColor(topLevelColor)
+      console.log('[Modal] Set likeColor from top-level:', topLevelColor)
+    }
+    if (topLevelSize && isValidVariantValue(topLevelSize)) {
+      setLikeSize(topLevelSize)
+      console.log('[Modal] Set likeSize from top-level:', topLevelSize)
+    }
+    if (topLevelStyle && isValidVariantValue(topLevelStyle)) {
+      setLikeStyle(topLevelStyle)
+      console.log('[Modal] Set likeStyle from top-level:', topLevelStyle)
+    }
+    if (topLevelConfiguration && isValidVariantValue(topLevelConfiguration)) {
+      setLikeConfiguration(topLevelConfiguration)
+      console.log('[Modal] Set likeConfiguration from top-level:', topLevelConfiguration)
+    }
+    
+    // PRIORITY 2: Also check attributes object for any fields not found at top level
     const attrs = gift?.attributes || extractedProduct?.attributes || {}
     
-    if (isOpen && Object.keys(attrs).length > 0) {
-      console.log('[Modal] Pre-filling options from attributes:', attrs)
+    if (Object.keys(attrs).length > 0) {
+      console.log('[Modal] Pre-filling from attributes:', attrs)
       
-      // Pre-fill Style (with validation)
-      if (attrs.style && isValidVariantValue(attrs.style)) {
-        setLikeStyle(attrs.style)
-        console.log('[Modal] Set likeStyle:', attrs.style)
-      }
+      // Known standard variant fields (case-insensitive matching)
+      // Only these are shown - product specs like Material, Item Weight, etc. are excluded
+      const standardFields = ['style', 'color', 'size', 'set', 'configuration']
       
-      // Pre-fill Color (with validation)
-      if (attrs.color && isValidVariantValue(attrs.color)) {
-        setLikeColor(attrs.color)
-        console.log('[Modal] Set likeColor:', attrs.color)
-      }
-      
-      // Pre-fill Size (with validation)
-      if (attrs.size && isValidVariantValue(attrs.size)) {
-        setLikeSize(attrs.size)
-        console.log('[Modal] Set likeSize:', attrs.size)
-      }
-      
-      // Pre-fill Set/Configuration (with validation)
-      const setVal = attrs.set || attrs.configuration
-      if (setVal && isValidVariantValue(setVal)) {
-        setLikeConfiguration(setVal)
-        console.log('[Modal] Set likeConfiguration:', setVal)
+      // Process all attributes
+      for (const [key, value] of Object.entries(attrs)) {
+        if (!value || !isValidVariantValue(value as string)) continue
+        
+        const lowerKey = key.toLowerCase()
+        
+        // Handle standard fields (only if not already set from top-level)
+        if (lowerKey === 'style' && !topLevelStyle) {
+          setLikeStyle(value as string)
+          console.log('[Modal] Set likeStyle from attrs:', value)
+        } else if (lowerKey === 'color' && !topLevelColor) {
+          setLikeColor(value as string)
+          console.log('[Modal] Set likeColor from attrs:', value)
+        } else if (lowerKey === 'size' && !topLevelSize) {
+          setLikeSize(value as string)
+          console.log('[Modal] Set likeSize from attrs:', value)
+        } else if ((lowerKey === 'set' || lowerKey === 'configuration') && !topLevelConfiguration) {
+          setLikeConfiguration(value as string)
+          console.log('[Modal] Set likeConfiguration from attrs:', value)
+        }
+        // NOTE: We intentionally do NOT auto-populate custom fields from product specs
+        // like Material, Item Weight, Operating System, etc.
+        // Only variant options (Style, Color, Size, Configuration) should be shown
+        // Custom fields should only come from explicitly saved user preferences
       }
     }
   }, [isOpen, gift, extractedProduct])
@@ -275,6 +390,105 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
   useEffect(() => {
     console.log('[Modal] 🖼️ altClippedImage STATE CHANGED:', altClippedImage?.substring(0, 60) || 'null')
   }, [altClippedImage])
+
+  // Helper to load preferences into state
+  const loadPreferencesIntoState = (prefs: any) => {
+    if (!prefs) return false
+    
+    let loaded = false
+    
+    // Load I Wish preferences
+    if (prefs.iLike) {
+      const iLike = prefs.iLike
+      if (iLike.image) setLikeClippedImage(iLike.image)
+      if (iLike.title) setLikeClippedTitle(iLike.title)
+      if (iLike.size) setLikeSize(iLike.size)
+      if (iLike.color) setLikeColor(iLike.color)
+      if (iLike.style) setLikeStyle(iLike.style)
+      if (iLike.configuration) setLikeConfiguration(iLike.configuration)
+      if (iLike.customFields) setLikeCustomFields(iLike.customFields.map((f: any) => ({ ...f, id: Date.now().toString() + Math.random() })))
+      if (iLike.notes) setLikeNotes(iLike.notes)
+      setLikeSelected(true)
+      loaded = true
+      console.log('[Modal] ✅ Loaded I Wish preferences')
+    }
+    
+    // Load Alternative preferences
+    if (prefs.alternative) {
+      const alt = prefs.alternative
+      if (alt.image) setAltClippedImage(alt.image)
+      if (alt.title) setAltClippedTitle(alt.title)
+      if (alt.size) setAltSize(alt.size)
+      if (alt.color) setAltColor(alt.color)
+      if (alt.style) setAltStyle(alt.style)
+      if (alt.configuration) setAltConfiguration(alt.configuration)
+      if (alt.customFields) setAltCustomFields(alt.customFields.map((f: any) => ({ ...f, id: Date.now().toString() + Math.random() })))
+      if (alt.notes) setAltNotes(alt.notes)
+      setAltSelected(true)
+      loaded = true
+      console.log('[Modal] ✅ Loaded Alternative preferences')
+    }
+    
+    // Load Ok to Buy preferences
+    if (prefs.okToBuy) {
+      const ok = prefs.okToBuy
+      if (ok.image) setOkClippedImage(ok.image)
+      if (ok.title) setOkClippedTitle(ok.title)
+      if (ok.size) setOkSize(ok.size)
+      if (ok.color) setOkColor(ok.color)
+      if (ok.style) setOkStyle(ok.style)
+      if (ok.configuration) setOkConfiguration(ok.configuration)
+      setOkSelected(true)
+      setOkToBuyExpanded(true)
+      loaded = true
+      console.log('[Modal] ✅ Loaded Ok to Buy preferences')
+    }
+    
+    return loaded
+  }
+  
+  // Load saved preference options when modal opens
+  // Priority: 1) gift.preferenceOptions (from database), 2) localStorage (for unsaved drafts)
+  useEffect(() => {
+    if (!isOpen || !gift?.id) return
+    
+    console.log('[Modal] Loading preferences for gift:', gift.id)
+    
+    // First, try to load from gift.preferenceOptions (database)
+    if (gift.preferenceOptions) {
+      console.log('[Modal] Loading from gift.preferenceOptions...')
+      try {
+        const prefs = typeof gift.preferenceOptions === 'string' 
+          ? JSON.parse(gift.preferenceOptions) 
+          : gift.preferenceOptions
+        
+        if (loadPreferencesIntoState(prefs)) {
+          console.log('[Modal] ✅ Loaded preferences from database')
+          return
+        }
+      } catch (e) {
+        console.error('[Modal] Error parsing gift.preferenceOptions:', e)
+      }
+    }
+    
+    // Second, try to load from localStorage (for unsaved drafts)
+    try {
+      const localStorageKey = `wishbee_prefs_${gift.id}`
+      const savedPrefs = localStorage.getItem(localStorageKey)
+      if (savedPrefs) {
+        console.log('[Modal] Loading from localStorage:', localStorageKey)
+        const prefs = JSON.parse(savedPrefs)
+        if (loadPreferencesIntoState(prefs)) {
+          console.log('[Modal] ✅ Loaded preferences from localStorage')
+          return
+        }
+      }
+    } catch (e) {
+      console.error('[Modal] Error loading from localStorage:', e)
+    }
+    
+    console.log('[Modal] No saved preferences found for gift:', gift.id)
+  }, [isOpen, gift?.id, gift?.preferenceOptions]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Reset when modal closes
   useEffect(() => {
@@ -378,13 +592,23 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
             const normalizedAttributes: Record<string, string> = {}
             
             // Process actual variants (these are the selectable options on the product page)
+            console.log('[Modal] Processing variants. Raw data.variants:', JSON.stringify(data.variants))
+            console.log('[Modal] data.variants.color:', data.variants.color)
+            console.log('[Modal] data.variants.Color:', data.variants.Color)
+            
             for (const [key, value] of Object.entries(data.variants)) {
+              console.log(`[Modal] Processing key="${key}", value="${value}", typeof value="${typeof value}"`)
               if (value) {
                 const normalizedKey = normalizeAttributeKey(key)
                 console.log(`[Modal] Normalizing variant: ${key} -> ${normalizedKey} = ${value}`)
                 normalizedAttributes[normalizedKey] = value as string
+              } else {
+                console.log(`[Modal] Skipping key="${key}" because value is falsy`)
               }
             }
+            
+            console.log('[Modal] After processing, normalizedAttributes:', JSON.stringify(normalizedAttributes))
+            console.log('[Modal] normalizedAttributes.Color:', normalizedAttributes['Color'])
             
             // Also check specifications for Style if not already in variants
             // Some Amazon products have Style in specifications instead of variants
@@ -471,11 +695,34 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
               setAltAttributes(normalizedAttributes)
 
               // Also set legacy fields for backward compatibility (with validation)
-              if (normalizedAttributes['Size'] && isValidVariantValue(normalizedAttributes['Size'])) setAltSize(normalizedAttributes['Size'])
-              if (normalizedAttributes['Color'] && isValidVariantValue(normalizedAttributes['Color'])) setAltColor(normalizedAttributes['Color'])
-              if (normalizedAttributes['Style'] && isValidVariantValue(normalizedAttributes['Style'])) setAltStyle(normalizedAttributes['Style'])
+              console.log('[Modal] ALT - Setting legacy fields from normalizedAttributes:', normalizedAttributes)
+              
+              const altSizeVal = normalizedAttributes['Size']
+              const altColorVal = normalizedAttributes['Color']
+              const altStyleVal = normalizedAttributes['Style']
               const altConfigVal = normalizedAttributes['Set'] || normalizedAttributes['Configuration']
-              if (altConfigVal && isValidVariantValue(altConfigVal)) setAltConfiguration(altConfigVal)
+              
+              console.log('[Modal] ALT - Size:', altSizeVal, 'valid:', isValidVariantValue(altSizeVal))
+              console.log('[Modal] ALT - Color:', altColorVal, 'valid:', isValidVariantValue(altColorVal))
+              console.log('[Modal] ALT - Style:', altStyleVal, 'valid:', isValidVariantValue(altStyleVal))
+              console.log('[Modal] ALT - Config:', altConfigVal, 'valid:', isValidVariantValue(altConfigVal))
+              
+              if (altSizeVal && isValidVariantValue(altSizeVal)) {
+                setAltSize(altSizeVal)
+                console.log('[Modal] ALT - ✅ Set Size:', altSizeVal)
+              }
+              if (altColorVal && isValidVariantValue(altColorVal)) {
+                setAltColor(altColorVal)
+                console.log('[Modal] ALT - ✅ Set Color:', altColorVal)
+              }
+              if (altStyleVal && isValidVariantValue(altStyleVal)) {
+                setAltStyle(altStyleVal)
+                console.log('[Modal] ALT - ✅ Set Style:', altStyleVal)
+              }
+              if (altConfigVal && isValidVariantValue(altConfigVal)) {
+                setAltConfiguration(altConfigVal)
+                console.log('[Modal] ALT - ✅ Set Config:', altConfigVal)
+              }
               setAltSelected(true)
               
               console.log('[Modal] ✅ Filled Alternative fields with extension data:', normalizedAttributes)
@@ -924,6 +1171,19 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
       }
       
       console.log('[AddToWishlist] Successfully added to wishlist')
+      
+      // KEEP preferences in localStorage for when modal is reopened
+      // The gift object doesn't have preferenceOptions, so we need localStorage
+      if (gift?.id) {
+        try {
+          const localStorageKey = `wishbee_prefs_${gift.id}`
+          // Save the current preferences to localStorage instead of clearing
+          localStorage.setItem(localStorageKey, JSON.stringify(preferenceOptions))
+          console.log('[AddToWishlist] ✅ Saved preferences to localStorage:', localStorageKey)
+        } catch (e) {
+          console.error('[AddToWishlist] Error saving to localStorage:', e)
+        }
+      }
 
       toast({
         title: "✓ Added to My Wishlist",
@@ -952,6 +1212,120 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
       savingRef.current = false
       setIsSaving(false)
     }
+  }
+
+  // Helper to build current preferences object
+  const buildCurrentPreferences = (): PreferenceOptions => {
+    console.log('[Modal] buildCurrentPreferences called')
+    console.log('[Modal] - likeSelected:', likeSelected)
+    console.log('[Modal] - altSelected:', altSelected, 'altClippedImage:', altClippedImage?.substring(0, 50), 'altColor:', altColor)
+    console.log('[Modal] - okSelected:', okSelected)
+    
+    // Helper to validate and clean option values (filter out garbage data)
+    const cleanOptionValue = (value: string | null | undefined): string | null => {
+      if (!value) return null
+      const str = value.toString().trim()
+      if (str.length > 100 || str.length === 0) return null
+      const garbagePatterns = [
+        'stars', 'rating', 'review', 'cart', 'slide', 'percent',
+        'protection plan', 'about this', 'add to', 'widget',
+        'feedback', 'out of 5', 'customer', 'items in'
+      ]
+      const lowerStr = str.toLowerCase()
+      if (garbagePatterns.some(p => lowerStr.includes(p))) return null
+      return str
+    }
+
+    const prefs = {
+      iLike: likeSelected ? {
+        image: likeClippedImage || extractedProduct?.imageUrl || null,
+        title: likeClippedTitle || extractedProduct?.productName || null,
+        size: cleanOptionValue(likeSize),
+        color: cleanOptionValue(likeColor),
+        style: cleanOptionValue(likeStyle),
+        configuration: cleanOptionValue(likeConfiguration),
+        customFields: likeCustomFields.filter(f => f.key && f.value).map(f => ({ key: f.key, value: f.value })),
+        notes: likeNotes.trim() || null,
+      } : null,
+      alternative: altSelected ? {
+        image: altClippedImage || null,
+        title: altClippedTitle || null,
+        size: cleanOptionValue(altSize),
+        color: cleanOptionValue(altColor),
+        style: cleanOptionValue(altStyle),
+        configuration: cleanOptionValue(altConfiguration),
+        customFields: altCustomFields.filter(f => f.key && f.value).map(f => ({ key: f.key, value: f.value })),
+        notes: altNotes.trim() || null,
+      } : null,
+      okToBuy: okSelected ? {
+        image: okClippedImage || null,
+        title: okClippedTitle || null,
+        size: cleanOptionValue(okSize),
+        color: cleanOptionValue(okColor),
+        style: cleanOptionValue(okStyle),
+        configuration: cleanOptionValue(okConfiguration),
+      } : null,
+    }
+    
+    console.log('[Modal] Built preferences object:', JSON.stringify(prefs))
+    return prefs
+  }
+
+  // Handle close with auto-save of preferences
+  const handleClose = async () => {
+    // Check if any preferences have been set
+    const hasPreferences = likeSelected || altSelected || okSelected
+    
+    console.log('[Modal] handleClose called - hasPreferences:', hasPreferences, 'gift.id:', gift?.id)
+    console.log('[Modal] States: likeSelected=', likeSelected, 'altSelected=', altSelected, 'okSelected=', okSelected)
+    console.log('[Modal] Alt data: image=', altClippedImage?.substring(0, 50), 'color=', altColor, 'style=', altStyle)
+
+    if (hasPreferences && gift?.id) {
+      const preferences = buildCurrentPreferences()
+      console.log('[Modal] Built preferences:', JSON.stringify(preferences))
+
+      // ALWAYS save to localStorage for draft persistence (works for new items too)
+      try {
+        const localStorageKey = `wishbee_prefs_${gift.id}`
+        localStorage.setItem(localStorageKey, JSON.stringify(preferences))
+        console.log('[Modal] ✅ Saved preferences to localStorage:', localStorageKey)
+        
+        toast({
+          title: "🐝 Options Saved",
+          description: "Your preferred options have been saved.",
+          variant: "warm",
+        })
+      } catch (error) {
+        console.error('[Modal] Error saving to localStorage:', error)
+      }
+
+      // If this is an existing wishlist item, also save preferences to the database
+      if (wishlistItemId) {
+        try {
+          console.log('[Modal] Also saving preferences for existing item:', wishlistItemId)
+          const response = await fetch(`/api/wishlists/items/${wishlistItemId}/preferences`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ preferenceOptions: preferences }),
+          })
+
+          if (response.ok) {
+            console.log('[Modal] ✅ Preferences saved to database successfully')
+          } else {
+            console.error('[Modal] Failed to save preferences to database:', await response.text())
+          }
+        } catch (error) {
+          console.error('[Modal] Error saving preferences to database:', error)
+        }
+      }
+
+      // Notify parent component of preferences change
+      if (onSavePreferences) {
+        onSavePreferences(preferences)
+      }
+    }
+
+    onClose()
   }
 
   // Helper functions for editing variant fields
@@ -1048,12 +1422,281 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
     setIsAddingAltField(false)
   }
 
+  // Image upload handlers for I Wish section
+  const handleLikeImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: "Invalid file type",
+        description: "Please upload an image file (JPG, PNG, GIF, etc.)",
+        variant: "destructive",
+      })
+      return
+    }
+    
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Please upload an image smaller than 5MB",
+        variant: "destructive",
+      })
+      return
+    }
+    
+    // Convert to base64 for preview (in production, you'd upload to a server/CDN)
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      const imageUrl = event.target?.result as string
+      setLikeClippedImage(imageUrl)
+      toast({
+        title: "Image updated",
+        description: "Product image has been updated for I Wish section",
+      })
+    }
+    reader.readAsDataURL(file)
+    
+    // Reset the input so the same file can be re-selected
+    e.target.value = ''
+  }
+  
+  const handleLikeImageDelete = () => {
+    setLikeClippedImage(null)
+    toast({
+      title: "Image removed",
+      description: "Product image has been removed from I Wish section",
+    })
+  }
+  
+  const handleLikeImageUrlInput = () => {
+    // Auto-populate with current image URL if available
+    const currentUrl = likeClippedImage || extractedProduct?.imageUrl || gift?.image || ""
+    // Don't show data: URLs or placeholder in the prompt
+    const defaultUrl = currentUrl.startsWith('data:') || currentUrl === '/placeholder.svg' ? "" : currentUrl
+    
+    const url = prompt("Enter the product image URL:", defaultUrl)
+    if (url !== null && url.trim()) {
+      // Basic URL validation
+      if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:image')) {
+        setLikeClippedImage(url.trim())
+        toast({
+          title: "Image updated",
+          description: "Product image URL has been set for I Wish section",
+        })
+      } else {
+        toast({
+          title: "Invalid URL",
+          description: "Please enter a valid image URL starting with http:// or https://",
+          variant: "destructive",
+        })
+      }
+    }
+  }
+  
+  // Image upload handlers for Alternative section
+  const handleAltImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: "Invalid file type",
+        description: "Please upload an image file (JPG, PNG, GIF, etc.)",
+        variant: "destructive",
+      })
+      return
+    }
+    
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Please upload an image smaller than 5MB",
+        variant: "destructive",
+      })
+      return
+    }
+    
+    // Convert to base64 for preview
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      const imageUrl = event.target?.result as string
+      setAltClippedImage(imageUrl)
+      toast({
+        title: "Image updated",
+        description: "Product image has been updated for Alternative section",
+      })
+    }
+    reader.readAsDataURL(file)
+    
+    // Reset the input
+    e.target.value = ''
+  }
+  
+  const handleAltImageDelete = () => {
+    setAltClippedImage(null)
+    toast({
+      title: "Image removed",
+      description: "Product image has been removed from Alternative section",
+    })
+  }
+  
+  const handleAltImageUrlInput = () => {
+    // Auto-populate with current image URL if available
+    // Fall back to I Wish image or main product image as a starting point
+    const currentUrl = altClippedImage || likeClippedImage || extractedProduct?.imageUrl || gift?.image || ""
+    // Don't show data: URLs or placeholder in the prompt
+    const defaultUrl = currentUrl.startsWith('data:') || currentUrl === '/placeholder.svg' ? "" : currentUrl
+    
+    const url = prompt("Enter the product image URL:", defaultUrl)
+    if (url !== null && url.trim()) {
+      if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:image')) {
+        setAltClippedImage(url.trim())
+        toast({
+          title: "Image updated",
+          description: "Product image URL has been set for Alternative section",
+        })
+      } else {
+        toast({
+          title: "Invalid URL",
+          description: "Please enter a valid image URL starting with http:// or https://",
+          variant: "destructive",
+        })
+      }
+    }
+  }
+  
+  // Paste from clipboard handlers - EASY way to add images
+  // Simplified version that works better across browsers
+  const handleLikePasteFromClipboard = async () => {
+    console.log('[Paste] I Wish - Starting clipboard paste...')
+    try {
+      // First, try the simple text-based approach (most reliable)
+      const text = await navigator.clipboard.readText()
+      const trimmedText = text?.trim() || ""
+      console.log('[Paste] I Wish - Clipboard text:', trimmedText.substring(0, 100))
+      
+      if (trimmedText) {
+        // Check if it's a valid image URL
+        if (trimmedText.startsWith('http://') || trimmedText.startsWith('https://')) {
+          console.log('[Paste] I Wish - Valid URL detected, setting image...')
+          // Accept any URL - let the browser try to load it
+          setLikeClippedImage(trimmedText)
+          toast({
+            title: "Image URL pasted!",
+            description: "Product image has been updated",
+          })
+          return
+        } else {
+          console.log('[Paste] I Wish - Text is not a URL:', trimmedText.substring(0, 50))
+        }
+      }
+      
+      // If no text URL, show instructions
+      toast({
+        title: "No image URL found",
+        description: "Right-click the product image → 'Copy image address' → then paste",
+        variant: "destructive",
+      })
+    } catch (error) {
+      console.error('[Paste] I Wish - Clipboard read error:', error)
+      toast({
+        title: "Cannot access clipboard",
+        description: "Please use 'Upload' button or 'Enter URL' instead",
+        variant: "destructive",
+      })
+    }
+  }
+  
+  const handleAltPasteFromClipboard = async () => {
+    console.log('[Paste] Alt - Starting clipboard paste...')
+    try {
+      // First, try the simple text-based approach (most reliable)
+      const text = await navigator.clipboard.readText()
+      const trimmedText = text?.trim() || ""
+      console.log('[Paste] Alt - Clipboard text:', trimmedText.substring(0, 100))
+      
+      if (trimmedText) {
+        // Check if it's a valid image URL
+        if (trimmedText.startsWith('http://') || trimmedText.startsWith('https://')) {
+          console.log('[Paste] Alt - Valid URL detected, setting image...')
+          // Accept any URL - let the browser try to load it
+          setAltClippedImage(trimmedText)
+          toast({
+            title: "Image URL pasted!",
+            description: "Alternative product image has been updated",
+          })
+          return
+        } else {
+          console.log('[Paste] Alt - Text is not a URL:', trimmedText.substring(0, 50))
+        }
+      }
+      
+      // If no text URL, show instructions
+      toast({
+        title: "No image URL found",
+        description: "Right-click the product image → 'Copy image address' → then paste",
+        variant: "destructive",
+      })
+    } catch (error) {
+      console.error('[Paste] Alt - Clipboard read error:', error)
+      toast({
+        title: "Cannot access clipboard",
+        description: "Please use 'Upload' button or 'Enter URL' instead",
+        variant: "destructive",
+      })
+    }
+  }
+  
+  // Submit image URL from text input
+  const handleLikeImageUrlSubmit = () => {
+    const url = likeImageUrlInput.trim()
+    if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+      setLikeClippedImage(url)
+      setLikeImageUrlInput("")
+      setShowLikeImageInput(false)
+      toast({
+        title: "Image updated!",
+        description: "Product image has been set",
+      })
+    } else {
+      toast({
+        title: "Invalid URL",
+        description: "Please enter a URL starting with http:// or https://",
+        variant: "destructive",
+      })
+    }
+  }
+  
+  const handleAltImageUrlSubmit = () => {
+    const url = altImageUrlInput.trim()
+    if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+      setAltClippedImage(url)
+      setAltImageUrlInput("")
+      setShowAltImageInput(false)
+      toast({
+        title: "Image updated!",
+        description: "Alternative product image has been set",
+      })
+    } else {
+      toast({
+        title: "Invalid URL",
+        description: "Please enter a URL starting with http:// or https://",
+        variant: "destructive",
+      })
+    }
+  }
+
   if (!isOpen) return null
 
   return (
-    <div 
+    <div
       className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
-      onClick={onClose}
+      onClick={handleClose}
     >
       <div 
         className="bg-white rounded-2xl shadow-2xl w-[600px] max-h-[90vh] overflow-hidden"
@@ -1066,7 +1709,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
             Choose Your Preferred Options
           </h3>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="absolute right-4 p-1.5 hover:bg-[#4A2F1A] rounded-full transition-colors"
           >
             <X className="w-[18px] h-[18px] text-[#F5DEB3]" />
@@ -1194,19 +1837,90 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
                         
                         {/* Product Image & Selected Options Row */}
                         <div className="flex gap-3">
-                          {/* Show clipped image if available, otherwise show main product image */}
-                          {(() => {
-                            const imgSrc = likeClippedImage || extractedProduct?.imageUrl || gift?.image || "/placeholder.svg"
-                            console.log('[Modal] I Wish image render - likeClippedImage:', likeClippedImage?.substring(0, 50), 'using:', imgSrc.substring(0, 50))
-                            return (
-                              <img
-                                key={`like-img-${likeClippedImage || 'default'}`}
-                                src={imgSrc}
-                                alt={likeClippedTitle || extractedProduct?.productName || 'Selected product'}
-                                className="w-20 h-20 object-contain rounded-lg bg-white border border-[#DAA520]/20 flex-shrink-0"
-                              />
-                            )
-                          })()}
+                          {/* Show clipped image if available, otherwise show main product image - with edit/delete icons */}
+                          <div className="flex-shrink-0">
+                            {/* Hidden file input for image upload */}
+                            <input
+                              ref={likeImageInputRef}
+                              type="file"
+                              accept="image/*"
+                              onChange={handleLikeImageUpload}
+                              className="hidden"
+                            />
+                            
+                            {/* Image URL input field */}
+                            {showLikeImageInput ? (
+                              <div className="w-32 space-y-1">
+                                <p className="text-[8px] text-[#654321] leading-tight">
+                                  💡 Right-click image → Open in new tab → Copy URL from address bar
+                                </p>
+                                <input
+                                  type="text"
+                                  value={likeImageUrlInput}
+                                  onChange={(e) => setLikeImageUrlInput(e.target.value)}
+                                  placeholder="Paste image URL here"
+                                  className="w-full px-1.5 py-1 text-[10px] border border-[#DAA520] rounded focus:outline-none focus:ring-1 focus:ring-[#DAA520]"
+                                  autoFocus
+                                  onKeyDown={(e) => e.key === 'Enter' && handleLikeImageUrlSubmit()}
+                                />
+                                <div className="flex gap-1">
+                                  <button 
+                                    onClick={handleLikeImageUrlSubmit}
+                                    className="flex-1 px-1 py-0.5 bg-green-500 text-white text-[9px] rounded hover:bg-green-600"
+                                  >
+                                    Save
+                                  </button>
+                                  <button 
+                                    onClick={() => { setShowLikeImageInput(false); setLikeImageUrlInput(""); }}
+                                    className="flex-1 px-1 py-0.5 bg-gray-300 text-gray-700 text-[9px] rounded hover:bg-gray-400"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="relative group">
+                                {(() => {
+                                  const imgSrc = likeClippedImage || extractedProduct?.imageUrl || gift?.image || "/placeholder.svg"
+                                  console.log('[Modal] I Wish image render - likeClippedImage:', likeClippedImage?.substring(0, 50), 'using:', imgSrc.substring(0, 50))
+                                  return (
+                                    <img
+                                      key={`like-img-${likeClippedImage || 'default'}`}
+                                      src={imgSrc}
+                                      alt={likeClippedTitle || extractedProduct?.productName || 'Selected product'}
+                                      className="w-20 h-20 object-contain rounded-lg bg-white border border-[#DAA520]/20"
+                                    />
+                                  )
+                                })()}
+                                {/* Image edit/delete overlay */}
+                                <div className="absolute inset-0 bg-black/50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                                  <button
+                                    onClick={() => setShowLikeImageInput(true)}
+                                    className="p-1.5 bg-white/90 rounded-full hover:bg-white transition-colors"
+                                    title="Paste image URL"
+                                  >
+                                    <Pencil className="w-3.5 h-3.5 text-blue-600" />
+                                  </button>
+                                  <button
+                                    onClick={() => likeImageInputRef.current?.click()}
+                                    className="p-1.5 bg-white/90 rounded-full hover:bg-white transition-colors"
+                                    title="Upload image from computer"
+                                  >
+                                    <Upload className="w-3.5 h-3.5 text-amber-600" />
+                                  </button>
+                                  {likeClippedImage && (
+                                    <button
+                                      onClick={handleLikeImageDelete}
+                                      className="p-1.5 bg-white/90 rounded-full hover:bg-white transition-colors"
+                                      title="Remove image"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
                           <div className="flex-1 space-y-1.5">
                             {/* Clean variant options - Style, Color, Size, Set with Edit/Delete (with validation) */}
                             {likeStyle && isValidVariantValue(likeStyle) && (
@@ -1227,7 +1941,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
                                   </div>
                                 ) : (
                                   <>
-                                    <span className="px-2 py-0.5 bg-[#DAA520]/20 text-[#654321] text-xs font-medium rounded border border-[#DAA520]/30 truncate max-w-[120px]" title={getCleanVariantDisplay(likeStyle)}>{getCleanVariantDisplay(likeStyle)}</span>
+                                    <span className="px-2 py-0.5 bg-[#DAA520]/20 text-[#654321] text-xs font-medium rounded border border-[#DAA520]/30 flex-1 break-words" title={getCleanVariantDisplay(likeStyle)}>{getCleanVariantDisplay(likeStyle)}</span>
                                     <button onClick={() => startEditingLikeField('style', getCleanVariantDisplay(likeStyle))} className="p-0.5 hover:bg-amber-100 rounded opacity-0 group-hover:opacity-100 transition-opacity"><Pencil className="w-3 h-3 text-amber-600" /></button>
                                     <button onClick={() => deleteLikeField('style')} className="p-0.5 hover:bg-red-100 rounded opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-3 h-3 text-red-500" /></button>
                                   </>
@@ -1252,7 +1966,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
                                   </div>
                                 ) : (
                                   <>
-                                    <span className="px-2 py-0.5 bg-[#DAA520]/20 text-[#654321] text-xs font-medium rounded border border-[#DAA520]/30 truncate max-w-[120px]" title={getCleanVariantDisplay(likeColor)}>{getCleanVariantDisplay(likeColor)}</span>
+                                    <span className="px-2 py-0.5 bg-[#DAA520]/20 text-[#654321] text-xs font-medium rounded border border-[#DAA520]/30 flex-1 break-words" title={getCleanVariantDisplay(likeColor)}>{getCleanVariantDisplay(likeColor)}</span>
                                     <button onClick={() => startEditingLikeField('color', getCleanVariantDisplay(likeColor))} className="p-0.5 hover:bg-amber-100 rounded opacity-0 group-hover:opacity-100 transition-opacity"><Pencil className="w-3 h-3 text-amber-600" /></button>
                                     <button onClick={() => deleteLikeField('color')} className="p-0.5 hover:bg-red-100 rounded opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-3 h-3 text-red-500" /></button>
                                   </>
@@ -1277,7 +1991,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
                                   </div>
                                 ) : (
                                   <>
-                                    <span className="px-2 py-0.5 bg-[#DAA520]/20 text-[#654321] text-xs font-medium rounded border border-[#DAA520]/30 truncate max-w-[120px]" title={getCleanVariantDisplay(likeSize)}>{getCleanVariantDisplay(likeSize)}</span>
+                                    <span className="px-2 py-0.5 bg-[#DAA520]/20 text-[#654321] text-xs font-medium rounded border border-[#DAA520]/30 flex-1 break-words" title={getCleanVariantDisplay(likeSize)}>{getCleanVariantDisplay(likeSize)}</span>
                                     <button onClick={() => startEditingLikeField('size', getCleanVariantDisplay(likeSize))} className="p-0.5 hover:bg-amber-100 rounded opacity-0 group-hover:opacity-100 transition-opacity"><Pencil className="w-3 h-3 text-amber-600" /></button>
                                     <button onClick={() => deleteLikeField('size')} className="p-0.5 hover:bg-red-100 rounded opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-3 h-3 text-red-500" /></button>
                                   </>
@@ -1302,7 +2016,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
                                   </div>
                                 ) : (
                                   <>
-                                    <span className="px-2 py-0.5 bg-[#DAA520]/20 text-[#654321] text-xs font-medium rounded border border-[#DAA520]/30 truncate max-w-[120px]" title={getCleanVariantDisplay(likeConfiguration)}>{getCleanVariantDisplay(likeConfiguration)}</span>
+                                    <span className="px-2 py-0.5 bg-[#DAA520]/20 text-[#654321] text-xs font-medium rounded border border-[#DAA520]/30 flex-1 break-words" title={getCleanVariantDisplay(likeConfiguration)}>{getCleanVariantDisplay(likeConfiguration)}</span>
                                     <button onClick={() => startEditingLikeField('set', getCleanVariantDisplay(likeConfiguration))} className="p-0.5 hover:bg-amber-100 rounded opacity-0 group-hover:opacity-100 transition-opacity"><Pencil className="w-3 h-3 text-amber-600" /></button>
                                     <button onClick={() => deleteLikeField('set')} className="p-0.5 hover:bg-red-100 rounded opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-3 h-3 text-red-500" /></button>
                                   </>
@@ -1474,23 +2188,50 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
                                   const data = await response.json()
                                   console.log('[Modal] Manual refresh data:', data)
                                   if (data.variants && Object.keys(data.variants).length > 0) {
+                                    console.log('[Modal] Alt Refresh - Raw variants:', JSON.stringify(data.variants))
+                                    
                                     // Process the data for Alternative
                                     if (data.image) {
                                       setAltClippedImage(data.image)
                                       console.log('[Modal] Alt - Set image:', data.image)
                                     }
                                     if (data.title) setAltClippedTitle(data.title)
-                                    // Set variant fields
+                                    
+                                    // Normalize and set variant fields (handle both lowercase and capitalized keys)
                                     const variants = data.variants
-                                    if (variants.color) setAltColor(variants.color)
-                                    if (variants.style) setAltStyle(variants.style)
-                                    if (variants.set) setAltConfiguration(variants.set)
-                                    if (variants.size) setAltSize(variants.size)
-                                    // Check specifications for Style
-                                    if (!variants.style && data.specifications?.Style) {
-                                      const styleVal = data.specifications.Style.replace(/^[\u200E\u200F\u202A-\u202E]+/, '').trim()
-                                      if (styleVal) setAltStyle(styleVal)
+                                    const colorVal = variants.color || variants.Color
+                                    const styleVal = variants.style || variants.Style
+                                    const setVal = variants.set || variants.Set || variants.configuration || variants.Configuration
+                                    const sizeVal = variants.size || variants.Size
+                                    
+                                    console.log('[Modal] Alt Refresh - Normalized: color=', colorVal, 'style=', styleVal, 'set=', setVal, 'size=', sizeVal)
+                                    
+                                    if (colorVal && isValidVariantValue(colorVal)) {
+                                      setAltColor(colorVal)
+                                      console.log('[Modal] Alt - Set color:', colorVal)
                                     }
+                                    if (styleVal && isValidVariantValue(styleVal)) {
+                                      setAltStyle(styleVal)
+                                      console.log('[Modal] Alt - Set style:', styleVal)
+                                    }
+                                    if (setVal && isValidVariantValue(setVal)) {
+                                      setAltConfiguration(setVal)
+                                      console.log('[Modal] Alt - Set configuration:', setVal)
+                                    }
+                                    if (sizeVal && isValidVariantValue(sizeVal)) {
+                                      setAltSize(sizeVal)
+                                      console.log('[Modal] Alt - Set size:', sizeVal)
+                                    }
+                                    
+                                    // Check specifications for Style as fallback
+                                    if (!styleVal && data.specifications?.Style) {
+                                      const specStyleVal = data.specifications.Style.replace(/^[\u200E\u200F\u202A-\u202E]+/, '').trim()
+                                      if (specStyleVal && isValidVariantValue(specStyleVal)) {
+                                        setAltStyle(specStyleVal)
+                                        console.log('[Modal] Alt - Set style from specs:', specStyleVal)
+                                      }
+                                    }
+                                    
                                     setAwaitingExtensionFor(null)
                                     toast({
                                       title: "🐝 Options Received!",
@@ -1519,26 +2260,100 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
                         </p>
                         {/* Product Image & Options Row */}
                         <div className="flex gap-3">
-                          {/* Show clipped image ONLY if received from extension - don't fall back to original product image */}
-                          {(() => {
-                            console.log('[Modal] Alt image render - altClippedImage:', altClippedImage?.substring(0, 50) || 'null')
-                            if (altClippedImage) {
-                              return (
-                                <img
-                                  key={`alt-img-${altClippedImage}`}
-                                  src={altClippedImage}
-                                  alt={altClippedTitle || 'Alternative product'}
-                                  className="w-16 h-16 object-contain rounded-lg bg-white border border-[#D97706]/20 flex-shrink-0"
+                          {/* Show clipped image with edit/delete icons */}
+                          <div className="flex-shrink-0">
+                            {/* Hidden file input for image upload */}
+                            <input
+                              ref={altImageInputRef}
+                              type="file"
+                              accept="image/*"
+                              onChange={handleAltImageUpload}
+                              className="hidden"
+                            />
+                            
+                            {/* Image URL input field */}
+                            {showAltImageInput ? (
+                              <div className="w-28 space-y-1">
+                                <p className="text-[7px] text-[#6B4423] leading-tight">
+                                  💡 Right-click image → Open in new tab → Copy URL
+                                </p>
+                                <input
+                                  type="text"
+                                  value={altImageUrlInput}
+                                  onChange={(e) => setAltImageUrlInput(e.target.value)}
+                                  placeholder="Paste image URL"
+                                  className="w-full px-1 py-1 text-[9px] border border-[#D97706] rounded focus:outline-none focus:ring-1 focus:ring-[#D97706]"
+                                  autoFocus
+                                  onKeyDown={(e) => e.key === 'Enter' && handleAltImageUrlSubmit()}
                                 />
-                              )
-                            } else {
-                              return (
-                                <div className="w-16 h-16 rounded-lg bg-gradient-to-br from-amber-50 to-orange-50 border border-[#D97706]/20 flex-shrink-0 flex items-center justify-center">
-                                  <span className="text-[#D97706] text-xs text-center px-1">Clip variant image</span>
+                                <div className="flex gap-0.5">
+                                  <button 
+                                    onClick={handleAltImageUrlSubmit}
+                                    className="flex-1 px-1 py-0.5 bg-green-500 text-white text-[8px] rounded hover:bg-green-600"
+                                  >
+                                    Save
+                                  </button>
+                                  <button 
+                                    onClick={() => { setShowAltImageInput(false); setAltImageUrlInput(""); }}
+                                    className="flex-1 px-1 py-0.5 bg-gray-300 text-gray-700 text-[8px] rounded hover:bg-gray-400"
+                                  >
+                                    Cancel
+                                  </button>
                                 </div>
-                              )
-                            }
-                          })()}
+                              </div>
+                            ) : (
+                              <div className="relative group">
+                                {(() => {
+                                  console.log('[Modal] Alt image render - altClippedImage:', altClippedImage?.substring(0, 50) || 'null')
+                                  if (altClippedImage) {
+                                    return (
+                                      <img
+                                        key={`alt-img-${altClippedImage}`}
+                                        src={altClippedImage}
+                                        alt={altClippedTitle || 'Alternative product'}
+                                        className="w-16 h-16 object-contain rounded-lg bg-white border border-[#D97706]/20"
+                                      />
+                                    )
+                                  } else {
+                                    return (
+                                      <div 
+                                        className="w-16 h-16 rounded-lg bg-gradient-to-br from-amber-50 to-orange-50 border border-[#D97706]/20 flex items-center justify-center cursor-pointer hover:border-[#D97706]"
+                                        onClick={() => setShowAltImageInput(true)}
+                                      >
+                                        <span className="text-[#D97706] text-[9px] text-center px-1">Click to add image</span>
+                                      </div>
+                                    )
+                                  }
+                                })()}
+                                {/* Image edit/delete overlay - only show when there's an image */}
+                                {altClippedImage && (
+                                  <div className="absolute inset-0 bg-black/50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                                    <button
+                                      onClick={() => setShowAltImageInput(true)}
+                                      className="p-1 bg-white/90 rounded-full hover:bg-white transition-colors"
+                                      title="Change image URL"
+                                    >
+                                      <Pencil className="w-3 h-3 text-blue-600" />
+                                    </button>
+                                    <button
+                                      onClick={() => altImageInputRef.current?.click()}
+                                      className="p-1 bg-white/90 rounded-full hover:bg-white transition-colors"
+                                      title="Upload image from computer"
+                                    >
+                                      <Upload className="w-3 h-3 text-amber-600" />
+                                    </button>
+                                    <button
+                                      onClick={handleAltImageDelete}
+                                      className="p-1 bg-white/90 rounded-full hover:bg-white transition-colors"
+                                      title="Remove image"
+                                    >
+                                      <Trash2 className="w-3 h-3 text-red-500" />
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
                           <div className="flex-1 space-y-1.5">
                             {/* Variant options - Style, Color, Size, Set with Edit/Delete */}
                             {altStyle && isValidVariantValue(altStyle) && (
@@ -1559,7 +2374,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
                                   </div>
                                 ) : (
                                   <>
-                                    <span className="px-2 py-0.5 bg-[#D97706]/20 text-[#6B4423] text-xs font-medium rounded border border-[#D97706]/30 truncate max-w-[120px]" title={getCleanVariantDisplay(altStyle)}>{getCleanVariantDisplay(altStyle)}</span>
+                                    <span className="px-2 py-0.5 bg-[#D97706]/20 text-[#6B4423] text-xs font-medium rounded border border-[#D97706]/30 flex-1 break-words" title={getCleanVariantDisplay(altStyle)}>{getCleanVariantDisplay(altStyle)}</span>
                                     <button onClick={() => startEditingAltField('style', getCleanVariantDisplay(altStyle))} className="p-0.5 hover:bg-amber-100 rounded opacity-0 group-hover:opacity-100 transition-opacity"><Pencil className="w-3 h-3 text-amber-600" /></button>
                                     <button onClick={() => deleteAltField('style')} className="p-0.5 hover:bg-red-100 rounded opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-3 h-3 text-red-500" /></button>
                                   </>
@@ -1584,7 +2399,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
                                   </div>
                                 ) : (
                                   <>
-                                    <span className="px-2 py-0.5 bg-[#D97706]/20 text-[#6B4423] text-xs font-medium rounded border border-[#D97706]/30 truncate max-w-[120px]" title={getCleanVariantDisplay(altColor)}>{getCleanVariantDisplay(altColor)}</span>
+                                    <span className="px-2 py-0.5 bg-[#D97706]/20 text-[#6B4423] text-xs font-medium rounded border border-[#D97706]/30 flex-1 break-words" title={getCleanVariantDisplay(altColor)}>{getCleanVariantDisplay(altColor)}</span>
                                     <button onClick={() => startEditingAltField('color', getCleanVariantDisplay(altColor))} className="p-0.5 hover:bg-amber-100 rounded opacity-0 group-hover:opacity-100 transition-opacity"><Pencil className="w-3 h-3 text-amber-600" /></button>
                                     <button onClick={() => deleteAltField('color')} className="p-0.5 hover:bg-red-100 rounded opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-3 h-3 text-red-500" /></button>
                                   </>
@@ -1609,7 +2424,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
                                   </div>
                                 ) : (
                                   <>
-                                    <span className="px-2 py-0.5 bg-[#D97706]/20 text-[#6B4423] text-xs font-medium rounded border border-[#D97706]/30 truncate max-w-[120px]" title={getCleanVariantDisplay(altSize)}>{getCleanVariantDisplay(altSize)}</span>
+                                    <span className="px-2 py-0.5 bg-[#D97706]/20 text-[#6B4423] text-xs font-medium rounded border border-[#D97706]/30 flex-1 break-words" title={getCleanVariantDisplay(altSize)}>{getCleanVariantDisplay(altSize)}</span>
                                     <button onClick={() => startEditingAltField('size', getCleanVariantDisplay(altSize))} className="p-0.5 hover:bg-amber-100 rounded opacity-0 group-hover:opacity-100 transition-opacity"><Pencil className="w-3 h-3 text-amber-600" /></button>
                                     <button onClick={() => deleteAltField('size')} className="p-0.5 hover:bg-red-100 rounded opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-3 h-3 text-red-500" /></button>
                                   </>
@@ -1634,7 +2449,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
                                   </div>
                                 ) : (
                                   <>
-                                    <span className="px-2 py-0.5 bg-[#D97706]/20 text-[#6B4423] text-xs font-medium rounded border border-[#D97706]/30 truncate max-w-[120px]" title={getCleanVariantDisplay(altConfiguration)}>{getCleanVariantDisplay(altConfiguration)}</span>
+                                    <span className="px-2 py-0.5 bg-[#D97706]/20 text-[#6B4423] text-xs font-medium rounded border border-[#D97706]/30 flex-1 break-words" title={getCleanVariantDisplay(altConfiguration)}>{getCleanVariantDisplay(altConfiguration)}</span>
                                     <button onClick={() => startEditingAltField('set', getCleanVariantDisplay(altConfiguration))} className="p-0.5 hover:bg-amber-100 rounded opacity-0 group-hover:opacity-100 transition-opacity"><Pencil className="w-3 h-3 text-amber-600" /></button>
                                     <button onClick={() => deleteAltField('set')} className="p-0.5 hover:bg-red-100 rounded opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-3 h-3 text-red-500" /></button>
                                   </>
@@ -1766,7 +2581,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose }: AddToWishlistModal
                   {/* Action Buttons - Smaller size */}
                   <div className="flex gap-2 pt-2">
                     <button
-                      onClick={onClose}
+                      onClick={handleClose}
                       className="flex-1 h-8 text-xs rounded-lg border border-[#8B5A3C]/30 text-[#6B4423] font-medium hover:bg-[#8B5A3C]/10 transition-all"
                     >
                       Cancel

@@ -153,6 +153,13 @@ export async function PUT(
         })
       }
       
+      // Add variant options from body directly (style, color, size, set, configuration)
+      if (body.style) attributes.style = body.style
+      if (body.color) attributes.color = body.color
+      if (body.size) attributes.size = body.size
+      if (body.set) attributes.set = body.set
+      if (body.configuration) attributes.configuration = body.configuration
+      
       updateData.attributes = Object.keys(attributes).length > 0 ? attributes : null
     }
     

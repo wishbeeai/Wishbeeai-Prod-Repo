@@ -4313,11 +4313,9 @@ async function extractWithoutAI(
             }
           }
           
-          // FALLBACK: If no valid color found, try to extract from product title
+          // FALLBACK: If no valid color found, try simple extraction from product title
           if (!productData.attributes.color) {
-            const productTitle = (productData.productName || '')
-            const titleLower = productTitle.toLowerCase()
-            console.log("[v0] 🔍 Checking product title for color:", productTitle)
+            console.log("[v0] 🔍 Checking product title for simple color:", productTitle)
             
             // Apple device colors
             const appleColors = [
@@ -4512,6 +4510,139 @@ async function extractWithoutAI(
           color: productData.attributes.color || 'not found',
           style: productData.attributes.style || 'not found',
           set: productData.attributes.set || 'not found'
+        })
+        
+        // Extract SIZE from Amazon's dimension system (size_name) - for Apple Watch, etc.
+        // This captures case sizes like 49mm, 45mm, 42mm, 41mm, 40mm, 38mm
+        const productNameLower = (productData.productName || '').toLowerCase()
+        const isWatch = productNameLower.includes('watch') || productNameLower.includes('smartwatch')
+        
+        if (!productData.attributes.size && isWatch) {
+          console.log("[v0] ⌚ Attempting to extract SIZE for watch product...")
+          
+          const sizeDimensionPatterns = [
+            // Pattern 1: selectedVariations JSON (most reliable)
+            /"selectedVariations"\s*:\s*\{[^}]*"size_name"\s*:\s*"([^"]+)"/i,
+            // Pattern 2: variation_size_name with selection class
+            /<span[^>]*id=["']variation_size_name["'][^>]*>[\s\S]*?<span[^>]*class=["'][^"']*selection["'][^>]*>([^<]+)</i,
+            /variation_size_name[\s\S]{0,300}?selection[^>]*>[\s]*([^<]+)</i,
+            // Pattern 3: Size selection text in UI
+            /<span[^>]*class=["'][^"']*selection["'][^>]*>[\s]*(?:Size|Case Size):?\s*([^<]+)</i,
+            // Pattern 4: data-csa-c-dimension attributes
+            /<span[^>]*data-csa-c-dimension-name=["']size_name["'][^>]*data-csa-c-dimension-value=["']([^"']+)["']/i,
+            /<[^>]*data-csa-c-dimension-name=["']size_name["'][^>]*>[\s\S]*?data-csa-c-dimension-value=["']([^"']+)["']/i,
+            // Pattern 5: case_size dimension
+            /<span[^>]*data-csa-c-dimension-name=["']case_size_name["'][^>]*data-csa-c-dimension-value=["']([^"']+)["']/i,
+            /"case_size_name"\s*:\s*"([^"]+)"/i,
+            // Pattern 6: selectedDimensions in JavaScript
+            /selectedDimensions[^}]*size_name[^}]*:\s*"([^"]+)"/i,
+            // Pattern 7: size_name in JSON
+            /"size_name"\s*:\s*"([^"]+)"/i,
+          ]
+          
+          for (const pattern of sizeDimensionPatterns) {
+            const match = htmlContent.match(pattern)
+            if (match && match[1]) {
+              let size = decodeHtmlEntities(match[1].trim())
+              // Validate: should look like a watch size (mm format)
+              if (size && size.length < 30 && !size.toLowerCase().includes('select')) {
+                productData.attributes.size = size
+                console.log("[v0] ✅ Extracted Size from Amazon dimension:", productData.attributes.size)
+                break
+              }
+            }
+          }
+          
+          // Fallback: Extract size from product name (e.g., "49mm", "45mm")
+          if (!productData.attributes.size) {
+            const sizeMatch = productData.productName?.match(/\b(\d{2}mm)\b/i)
+            if (sizeMatch) {
+              productData.attributes.size = sizeMatch[1]
+              console.log("[v0] ✅ Extracted Size from product name:", productData.attributes.size)
+            }
+          }
+        }
+        
+        // Extract CONFIGURATION from Amazon's dimension system - THIS IS FOR APPLECARE
+        // Note: Connectivity (GPS, GPS + Cellular) is a SPEC, not a variant - don't extract it as configuration
+        // Configuration on Amazon = AppleCare options (With/Without AppleCare+)
+        if (!productData.attributes.configuration) {
+          console.log("[v0] ⌚ Attempting to extract CONFIGURATION (AppleCare) for product...")
+          
+          // First, copy from 'set' if already extracted (AppleCare is stored in set)
+          if (productData.attributes.set) {
+            productData.attributes.configuration = productData.attributes.set
+            console.log("[v0] ✅ Copied Configuration from set:", productData.attributes.configuration)
+          } else {
+            // Try to extract AppleCare configuration from HTML
+            const appleCarePatterns = [
+              // Pattern 1: selectedVariations with configuration_name
+              /"selectedVariations"\s*:\s*\{[^}]*"configuration_name"\s*:\s*"([^"]+)"/i,
+              // Pattern 2: variation_configuration_name with selection
+              /variation_configuration_name[\s\S]{0,300}?selection[^>]*>[\s]*([^<]+)</i,
+              // Pattern 3: data-csa-c-dimension for configuration
+              /<span[^>]*data-csa-c-dimension-name=["']configuration_name["'][^>]*data-csa-c-dimension-value=["']([^"']+)["']/i,
+              // Pattern 4: configuration_name in JSON
+              /"configuration_name"\s*:\s*"([^"]+)"/i,
+              // Pattern 5: Selection text with AppleCare
+              /<span[^>]*class=["'][^"']*selection["'][^>]*>[^<]*?((?:With|Without)\s*AppleCare[^<]*)</i,
+            ]
+            
+            for (const pattern of appleCarePatterns) {
+              const match = htmlContent.match(pattern)
+              if (match && match[1]) {
+                let config = decodeHtmlEntities(match[1].trim())
+                // Only accept AppleCare-related values
+                if (config && config.length < 50 && 
+                    !config.toLowerCase().includes('select') &&
+                    (config.toLowerCase().includes('applecare') || 
+                     config.toLowerCase().includes('without') ||
+                     config.toLowerCase().includes('protection'))) {
+                  productData.attributes.configuration = config
+                  console.log("[v0] ✅ Extracted Configuration (AppleCare):", productData.attributes.configuration)
+                  break
+                }
+              }
+            }
+          }
+          
+          // Fallback: Check product name for AppleCare mention
+          if (!productData.attributes.configuration && productNameLower) {
+            if (productNameLower.includes('without applecare')) {
+              productData.attributes.configuration = 'Without AppleCare+'
+              console.log("[v0] ✅ Extracted Configuration from product name: Without AppleCare+")
+            } else if (productNameLower.includes('with applecare+ (2 years)') || productNameLower.includes('applecare+ (2 years)')) {
+              productData.attributes.configuration = 'With AppleCare+ (2 Years)'
+              console.log("[v0] ✅ Extracted Configuration from product name: With AppleCare+ (2 Years)")
+            } else if (productNameLower.includes('with applecare')) {
+              productData.attributes.configuration = 'With AppleCare+'
+              console.log("[v0] ✅ Extracted Configuration from product name: With AppleCare+")
+            }
+          }
+          
+          // FINAL FALLBACK: For Apple products, default to "Without AppleCare+" if no config found
+          // This is the most common selection and the base product option
+          if (!productData.attributes.configuration && productNameLower) {
+            const isAppleProduct = productNameLower.includes('apple') || 
+                                   productNameLower.includes('iphone') || 
+                                   productNameLower.includes('ipad') || 
+                                   productNameLower.includes('macbook') ||
+                                   productNameLower.includes('airpods') ||
+                                   productNameLower.includes('watch ultra') ||
+                                   productNameLower.includes('apple watch')
+            if (isAppleProduct) {
+              productData.attributes.configuration = 'Without AppleCare+'
+              console.log("[v0] ✅ Defaulting Configuration to: Without AppleCare+ (Apple product default)")
+            }
+          }
+        }
+        
+        console.log("[v0] 📋 Updated variant extraction results:", {
+          color: productData.attributes.color || 'not found',
+          style: productData.attributes.style || 'not found',
+          set: productData.attributes.set || 'not found',
+          size: productData.attributes.size || 'not found',
+          configuration: productData.attributes.configuration || 'not found'
         })
       }
       
@@ -5437,6 +5568,79 @@ async function extractWithoutAI(
   }
   productData.attributes = finalDeduplicatedAttributes
   console.log("[v0] Final deduplicated attributes:", Object.keys(productData.attributes))
+  
+  // ===== APPLE WATCH SPECIFIC EXTRACTION (Function Level) =====
+  // For Apple Watch, extract the full "Case with Band/Loop" combination from product title
+  // This OVERRIDES any simple color like "Titanium" or "base" with the full description
+  const watchProductTitleFinal = (productData.productName || '')
+  const watchTitleLowerFinal = watchProductTitleFinal.toLowerCase()
+  const isAppleWatchFinal = watchTitleLowerFinal.includes('watch') && (watchTitleLowerFinal.includes('apple') || watchTitleLowerFinal.includes('ultra'))
+  
+  if (isAppleWatchFinal) {
+    console.log("[v0] ⌚ APPLE WATCH DETECTED - Extracting case+band combination")
+    console.log("[v0] Product title:", watchProductTitleFinal)
+    console.log("[v0] Current color (will override):", productData.attributes.color)
+    
+    // Pattern to match: "[Adjective] [Color] [Material] Case w/ [Band Description]"
+    const watchCasePatternsFunc = [
+      // Pattern 1: "w/[Adj] Titanium Case w/[Band] Loop/Band" - most common for Ultra
+      /(?:with|w\/)\s*([A-Za-z]+(?:\s+[A-Za-z]+)?\s+(?:Titanium|Aluminum|Aluminium)\s+Case\s+(?:with|w\/)\s*[A-Za-z\s]+(?:Loop|Band|Strap|Braided))/i,
+      // Pattern 2: "[Color] Titanium Case with [Band]" without leading with/w/
+      /([A-Za-z]+(?:\s+[A-Za-z]+)?\s+(?:Titanium|Aluminum|Aluminium)\s+Case\s+(?:with|w\/)\s*[A-Za-z\s]+(?:Loop|Band|Strap|Braided))/i,
+      // Pattern 3: Smartwatch variant
+      /Smartwatch\s+(?:with|w\/)\s*([A-Za-z]+(?:\s+[A-Za-z]+)?\s+(?:Titanium|Aluminum|Aluminium)\s+Case\s+(?:with|w\/)\s*[A-Za-z\s]+(?:Loop|Band|Strap))/i,
+    ]
+    
+    for (const pattern of watchCasePatternsFunc) {
+      const match = watchProductTitleFinal.match(pattern)
+      if (match && match[1]) {
+        let caseAndBand = match[1].trim()
+        // Clean up: remove trailing size indicators like "- L", "- M", "- S"
+        caseAndBand = caseAndBand.replace(/\s*-\s*[SML]\.?$/i, '').trim()
+        // Clean up any trailing characters
+        caseAndBand = caseAndBand.replace(/[,\.\-]+$/, '').trim()
+        // Normalize "w/" to "with" for cleaner display
+        caseAndBand = caseAndBand.replace(/\s*w\/\s*/g, ' with ')
+        // Clean up double spaces
+        caseAndBand = caseAndBand.replace(/\s+/g, ' ').trim()
+        
+        if (caseAndBand.length > 10 && caseAndBand.length < 100) {
+          productData.attributes.color = caseAndBand
+          console.log("[v0] ✅ APPLE WATCH: Extracted case+band (overriding):", productData.attributes.color)
+          break
+        }
+      }
+    }
+    
+    // Extract BAND SIZE (S, M, L) from title for Size field
+    // Pattern: "- L." or "- M" or "- S/M" followed by a period or space (not necessarily at end)
+    // Example: "...Alpine Loop - L. Satellite Communications..."
+    const bandSizePatterns = [
+      /\s-\s([SML])\.\s/i,           // "- L. " with period and space after
+      /\s-\s([SML](?:\/[SML])?)[\.\s]/i, // "- L." or "- S/M." 
+      /\s-\s([SML](?:\/[SML])?)\s*$/i,   // "- L" at end of string
+      /Loop\s+-\s+([SML])[\.\s]/i,   // "Loop - L." 
+      /Band\s+-\s+([SML])[\.\s]/i,   // "Band - L."
+    ]
+    
+    for (const pattern of bandSizePatterns) {
+      const bandSizeMatchFinal = watchProductTitleFinal.match(pattern)
+      if (bandSizeMatchFinal && bandSizeMatchFinal[1]) {
+        const sizeMapFinal: Record<string, string> = { 'S': 'Small', 'M': 'Medium', 'L': 'Large', 'S/M': 'Small/Medium', 'M/L': 'Medium/Large' }
+        const bandSizeFinal = bandSizeMatchFinal[1].toUpperCase()
+        productData.attributes.size = sizeMapFinal[bandSizeFinal] || bandSizeFinal
+        console.log("[v0] ✅ APPLE WATCH: Extracted band size:", productData.attributes.size)
+        break
+      }
+    }
+    
+    // Default Configuration to "Without AppleCare+" for Apple Watch
+    if (!productData.attributes.configuration && !productData.attributes.set) {
+      productData.attributes.configuration = 'Without AppleCare+'
+      console.log("[v0] ✅ APPLE WATCH: Defaulting Configuration to Without AppleCare+")
+    }
+  }
+  // ===== END APPLE WATCH SPECIFIC EXTRACTION =====
   
   // FINAL FALLBACK: If we still don't have product name, try URL extraction one more time
   // This is a safety net in case the earlier extraction didn't run
@@ -7297,52 +7501,60 @@ async function extractWithoutAI(
       // Improve color extraction for jewelry - look for color/plating info
       // This should catch things like "18K Gold Plated", "Rose Gold", "Silver", etc.
       // For jewelry, we want to prioritize jewelry-specific color patterns and override generic colors
-      const jewelryColorPatterns = [
-        /<td[^>]*>Color[^<]*<\/td>\s*<td[^>]*>([^<]+)<\/td>/i,
-        /<th[^>]*>Color[^<]*<\/th>\s*<td[^>]*>([^<]+)<\/td>/i,
-        /<dt[^>]*>Color[^<]*<\/dt>\s*<dd[^>]*>([^<]+)<\/dd>/i,
-        /(?:18K|14K|10K)\s+(?:Gold|Yellow Gold|White Gold|Rose Gold)(?:\s+Plated)?/i,
-        /(?:Sterling|925)\s+Silver/i,
-        /(?:Rose|Yellow|White)\s+Gold/i,
-        /Platinum/i,
-        /Titanium/i,
-      ]
+      // SKIP this for Apple Watch products - they have their own case+band extraction
+      const productNameForJewelry = (productData.productName || '').toLowerCase()
+      const isAppleWatchForJewelry = productNameForJewelry.includes('watch') && (productNameForJewelry.includes('apple') || productNameForJewelry.includes('ultra'))
       
-      let foundJewelryColor = false
-      const currentColor = productData.attributes.color
-      const isCurrentColorGeneric = currentColor && !/(?:18K|14K|10K|Gold|Silver|Platinum|Titanium|Plated)/i.test(currentColor)
-      
-      // Try to find jewelry-specific color patterns
-      for (const pattern of jewelryColorPatterns) {
-        const match = htmlContent.match(pattern)
-        if (match && (match[0] || match[1])) {
-          const color = (match[0] || match[1]).trim().split(',')[0].split('(')[0].trim()
-          // Check if it looks like a jewelry color (contains K, Gold, Silver, Platinum, etc.)
-          const isJewelryColor = /(?:18K|14K|10K|Gold|Silver|Platinum|Titanium|Plated)/i.test(color)
-          if (color && color.length > 0 && color.length < 100 && isJewelryColor) {
-            // Override if no color exists or if current color is generic
-            if (!currentColor || isCurrentColorGeneric) {
-              productData.attributes.color = color
-              foundJewelryColor = true
-              log(`[v0] ✅ Extracted jewelry color: ${color}${currentColor ? ' (overrode generic color)' : ''}`)
-              break
+      if (isAppleWatchForJewelry) {
+        log(`[v0] ⌚ Skipping jewelry color extraction for Apple Watch product`)
+      } else {
+        const jewelryColorPatterns = [
+          /<td[^>]*>Color[^<]*<\/td>\s*<td[^>]*>([^<]+)<\/td>/i,
+          /<th[^>]*>Color[^<]*<\/th>\s*<td[^>]*>([^<]+)<\/td>/i,
+          /<dt[^>]*>Color[^<]*<\/dt>\s*<dd[^>]*>([^<]+)<\/dd>/i,
+          /(?:18K|14K|10K)\s+(?:Gold|Yellow Gold|White Gold|Rose Gold)(?:\s+Plated)?/i,
+          /(?:Sterling|925)\s+Silver/i,
+          /(?:Rose|Yellow|White)\s+Gold/i,
+          /Platinum/i,
+          /Titanium/i,
+        ]
+        
+        let foundJewelryColor = false
+        const currentColor = productData.attributes.color
+        const isCurrentColorGeneric = currentColor && !/(?:18K|14K|10K|Gold|Silver|Platinum|Titanium|Plated)/i.test(currentColor)
+        
+        // Try to find jewelry-specific color patterns
+        for (const pattern of jewelryColorPatterns) {
+          const match = htmlContent.match(pattern)
+          if (match && (match[0] || match[1])) {
+            const color = (match[0] || match[1]).trim().split(',')[0].split('(')[0].trim()
+            // Check if it looks like a jewelry color (contains K, Gold, Silver, Platinum, etc.)
+            const isJewelryColor = /(?:18K|14K|10K|Gold|Silver|Platinum|Titanium|Plated)/i.test(color)
+            if (color && color.length > 0 && color.length < 100 && isJewelryColor) {
+              // Override if no color exists or if current color is generic
+              if (!currentColor || isCurrentColorGeneric) {
+                productData.attributes.color = color
+                foundJewelryColor = true
+                log(`[v0] ✅ Extracted jewelry color: ${color}${currentColor ? ' (overrode generic color)' : ''}`)
+                break
+              }
             }
           }
         }
-      }
-      
-      // If no jewelry-specific color found and no color exists, try generic color pattern
-      if (!foundJewelryColor && !productData.attributes.color) {
-        const genericColorPattern = /Color[:\s]+([^<\n]+?)(?:<|$|,|\n)/i
-        const match = htmlContent.match(genericColorPattern)
-        if (match && match[1]) {
-          const color = match[1].trim().split(',')[0].split('(')[0].trim()
-          if (color && color.length > 0 && color.length < 100) {
-            productData.attributes.color = color
-            log(`[v0] ✅ Extracted generic color: ${color}`)
+        
+        // If no jewelry-specific color found and no color exists, try generic color pattern
+        if (!foundJewelryColor && !productData.attributes.color) {
+          const genericColorPattern = /Color[:\s]+([^<\n]+?)(?:<|$|,|\n)/i
+          const match = htmlContent.match(genericColorPattern)
+          if (match && match[1]) {
+            const color = match[1].trim().split(',')[0].split('(')[0].trim()
+            if (color && color.length > 0 && color.length < 100) {
+              productData.attributes.color = color
+              log(`[v0] ✅ Extracted generic color: ${color}`)
+            }
           }
         }
-      }
+      } // End of else block for non-Apple Watch jewelry color extraction
       
     } catch (error) {
       log(`[v0] Error extracting jewelry attributes: ${error}`)
@@ -8168,6 +8380,71 @@ Return ONLY valid JSON, no markdown, no explanation.`
             productData.attributes = absoluteFinalDedupScraper
             console.log("[v0] ScraperAPI ABSOLUTE FINAL: Deduplicated attributes before return:", Object.keys(productData.attributes))
           }
+          
+          // ===== APPLE WATCH SPECIFIC EXTRACTION (ScraperAPI Path) =====
+          // For Apple Watch, extract the full "Case with Band/Loop" combination from product title
+          // This OVERRIDES simple colors like "Titanium" with the full description
+          const productTitleForWatch = (productData.productName || '')
+          const titleLowerForWatch = productTitleForWatch.toLowerCase()
+          const isAppleWatchProduct = titleLowerForWatch.includes('watch') && (titleLowerForWatch.includes('apple') || titleLowerForWatch.includes('ultra'))
+          
+          if (isAppleWatchProduct) {
+            console.log("[v0] ⌚ ScraperAPI: Detected Apple Watch - extracting full case+band combination")
+            console.log("[v0] Product title:", productTitleForWatch)
+            console.log("[v0] Current color (will override):", productData.attributes?.color)
+            
+            // Pattern to match: "[Adjective] [Color] [Material] Case w/ [Band Description]"
+            const watchCasePatterns = [
+              // Pattern 1: "w/[Adj] Titanium Case w/[Band] Loop/Band" - most common for Ultra
+              /(?:with|w\/)\s*([A-Za-z]+(?:\s+[A-Za-z]+)?\s+(?:Titanium|Aluminum|Aluminium)\s+Case\s+(?:with|w\/)\s*[A-Za-z\s]+(?:Loop|Band|Strap|Braided))/i,
+              // Pattern 2: "[Color] Titanium Case with [Band]" without leading with/w/
+              /([A-Za-z]+(?:\s+[A-Za-z]+)?\s+(?:Titanium|Aluminum|Aluminium)\s+Case\s+(?:with|w\/)\s*[A-Za-z\s]+(?:Loop|Band|Strap|Braided))/i,
+              // Pattern 3: Smartwatch variant
+              /Smartwatch\s+(?:with|w\/)\s*([A-Za-z]+(?:\s+[A-Za-z]+)?\s+(?:Titanium|Aluminum|Aluminium)\s+Case\s+(?:with|w\/)\s*[A-Za-z\s]+(?:Loop|Band|Strap))/i,
+            ]
+            
+            for (const pattern of watchCasePatterns) {
+              const match = productTitleForWatch.match(pattern)
+              if (match && match[1]) {
+                let caseAndBand = match[1].trim()
+                // Clean up: remove trailing size indicators like "- L", "- M", "- S"
+                caseAndBand = caseAndBand.replace(/\s*-\s*[SML]\.?$/i, '').trim()
+                // Clean up any trailing characters
+                caseAndBand = caseAndBand.replace(/[,\.\-]+$/, '').trim()
+                // Normalize "w/" to "with" for cleaner display
+                caseAndBand = caseAndBand.replace(/\s*w\/\s*/g, ' with ')
+                // Clean up double spaces
+                caseAndBand = caseAndBand.replace(/\s+/g, ' ').trim()
+                
+                if (caseAndBand.length > 10 && caseAndBand.length < 100) {
+                  if (!productData.attributes) productData.attributes = {}
+                  productData.attributes.color = caseAndBand
+                  console.log("[v0] ✅ ScraperAPI: Extracted Apple Watch case+band:", productData.attributes.color)
+                  break
+                }
+              }
+            }
+            
+            // Extract BAND SIZE (S, M, L) from title for Size field
+            if (!productData.attributes?.size) {
+              const bandSizeMatch = productTitleForWatch.match(/\s*-\s*([SML](?:\/[SML])?)\s*\.?\s*$/i)
+              if (bandSizeMatch) {
+                const sizeMap: Record<string, string> = { 'S': 'Small', 'M': 'Medium', 'L': 'Large', 'S/M': 'Small/Medium', 'M/L': 'Medium/Large' }
+                const bandSize = bandSizeMatch[1].toUpperCase()
+                if (!productData.attributes) productData.attributes = {}
+                productData.attributes.size = sizeMap[bandSize] || bandSize
+                console.log("[v0] ✅ ScraperAPI: Extracted Apple Watch band size:", productData.attributes.size)
+              }
+            }
+            
+            // Default Configuration to "Without AppleCare+" for Apple products
+            if (!productData.attributes?.configuration && !productData.attributes?.set) {
+              if (!productData.attributes) productData.attributes = {}
+              productData.attributes.configuration = 'Without AppleCare+'
+              console.log("[v0] ✅ ScraperAPI: Defaulting Configuration to: Without AppleCare+")
+            }
+          }
+          // ===== END APPLE WATCH SPECIFIC EXTRACTION =====
           
           console.log("[v0] 🔍 Final imageUrl (ScraperAPI path):", productData.imageUrl ? productData.imageUrl.substring(0, 100) : "null")
           console.log("[v0] Final product data:", JSON.stringify(productData).substring(0, 1000))

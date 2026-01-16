@@ -74,6 +74,53 @@ export default function TrendingGiftsPage() {
     )
   }
 
+  // Get unique warm color for each category
+  const getCategoryColor = (category: string): { bg: string; text: string; border: string } => {
+    const categoryColors: Record<string, { bg: string; text: string; border: string }> = {
+      'Electronics': { bg: 'from-rose-100 to-pink-100', text: 'text-rose-700', border: 'border-rose-200' },
+      'Home & Kitchen': { bg: 'from-amber-100 to-yellow-100', text: 'text-amber-700', border: 'border-amber-200' },
+      'Clothing': { bg: 'from-violet-100 to-purple-100', text: 'text-violet-700', border: 'border-violet-200' },
+      'Beauty': { bg: 'from-pink-100 to-rose-100', text: 'text-pink-700', border: 'border-pink-200' },
+      'Sports': { bg: 'from-emerald-100 to-teal-100', text: 'text-emerald-700', border: 'border-emerald-200' },
+      'Toys': { bg: 'from-orange-100 to-amber-100', text: 'text-orange-700', border: 'border-orange-200' },
+      'Books': { bg: 'from-indigo-100 to-blue-100', text: 'text-indigo-700', border: 'border-indigo-200' },
+      'Food': { bg: 'from-lime-100 to-green-100', text: 'text-lime-700', border: 'border-lime-200' },
+      'Jewelry': { bg: 'from-fuchsia-100 to-pink-100', text: 'text-fuchsia-700', border: 'border-fuchsia-200' },
+      'Pet Supplies': { bg: 'from-cyan-100 to-sky-100', text: 'text-cyan-700', border: 'border-cyan-200' },
+      'Garden': { bg: 'from-green-100 to-emerald-100', text: 'text-green-700', border: 'border-green-200' },
+      'Automotive': { bg: 'from-slate-100 to-gray-100', text: 'text-slate-700', border: 'border-slate-200' },
+      'Health': { bg: 'from-teal-100 to-cyan-100', text: 'text-teal-700', border: 'border-teal-200' },
+      'Baby': { bg: 'from-sky-100 to-blue-100', text: 'text-sky-700', border: 'border-sky-200' },
+      'Office': { bg: 'from-stone-100 to-neutral-100', text: 'text-stone-700', border: 'border-stone-200' },
+    }
+    
+    // Check for exact match first
+    if (categoryColors[category]) {
+      return categoryColors[category]
+    }
+    
+    // Check for partial matches
+    const lowerCategory = category.toLowerCase()
+    for (const [key, value] of Object.entries(categoryColors)) {
+      if (lowerCategory.includes(key.toLowerCase()) || key.toLowerCase().includes(lowerCategory)) {
+        return value
+      }
+    }
+    
+    // Generate a consistent color based on the category name hash
+    const hash = category.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
+    const colorOptions = [
+      { bg: 'from-coral-100 to-red-100', text: 'text-red-700', border: 'border-red-200' },
+      { bg: 'from-amber-100 to-orange-100', text: 'text-amber-700', border: 'border-amber-200' },
+      { bg: 'from-yellow-100 to-lime-100', text: 'text-yellow-700', border: 'border-yellow-200' },
+      { bg: 'from-rose-100 to-pink-100', text: 'text-rose-700', border: 'border-rose-200' },
+      { bg: 'from-orange-100 to-red-100', text: 'text-orange-700', border: 'border-orange-200' },
+      { bg: 'from-fuchsia-100 to-purple-100', text: 'text-fuchsia-700', border: 'border-fuchsia-200' },
+    ]
+    
+    return colorOptions[hash % colorOptions.length]
+  }
+
   // Add affiliate tag to Amazon URLs
   const addAffiliateTag = (url: string): string => {
     if (!url) return url
@@ -777,11 +824,14 @@ export default function TrendingGiftsPage() {
                     className="w-full h-52 object-contain bg-white group-hover:scale-110 transition-transform duration-500"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                  {gift.category && (
-                    <div className="absolute top-3 left-3 bg-gradient-to-r from-amber-100 to-orange-100 backdrop-blur-sm text-[#8B4513] px-3 py-1 rounded-full text-xs font-bold shadow-md border border-amber-200">
-                      {gift.category}
-                    </div>
-                  )}
+                  {gift.category && (() => {
+                    const colors = getCategoryColor(gift.category)
+                    return (
+                      <div className={`absolute top-3 left-3 bg-gradient-to-r ${colors.bg} backdrop-blur-sm ${colors.text} px-3 py-1 rounded-full text-xs font-bold shadow-md border ${colors.border}`}>
+                        {gift.category}
+                      </div>
+                    )
+                  })()}
                   {gift.originalPrice && gift.originalPrice > gift.targetAmount && (
                     <div className="absolute top-3 right-3 bg-gradient-to-r from-red-500 to-rose-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-lg animate-pulse">
                       SALE
@@ -1073,11 +1123,14 @@ export default function TrendingGiftsPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-4 flex-wrap">
-                      {gift.category && (
-                        <span className="bg-gradient-to-r from-amber-100 to-orange-100 text-[#8B4513] px-3 py-1 rounded-full text-xs font-bold border border-amber-200">
-                          {gift.category}
-                        </span>
-                      )}
+                      {gift.category && (() => {
+                        const colors = getCategoryColor(gift.category)
+                        return (
+                          <span className={`bg-gradient-to-r ${colors.bg} ${colors.text} px-3 py-1 rounded-full text-xs font-bold border ${colors.border}`}>
+                            {gift.category}
+                          </span>
+                        )
+                      })()}
                       {gift.rating && gift.rating > 0 && (
                         <div className="flex items-center gap-2">
                           <div className="flex items-center gap-0.5">

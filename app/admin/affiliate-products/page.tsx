@@ -17,6 +17,7 @@ import {
   Bell,
   User,
   ChevronDown,
+  ChevronUp,
   ArrowLeft,
   Package,
   Sparkles,
@@ -123,7 +124,7 @@ export default function AdminAffiliateProductsPage() {
   const [isExtracting, setIsExtracting] = useState(false)
   const [extractedProduct, setExtractedProduct] = useState<any>(null)
   // Variant options extracted from URL (color, size, style, set/configuration) - displayed in "Selected Options" layout
-  const [variantOptions, setVariantOptions] = useState<{color?: string, size?: string, style?: string, set?: string}>({})
+  const [variantOptions, setVariantOptions] = useState<{color?: string, size?: string, style?: string, configuration?: string}>({})
   // State for editing variant options
   const [editingOption, setEditingOption] = useState<'style' | 'color' | 'size' | 'set' | null>(null)
   const [editOptionValue, setEditOptionValue] = useState('')
@@ -276,6 +277,21 @@ export default function AdminAffiliateProductsPage() {
       amazonChoice: product.amazonChoice || false,
       bestSeller: product.bestSeller || false,
     })
+    
+    // Load saved variant options (Color, Size, Style, Configuration)
+    const savedVariantOptions: {color?: string, size?: string, style?: string, configuration?: string} = {}
+    if ((product as any).color) savedVariantOptions.color = (product as any).color
+    if ((product as any).size) savedVariantOptions.size = (product as any).size
+    if ((product as any).style) savedVariantOptions.style = (product as any).style
+    if ((product as any).configuration) savedVariantOptions.configuration = (product as any).configuration
+    // Also check in attributes as fallback
+    if (!savedVariantOptions.color && product.attributes?.color) savedVariantOptions.color = product.attributes.color
+    if (!savedVariantOptions.size && product.attributes?.size) savedVariantOptions.size = product.attributes.size
+    if (!savedVariantOptions.style && product.attributes?.style) savedVariantOptions.style = product.attributes.style
+    if (!savedVariantOptions.configuration && product.attributes?.configuration) savedVariantOptions.configuration = product.attributes.configuration
+    
+    setVariantOptions(savedVariantOptions)
+    console.log('[Admin] Loaded variant options for editing:', savedVariantOptions)
     // Populate extractedProduct with existing product data for editing
     // Filter out color, size, and style from existing product attributes
     let filteredEditAttributes = null
@@ -512,7 +528,9 @@ export default function AdminAffiliateProductsPage() {
           if (!value || typeof value !== 'string') return false
           const trimmed = value.trim()
           // Reject if empty, too long, or contains garbage patterns
-          if (trimmed.length === 0 || trimmed.length > 50) return false
+          // Increased max length from 50 to 100 to support Apple Watch case+band descriptions
+          // e.g., "Rugged Titanium Case with Natural Titanium Milanese Loop" (53 chars)
+          if (trimmed.length === 0 || trimmed.length > 100) return false
           // Reject CSS-like content, HTML, scripts, or special characters
           if (trimmed.includes('{') || trimmed.includes('}') || trimmed.includes('<') || trimmed.includes('>')) return false
           if (trimmed.includes('function') || trimmed.includes('var ') || trimmed.includes('const ')) return false
@@ -525,7 +543,7 @@ export default function AdminAffiliateProductsPage() {
           return true
         }
         
-        const extractedVariants: {color?: string, size?: string, style?: string, set?: string} = {}
+        const extractedVariants: {color?: string, size?: string, style?: string, configuration?: string} = {}
         
         // Helper to get a string value (handles arrays by taking first element)
         const getStringValue = (val: any): string | undefined => {
@@ -555,19 +573,24 @@ export default function AdminAffiliateProductsPage() {
         console.log('[Admin] extracted.set:', extracted.set)
         console.log('[Admin] extracted.attributes?.configuration:', extracted.attributes?.configuration)
         console.log('[Admin] extracted.configuration:', extracted.configuration)
+        // Also check for watch-specific fields
+        console.log('[Admin] extracted.attributes?.connectivity:', extracted.attributes?.connectivity)
+        console.log('[Admin] extracted.attributes?.connectivityTechnology:', extracted.attributes?.connectivityTechnology)
         console.log('[Admin] ===================================')
         
         // Get values, handling arrays properly
         const colorVal = getStringValue(extracted.attributes?.color) || getStringValue(extracted.color)
         const sizeVal = getStringValue(extracted.attributes?.size) || getStringValue(extracted.size)
         const styleVal = getStringValue(extracted.attributes?.style) || getStringValue(extracted.style)
-        const setVal = getStringValue(extracted.attributes?.set) || getStringValue(extracted.set) || 
-                       getStringValue(extracted.attributes?.configuration) || getStringValue(extracted.configuration)
+        // Configuration: AppleCare options (Amazon calls this "configuration_name" dimension)
+        // Note: connectivity (GPS, GPS + Cellular) is a SPEC, not a variant - don't include it here
+        const configVal = getStringValue(extracted.attributes?.set) || getStringValue(extracted.set) ||
+                          getStringValue(extracted.attributes?.configuration) || getStringValue(extracted.configuration)
         
         console.log('[Admin] colorVal (processed):', colorVal, 'isValid:', isValidVariantValue(colorVal))
         console.log('[Admin] sizeVal (processed):', sizeVal, 'isValid:', isValidVariantValue(sizeVal))
         console.log('[Admin] styleVal (processed):', styleVal, 'isValid:', isValidVariantValue(styleVal))
-        console.log('[Admin] setVal (processed):', setVal, 'isValid:', isValidVariantValue(setVal))
+        console.log('[Admin] configVal (processed):', configVal, 'isValid:', isValidVariantValue(configVal))
         
         // Additional validation: reject shape values for style (e.g., "SQUARE" is shape, not style)
         const isValidStyleValue = (val: string | undefined): boolean => {
@@ -584,7 +607,7 @@ export default function AdminAffiliateProductsPage() {
         if (isValidVariantValue(colorVal)) extractedVariants.color = colorVal!.trim()
         if (isValidVariantValue(sizeVal)) extractedVariants.size = sizeVal!.trim()
         if (isValidStyleValue(styleVal)) extractedVariants.style = styleVal!.trim()
-        if (isValidVariantValue(setVal)) extractedVariants.set = setVal!.trim()
+        if (isValidVariantValue(configVal)) extractedVariants.configuration = configVal!.trim()
         
         setVariantOptions(extractedVariants)
         console.log('[Admin] Final extracted variant options for I Wish display:', extractedVariants)
@@ -1056,11 +1079,11 @@ export default function AdminAffiliateProductsPage() {
           : (formData.productLink || extractedProduct.productLink || "").trim() || undefined,
         amazonChoice: extractedProduct?.amazonChoice ?? formData.amazonChoice,
         bestSeller: extractedProduct?.bestSeller ?? formData.bestSeller,
-        // Include variant options (Style, Color, Size, Set) as top-level fields
+        // Include variant options (Style, Color, Size, Configuration) as top-level fields
         style: variantOptions.style || undefined,
         color: variantOptions.color || undefined,
         size: variantOptions.size || undefined,
-        set: variantOptions.set || undefined,
+        configuration: variantOptions.configuration || undefined,
         // Include ALL product specifications/attributes dynamically
         attributes: (() => {
           // Start with an EMPTY object - only include what user has in productAttributes
@@ -1807,18 +1830,21 @@ export default function AdminAffiliateProductsPage() {
                     </div>
                     
                     {/* Selected Options - Variant Options from URL */}
-                    {(variantOptions.style || variantOptions.color || variantOptions.size || variantOptions.set || editingOption || customVariantOptions.length > 0 || isAddingCustomOption || extractedProduct) && (
+                    {(variantOptions.style || variantOptions.color || variantOptions.size || variantOptions.configuration || editingOption || customVariantOptions.length > 0 || isAddingCustomOption || extractedProduct) && (
                       <div className="bg-gradient-to-br from-[#FEF7ED] via-[#FFF7ED] to-[#FFFBEB] border-2 border-[#DAA520]/40 rounded-xl p-4 shadow-lg">
-                        <div className="flex items-center gap-2 mb-3 pb-2 border-b border-[#DAA520]/20">
+                        <div className="flex items-center gap-2 mb-2 pb-2 border-b border-[#DAA520]/20">
                           <SlidersHorizontal className="w-4 h-4 text-[#DAA520]" />
                           <h4 className="text-sm font-bold text-[#8B4513]">Selected Options</h4>
                           <span className="text-[10px] text-gray-500 ml-auto">Variant options from URL</span>
                         </div>
+                        <p className="text-[10px] text-amber-700 bg-amber-50 px-2 py-1 rounded mb-2 border border-amber-200">
+                          💡 <strong>Tip:</strong> If the extracted color/options don't match what you selected on Amazon, click the ✏️ pencil icon to edit them.
+                        </p>
                         <div className="space-y-2">
                           {/* Style Option - Only show if has value or being edited */}
                           {(variantOptions.style || editingOption === 'style') && (
                             <div className="flex items-center gap-2 group">
-                              <span className="text-xs font-semibold text-[#654321] min-w-[50px]">Style:</span>
+                              <span className="text-xs font-semibold text-[#654321] min-w-[80px]">Style:</span>
                               {editingOption === 'style' ? (
                                 <div className="flex items-center gap-1 flex-1">
                                   <Input
@@ -1878,7 +1904,7 @@ export default function AdminAffiliateProductsPage() {
                           {/* Color Option - Only show if has value or being edited */}
                           {(variantOptions.color || editingOption === 'color') && (
                             <div className="flex items-center gap-2 group">
-                              <span className="text-xs font-semibold text-[#654321] min-w-[50px]">Color:</span>
+                              <span className="text-xs font-semibold text-[#654321] min-w-[80px]">Color:</span>
                               {editingOption === 'color' ? (
                                 <div className="flex items-center gap-1 flex-1">
                                   <Input
@@ -1938,7 +1964,7 @@ export default function AdminAffiliateProductsPage() {
                           {/* Size Option - Only show if has value or being edited */}
                           {(variantOptions.size || editingOption === 'size') && (
                             <div className="flex items-center gap-2 group">
-                              <span className="text-xs font-semibold text-[#654321] min-w-[50px]">Size:</span>
+                              <span className="text-xs font-semibold text-[#654321] min-w-[80px]">Size:</span>
                               {editingOption === 'size' ? (
                                 <div className="flex items-center gap-1 flex-1">
                                   <Input
@@ -1995,17 +2021,17 @@ export default function AdminAffiliateProductsPage() {
                             </div>
                           )}
                           
-                          {/* Set Option - Only show if has value or being edited */}
-                          {(variantOptions.set || editingOption === 'set') && (
+                          {/* Configuration Option - For AppleCare options */}
+                          {(variantOptions.configuration || editingOption === 'configuration') && (
                             <div className="flex items-center gap-2 group">
-                              <span className="text-xs font-semibold text-[#654321] min-w-[50px]">Set:</span>
-                              {editingOption === 'set' ? (
+                              <span className="text-xs font-semibold text-[#654321] min-w-[80px]">Configuration:</span>
+                              {editingOption === 'configuration' ? (
                                 <div className="flex items-center gap-1 flex-1">
                                   <Input
                                     value={editOptionValue}
                                     onChange={(e) => setEditOptionValue(e.target.value)}
                                     className="h-7 text-xs flex-1"
-                                    placeholder="e.g., With AppleCare+, Bundle"
+                                    placeholder="e.g., Without AppleCare+, With AppleCare+ (2 Years)"
                                     autoFocus
                                   />
                                   <button
@@ -2013,7 +2039,7 @@ export default function AdminAffiliateProductsPage() {
                                     onClick={(e) => {
                                       e.preventDefault()
                                       e.stopPropagation()
-                                      setVariantOptions({ ...variantOptions, set: editOptionValue || undefined })
+                                      setVariantOptions({ ...variantOptions, configuration: editOptionValue || undefined })
                                       setEditingOption(null)
                                       setEditOptionValue('')
                                     }}
@@ -2032,21 +2058,21 @@ export default function AdminAffiliateProductsPage() {
                               ) : (
                                 <>
                                   <span className="px-2 py-1 bg-[#DAA520]/20 text-[#654321] text-xs font-medium rounded-md border border-[#DAA520]/30 flex-1">
-                                    {variantOptions.set}
+                                    {variantOptions.configuration}
                                   </span>
                                   <button
                                     type="button"
-                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingOption('set'); setEditOptionValue(variantOptions.set || '') }}
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingOption('configuration'); setEditOptionValue(variantOptions.configuration || '') }}
                                     className="p-1 hover:bg-amber-100 rounded"
-                                    title="Edit Set"
+                                    title="Edit Configuration"
                                   >
                                     <Edit2 className="w-3 h-3 text-[#F59E0B]" />
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setVariantOptions(prev => ({ ...prev, set: undefined })) }}
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setVariantOptions(prev => ({ ...prev, configuration: undefined })) }}
                                     className="p-1 hover:bg-red-100 rounded"
-                                    title="Delete Set"
+                                    title="Delete Configuration"
                                   >
                                     <Trash2 className="w-3 h-3 text-red-500" />
                                   </button>
@@ -2058,7 +2084,7 @@ export default function AdminAffiliateProductsPage() {
                           {/* Custom Variant Options */}
                           {customVariantOptions.map((option) => (
                             <div key={option.id} className="flex items-center gap-2 group">
-                              <span className="text-xs font-semibold text-[#654321] min-w-[50px] truncate" title={option.name}>
+                              <span className="text-xs font-semibold text-[#654321] min-w-[80px] truncate" title={option.name}>
                                 {option.name}:
                               </span>
                               {editingCustomOptionId === option.id ? (
@@ -2669,8 +2695,53 @@ export default function AdminAffiliateProductsPage() {
                     <div className="bg-white rounded-xl p-4 shadow-md border border-amber-200">
                       <label className="block text-sm font-bold text-[#654321] mb-3">Product Attributes</label>
                       <div className="space-y-2">
-                        {productAttributes.map((attr) => (
+                        {productAttributes.map((attr, index) => (
                           <div key={attr.id} className="flex items-center gap-2">
+                            {/* Move Up/Down Arrows */}
+                            <div className="flex flex-col gap-0.5">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  if (index > 0) {
+                                    setProductAttributes(prev => {
+                                      const newArr = [...prev]
+                                      const temp = newArr[index]
+                                      newArr[index] = newArr[index - 1]
+                                      newArr[index - 1] = temp
+                                      return newArr
+                                    })
+                                  }
+                                }}
+                                disabled={index === 0}
+                                className="h-5 w-5 p-0 text-gray-400 hover:text-amber-600 hover:bg-amber-50 disabled:opacity-30 disabled:cursor-not-allowed"
+                                title="Move up"
+                              >
+                                <ChevronUp className="w-3.5 h-3.5" />
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  if (index < productAttributes.length - 1) {
+                                    setProductAttributes(prev => {
+                                      const newArr = [...prev]
+                                      const temp = newArr[index]
+                                      newArr[index] = newArr[index + 1]
+                                      newArr[index + 1] = temp
+                                      return newArr
+                                    })
+                                  }
+                                }}
+                                disabled={index === productAttributes.length - 1}
+                                className="h-5 w-5 p-0 text-gray-400 hover:text-amber-600 hover:bg-amber-50 disabled:opacity-30 disabled:cursor-not-allowed"
+                                title="Move down"
+                              >
+                                <ChevronDown className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
                             <Input
                               value={attr.name || ''}
                               onChange={(e) => {
@@ -2678,7 +2749,7 @@ export default function AdminAffiliateProductsPage() {
                                   a.id === attr.id ? { ...a, name: e.target.value } : a
                                 ))
                               }}
-                              className="w-40 h-8 text-sm font-medium border-gray-300 focus:border-amber-500"
+                              className="w-36 h-8 text-sm font-medium border-gray-300 focus:border-amber-500"
                               placeholder="Attribute name"
                             />
                             <Input

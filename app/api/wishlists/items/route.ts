@@ -115,9 +115,27 @@ export async function POST(request: NextRequest) {
       try {
         const options = typeof preferenceOptions === 'string' ? JSON.parse(preferenceOptions) : preferenceOptions
         descriptionData.preferenceOptions = options
+        
+        // Log what's being saved for debugging
+        console.log('[API] ========== SAVING PREFERENCE OPTIONS ==========')
+        console.log('[API] I Wish:', options.iLike ? 'YES' : 'NO')
+        if (options.iLike) {
+          console.log('[API] I Wish image:', options.iLike.image?.substring(0, 60))
+          console.log('[API] I Wish color:', options.iLike.color)
+        }
+        console.log('[API] Alternative:', options.alternative ? 'YES' : 'NO')
+        if (options.alternative) {
+          console.log('[API] Alternative image:', options.alternative.image?.substring(0, 60))
+          console.log('[API] Alternative color:', options.alternative.color)
+          console.log('[API] Alternative style:', options.alternative.style)
+        }
+        console.log('[API] Ok to Buy:', options.okToBuy ? 'YES' : 'NO')
+        console.log('[API] =================================================')
       } catch (e) {
         console.error('Error parsing preferenceOptions:', e)
       }
+    } else {
+      console.log('[API] ⚠️ NO preferenceOptions received!')
     }
     
     // Add individual color/size if provided (legacy support)
@@ -149,6 +167,8 @@ export async function POST(request: NextRequest) {
     }
     
     insertData.description = JSON.stringify(descriptionData)
+    
+    console.log('[API] Final description being saved:', insertData.description.substring(0, 500))
 
     // Note: category, quantity, priority, stock_status don't exist in the database
 
