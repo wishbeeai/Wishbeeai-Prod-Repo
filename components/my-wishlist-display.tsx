@@ -9,6 +9,7 @@ import Image from "next/image"
 import { useToast } from "@/hooks/use-toast"
 import Link from "next/link"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
+import { ShareModal } from "@/components/share-modal"
 
 interface PreferenceOption {
   [key: string]: string | null | undefined | Array<{ key: string; value: string }>  // Dynamic variant keys
@@ -32,6 +33,7 @@ interface Badges {
 
 interface WishlistItem {
   id: string
+  wishlistId: string        // ID of the wishlist this item belongs to
   webLink: string
   quantity: number
   productImageUrl: string
@@ -85,6 +87,14 @@ export function MyWishlistDisplay() {
     style: string
     configuration: string
   }>({ color: '', size: '', style: '', configuration: '' })
+
+  // State for Share Modal
+  const [shareModalOpen, setShareModalOpen] = useState(false)
+  const [shareItem, setShareItem] = useState<WishlistItem | null>(null)
+
+  // State for Specifications Modal
+  const [isSpecsModalOpen, setIsSpecsModalOpen] = useState(false)
+  const [selectedItemForSpecs, setSelectedItemForSpecs] = useState<WishlistItem | null>(null)
 
   // Fetch wishlist items from database
   useEffect(() => {
@@ -169,6 +179,7 @@ export function MyWishlistDisplay() {
 
           return {
             id: item.id,
+            wishlistId: item.wishlist_id, // Preserve wishlist ID for sharing
             webLink: item.product_url || "#",
             quantity: 1,
             productImageUrl: item.image_url || "/placeholder.svg",
@@ -235,35 +246,21 @@ export function MyWishlistDisplay() {
     }
   }
 
-  const handleShare = async (item: WishlistItem) => {
-    try {
-      const shareData = {
-        title: item.giftName,
-        text: `Check out this item on my wishlist: ${item.giftName}`,
-        url: item.webLink,
-      }
+  /**
+   * Open the share modal for a specific item
+   * The modal allows sharing via multiple channels (WhatsApp, SMS, Email, etc.)
+   */
+  const handleShare = (item: WishlistItem) => {
+    setShareItem(item)
+    setShareModalOpen(true)
+  }
 
-      if (navigator.share) {
-        await navigator.share(shareData)
-        toast({
-          title: "Shared Successfully!",
-          description: "Item shared via your device",
-        })
-      } else {
-        await navigator.clipboard.writeText(item.webLink)
-        toast({
-          title: "Link Copied!",
-          description: "Product link copied to clipboard",
-        })
-      }
-    } catch (error) {
-      console.error("Error sharing:", error)
-      toast({
-        title: "Share Failed",
-        description: "Could not share this item",
-        variant: "destructive",
-      })
-    }
+  /**
+   * Close the share modal and reset state
+   */
+  const closeShareModal = () => {
+    setShareModalOpen(false)
+    setShareItem(null)
   }
 
   const handleDelete = async (id: string) => {
@@ -495,8 +492,8 @@ export function MyWishlistDisplay() {
 
       <div className="flex justify-center">
         <Link href="/wishlist/add">
-          <Button className="bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-white hover:opacity-90 text-xs sm:text-sm">
-            <Plus className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+          <Button className="h-9 px-4 rounded-full bg-gradient-to-r from-[#E65C00] via-[#F9A825] to-[#FFD54F] text-white hover:from-[#FFD54F] hover:via-[#F9A825] hover:to-[#E65C00] transition-all duration-300 hover:scale-105 shadow-md hover:shadow-lg text-xs font-semibold">
+            <Plus className="h-4 w-4 mr-1.5" />
             Add New Item
           </Button>
         </Link>
@@ -511,19 +508,16 @@ export function MyWishlistDisplay() {
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {wishlistItems.map((item) => (
             <Card key={item.id} className="overflow-hidden hover:shadow-2xl transition-all duration-300 flex flex-col h-full bg-gradient-to-br from-orange-50/80 via-amber-50/60 to-yellow-50/80 border border-[#DAA520]/20 hover:border-[#DAA520]/40">
-              {/* Product Details - Image moved to I Wish and Alternative sections */}
-              <div className="p-4 flex flex-col h-full">
-                {/* Product Title - 2 lines max */}
-                <div className="h-11 mb-1.5">
-                  <h3 className="font-bold text-sm text-[#5D4037] line-clamp-2 leading-tight">
-                    {item.giftName}
-                  </h3>
-                </div>
+              {/* Product Title Header - Yellow Gradient */}
+              <div className="bg-gradient-to-r from-[#B8860B] via-[#DAA520] to-[#F4C430] px-4 py-3">
+                <h3 className="font-bold text-sm line-clamp-2 leading-tight text-white drop-shadow-sm">
+                  {item.giftName}
+                </h3>
+                <span className="text-[11px] text-white/80 font-medium">{item.storeName}</span>
+              </div>
 
-                {/* Store name */}
-                <div className="mb-1.5">
-                  <span className="text-xs text-[#8B6914] font-medium">{item.storeName}</span>
-                </div>
+              {/* Product Details */}
+              <div className="p-4 flex flex-col h-full">
 
                 {/* Stars and Review Count - Same styling as Trending Gifts */}
                 {(item.rating || item.reviewCount) && (
@@ -580,26 +574,24 @@ export function MyWishlistDisplay() {
                   </div>
                 )}
 
-                {/* Badges */}
-                {item.badges && (item.badges.amazonChoice || item.badges.bestSeller || item.badges.overallPick) && (
-                  <div className="flex flex-wrap gap-1 mb-1.5">
-                    {item.badges.amazonChoice && (
-                      <span className="text-[10px] bg-gradient-to-r from-gray-900 to-black text-white px-2.5 py-1 rounded-full font-bold shadow-sm">
-                        Amazon's Choice
-                      </span>
-                    )}
-                    {item.badges.bestSeller && (
-                      <span className="text-[10px] text-white px-2.5 py-1 rounded-full font-bold shadow-sm" style={{ backgroundColor: '#D14900' }}>
-                        #1 Best Seller
-                      </span>
-                    )}
-                    {item.badges.overallPick && (
-                      <span className="text-[10px] bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-2.5 py-1 rounded-full font-bold shadow-sm">
-                        ⭐ Overall Pick
-                      </span>
-                    )}
-                  </div>
-                )}
+                {/* Badges - Reserved line for consistent layout */}
+                <div className="flex flex-wrap gap-1 mb-1.5 min-h-[22px]">
+                  {item.badges?.amazonChoice && (
+                    <span className="text-[10px] bg-gradient-to-r from-gray-900 to-black text-white px-2.5 py-1 rounded-full font-bold shadow-sm">
+                      Amazon&apos;s Choice
+                    </span>
+                  )}
+                  {item.badges?.bestSeller && (
+                    <span className="text-[10px] text-white px-2.5 py-1 rounded-full font-bold shadow-sm" style={{ backgroundColor: '#D14900' }}>
+                      #1 Best Seller
+                    </span>
+                  )}
+                  {item.badges?.overallPick && (
+                    <span className="text-[10px] bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-2.5 py-1 rounded-full font-bold shadow-sm">
+                      ⭐ Overall Pick
+                    </span>
+                  )}
+                </div>
 
                 {/* Price - List Price and Sale Price */}
                 <div className="mb-2 bg-gradient-to-r from-[#FEF3C7]/50 to-[#FDE68A]/30 rounded-lg px-2 py-1.5">
@@ -672,7 +664,17 @@ export function MyWishlistDisplay() {
                         ))}
                       </div>
                       {moreCount > 0 && (
-                        <p className="text-[10px] font-bold text-[#DAA520] mt-2">+{moreCount} more specs →</p>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setSelectedItemForSpecs(item)
+                            setIsSpecsModalOpen(true)
+                          }}
+                          className="text-left text-[10px] font-bold text-[#DAA520] hover:text-[#B8860B] cursor-pointer transition-colors mt-2"
+                        >
+                          +{moreCount} more specs →
+                        </button>
                       )}
                     </div>
                   )
@@ -707,8 +709,8 @@ export function MyWishlistDisplay() {
                       .filter(([key, value]) => !excludeKeys.includes(key) && isValidValue(value) && typeof value === 'string')
                   }
                   
-                  // Filter out 'size' from I Wish entries as requested
-                  const iLikeEntries = getValidEntries(item.preferenceOptions.iLike).filter(([key]) => key.toLowerCase() !== 'size')
+                  // Get all valid entries including size
+                  const iLikeEntries = getValidEntries(item.preferenceOptions.iLike)
                   const altEntries = getValidEntries(item.preferenceOptions.alternative)
                   const okToBuyEntries = getValidEntries(item.preferenceOptions.okToBuy)
                   
@@ -723,8 +725,8 @@ export function MyWishlistDisplay() {
                       </div>
 
                       <div className="space-y-2">
-                        {/* I Wish Section - With image on left */}
-                        <div className="rounded-lg border-2 border-[#B8860B] bg-gradient-to-r from-[#DAA520]/30 to-[#F4C430]/25 shadow-md p-2.5">
+                        {/* I Wish Section - With image on left - Fixed size */}
+                        <div className="rounded-lg border-2 border-[#B8860B] bg-gradient-to-r from-[#DAA520]/30 to-[#F4C430]/25 shadow-md p-2.5 h-[160px] overflow-hidden">
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2">
                               <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gradient-to-r from-[#B8860B] via-[#DAA520] to-[#F4C430] text-white flex items-center gap-1 shadow-sm">
@@ -781,93 +783,106 @@ export function MyWishlistDisplay() {
                             
                             {/* Options - Right Panel */}
                             <div className="flex-1 min-w-0">
-                              {/* Edit Mode */}
+                              {/* Edit Mode - Only show fields that have values or are in iLikeEntries */}
                           {editingItemId === item.id ? (
                             <div className="space-y-2">
-                              {/* Color */}
-                              <div className="flex items-center gap-2">
-                                <label className="text-[10px] font-semibold text-[#6B4423] w-20">Color:</label>
-                                <input
-                                  type="text"
-                                  value={editedPreferences.color}
-                                  onChange={(e) => setEditedPreferences(prev => ({ ...prev, color: e.target.value }))}
-                                  className="flex-1 text-[10px] px-2 py-1 border border-[#DAA520]/30 rounded bg-white focus:outline-none focus:border-[#DAA520]"
-                                  placeholder="e.g., Silver Aluminum Case"
-                                />
-                                {editedPreferences.color && (
-                                  <button
-                                    type="button"
-                                    onClick={() => removePreferenceOption('color')}
-                                    className="p-0.5 text-red-500 hover:text-red-700 transition-colors"
-                                    title="Remove"
-                                  >
-                                    <X className="w-3 h-3" />
-                                  </button>
-                                )}
-                              </div>
-                              {/* Size */}
-                              <div className="flex items-center gap-2">
-                                <label className="text-[10px] font-semibold text-[#6B4423] w-20">Size:</label>
-                                <input
-                                  type="text"
-                                  value={editedPreferences.size}
-                                  onChange={(e) => setEditedPreferences(prev => ({ ...prev, size: e.target.value }))}
-                                  className="flex-1 text-[10px] px-2 py-1 border border-[#DAA520]/30 rounded bg-white focus:outline-none focus:border-[#DAA520]"
-                                  placeholder="e.g., 42mm + S/M"
-                                />
-                                {editedPreferences.size && (
-                                  <button
-                                    type="button"
-                                    onClick={() => removePreferenceOption('size')}
-                                    className="p-0.5 text-red-500 hover:text-red-700 transition-colors"
-                                    title="Remove"
-                                  >
-                                    <X className="w-3 h-3" />
-                                  </button>
-                                )}
-                              </div>
-                              {/* Style */}
-                              <div className="flex items-center gap-2">
-                                <label className="text-[10px] font-semibold text-[#6B4423] w-20">Style:</label>
-                                <input
-                                  type="text"
-                                  value={editedPreferences.style}
-                                  onChange={(e) => setEditedPreferences(prev => ({ ...prev, style: e.target.value }))}
-                                  className="flex-1 text-[10px] px-2 py-1 border border-[#DAA520]/30 rounded bg-white focus:outline-none focus:border-[#DAA520]"
-                                  placeholder="e.g., Sport Band"
-                                />
-                                {editedPreferences.style && (
-                                  <button
-                                    type="button"
-                                    onClick={() => removePreferenceOption('style')}
-                                    className="p-0.5 text-red-500 hover:text-red-700 transition-colors"
-                                    title="Remove"
-                                  >
-                                    <X className="w-3 h-3" />
-                                  </button>
-                                )}
-                              </div>
-                              {/* Configuration */}
-                              <div className="flex items-center gap-2">
-                                <label className="text-[10px] font-semibold text-[#6B4423] w-20">Config:</label>
-                                <input
-                                  type="text"
-                                  value={editedPreferences.configuration}
-                                  onChange={(e) => setEditedPreferences(prev => ({ ...prev, configuration: e.target.value }))}
-                                  className="flex-1 text-[10px] px-2 py-1 border border-[#DAA520]/30 rounded bg-white focus:outline-none focus:border-[#DAA520]"
-                                  placeholder="e.g., GPS + Cellular"
-                                />
-                                {editedPreferences.configuration && (
-                                  <button
-                                    type="button"
-                                    onClick={() => removePreferenceOption('configuration')}
-                                    className="p-0.5 text-red-500 hover:text-red-700 transition-colors"
-                                    title="Remove"
-                                  >
-                                    <X className="w-3 h-3" />
-                                  </button>
-                                )}
-                              </div>
+                              {/* Color - show if has value or in entries */}
+                              {(editedPreferences.color || iLikeEntries.some(([k]) => k.toLowerCase() === 'color')) && (
+                                <div className="flex items-center gap-2">
+                                  <label className="text-[10px] font-semibold text-[#6B4423] w-20">Color:</label>
+                                  <input
+                                    type="text"
+                                    value={editedPreferences.color}
+                                    onChange={(e) => setEditedPreferences(prev => ({ ...prev, color: e.target.value }))}
+                                    className="flex-1 text-[10px] px-2 py-1 border border-[#DAA520]/30 rounded bg-white focus:outline-none focus:border-[#DAA520]"
+                                    placeholder="e.g., Silver Aluminum Case"
+                                  />
+                                  {editedPreferences.color && (
+                                    <button
+                                      type="button"
+                                      onClick={() => removePreferenceOption('color')}
+                                      className="p-0.5 text-red-500 hover:text-red-700 transition-colors"
+                                      title="Remove"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                              {/* Size - show if has value or in entries */}
+                              {(editedPreferences.size || iLikeEntries.some(([k]) => k.toLowerCase() === 'size')) && (
+                                <div className="flex items-center gap-2">
+                                  <label className="text-[10px] font-semibold text-[#6B4423] w-20">Size:</label>
+                                  <input
+                                    type="text"
+                                    value={editedPreferences.size}
+                                    onChange={(e) => setEditedPreferences(prev => ({ ...prev, size: e.target.value }))}
+                                    className="flex-1 text-[10px] px-2 py-1 border border-[#DAA520]/30 rounded bg-white focus:outline-none focus:border-[#DAA520]"
+                                    placeholder="e.g., 42mm + S/M"
+                                  />
+                                  {editedPreferences.size && (
+                                    <button
+                                      type="button"
+                                      onClick={() => removePreferenceOption('size')}
+                                      className="p-0.5 text-red-500 hover:text-red-700 transition-colors"
+                                      title="Remove"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                              {/* Style - show if has value or in entries */}
+                              {(editedPreferences.style || iLikeEntries.some(([k]) => k.toLowerCase() === 'style')) && (
+                                <div className="flex items-center gap-2">
+                                  <label className="text-[10px] font-semibold text-[#6B4423] w-20">Style:</label>
+                                  <input
+                                    type="text"
+                                    value={editedPreferences.style}
+                                    onChange={(e) => setEditedPreferences(prev => ({ ...prev, style: e.target.value }))}
+                                    className="flex-1 text-[10px] px-2 py-1 border border-[#DAA520]/30 rounded bg-white focus:outline-none focus:border-[#DAA520]"
+                                    placeholder="e.g., Sport Band"
+                                  />
+                                  {editedPreferences.style && (
+                                    <button
+                                      type="button"
+                                      onClick={() => removePreferenceOption('style')}
+                                      className="p-0.5 text-red-500 hover:text-red-700 transition-colors"
+                                      title="Remove"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                              {/* Configuration - show if has value or in entries */}
+                              {(editedPreferences.configuration || iLikeEntries.some(([k]) => k.toLowerCase() === 'configuration')) && (
+                                <div className="flex items-center gap-2">
+                                  <label className="text-[10px] font-semibold text-[#6B4423] w-20">Config:</label>
+                                  <input
+                                    type="text"
+                                    value={editedPreferences.configuration}
+                                    onChange={(e) => setEditedPreferences(prev => ({ ...prev, configuration: e.target.value }))}
+                                    className="flex-1 text-[10px] px-2 py-1 border border-[#DAA520]/30 rounded bg-white focus:outline-none focus:border-[#DAA520]"
+                                    placeholder="e.g., GPS + Cellular"
+                                  />
+                                  {editedPreferences.configuration && (
+                                    <button
+                                      type="button"
+                                      onClick={() => removePreferenceOption('configuration')}
+                                      className="p-0.5 text-red-500 hover:text-red-700 transition-colors"
+                                      title="Remove"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                              {/* Show message if no editable fields */}
+                              {!editedPreferences.color && !editedPreferences.size && !editedPreferences.style && !editedPreferences.configuration &&
+                               !iLikeEntries.some(([k]) => ['color', 'size', 'style', 'configuration'].includes(k.toLowerCase())) && (
+                                <p className="text-[10px] text-[#8B6914] italic">No variant options available for this product.</p>
+                              )}
                             </div>
                           ) : (
                             /* Display Mode */
@@ -889,8 +904,8 @@ export function MyWishlistDisplay() {
                           </div>
                         </div>
 
-                        {/* Alternative Section - With image on left */}
-                        <div className="rounded-lg border-2 border-[#D97706] bg-gradient-to-r from-[#D97706]/15 to-[#F59E0B]/15 p-2.5">
+                        {/* Alternative Section - With image on left - Fixed size */}
+                        <div className="rounded-lg border-2 border-[#D97706] bg-gradient-to-r from-[#D97706]/15 to-[#F59E0B]/15 p-2.5 h-[240px] overflow-hidden">
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2">
                               <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gradient-to-r from-[#D97706] to-[#F59E0B] text-white shadow-sm">
@@ -1056,7 +1071,7 @@ export function MyWishlistDisplay() {
                           </div>
                         </div>
 
-                        {/* Ok to Buy Section - Matches modal/add page styling */}
+                        {/* Ok to Buy Section - Auto size to fit content */}
                         <div className="rounded-lg border-2 border-[#8B5A3C]/20 bg-white/50 p-2.5">
                           <div className="flex items-center gap-2 mb-2">
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gradient-to-r from-[#C2410C] to-[#EA580C] text-white shadow-sm">
@@ -1113,6 +1128,97 @@ export function MyWishlistDisplay() {
           ))}
         </div>
       )}
+
+      {/* Product Specifications Modal */}
+      {isSpecsModalOpen && selectedItemForSpecs && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          onClick={() => {
+            setIsSpecsModalOpen(false)
+            setSelectedItemForSpecs(null)
+          }}
+        >
+          <div 
+            className="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border-2 border-[#DAA520]/30"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-[#6B4423] via-[#8B5A3C] to-[#6B4423] p-4 border-b-2 border-[#4A2F1A] relative">
+              <button
+                onClick={() => {
+                  setIsSpecsModalOpen(false)
+                  setSelectedItemForSpecs(null)
+                }}
+                className="absolute right-3 top-3 p-1 hover:bg-[#4A2F1A] rounded-full transition-colors"
+              >
+                <X className="w-5 h-5 text-white" />
+              </button>
+              <div className="text-center px-8">
+                <h3 className="text-lg font-bold text-[#F5DEB3] line-clamp-2">
+                  {selectedItemForSpecs.giftName}
+                </h3>
+                <p className="text-sm text-[#DAA520] mt-1 font-semibold">Additional Specifications</p>
+              </div>
+            </div>
+
+            {/* Specifications List - Only show specs not displayed in card (after first 5) */}
+            <div className="p-4 overflow-y-auto max-h-[60vh] bg-gradient-to-b from-[#F5F1E8] to-white">
+              <div className="grid grid-cols-1 gap-3">
+                {(() => {
+                  // Get all valid specifications
+                  const allSpecs = selectedItemForSpecs.specifications || selectedItemForSpecs.attributes || {}
+                  const validSpecs = Object.entries(allSpecs).filter(([key, value]) => {
+                    if (!value || value === 'null' || value === 'undefined') return false
+                    const strValue = String(value).trim()
+                    if (strValue.length === 0 || strValue.length > 200) return false
+                    const lowerKey = key.toLowerCase()
+                    const garbageKeys = ['asin', 'item model number', 'date first available', 'department', 'manufacturer']
+                    if (garbageKeys.some(g => lowerKey.includes(g))) return false
+                    return true
+                  })
+                  
+                  // Show only specs after the first 5 (those not shown in the card)
+                  const additionalSpecs = validSpecs.slice(5)
+                  
+                  if (additionalSpecs.length === 0) {
+                    return (
+                      <div className="text-center py-8 text-[#8B5A3C]">
+                        No additional specifications available.
+                      </div>
+                    )
+                  }
+                  
+                  return additionalSpecs.map(([key, value]) => (
+                    <div 
+                      key={key} 
+                      className="bg-gradient-to-r from-[#6B4423]/10 via-[#8B5A3C]/10 to-[#6B4423]/10 rounded-lg p-3 border border-[#8B5A3C]/20"
+                    >
+                      <p className="text-xs font-bold text-[#6B4423] capitalize mb-1">
+                        {key.replace(/([A-Z])/g, ' $1').trim()}
+                      </p>
+                      <p className="text-sm text-[#654321]">{String(value)}</p>
+                    </div>
+                  ))
+                })()}
+              </div>
+            </div>
+
+            {/* Modal Footer - Same as header color */}
+            <div className="bg-gradient-to-r from-[#6B4423] via-[#8B5A3C] to-[#6B4423] w-full h-[50px] border-t-2 border-[#4A2F1A]">
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Share Modal - for sharing wishlist items via multiple channels */}
+      <ShareModal
+        isOpen={shareModalOpen}
+        onClose={closeShareModal}
+        wishlistId={shareItem?.wishlistId || ""}
+        wishlistTitle="My Wishlist"
+        productId={shareItem?.id}
+        productName={shareItem?.giftName}
+      />
     </div>
   )
 }

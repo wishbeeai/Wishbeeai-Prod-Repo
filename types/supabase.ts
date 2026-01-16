@@ -176,6 +176,47 @@ export interface Database {
           created_at?: string
         }
       }
+      share_links: {
+        Row: {
+          id: string
+          token: string
+          wishlist_id: string | null
+          product_id: string | null
+          created_by_user_id: string
+          access_level: 'view' | 'contribute'
+          expires_at: string | null
+          created_at: string
+          updated_at: string | null
+          view_count: number
+          last_viewed_at: string | null
+        }
+        Insert: {
+          id?: string
+          token: string
+          wishlist_id?: string | null
+          product_id?: string | null
+          created_by_user_id: string
+          access_level?: 'view' | 'contribute'
+          expires_at?: string | null
+          created_at?: string
+          updated_at?: string | null
+          view_count?: number
+          last_viewed_at?: string | null
+        }
+        Update: {
+          id?: string
+          token?: string
+          wishlist_id?: string | null
+          product_id?: string | null
+          created_by_user_id?: string
+          access_level?: 'view' | 'contribute'
+          expires_at?: string | null
+          created_at?: string
+          updated_at?: string | null
+          view_count?: number
+          last_viewed_at?: string | null
+        }
+      }
     }
     Views: {
       [_ in never]: never
@@ -195,14 +236,20 @@ export type Wishlist = Database['public']['Tables']['wishlists']['Row']
 export type WishlistItem = Database['public']['Tables']['wishlist_items']['Row']
 export type GroupGift = Database['public']['Tables']['group_gifts']['Row']
 export type Contribution = Database['public']['Tables']['contributions']['Row']
+export type ShareLink = Database['public']['Tables']['share_links']['Row']
 
 export type WishlistInsert = Database['public']['Tables']['wishlists']['Insert']
 export type WishlistItemInsert = Database['public']['Tables']['wishlist_items']['Insert']
 export type GroupGiftInsert = Database['public']['Tables']['group_gifts']['Insert']
 export type ContributionInsert = Database['public']['Tables']['contributions']['Insert']
+export type ShareLinkInsert = Database['public']['Tables']['share_links']['Insert']
 
 export type WishlistUpdate = Database['public']['Tables']['wishlists']['Update']
 export type WishlistItemUpdate = Database['public']['Tables']['wishlist_items']['Update']
 export type GroupGiftUpdate = Database['public']['Tables']['group_gifts']['Update']
 export type ContributionUpdate = Database['public']['Tables']['contributions']['Update']
+export type ShareLinkUpdate = Database['public']['Tables']['share_links']['Update']
+
+// Share link access levels
+export type ShareAccessLevel = 'view' | 'contribute'
 
