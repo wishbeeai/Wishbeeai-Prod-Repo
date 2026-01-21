@@ -1,4 +1,5 @@
 import { generateObject } from "ai"
+import { openai } from "@ai-sdk/openai"
 import { z } from "zod"
 
 export async function POST(req: Request) {
@@ -6,7 +7,7 @@ export async function POST(req: Request) {
     const { analyticsData, contributionTrend, timeRange } = await req.json()
 
     const { object } = await generateObject({
-      model: "openai/gpt-4o-mini",
+      model: openai("gpt-4o-mini"),
       schema: z.object({
         keyFindings: z.array(z.string()).describe("3-5 key insights from the analytics data"),
         recommendations: z.array(z.string()).describe("3-5 actionable recommendations"),

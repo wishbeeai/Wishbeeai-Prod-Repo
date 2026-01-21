@@ -20,13 +20,6 @@ export default function WishlistPage() {
       <Header />
 
       <div className="container mx-auto px-4 py-12">
-        <div className="mb-8 text-center">
-          <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-gray-900 mb-2">My Wishlist</h1>
-          <p className="text-xs sm:text-sm md:text-base lg:text-lg text-gray-600">
-            View and manage your saved wishlist items
-          </p>
-        </div>
-
         <MyWishlistDisplay />
       </div>
 

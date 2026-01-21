@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server"
 import { generateText } from "ai"
+import { openai } from "@ai-sdk/openai"
 
 export async function POST(request: Request) {
   try {
     const { productName, description, category } = await request.json()
 
     const { text } = await generateText({
-      model: "openai/gpt-4o-mini",
+      model: openai("gpt-4o-mini"),
       prompt: `You are a product classification and attribute expert. Analyze this product and determine the most important attributes a buyer needs to make an informed purchase decision.
 
 Product Name: ${productName}

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { generateObject } from "ai"
+import { openai } from "@ai-sdk/openai"
 import { z } from "zod"
 
 const ProductSchema = z.object({
@@ -46,7 +47,7 @@ export async function POST(request: Request) {
     console.log("[v0] Searching for products:", query)
 
     const { object } = await generateObject({
-      model: "openai/gpt-4o-mini",
+      model: openai("gpt-4o-mini"),
       schema: ProductsResponseSchema,
       prompt: `You are a shopping assistant helping users find real, currently available products from trusted retailers.
 

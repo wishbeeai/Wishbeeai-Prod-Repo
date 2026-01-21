@@ -18,27 +18,22 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 
-export default function GroupsPage() {
-  const [groups, setGroups] = useState([
-    {
-      id: 1,
-      name: "Family Circle",
-      members: 12,
-      activeGifts: 2,
-      created: "2024-01-15",
-      image: "/images/groups.png",
-    },
-    {
-      id: 2,
-      name: "Work Friends",
-      members: 8,
-      activeGifts: 1,
-      created: "2024-03-20",
-      image: "/diverse-professional-team.png",
-    },
-  ])
+interface Group {
+  id: string
+  name: string
+  members: number
+  activeGifts: number
+  created: string
+  image: string
+  description?: string
+  isOwner?: boolean
+}
 
-  const [selectedGroup, setSelectedGroup] = useState<number | null>(null)
+export default function GroupsPage() {
+  const [groups, setGroups] = useState<Group[]>([])
+  const [isLoadingGroups, setIsLoadingGroups] = useState(true)
+
+  const [selectedGroup, setSelectedGroup] = useState<string | null>(null)
   const [aiInsights, setAiInsights] = useState<any>(null)
   const [upcomingOccasions, setUpcomingOccasions] = useState<any>(null)
   const [loadingInsights, setLoadingInsights] = useState(false)
@@ -47,7 +42,38 @@ export default function GroupsPage() {
 
   const router = useRouter()
 
-  const fetchGroupInsights = async (groupId: number) => {
+  // Fetch groups from API
+  const fetchGroups = async () => {
+    setIsLoadingGroups(true)
+    try {
+      const response = await fetch('/api/groups')
+      const data = await response.json()
+      
+      if (data.success && data.groups) {
+        setGroups(data.groups.map((g: any) => ({
+          id: g.id,
+          name: g.groupName,
+          members: g.memberCount || 0,
+          activeGifts: 0, // TODO: Fetch from gifts table
+          created: g.createdDate,
+          image: g.groupPhoto || '/images/groups.png',
+          description: g.description,
+          isOwner: g.isOwner,
+        })))
+      }
+    } catch (error) {
+      console.error('Error fetching groups:', error)
+      toast.error('Failed to load groups')
+    } finally {
+      setIsLoadingGroups(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchGroups()
+  }, [])
+
+  const fetchGroupInsights = async (groupId: string) => {
     setLoadingInsights(true)
     try {
       const group = groups.find((g) => g.id === groupId)
@@ -99,14 +125,18 @@ export default function GroupsPage() {
         }),
       })
 
-      if (!response.ok) throw new Error("Failed to detect occasions")
-
       const data = await response.json()
+      
+      if (!response.ok) {
+        throw new Error(data.details || data.error || "Failed to detect occasions")
+      }
+      
       setUpcomingOccasions(data)
       toast.success(`Found ${data.upcomingOccasions?.length || 0} upcoming occasions!`)
     } catch (error) {
       console.error("Error detecting occasions:", error)
-      toast.error("Failed to detect occasions")
+      const message = error instanceof Error ? error.message : "Failed to detect occasions"
+      toast.error(message)
     } finally {
       setLoadingOccasions(false)
     }
@@ -132,9 +162,10 @@ export default function GroupsPage() {
     }
   }
 
-  useEffect(() => {
-    detectOccasions()
-  }, [])
+  // Removed auto-detection on page load - user can click "Detect Occasions" button
+  // useEffect(() => {
+  //   detectOccasions()
+  // }, [])
 
   return (
     <div className="min-h-screen bg-[#F5F1E8]">
@@ -324,7 +355,36 @@ export default function GroupsPage() {
         )}
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {groups.map((group) => (
+          {/* Loading State */}
+          {isLoadingGroups && (
+            <div className="col-span-full flex justify-center py-12">
+              <div className="flex items-center gap-3 text-[#8B4513]">
+                <div className="w-6 h-6 border-2 border-[#DAA520] border-t-transparent rounded-full animate-spin" />
+                Loading groups...
+              </div>
+            </div>
+          )}
+
+          {/* Empty State */}
+          {!isLoadingGroups && groups.length === 0 && (
+            <div className="col-span-full text-center py-12">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[#DAA520]/10 flex items-center justify-center">
+                <Users className="w-8 h-8 text-[#DAA520]" />
+              </div>
+              <h3 className="text-lg font-semibold text-[#654321] mb-2">No groups yet</h3>
+              <p className="text-sm text-[#8B4513]/70 mb-4">Create your first group to start gifting together!</p>
+              <Link
+                href="/groups/create"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] font-semibold rounded-full hover:scale-105 transition-all"
+              >
+                <Users className="w-4 h-4" />
+                Create Group
+              </Link>
+            </div>
+          )}
+
+          {/* Groups List */}
+          {!isLoadingGroups && groups.map((group) => (
             <div key={group.id} className="bg-white rounded-xl shadow-lg border-2 border-[#DAA520]/20 p-6">
               <div className="flex items-center gap-4 mb-4">
                 <img

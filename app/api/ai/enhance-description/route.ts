@@ -1,4 +1,8 @@
-import { generateText } from "ai"
+import Anthropic from "@anthropic-ai/sdk"
+
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+})
 
 export async function POST(req: Request) {
   try {
@@ -26,15 +30,15 @@ Create a compelling, concise product description (100-150 words) that:
 - Is helpful for potential gift-givers
 - Uses engaging, friendly language
 
-Enhanced Description:`
+Return ONLY the enhanced description text, no additional commentary.`
 
-      const { text } = await generateText({
-        model: "openai/gpt-4o-mini",
-        prompt,
-        maxTokens: 250,
-        temperature: 0.7,
+      const message = await anthropic.messages.create({
+        model: "claude-3-haiku-20240307",
+        max_tokens: 250,
+        messages: [{ role: "user", content: prompt }],
       })
 
+      const text = message.content[0].type === "text" ? message.content[0].text : ""
       return Response.json({ enhancedDescription: text.trim() })
     }
 
@@ -77,20 +81,25 @@ Requirements:
 - End with a warm, possibly centered call-to-action
 - DO NOT include placeholder text for dates, locations, or links
 - DO NOT wrap the HTML in code fences or markdown formatting
-- Return raw HTML only
+- Return raw HTML only`
 
-Enhanced description:`
-
-    const { text } = await generateText({
-      model: "openai/gpt-4o-mini",
-      prompt,
-      maxTokens: 300,
-      temperature: 0.8,
+    const message = await anthropic.messages.create({
+      model: "claude-3-haiku-20240307",
+      max_tokens: 400,
+      messages: [{ role: "user", content: prompt }],
     })
 
+    const text = message.content[0].type === "text" ? message.content[0].text : ""
     return Response.json({ enhancedDescription: text })
   } catch (error) {
     console.error("[v0] Error enhancing description:", error)
-    return Response.json({ error: "Failed to enhance description" }, { status: 500 })
+    const errorMessage = error instanceof Error ? error.message : "Unknown error"
+    
+    return Response.json({ 
+      error: "Failed to enhance description",
+      details: errorMessage.includes("API key") 
+        ? "AI API key not configured. Please set ANTHROPIC_API_KEY."
+        : errorMessage
+    }, { status: 500 })
   }
 }

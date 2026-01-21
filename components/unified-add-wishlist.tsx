@@ -69,13 +69,17 @@ function cleanHtmlEntities(value: string): string {
 function getFilteredSpecifications(attributes: Record<string, any> | undefined): Array<[string, string]> {
   if (!attributes) return []
   
-  // Only exclude variant-related keys (same as trending page)
+  // Only exclude variant-related keys that are selection options, NOT product info
+  // Brand, memoryStorageCapacity, screenSize, displayResolutionMaximum should be INCLUDED
   const excludedKeys = [
-    'color', 'size', 'style', 'brand', 'sizeOptions', 'colorVariants', 
-    'combinedVariants', 'styleOptions', 'styleName', 'patternName'
+    'sizeOptions', 'colorVariants', 'combinedVariants', 'styleOptions', 
+    'styleName', 'patternName', 'image', 'title', 'notes'
   ]
   
-  return Object.entries(attributes)
+  // Priority specs to show first (in order)
+  const prioritySpecs = ['brand', 'model', 'memoryStorageCapacity', 'screenSize', 'displayResolutionMaximum', 'operatingSystem']
+  
+  const allSpecs = Object.entries(attributes)
     .filter(([key, value]) => {
       const keyLower = key.toLowerCase()
       // Exclude if in explicit list
@@ -84,16 +88,31 @@ function getFilteredSpecifications(attributes: Record<string, any> | undefined):
       if (value === null || value === undefined || value === '') return false
       // Exclude arrays and objects
       if (Array.isArray(value) || typeof value === 'object') return false
-      // Exclude garbage values
-      if (isGarbageValue(String(value))) return false
+      // Exclude garbage values (allow longer strings for features)
+      if (isGarbageValue(String(value), key)) return false
       return true
     })
     .map(([key, value]) => [key, cleanHtmlEntities(String(value))] as [string, string])
+  
+  // Sort priority specs first
+  allSpecs.sort((a, b) => {
+    const aIndex = prioritySpecs.findIndex(p => a[0].toLowerCase().includes(p.toLowerCase()))
+    const bIndex = prioritySpecs.findIndex(p => b[0].toLowerCase().includes(p.toLowerCase()))
+    if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex
+    if (aIndex !== -1) return -1
+    if (bIndex !== -1) return 1
+    return 0
+  })
+  
+  return allSpecs
 }
 
 // Helper to check if a value is garbage data
-function isGarbageValue(value: string): boolean {
-  if (!value || value.length > 200) return true
+function isGarbageValue(value: string, key?: string): boolean {
+  if (!value) return true
+  // Allow longer strings for features/description fields
+  const maxLength = key && (key.toLowerCase().includes('feature') || key.toLowerCase().includes('description')) ? 500 : 200
+  if (value.length > maxLength) return true
   const garbagePatterns = [
     /items?\s+in\s+cart/i,
     /percent\s+of\s+reviews/i,
@@ -362,6 +381,7 @@ export function UnifiedAddWishlist() {
         const response = await fetch('/api/extension/save-variants')
         if (response.ok) {
           const data = await response.json()
+          console.log('[Alt Clip] 📦 Full API response:', JSON.stringify(data, null, 2).substring(0, 500))
           if (data.variants && Object.keys(data.variants).length > 0) {
             console.log('[Alt Clip] Received variants:', data.variants)
             
@@ -376,10 +396,13 @@ export function UnifiedAddWishlist() {
               /^\d+\s+option/i,           // "1 option..."
               /see available/i,           // "See available options"
               /^\d+$/,                    // Pure numbers
+              /^price$/i,                 // Just "price"
+              /^shipping$/i,              // Just "shipping"
+              /^delivery$/i,              // Just "delivery"
             ]
             
-            // Valid variant keys we want to keep
-            const validVariantKeys = ['color', 'size', 'style', 'set', 'configuration', 'pattern', 'material', 'capacity', 'band', 'connector', 'type']
+            // Accept any variant key from the extension - be permissive, not restrictive
+            // The extension knows what it's extracting, we just clean the values
             
             for (const [key, value] of Object.entries(data.variants)) {
               if (!value || typeof value !== 'string') continue
@@ -392,13 +415,13 @@ export function UnifiedAddWishlist() {
                 continue
               }
               
-              // Skip if key is not a valid variant key
-              if (!validVariantKeys.some(vk => keyLower.includes(vk))) {
-                console.log('[Alt Clip] Skipping non-variant key:', key)
+              // Skip very short or very long keys (likely garbage)
+              if (key.length < 2 || key.length > 50) {
+                console.log('[Alt Clip] Skipping invalid length key:', key)
                 continue
               }
               
-              // FIRST: Clean the value - remove extra whitespace and price info BEFORE checking if it's garbage
+              // Clean the value - remove extra whitespace and price info
               let cleanedValue = value
                 .replace(/\s+/g, ' ')                    // Normalize whitespace
                 .replace(/\$[\d,.]+/g, '')              // Remove prices
@@ -406,24 +429,14 @@ export function UnifiedAddWishlist() {
                 .replace(/see available options?/gi, '') // Remove "see available"
                 .trim()
               
-              // For style/configuration keys, extract just Lightning/USB-C if present
-              if (keyLower.includes('style') || keyLower.includes('configuration') || keyLower.includes('connector')) {
-                // Check for Lightning or USB-C in the value
-                const connectorMatch = cleanedValue.match(/\b(Lightning|USB-C|USB Type-C)\b/i)
-                if (connectorMatch) {
-                  cleanedValue = connectorMatch[1]
-                  console.log('[Alt Clip] Extracted connector type:', cleanedValue)
-                }
-              }
-              
               // Now check if the CLEANED value is still garbage
-              if (!cleanedValue || cleanedValue.length < 2 || cleanedValue.length > 100) {
+              if (!cleanedValue || cleanedValue.length < 1 || cleanedValue.length > 150) {
                 console.log('[Alt Clip] Skipping empty/invalid cleaned value:', key, '=', cleanedValue)
                 continue
               }
               
               // Skip garbage words that are clearly not variant options
-              const garbageWords = ['price', 'option', 'select', 'choose', 'available', 'buy', 'cart', 'add', 'from', 'shipping', 'delivery']
+              const garbageWords = ['price', 'option', 'select', 'choose', 'available', 'buy', 'cart', 'add', 'shipping', 'delivery', 'undefined', 'null']
               if (garbageWords.includes(cleanedValue.toLowerCase())) {
                 console.log('[Alt Clip] Skipping garbage word value:', key, '=', cleanedValue)
                 continue
@@ -438,6 +451,7 @@ export function UnifiedAddWishlist() {
               
               const normalizedKey = normalizeAttributeKey(key)
               normalizedAttributes[normalizedKey] = cleanedValue
+              console.log('[Alt Clip] ✅ Accepted variant:', normalizedKey, '=', cleanedValue)
             }
             
             console.log('[Alt Clip] Cleaned attributes:', normalizedAttributes)
@@ -445,66 +459,23 @@ export function UnifiedAddWishlist() {
             // Found clipped data for Alternative
             setAltAttributes(normalizedAttributes)
             
-            // Check if the clipped image is a valid product image (not a color swatch or placeholder)
-            // Color swatches and placeholders are typically very small images with specific URL patterns
-            const isInvalidProductImage = (imageUrl: string): boolean => {
-              if (!imageUrl) return true
-              const url = imageUrl.toLowerCase()
-              
-              // Amazon color swatch and placeholder patterns
-              // Be careful not to filter out valid product images!
-              const invalidPatterns = [
-                /_us\d{2,3}_/i,       // _US40_, _US50_, etc. (small thumbnails) 
-                /_sx\d{2}_/i,         // _SX38_, etc. (very small - 2 digits only)
-                /_sy\d{2}_/i,         // _SY38_, etc. (very small - 2 digits only)
-                /_ss\d{2}_/i,         // _SS40_, etc. (very small - 2 digits only)
-                /swatch/i,            // Contains "swatch"
-                /\+\+/,               // Contains ++ (like 01++SjnuXRL)
-                /transparent/i,       // Transparent placeholder
-                /blank/i,             // Blank image
-                /placeholder/i,       // Placeholder
-                /spacer/i,            // Spacer image
-                /pixel/i,             // Tracking pixel
-              ]
-              
-              // Check if URL matches any invalid pattern
-              if (invalidPatterns.some(pattern => pattern.test(url))) {
-                return true
-              }
-              
-              // Check if image ID looks like a placeholder
-              const imageIdMatch = url.match(/\/images\/I\/([^.]+)\./i)
-              if (imageIdMatch && imageIdMatch[1]) {
-                const imageId = imageIdMatch[1]
-                // Valid Amazon product images typically have IDs like 41XxYzAbCdE, 71ABcDeFgHi, etc.
-                // They start with digits like 31, 41, 51, 61, 71, 81, 91
-                // Placeholders often start with 0 and have weird IDs like 01++SjnuXRL
-                if (imageId.startsWith('0') && (imageId.includes('+') || imageId.length < 8)) {
-                  console.log('[Alt Clip] Invalid placeholder image ID detected:', imageId)
-                  return true
-                }
-              }
-              
-              return false
-            }
+            // Log what we received
+            console.log('[Alt Clip] Received data.image:', data.image?.substring(0, 120) || 'UNDEFINED')
             
-            // Log received image for debugging
-            console.log('[Alt Clip] Received image URL:', data.image?.substring(0, 100))
-            
-            // Use the clipped image only if it's a valid product image
-            // Do NOT fall back to main product image - Alternative should have its own distinct image
-            if (data.image && !isInvalidProductImage(data.image)) {
+            // Set image - accept any valid URL, be less aggressive with filtering
+            // The server-side already filters swatches, so trust what we receive
+            if (data.image && typeof data.image === 'string' && data.image.startsWith('http')) {
               setAltClippedImage(data.image)
               console.log('[Alt Clip] ✅ Using clipped product image:', data.image?.substring(0, 80))
             } else {
-              // Log why the image was rejected
-              if (data.image) {
-                const imageIdMatch = data.image.match(/\/images\/I\/([^.]+)\./i)
-                console.log('[Alt Clip] ⚠️ Image rejected - URL:', data.image?.substring(0, 80))
-                console.log('[Alt Clip] ⚠️ Image ID:', imageIdMatch?.[1] || 'not found')
+              // Fallback: use the main product image if no clipped image received
+              // This happens when the extension doesn't capture the image properly
+              if (extractedProduct?.imageUrl) {
+                setAltClippedImage(extractedProduct.imageUrl)
+                console.log('[Alt Clip] ⚠️ No clipped image - using main product image as fallback:', extractedProduct.imageUrl?.substring(0, 80))
+              } else {
+                console.log('[Alt Clip] ⚠️ No valid image received and no fallback available')
               }
-              // Keep Alternative image empty if clipped image is invalid
-              console.log('[Alt Clip] Clipped image is invalid/placeholder, Alternative image will be empty')
             }
             if (data.title) setAltClippedTitle(data.title)
             setIsWaitingForAltClip(false)
@@ -711,8 +682,11 @@ export function UnifiedAddWishlist() {
       
       // Build dynamic variants object preserving original labels from the retailer
       // Only include variant-like attributes (not specifications)
-      // Note: 'material' removed - it's typically a specification, not a variant option
-      const variantKeys = ['color', 'size', 'style', 'configuration', 'set', 'pattern', 'band', 'capacity', 'connector', 'type', 'finish']
+      // These are SELECTABLE options on the product page (color swatches, dropdowns, etc.)
+      // NOTE: 'size' and 'set' are intentionally EXCLUDED:
+      // - Size: For electronics, different storage capacities are different products (ASINs), not variants
+      // - Set: Duplicates Configuration (AppleCare options)
+      const variantKeys = ['color', 'style', 'configuration', 'pattern', 'band', 'connector', 'type', 'finish']
       const specificationPatterns = [
         /\d+\s*(gb|tb|mb)/i, // Storage specs
         /\d+\s*(mah|wh)/i,   // Battery specs
@@ -1192,8 +1166,11 @@ export function UnifiedAddWishlist() {
       
       // Build dynamic variants object preserving original labels from the retailer
       // Only include variant-like attributes (not specifications)
-      // Note: 'material' removed - it's typically a specification, not a variant option
-      const variantKeys = ['color', 'size', 'style', 'configuration', 'set', 'pattern', 'band', 'capacity', 'connector', 'type', 'finish']
+      // These are SELECTABLE options on the product page (color swatches, dropdowns, etc.)
+      // NOTE: 'size' and 'set' are intentionally EXCLUDED:
+      // - Size: For electronics, different storage capacities are different products (ASINs), not variants
+      // - Set: Duplicates Configuration (AppleCare options)
+      const variantKeys = ['color', 'style', 'configuration', 'pattern', 'band', 'connector', 'type', 'finish']
       const specificationPatterns = [
         /\d+\s*(gb|tb|mb)/i, // Storage specs
         /\d+\s*(mah|wh)/i,   // Battery specs
@@ -2292,9 +2269,49 @@ export function UnifiedAddWishlist() {
                         ))
                       }
                       {!isEditingSpecs && Object.keys(editableSpecs).length > 5 && (
-                        <p className="text-[10px] font-bold text-[#DAA520] mt-1">
-                          +{Object.keys(editableSpecs).length - 5} more specs
-                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setIsEditingSpecs(true)}
+                          className="text-[10px] font-bold text-[#DAA520] hover:text-[#B8860B] mt-1 cursor-pointer transition-colors text-left"
+                        >
+                          +{Object.keys(editableSpecs).length - 5} more specs →
+                        </button>
+                      )}
+                      {/* Add Field button - visible in edit mode */}
+                      {isEditingSpecs && (
+                        <div className="mt-2 pt-2 border-t border-[#8B5A3C]/20">
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              placeholder="Field name"
+                              id="newSpecKey"
+                              className="w-[100px] px-2 py-1 text-xs border border-[#8B5A3C]/30 rounded bg-white focus:outline-none focus:border-[#DAA520] placeholder:text-gray-400"
+                            />
+                            <input
+                              type="text"
+                              placeholder="Value"
+                              id="newSpecValue"
+                              className="flex-1 px-2 py-1 text-xs border border-[#8B5A3C]/30 rounded bg-white focus:outline-none focus:border-[#DAA520] placeholder:text-gray-400"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const keyInput = document.getElementById('newSpecKey') as HTMLInputElement
+                                const valueInput = document.getElementById('newSpecValue') as HTMLInputElement
+                                if (keyInput && valueInput && keyInput.value.trim() && valueInput.value.trim()) {
+                                  const newKey = keyInput.value.trim().replace(/\s+/g, '')
+                                  setEditableSpecs(prev => ({ ...prev, [newKey]: valueInput.value.trim() }))
+                                  keyInput.value = ''
+                                  valueInput.value = ''
+                                }
+                              }}
+                              className="px-2 py-1 bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] text-xs font-semibold rounded hover:from-[#F4C430] hover:to-[#DAA520] transition-all flex items-center gap-1 shadow-sm hover:shadow-md"
+                            >
+                              <Plus className="w-3 h-3" />
+                              Add
+                            </button>
+                          </div>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -2313,11 +2330,28 @@ export function UnifiedAddWishlist() {
 
                     {/* I Wish Option Card - Auto-extracted variant options (like modal) */}
                     <div className="rounded-lg border-2 border-[#B8860B] bg-gradient-to-r from-[#DAA520]/30 to-[#F4C430]/25 shadow-md p-3">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-gradient-to-r from-[#B8860B] via-[#DAA520] to-[#F4C430] text-white flex items-center gap-1 shadow-sm">
-                          <Heart className="w-3 h-3 fill-red-500 text-red-500" /> I Wish
-                        </span>
-                        <span className="text-[10px] text-red-500 font-medium">* Required</span>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-gradient-to-r from-[#B8860B] via-[#DAA520] to-[#F4C430] text-white flex items-center gap-1 shadow-sm">
+                            <Heart className="w-3 h-3 fill-red-500 text-red-500" /> I Wish
+                          </span>
+                          <span className="text-[10px] text-red-500 font-medium">* Required</span>
+                        </div>
+                        {/* Clear I Wish section */}
+                        {(Object.keys(iWishVariants).length > 0 || likeCustomFields.length > 0 || likeNotes) && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIWishVariants({})
+                              setLikeCustomFields([])
+                              setLikeNotes("")
+                            }}
+                            className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full transition-colors"
+                            title="Clear I Wish section"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                       </div>
                       
                       <p className="text-[10px] text-[#8B6914] bg-[#DAA520]/10 px-2 py-1 rounded-md border border-[#DAA520]/20 italic mb-2">
@@ -2395,7 +2429,7 @@ export function UnifiedAddWishlist() {
                       <button
                         type="button"
                         onClick={() => setLikeCustomFields(prev => [...prev, { id: Date.now().toString(), key: '', value: '' }])}
-                        className="flex items-center gap-1 text-[10px] text-[#8B6914] hover:text-[#654321] font-medium mt-2"
+                        className="flex items-center gap-1 px-2 py-1 text-[10px] bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] font-semibold rounded-md hover:from-[#F4C430] hover:to-[#DAA520] transition-all shadow-sm hover:shadow-md mt-2"
                       >
                         <Plus className="w-3 h-3" />
                         Add Custom Field
@@ -2433,6 +2467,24 @@ export function UnifiedAddWishlist() {
                             ✓ Alternative
                           </span>
                           <span className="text-[10px] text-gray-500 font-medium">Optional</span>
+                          {/* Clear Alternative section */}
+                          {(altClippedImage || Object.keys(altAttributes).length > 0 || altCustomFields.length > 0 || altNotes) && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAltClippedImage(null)
+                                setAltClippedTitle(null)
+                                setAltAttributes({})
+                                setAltCustomFields([])
+                                setAltNotes("")
+                                setIsWaitingForAltClip(false)
+                              }}
+                              className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full transition-colors"
+                              title="Clear Alternative section"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                         <a
                           href={extractedProduct.productLink || productInput}
@@ -2541,7 +2593,7 @@ export function UnifiedAddWishlist() {
                       <button
                         type="button"
                         onClick={() => setAltCustomFields(prev => [...prev, { id: Date.now().toString(), key: '', value: '' }])}
-                        className="flex items-center gap-1 text-[10px] text-[#92400E] hover:text-[#78350F] font-medium mt-2"
+                        className="flex items-center gap-1 px-2 py-1 text-[10px] bg-gradient-to-r from-[#F59E0B] to-[#FBBF24] text-[#78350F] font-semibold rounded-md hover:from-[#FBBF24] hover:to-[#F59E0B] transition-all shadow-sm hover:shadow-md mt-2"
                       >
                         <Plus className="w-3 h-3" />
                         Add Custom Field

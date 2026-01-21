@@ -155,6 +155,9 @@ export interface Database {
           contributor_id: string
           amount: number
           message: string | null
+          role: 'organizer' | 'contributor'
+          contributor_name: string | null
+          contributor_email: string | null
           created_at: string
         }
         Insert: {
@@ -164,6 +167,9 @@ export interface Database {
           contributor_id: string
           amount: number
           message?: string | null
+          role?: 'organizer' | 'contributor'
+          contributor_name?: string | null
+          contributor_email?: string | null
           created_at?: string
         }
         Update: {
@@ -173,6 +179,9 @@ export interface Database {
           contributor_id?: string
           amount?: number
           message?: string | null
+          role?: 'organizer' | 'contributor'
+          contributor_name?: string | null
+          contributor_email?: string | null
           created_at?: string
         }
       }
@@ -252,4 +261,7 @@ export type ShareLinkUpdate = Database['public']['Tables']['share_links']['Updat
 
 // Share link access levels
 export type ShareAccessLevel = 'view' | 'contribute'
+
+// Contributor role types
+export type ContributorRole = 'organizer' | 'contributor'
 

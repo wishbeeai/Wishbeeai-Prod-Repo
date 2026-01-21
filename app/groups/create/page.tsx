@@ -207,6 +207,11 @@ export default function CreateGroupPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
+    if (!groupName.trim()) {
+      toast.error("Please enter a group name")
+      return
+    }
+
     if (memberEmails.length === 0) {
       toast.error("Please add at least one member to the group")
       return
@@ -271,16 +276,20 @@ export default function CreateGroupPage() {
         }),
       })
 
-      if (!response.ok) throw new Error("Failed to enhance description")
-
       const data = await response.json()
+      
+      if (!response.ok) {
+        throw new Error(data.details || data.error || "Failed to enhance description")
+      }
+      
       if (editorRef.current) {
         editorRef.current.innerHTML = data.enhancedDescription
         setDescription(data.enhancedDescription)
       }
       toast.success("Description enhanced with AI!")
     } catch (error) {
-      toast.error("Failed to enhance description")
+      const message = error instanceof Error ? error.message : "Failed to enhance description"
+      toast.error(message)
       console.error("[v0] Error enhancing description:", error)
     } finally {
       setIsEnhancingDescription(false)
@@ -304,13 +313,17 @@ export default function CreateGroupPage() {
         }),
       })
 
-      if (!response.ok) throw new Error("Failed to generate photo")
-
       const data = await response.json()
+      
+      if (!response.ok) {
+        throw new Error(data.details || data.error || "Failed to generate photo")
+      }
+      
       setImagePreview(data.imageUrl)
       toast.success("Group photo generated with AI!")
     } catch (error) {
-      toast.error("Failed to generate photo")
+      const message = error instanceof Error ? error.message : "Failed to generate photo"
+      toast.error(message)
       console.error("[v0] Error generating photo:", error)
     } finally {
       setIsGeneratingName(false)

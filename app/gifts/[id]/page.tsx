@@ -1,8 +1,6 @@
 "use client"
 
-import { useEffect } from "react"
-
-import { useState } from "react"
+import { useEffect, useState } from "react"
 
 import {
   ArrowLeft,
@@ -17,6 +15,11 @@ import {
   Share2,
   ShoppingBag,
   Gift,
+  Copy,
+  Mail,
+  MessageCircle,
+  Check,
+  ExternalLink,
 } from "lucide-react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
@@ -128,6 +131,9 @@ export default function GiftDetailPage() {
   const [aiInsights, setAiInsights] = useState<Record<string, string>>({})
   const [favorites, setFavorites] = useState<Set<string>>(new Set())
   const [showAiRecommendations, setShowAiRecommendations] = useState(false)
+  const [magicLink, setMagicLink] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+  const [showShareModal, setShowShareModal] = useState(false)
 
   useEffect(() => {
     console.log("[v0] Gift detail page - giftId:", giftId)
@@ -137,7 +143,18 @@ export default function GiftDetailPage() {
       router.replace("/gifts/create")
       return
     }
-    // Removed browse redirect - let Next.js handle it naturally
+    
+    // Check for magic link in session storage
+    if (giftId && giftId !== "browse" && giftId !== "create") {
+      const storedMagicLink = sessionStorage.getItem(`gift_${giftId}_magicLink`)
+      if (storedMagicLink) {
+        setMagicLink(storedMagicLink)
+        // Show share modal automatically for newly created gifts
+        setShowShareModal(true)
+        // Clear from session storage after retrieving
+        sessionStorage.removeItem(`gift_${giftId}_magicLink`)
+      }
+    }
   }, [giftId, router])
 
   useEffect(() => {
@@ -333,9 +350,9 @@ export default function GiftDetailPage() {
               <Button
                 onClick={handleAiSearch}
                 disabled={loading || !searchQuery.trim()}
-                className="bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 hover:from-amber-600 hover:via-orange-600 hover:to-rose-600 text-white font-semibold border-2 border-amber-400/30 shadow-[0_8px_30px_rgba(251,146,60,0.4)] hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed rounded-full px-4 sm:px-6 py-2 sm:py-3 text-xs sm:text-sm md:text-base w-full sm:w-auto"
+                className="bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 hover:from-amber-600 hover:via-orange-600 hover:to-rose-600 text-white font-medium border border-amber-400/30 shadow-sm hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed rounded-md px-3 py-1.5 text-[10px] w-full sm:w-auto"
               >
-                <Sparkles className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                <Sparkles className="w-3 h-3 mr-1" />
                 AI Search
               </Button>
             </div>
@@ -348,15 +365,15 @@ export default function GiftDetailPage() {
                 <ShoppingBag className="w-3.5 h-3.5 sm:w-5 sm:h-5 text-amber-600" />
                 <h3 className="font-bold text-amber-900 text-[11px] sm:text-sm md:text-base">Categories</h3>
               </div>
-              <div className="flex flex-wrap gap-1.5 sm:gap-2">
+              <div className="flex flex-wrap gap-1">
                 {categories.map((category) => (
                   <button
                     key={category}
                     onClick={() => setSelectedCategory(category)}
-                    className={`px-2 sm:px-4 py-1 sm:py-2 rounded-full text-[10px] sm:text-sm font-semibold transition-all border-2 ${
+                    className={`px-2 py-1 rounded-md text-[10px] font-medium transition-all border ${
                       selectedCategory === category
-                        ? "bg-gradient-to-r from-yellow-400 via-amber-500 to-orange-400 text-white border-transparent shadow-lg shadow-amber-300/50 scale-105"
-                        : "bg-white text-amber-700 border-amber-200 hover:border-amber-400 hover:bg-gradient-to-r hover:from-amber-50 hover:to-yellow-50"
+                        ? "bg-gradient-to-r from-yellow-400 via-amber-500 to-orange-400 text-white border-transparent shadow-sm"
+                        : "bg-white text-amber-700 border-amber-200 hover:border-amber-400 hover:bg-amber-50"
                     }`}
                   >
                     {category}
@@ -478,7 +495,7 @@ export default function GiftDetailPage() {
                       </div>
                     </div>
 
-                    <div className="flex gap-1 sm:gap-2 pt-3 border-t border-amber-100">
+                    <div className="flex gap-1 pt-2 border-t border-amber-100">
                       <Button
                         onClick={(e) => {
                           e.preventDefault()
@@ -486,16 +503,16 @@ export default function GiftDetailPage() {
                         }}
                         variant="outline"
                         size="sm"
-                        className={`flex-1 text-[9px] sm:text-xs md:text-sm px-1 sm:px-3 py-1 sm:py-2 transition-all ${
+                        className={`flex-1 text-[10px] px-1.5 py-1 transition-all rounded-md ${
                           favorites.has(gift.id)
-                            ? "bg-gradient-to-r from-red-500 via-red-600 to-rose-500 text-white border-transparent shadow-lg shadow-red-500/50"
-                            : "border-amber-300 text-amber-700 hover:bg-gradient-to-r hover:from-amber-50 hover:to-yellow-50 hover:border-amber-400"
+                            ? "bg-gradient-to-r from-red-500 to-rose-500 text-white border-transparent shadow-sm"
+                            : "border-amber-300 text-amber-700 hover:bg-amber-50 hover:border-amber-400"
                         }`}
                       >
                         <Heart
-                          className={`w-2.5 h-2.5 sm:w-4 sm:h-4 mr-0.5 sm:mr-1 ${favorites.has(gift.id) ? "fill-white" : ""}`}
+                          className={`w-3 h-3 mr-0.5 ${favorites.has(gift.id) ? "fill-white" : ""}`}
                         />
-                        <span className="hidden xs:inline">Save</span>
+                        Save
                       </Button>
                       <Button
                         onClick={(e) => {
@@ -504,20 +521,20 @@ export default function GiftDetailPage() {
                         }}
                         variant="outline"
                         size="sm"
-                        className="flex-1 border-orange-300 text-orange-700 hover:bg-gradient-to-r hover:from-orange-400 hover:via-rose-400 hover:to-pink-500 hover:text-white hover:border-transparent transition-all text-[9px] sm:text-xs md:text-sm px-1 sm:px-3 py-1 sm:py-2"
+                        className="flex-1 border-orange-300 text-orange-700 hover:bg-orange-50 hover:border-orange-400 transition-all text-[10px] px-1.5 py-1 rounded-md"
                       >
-                        <Share2 className="w-2.5 h-2.5 sm:w-4 sm:h-4 mr-0.5 sm:mr-1" />
-                        <span className="hidden xs:inline">Share</span>
+                        <Share2 className="w-3 h-3 mr-0.5" />
+                        Share
                       </Button>
                       <Button
                         onClick={(e) => {
                           e.preventDefault()
                           getAiInsight(gift.id, gift.name, gift.category)
                         }}
-                        className="flex-1 bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 hover:from-amber-600 hover:via-orange-600 hover:to-rose-600 text-white font-semibold border-2 border-amber-400/30 shadow-[0_8px_30px_rgba(251,146,60,0.4)] hover:shadow-xl transition-all rounded-full text-[9px] sm:text-xs md:text-sm px-1 sm:px-3 py-1 sm:py-2"
+                        className="flex-1 bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 hover:from-amber-600 hover:via-orange-600 hover:to-rose-600 text-white font-medium border border-amber-400/30 shadow-sm hover:shadow-md transition-all rounded-md text-[10px] px-1.5 py-1"
                       >
-                        <Sparkles className="w-2.5 h-2.5 sm:w-4 sm:h-4 mr-0.5 sm:mr-1" />
-                        <span className="hidden xs:inline">AI Insight</span>
+                        <Sparkles className="w-3 h-3 mr-0.5" />
+                        AI
                       </Button>
                     </div>
                   </div>
@@ -526,16 +543,14 @@ export default function GiftDetailPage() {
             </div>
           )}
 
-          <div className="mt-8 sm:mt-12 text-center">
-            <p className="text-amber-700 mb-4 text-xs sm:text-sm md:text-base">Can't find what you're looking for?</p>
+          <div className="mt-6 text-center">
+            <p className="text-amber-700 mb-3 text-[10px]">Can't find what you're looking for?</p>
             <Link href="/gifts/create">
-              <Button className="group relative w-auto px-4 py-1.5 sm:px-6 sm:py-3 bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#8B4513] rounded-full font-bold overflow-hidden transition-all duration-300 shadow-[0_8px_30px_rgba(218,165,32,0.4)] hover:shadow-[0_12px_40px_rgba(218,165,32,0.6)] hover:scale-105 hover:from-[#F4C430] hover:to-[#DAA520] active:scale-95 text-xs sm:text-sm md:text-base border-2 border-[#DAA520]/30">
-                <span className="relative z-10 flex items-center justify-center gap-1.5 sm:gap-2">
+              <Button className="group relative w-auto px-3 py-1.5 bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#8B4513] rounded-md font-semibold overflow-hidden transition-all duration-300 shadow-sm hover:shadow-md hover:scale-105 hover:from-[#F4C430] hover:to-[#DAA520] active:scale-95 text-[10px] border border-[#DAA520]/30">
+                <span className="relative z-10 flex items-center justify-center gap-1">
                   Create Your Own Gift Collection
-                  <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4" />
+                  <ArrowRight className="w-3 h-3" />
                 </span>
-                {/* Shimmer effect */}
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
               </Button>
             </Link>
           </div>
@@ -627,7 +642,123 @@ export default function GiftDetailPage() {
     toast.success("Opening contribution form...")
   }
 
+  const copyMagicLink = async () => {
+    if (magicLink) {
+      await navigator.clipboard.writeText(magicLink)
+      setCopied(true)
+      toast.success("Link copied to clipboard!")
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
+
+  const shareViaEmail = () => {
+    if (magicLink) {
+      const subject = encodeURIComponent(`You're invited to contribute to ${gift.name}`)
+      const body = encodeURIComponent(`Hi!\n\nYou're invited to contribute to a special gift:\n\n${gift.name}\n\n${gift.description}\n\nClick here to contribute: ${magicLink}\n\nThank you!`)
+      window.open(`mailto:?subject=${subject}&body=${body}`)
+    }
+  }
+
+  const shareViaWhatsApp = () => {
+    if (magicLink) {
+      const text = encodeURIComponent(`🎁 You're invited to contribute to ${gift.name}!\n\n${magicLink}`)
+      window.open(`https://wa.me/?text=${text}`)
+    }
+  }
+
   return (
+    <>
+      {/* Share Modal */}
+      {showShareModal && magicLink && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
+            <div className="bg-gradient-to-r from-[#6B4423] via-[#8B5A3C] to-[#6B4423] px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#DAA520] to-[#F4C430] flex items-center justify-center">
+                    <Share2 className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-white">Share Your Gift</h2>
+                    <p className="text-xs text-white/70">Invite friends to contribute</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowShareModal(false)}
+                  className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors text-white"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div className="text-center mb-4">
+                <p className="text-[#654321] font-semibold">🎉 Your gift is now live!</p>
+                <p className="text-sm text-[#8B4513]/70">Share this link with friends and family</p>
+              </div>
+              
+              {/* Magic Link */}
+              <div className="bg-[#F5F1E8] rounded-xl p-4">
+                <p className="text-xs text-[#8B4513]/70 mb-2">Share Link</p>
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="text" 
+                    value={magicLink} 
+                    readOnly 
+                    className="flex-1 bg-white border-2 border-[#DAA520]/30 rounded-lg px-3 py-2 text-sm text-[#654321] truncate"
+                  />
+                  <button
+                    onClick={copyMagicLink}
+                    className="px-4 py-2 bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] rounded-lg font-semibold text-sm hover:scale-105 transition-all flex items-center gap-1"
+                  >
+                    {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                    {copied ? 'Copied!' : 'Copy'}
+                  </button>
+                </div>
+              </div>
+              
+              {/* Share Options */}
+              <div className="grid grid-cols-3 gap-3">
+                <button
+                  onClick={copyMagicLink}
+                  className="flex flex-col items-center gap-2 p-4 bg-[#F5F1E8] rounded-xl hover:bg-[#DAA520]/10 transition-colors"
+                >
+                  <Copy className="w-6 h-6 text-[#DAA520]" />
+                  <span className="text-xs text-[#654321] font-medium">Copy Link</span>
+                </button>
+                <button
+                  onClick={shareViaEmail}
+                  className="flex flex-col items-center gap-2 p-4 bg-[#F5F1E8] rounded-xl hover:bg-[#DAA520]/10 transition-colors"
+                >
+                  <Mail className="w-6 h-6 text-[#DAA520]" />
+                  <span className="text-xs text-[#654321] font-medium">Email</span>
+                </button>
+                <button
+                  onClick={shareViaWhatsApp}
+                  className="flex flex-col items-center gap-2 p-4 bg-[#F5F1E8] rounded-xl hover:bg-[#DAA520]/10 transition-colors"
+                >
+                  <MessageCircle className="w-6 h-6 text-[#DAA520]" />
+                  <span className="text-xs text-[#654321] font-medium">WhatsApp</span>
+                </button>
+              </div>
+              
+              {/* Preview Link */}
+              <a
+                href={magicLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 w-full py-3 bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] font-bold rounded-xl hover:scale-[1.02] transition-all shadow-md"
+              >
+                <ExternalLink className="w-4 h-4" />
+                Preview Contribution Page
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+      
+    
     <div className="min-h-screen bg-[#F5F1E8]">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Link
@@ -693,7 +824,7 @@ export default function GiftDetailPage() {
 
               <button
                 onClick={handleContribute}
-                className="w-full px-6 py-3 bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#3B2F0F] rounded-lg font-bold text-lg hover:shadow-lg transition-all"
+                className="w-full px-3 py-2 bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#3B2F0F] rounded-md font-semibold text-sm hover:shadow-md transition-all"
               >
                 Contribute Now
               </button>
@@ -701,7 +832,7 @@ export default function GiftDetailPage() {
           </div>
 
           <div className="border-t-2 border-[#DAA520]/20 p-6 md:p-8">
-            <h2 className="text-2xl font-bold text-[#654321] mb-4">Recent Contributions</h2>
+            <h2 className="text-[18px] font-bold text-[#654321] mb-4">Recent Contributions</h2>
             <div className="space-y-3">
               {gift.recentContributions.map((contribution, index) => (
                 <div key={index} className="flex items-center justify-between p-4 bg-[#F5F1E8] rounded-lg">
@@ -709,7 +840,7 @@ export default function GiftDetailPage() {
                     <p className="font-semibold text-[#654321]">{contribution.name}</p>
                     <p className="text-sm text-[#8B4513]/70">{contribution.time}</p>
                   </div>
-                  <span className="font-bold text-[#DAA520] text-lg">${contribution.amount}</span>
+                  <span className="font-semibold text-[#DAA520] text-sm">${contribution.amount}</span>
                 </div>
               ))}
             </div>
@@ -717,5 +848,6 @@ export default function GiftDetailPage() {
         </div>
       </div>
     </div>
+    </>
   )
 }

@@ -55,24 +55,26 @@ export async function OPTIONS(req: NextRequest) {
 }
 
 // Helper function to check if image is a color swatch or placeholder (not a product image)
+// Be VERY conservative - only reject obvious placeholders, not legitimate product images
 function isSwatchOrPlaceholderImage(imageUrl: string | undefined): boolean {
   if (!imageUrl) return true
+  
+  // Must be a valid URL
+  if (!imageUrl.startsWith('http')) {
+    console.log('[save-variants] Rejected - not a valid URL:', imageUrl.substring(0, 60))
+    return true
+  }
+  
   const url = imageUrl.toLowerCase()
   
-  // Amazon color swatch and placeholder patterns
-  // Be careful not to filter out valid product images!
+  // Only reject OBVIOUS placeholder patterns
   const invalidPatterns = [
-    /_us\d{2}_/i,         // _US40_, etc. (very small - 2 digit thumbnails)
-    /_sx\d{2}_/i,         // _SX38_, etc. (very small)
-    /_sy\d{2}_/i,         // _SY38_, etc. (very small)
-    /_ss\d{2}_/i,         // _SS40_, etc. (very small)
-    /swatch/i,            // Contains "swatch"
-    /\+\+/,               // Contains ++ (like 01++SjnuXRL)
-    /transparent/i,       // Transparent placeholder
-    /blank/i,             // Blank image
-    /placeholder/i,       // Placeholder
-    /spacer/i,            // Spacer image
-    /pixel/i,             // Tracking pixel
+    /\+\+/,               // Contains ++ (like 01++SjnuXRL) - placeholder
+    /transparent-pixel/i, // Transparent placeholder pixel
+    /blank\.gif/i,        // Blank GIF
+    /placeholder\./i,     // Placeholder file
+    /spacer\./i,          // Spacer image file
+    /1x1\./i,             // 1x1 pixel
   ]
   
   // Check if URL matches any invalid pattern
@@ -81,18 +83,19 @@ function isSwatchOrPlaceholderImage(imageUrl: string | undefined): boolean {
     return true
   }
   
-  // Check if image ID looks like a placeholder
-  const imageIdMatch = url.match(/\/images\/i\/([^.]+)\./i)
-  if (imageIdMatch && imageIdMatch[1]) {
-    const imageId = imageIdMatch[1]
-    // Valid Amazon product images have IDs like 41XxYzAbCdE, 71ABcDeFgHi (start with digits 3-9)
-    // Placeholders often start with 0 and have weird characters like 01++SjnuXRL
-    if (imageId.startsWith('0') && (imageId.includes('+') || imageId.length < 8)) {
-      console.log('[save-variants] Rejected placeholder image ID:', imageId)
+  // Check for very small images by size parameter (swatches are typically < 50px)
+  const sizeMatch = url.match(/_(?:ss|sx|sy|us)(\d+)/i)
+  if (sizeMatch && sizeMatch[1]) {
+    const size = parseInt(sizeMatch[1], 10)
+    // Only reject truly tiny images (< 50px) which are definitely swatches
+    if (size < 50) {
+      console.log('[save-variants] Rejected tiny image (size ' + size + '):', url.substring(0, 60))
       return true
     }
   }
   
+  // Accept the image
+  console.log('[save-variants] ✅ Image accepted:', url.substring(0, 80))
   return false
 }
 
@@ -104,8 +107,10 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const { variants, specifications, url, timestamp, sessionToken, image, imageUrl, title, price } = body
 
-    // Support both 'image' and 'imageUrl' field names from extension
-    const rawImage = image || imageUrl || body.productImage || body.img
+    // Support multiple field names from extension - check ALL possible image fields
+    const rawImage = image || imageUrl || body.productImage || body.img || 
+                     body.mainImage || body.productImageUrl || body.mainImageUrl ||
+                     body.selectedImage || body.clippedImage || body.clipImage
 
     console.log('[save-variants] ========== NEW VARIANT DATA RECEIVED ==========')
     console.log('[save-variants] URL:', url?.substring(0, 80))
@@ -113,10 +118,17 @@ export async function POST(req: NextRequest) {
     Object.entries(variants || {}).forEach(([key, value]) => {
       console.log(`[save-variants] ✅ ${key}: ${value}`)
     })
-    console.log('[save-variants] Body keys:', Object.keys(body).join(', '))
-    console.log('[save-variants] Raw Image (image field):', image?.substring?.(0, 80) || 'undefined')
-    console.log('[save-variants] Raw Image (imageUrl field):', imageUrl?.substring?.(0, 80) || 'undefined')
-    console.log('[save-variants] Combined Raw Image:', rawImage?.substring?.(0, 80) || 'undefined')
+    console.log('[save-variants] ALL Body keys:', Object.keys(body).join(', '))
+    console.log('[save-variants] 📸 Checking ALL image fields:')
+    console.log('[save-variants]   - image:', image?.substring?.(0, 80) || 'undefined')
+    console.log('[save-variants]   - imageUrl:', imageUrl?.substring?.(0, 80) || 'undefined')
+    console.log('[save-variants]   - productImage:', body.productImage?.substring?.(0, 80) || 'undefined')
+    console.log('[save-variants]   - img:', body.img?.substring?.(0, 80) || 'undefined')
+    console.log('[save-variants]   - mainImage:', body.mainImage?.substring?.(0, 80) || 'undefined')
+    console.log('[save-variants]   - productImageUrl:', body.productImageUrl?.substring?.(0, 80) || 'undefined')
+    console.log('[save-variants]   - selectedImage:', body.selectedImage?.substring?.(0, 80) || 'undefined')
+    console.log('[save-variants]   - clippedImage:', body.clippedImage?.substring?.(0, 80) || 'undefined')
+    console.log('[save-variants] Combined Raw Image:', rawImage?.substring?.(0, 80) || 'NO IMAGE FOUND IN ANY FIELD')
     
     // Filter out swatch/placeholder images
     const validImage = isSwatchOrPlaceholderImage(rawImage) ? undefined : rawImage
@@ -144,8 +156,9 @@ export async function POST(req: NextRequest) {
       storeKey = sessionToken
     }
 
-    // Clear any old data first to ensure fresh data
-    variantStore.clear()
+    // Don't clear existing data - just overwrite with new data
+    // This prevents race conditions where data is cleared before being retrieved
+    console.log('[save-variants] Current store keys before save:', Array.from(variantStore.keys()))
     
     // Store variants with fresh timestamp (use validImage, not raw image)
     const now = Date.now()
@@ -235,14 +248,17 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ variants: null }, { headers: corsHeaders })
     }
 
-    // Allow data to be retrieved multiple times within 30 seconds
-    // Only mark as fully retrieved after 30 seconds to allow modal retries
+    // Allow data to be retrieved multiple times within 60 seconds
+    // Be more lenient to ensure the Alternative clip feature works
     const timeSinceStore = Date.now() - stored.timestamp
-    if (stored.retrieved && timeSinceStore > 30000) {
-      console.log('[save-variants] GET - Data already retrieved and expired, returning null')
+    if (stored.retrieved && timeSinceStore > 60000) {
+      console.log('[save-variants] GET - Data already retrieved and expired (>60s), returning null')
       console.log('[save-variants] GET - Stored timestamp:', stored.timestamp, 'Age:', timeSinceStore, 'ms')
       return NextResponse.json({ variants: null }, { headers: corsHeaders })
     }
+    
+    // Log retrieval details
+    console.log('[save-variants] GET - Data still valid, age:', timeSinceStore, 'ms, retrieved before:', stored.retrieved)
     
     console.log('[save-variants] GET - Fresh data found, returning...')
     console.log('[save-variants] GET - Image URL:', stored.image?.substring(0, 100))
@@ -259,11 +275,12 @@ export async function GET(req: NextRequest) {
       variantStore.set('latest', latestStored)
     }
     
-    // Delete after 60 seconds (give more time for retries)
+    // Delete after 2 minutes (give more time for retries)
     setTimeout(() => {
       variantStore.delete(storeKey)
       variantStore.delete('latest')
-    }, 60 * 1000)
+      console.log('[save-variants] Auto-deleted stored data after 2 minutes')
+    }, 2 * 60 * 1000)
 
     console.log('[save-variants] GET - Returning data:')
     console.log('[save-variants] GET - Has image:', !!stored.image, stored.image?.substring(0, 80))

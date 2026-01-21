@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { generateObject } from "ai"
+import { openai } from "@ai-sdk/openai"
 import { z } from "zod"
 import * as fal from "@fal-ai/serverless-client"
 
@@ -66,7 +67,7 @@ export async function POST(request: NextRequest) {
     })
 
     const { object: priceComparison } = await generateObject({
-      model: "openai/gpt-4o-mini",
+      model: openai("gpt-4o-mini"),
       schema: productSchema,
       prompt: `You are a price comparison expert. Your task is to find the EXACT SAME product at other retailers with IDENTICAL specifications.
 

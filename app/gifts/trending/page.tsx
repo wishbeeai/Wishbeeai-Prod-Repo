@@ -61,6 +61,7 @@ export default function TrendingGiftsPage() {
   const [removingGiftId, setRemovingGiftId] = useState<string | null>(null)
   const [selectedGiftForAttributes, setSelectedGiftForAttributes] = useState<Gift | null>(null)
   const [isAttributesModalOpen, setIsAttributesModalOpen] = useState(false)
+  const [expandedSpecs, setExpandedSpecs] = useState<Record<string, boolean>>({})
   
   // Check if current user is admin
   const isAdmin = user?.email?.toLowerCase().trim() === ADMIN_EMAIL.toLowerCase()
@@ -950,8 +951,8 @@ export default function TrendingGiftsPage() {
                 {/* Spacer to push content to bottom */}
                 <div className="flex-grow"></div>
 
-                {/* Product Specifications - Fixed height for alignment */}
-                <div className="bg-gradient-to-r from-[#6B4423]/5 to-[#8B5A3C]/5 rounded-lg p-3 border border-[#8B5A3C]/10 mt-auto h-[175px] flex flex-col">
+                {/* Product Specifications */}
+                <div className="bg-gradient-to-r from-[#6B4423]/5 to-[#8B5A3C]/5 rounded-lg p-3 border border-[#8B5A3C]/10 mt-auto min-h-[175px] flex flex-col">
                   <p className="text-[10px] font-bold text-[#6B4423] uppercase tracking-wider mb-2 flex items-center gap-1 flex-shrink-0">
                     <span className="w-1.5 h-1.5 bg-[#DAA520] rounded-full"></span>
                     Specifications
@@ -969,7 +970,7 @@ export default function TrendingGiftsPage() {
                             !['color', 'size', 'style', 'brand', 'sizeOptions', 'colorVariants', 'combinedVariants', 'styleOptions', 'styleName', 'patternName'].includes(key) &&
                             value !== null && value !== undefined && value !== ''
                           )
-                          .slice(0, 5)
+                          .slice(0, expandedSpecs[gift.id] ? undefined : 5)
                           .map(([key, value]) => (
                             <div key={key} className="flex items-center text-[10px] h-[16px]">
                               <span className="font-semibold text-[#6B4423] capitalize w-[85px] flex-shrink-0 truncate">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
@@ -982,12 +983,11 @@ export default function TrendingGiftsPage() {
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation()
-                              setSelectedGiftForAttributes(gift)
-                              setIsAttributesModalOpen(true)
+                              setExpandedSpecs(prev => ({ ...prev, [gift.id]: !prev[gift.id] }))
                             }}
-                            className="text-left text-[10px] font-bold text-[#DAA520] hover:text-[#B8860B] cursor-pointer transition-colors h-[16px]"
+                            className="text-left text-[8px] font-bold text-[#DAA520] mt-1 hover:text-[#B8860B] hover:underline cursor-pointer transition-colors"
                           >
-                            +{getFilteredAttributes(gift).length - 5} more specs →
+                            {expandedSpecs[gift.id] ? 'Show less' : `+${getFilteredAttributes(gift).length - 5} more specs`}
                           </button>
                         )}
                       </div>
@@ -1081,8 +1081,8 @@ export default function TrendingGiftsPage() {
                           </TooltipContent>
                         </Tooltip>
                         {gift.source && <p className="text-sm text-[#8B4513]/70 mb-2">From {gift.source}</p>}
-                        {/* Product Specifications - List View - Fixed height */}
-                        <div className="mb-2 h-[140px] bg-gradient-to-r from-[#6B4423]/5 to-[#8B5A3C]/5 rounded-lg p-2 border border-[#8B5A3C]/10 overflow-hidden">
+                        {/* Product Specifications - List View */}
+                        <div className="mb-2 min-h-[140px] bg-gradient-to-r from-[#6B4423]/5 to-[#8B5A3C]/5 rounded-lg p-2 border border-[#8B5A3C]/10">
                           <p className="text-xs font-semibold text-[#6B4423] uppercase tracking-wide mb-1">Specifications</p>
                           {gift.attributes && Object.keys(gift.attributes).filter(key => 
                             !['color', 'size', 'style', 'brand', 'sizeOptions', 'colorVariants', 'combinedVariants', 'styleOptions', 'styleName', 'patternName'].includes(key) &&
@@ -1094,7 +1094,7 @@ export default function TrendingGiftsPage() {
                                   !['color', 'size', 'style', 'brand', 'sizeOptions', 'colorVariants', 'combinedVariants', 'styleOptions', 'styleName', 'patternName'].includes(key) &&
                                   value !== null && value !== undefined && value !== ''
                                 )
-                                .slice(0, 5)
+                                .slice(0, expandedSpecs[gift.id] ? undefined : 5)
                                 .map(([key, value]) => (
                                   <div key={key} className="flex items-center text-[11px] h-[16px]">
                                     <span className="font-semibold text-[#6B4423] capitalize w-[120px] flex-shrink-0 truncate">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
@@ -1107,12 +1107,11 @@ export default function TrendingGiftsPage() {
                                   type="button"
                                   onClick={(e) => {
                                     e.stopPropagation()
-                                    setSelectedGiftForAttributes(gift)
-                                    setIsAttributesModalOpen(true)
+                                    setExpandedSpecs(prev => ({ ...prev, [gift.id]: !prev[gift.id] }))
                                   }}
-                                  className="text-left text-[11px] font-semibold text-[#DAA520] hover:text-[#B8860B] cursor-pointer transition-colors h-[16px]"
+                                  className="text-left text-[8px] font-bold text-[#DAA520] mt-1 hover:text-[#B8860B] hover:underline cursor-pointer transition-colors"
                                 >
-                                  +{getFilteredAttributes(gift).length - 5} more specs →
+                                  {expandedSpecs[gift.id] ? 'Show less' : `+${getFilteredAttributes(gift).length - 5} more specs`}
                                 </button>
                               )}
                             </div>

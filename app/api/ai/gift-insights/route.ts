@@ -1,11 +1,12 @@
 import { generateText } from "ai"
+import { openai } from "@ai-sdk/openai"
 
 export async function POST(req: Request) {
   try {
     const { giftName, category } = await req.json()
 
     const { text } = await generateText({
-      model: "openai/gpt-5-mini",
+      model: openai("gpt-4o-mini"),
       prompt: `You are a gift shopping expert. For this gift: "${giftName}" in the ${category} category, 
       provide one quick insight about why it's a great gift, best time to buy, or a helpful tip. 
       Keep it to 1-2 sentences, friendly and conversational.`,

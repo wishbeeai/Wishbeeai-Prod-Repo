@@ -256,7 +256,7 @@ Generated on: ${new Date().toLocaleString()}
             </div>
 
             <div className="border-t-2 border-[#DAA520]/20 pt-6">
-              <h2 className="text-2xl font-bold text-[#654321] mb-4">Recent Contributions</h2>
+              <h2 className="text-[18px] font-bold text-[#654321] mb-4">Recent Contributions</h2>
               <div className="space-y-3">
                 {displayedContributions.map((contribution, index) => (
                   <div key={index} className="flex items-center justify-between p-4 bg-[#F5F1E8] rounded-lg">
@@ -264,7 +264,7 @@ Generated on: ${new Date().toLocaleString()}
                       <p className="font-semibold text-[#654321]">{contribution.name}</p>
                       <p className="text-sm text-[#8B4513]/70">{new Date(contribution.date).toLocaleDateString()}</p>
                     </div>
-                    <p className="text-lg font-bold text-[#DAA520]">${contribution.amount}</p>
+                    <p className="text-sm font-semibold text-[#DAA520]">${contribution.amount}</p>
                   </div>
                 ))}
               </div>

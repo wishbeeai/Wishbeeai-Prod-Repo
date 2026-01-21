@@ -459,6 +459,7 @@ async function extractWithoutAI(
       weightLimit: null,
       seatingCapacity: null,
       style: null,
+      configuration: null,
       // Audio/Headphone-specific attributes
       earPlacement: null,
       formFactor: null,
@@ -479,6 +480,7 @@ async function extractWithoutAI(
       shape: null,
       screenSize: null,
       displayType: null,
+      displayResolutionMaximum: null,
       waterResistance: null,
       // General technical specifications
       wattage: null,
@@ -547,7 +549,12 @@ async function extractWithoutAI(
     }
     if (structuredData.brand) productData.attributes.brand = decodeHtmlEntities(structuredData.brand)
     if (structuredData.color && structuredData.color.trim() !== "") {
-      productData.attributes.color = decodeHtmlEntities(structuredData.color.trim())
+      const colorValue = decodeHtmlEntities(structuredData.color.trim()).toLowerCase()
+      // Reject placeholder/generic color values
+      const invalidColors = ['base', 'default', 'standard', 'normal', 'regular', 'basic', 'none', 'n/a']
+      if (!invalidColors.includes(colorValue)) {
+        productData.attributes.color = decodeHtmlEntities(structuredData.color.trim())
+      }
     }
     if (structuredData.material && structuredData.material.trim() !== "") {
       productData.attributes.material = decodeHtmlEntities(structuredData.material.trim())
@@ -2680,8 +2687,12 @@ async function extractWithoutAI(
       
       // PRIORITY 4: Try to extract from structured data if available
       if (!productData.attributes.color && structuredData?.color) {
-        productData.attributes.color = structuredData.color
-        console.log("[v0] Extracted color from structured data (Tommy.com):", productData.attributes.color)
+        const colorValue = String(structuredData.color).toLowerCase().trim()
+        const invalidColors = ['base', 'default', 'standard', 'normal', 'regular', 'basic', 'none', 'n/a']
+        if (!invalidColors.includes(colorValue)) {
+          productData.attributes.color = structuredData.color
+          console.log("[v0] Extracted color from structured data (Tommy.com):", productData.attributes.color)
+        }
       }
       
       // PRIORITY 5: Look for color in page title or meta tags
@@ -4246,7 +4257,8 @@ async function extractWithoutAI(
             'price', 'style', 'size', 'set', 'configuration', 'bundle', 'pack', 'quantity',
             'option', 'select', 'choose', 'click', 'buy', 'add', 'cart', 'shipping', 'delivery',
             'stock', 'available', 'unavailable', 'sold', 'out', 'new', 'used', 'renewed',
-            'applecare', 'protection', 'warranty', 'plan', 'year', 'month', 'day'
+            'applecare', 'protection', 'warranty', 'plan', 'year', 'month', 'day',
+            'base', 'default', 'standard', 'normal', 'regular', 'basic'
           ]
 
           const colorDimensionPatterns = [
@@ -4349,19 +4361,50 @@ async function extractWithoutAI(
           }
         }
 
-        // Extract STYLE from Amazon's dimension system (style_name) - e.g., USB-C, Lightning
-        // For Apple products, style specifically means connector type (not shape)
+        // Extract STYLE from Amazon's dimension system (style_name)
+        // This captures: connector types (USB-C, Lightning), connectivity (Wi-Fi, Cellular), bundle options, etc.
         if (!productData.attributes.style) {
           const productNameLower = (productData.productName || '').toLowerCase()
-          // Detect Apple audio products (including AirPods Max which may show as "Apple Headphones")
+          
+          // Detect Apple audio products (for connector type validation)
           const isAppleAudioProduct = productNameLower.includes('airpods') || 
                                       productNameLower.includes('earpods') ||
                                       productNameLower.includes('beats') ||
                                       (productNameLower.includes('apple') && productNameLower.includes('headphones')) ||
                                       (productNameLower.includes('apple') && productNameLower.includes('max'))
           
+          // Detect Apple Watch products (connectivity validation)
+          // For Apple Watch, "Style" should represent connectivity: GPS or GPS + Cellular
+          const isAppleWatchProduct =
+            productNameLower.includes('apple watch') ||
+            productNameLower.includes('watch ultra') ||
+            productNameLower.includes('watch series')
+
+          // Detect iPad/tablet products
+          const isTabletProduct = productNameLower.includes('ipad') || 
+                                  productNameLower.includes('tablet') ||
+                                  productNameLower.includes('galaxy tab')
+          
           // For Apple audio products, only accept connector types as style
           const validConnectorTypes = ['lightning', 'usb-c', 'usb type-c', 'type-c', 'usb c', '3.5mm', 'wireless']
+
+          const formatAppleWatchStyle = (textLower: string): string | null => {
+            // Prefer explicit combined form first
+            if (textLower.includes('gps + cellular') || textLower.includes('gps+cellular')) return 'GPS + Cellular'
+            if (textLower.includes('gps') && textLower.includes('cellular')) return 'GPS + Cellular'
+            // Some pages only show "Cellular" (Apple Watch cellular models always include GPS)
+            if (textLower.includes('cellular')) return 'GPS + Cellular'
+            // Plain GPS
+            if (/\bgps\b/i.test(textLower)) return 'GPS'
+            return null
+          }
+          
+          // Valid style values for tablets/iPads (connectivity, bundle options)
+          const validTabletStyles = [
+            'wi-fi', 'wifi', 'cellular', 'wi-fi + cellular', 'wifi + cellular', 'lte', '5g',
+            'ipad only', 'with pencil', 'with keyboard', 'with case', 'bundle',
+            'standard', 'pro', 'air', 'mini'
+          ]
           
           const stylePatterns = [
             // Pattern 1: data-csa-c-dimension attributes (HIGHEST PRIORITY)
@@ -4372,20 +4415,16 @@ async function extractWithoutAI(
             /selectedDimensions[^}]*style_name[^}]*:\s*"([^"]+)"/i,
             // Pattern 3: style_name in various JSON contexts
             /"style_name"\s*:\s*"([^"]+)"/i,
-            /style_name['"]\s*:\s*['"](Lightning|USB-C|USB Type-C|Type-C)['"]/i,
+            /style_name['"]\s*:\s*['"]([^'"]+)['"]/i,
             // Pattern 4: Style selection text in UI
             /<span[^>]*class=["'][^"']*selection["'][^>]*>[\s]*Style:?\s*([^<]+)</i,
             /variation_style_name[\s\S]{0,300}?selection[^>]*>[\s]*([^<]+)</i,
-            // Pattern 5: Selected swatch with connector type
-            /twisterSwatchWrapper[\s\S]{0,500}?selected[\s\S]{0,200}?(Lightning|USB-C|USB Type-C|Type-C)/i,
-            /<li[^>]*class=["'][^"']*swatchSelect[^"']*["'][^>]*>[\s\S]*?(Lightning|USB-C|USB Type-C)/i,
-            // Pattern 6: Direct connector type mentions in twister/variation areas
-            /id=["']variation_style_name["'][\s\S]{0,500}?(USB-C|USB Type-C|Lightning)/i,
-            /variation_style[\s\S]{0,300}?(USB-C|USB Type-C|Lightning)/i,
-            // Pattern 7: Inline dimension values in JavaScript
+            // Pattern 5: Amazon's variation_style_name div with selection
+            /id=["']variation_style_name["'][\s\S]{0,500}?selection[^>]*>[\s]*([^<]+)</i,
+            // Pattern 6: Inline dimension values in JavaScript
             /"dimensionValuesDisplayData"[\s\S]{0,2000}?"style_name"[\s\S]{0,200}?"([^"]+)"/i,
-            // Pattern 8: Amazon's twister data inline
-            /twister-plus-inline-twister-card[\s\S]{0,1000}?(USB-C|USB Type-C|Lightning)/i,
+            // Pattern 7: Amazon's twister data inline - general capture
+            /twister-plus-inline-twister-card[\s\S]{0,1000}?style_name[^:]*:\s*["']([^"']+)["']/i,
           ]
           
           for (const pattern of stylePatterns) {
@@ -4394,17 +4433,34 @@ async function extractWithoutAI(
               const style = decodeHtmlEntities(match[1].trim())
               const styleLower = style.toLowerCase()
               
-              // Reject invalid values
+              // Reject clearly invalid values
               if (!style || 
-                  style.length > 50 || 
+                  style.length > 80 || 
                   styleLower.includes('select') ||
                   styleLower.includes('choose') ||
-                  styleLower === 'square' ||        // This is shape, not style
-                  styleLower === 'round' ||         // This is shape, not style
-                  styleLower === 'rectangle' ||    // This is shape, not style
-                  styleLower.includes('shape')) {
+                  styleLower === 'square' ||
+                  styleLower === 'round' ||
+                  styleLower === 'rectangle' ||
+                  styleLower.includes('shape') ||
+                  (isAppleWatchProduct && (styleLower.includes('rectangular') || styleLower.includes('circular') || styleLower.includes('oval'))) ||
+                  styleLower.includes('null') ||
+                  styleLower.includes('undefined') ||
+                  style.includes('{') ||
+                  style.includes('<')) {
                 console.log("[v0] ⚠️ Rejected invalid style value:", style)
                 continue
+              }
+              
+              // For Apple Watch, ONLY accept GPS/GPS + Cellular connectivity styles
+              if (isAppleWatchProduct) {
+                const watchStyle = formatAppleWatchStyle(styleLower)
+                if (!watchStyle) {
+                  console.log("[v0] ⚠️ Rejected non-connectivity style for Apple Watch:", style)
+                  continue
+                }
+                productData.attributes.style = watchStyle
+                console.log("[v0] ✅ Extracted Style for Apple Watch:", productData.attributes.style)
+                break
               }
               
               // For Apple audio products, only accept connector types
@@ -4412,6 +4468,15 @@ async function extractWithoutAI(
                 const isValidConnector = validConnectorTypes.some(ct => styleLower.includes(ct))
                 if (!isValidConnector) {
                   console.log("[v0] ⚠️ Rejected non-connector style for Apple audio:", style)
+                  continue
+                }
+              }
+              
+              // For tablets/iPads, only accept connectivity options (Wi-Fi, Cellular)
+              if (isTabletProduct) {
+                const isValidTabletStyle = validTabletStyles.some(vts => styleLower.includes(vts))
+                if (!isValidTabletStyle) {
+                  console.log("[v0] ⚠️ Rejected non-connectivity style for tablet:", style)
                   continue
                 }
               }
@@ -4428,6 +4493,12 @@ async function extractWithoutAI(
                 formattedStyle = '3.5mm'
               } else if (styleLower === 'wireless') {
                 formattedStyle = 'Wireless'
+              } else if (styleLower.includes('wi-fi + cellular') || styleLower.includes('wifi + cellular')) {
+                formattedStyle = 'Wi-Fi + Cellular'
+              } else if (styleLower === 'wi-fi' || styleLower === 'wifi') {
+                formattedStyle = 'Wi-Fi'
+              } else if (styleLower === 'cellular' || styleLower === 'lte' || styleLower === '5g') {
+                formattedStyle = styleLower.toUpperCase()
               } else {
                 // Capitalize first letter of each word for other styles
                 formattedStyle = style.split(' ').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')
@@ -4439,7 +4510,7 @@ async function extractWithoutAI(
             }
           }
           
-          // FALLBACK: If no style found from patterns, check product name for connector type
+          // FALLBACK for audio products: Check product name for connector type
           if (!productData.attributes.style && isAppleAudioProduct) {
             const productTitle = (productData.productName || '').toLowerCase()
             console.log("[v0] 🔍 Checking product title for connector type:", productTitle)
@@ -4456,9 +4527,40 @@ async function extractWithoutAI(
             }
           }
           
-          // FALLBACK 2: Check HTML content for explicit USB-C or Lightning mentions near product info
+          // FALLBACK for tablets: Check product name for connectivity
+          if (!productData.attributes.style && isTabletProduct) {
+            const productTitle = (productData.productName || '').toLowerCase()
+            console.log("[v0] 🔍 Checking product title for tablet style/connectivity:", productTitle)
+            
+            if (productTitle.includes('wi-fi + cellular') || productTitle.includes('wifi + cellular') || 
+                (productTitle.includes('wi-fi') && productTitle.includes('cellular'))) {
+              productData.attributes.style = 'Wi-Fi + Cellular'
+              console.log("[v0] ✅ Extracted Style from product title: Wi-Fi + Cellular")
+            } else if (productTitle.includes('cellular') || productTitle.includes('5g') || productTitle.includes('lte')) {
+              productData.attributes.style = 'Cellular'
+              console.log("[v0] ✅ Extracted Style from product title: Cellular")
+            } else if (productTitle.includes('wi-fi') || productTitle.includes('wifi')) {
+              productData.attributes.style = 'Wi-Fi'
+              console.log("[v0] ✅ Extracted Style from product title: Wi-Fi")
+            }
+          }
+
+          // FALLBACK for Apple Watch: Extract GPS vs GPS + Cellular from title/overview specs
+          if (!productData.attributes.style && isAppleWatchProduct) {
+            const titleLower = (productData.productName || '').toLowerCase()
+            const connectivityLower = String(productData.attributes?.connectivityTechnology || '').toLowerCase()
+            const wirelessLower = String(productData.attributes?.wirelessType || '').toLowerCase()
+            const combinedLower = `${titleLower} ${connectivityLower} ${wirelessLower}`.trim()
+
+            const watchStyle = formatAppleWatchStyle(combinedLower)
+            if (watchStyle) {
+              productData.attributes.style = watchStyle
+              console.log("[v0] ✅ Extracted Style for Apple Watch (fallback):", productData.attributes.style)
+            }
+          }
+          
+          // FALLBACK for audio products: Check HTML content for explicit mentions
           if (!productData.attributes.style && isAppleAudioProduct && htmlContent) {
-            // Look for USB-C or Lightning in the product title area of the HTML
             const titleAreaMatch = htmlContent.match(/id=["']?productTitle["']?[^>]*>[\s\S]{0,500}?(USB-C|USB Type-C|Lightning)/i)
             if (titleAreaMatch && titleAreaMatch[1]) {
               const connector = titleAreaMatch[1]
@@ -4563,46 +4665,91 @@ async function extractWithoutAI(
           }
         }
         
-        // Extract CONFIGURATION from Amazon's dimension system - THIS IS FOR APPLECARE
-        // Note: Connectivity (GPS, GPS + Cellular) is a SPEC, not a variant - don't extract it as configuration
-        // Configuration on Amazon = AppleCare options (With/Without AppleCare+)
+        // Extract CONFIGURATION from Amazon's dimension system
+        // Configuration = AppleCare options for ALL Apple products (including iPads)
+        // Bundle options (iPad Only, iPad + Pencil) are NOT configuration - they should be in 'set'
         if (!productData.attributes.configuration) {
-          console.log("[v0] ⌚ Attempting to extract CONFIGURATION (AppleCare) for product...")
+          const productNameLower = (productData.productName || '').toLowerCase()
+          const isAppleProduct = productNameLower.includes('apple') || 
+                                 productNameLower.includes('iphone') || 
+                                 productNameLower.includes('ipad') ||
+                                 productNameLower.includes('macbook') ||
+                                 productNameLower.includes('airpods') ||
+                                 productNameLower.includes('watch ultra') ||
+                                 productNameLower.includes('apple watch')
           
-          // First, copy from 'set' if already extracted (AppleCare is stored in set)
-          if (productData.attributes.set) {
-            productData.attributes.configuration = productData.attributes.set
-            console.log("[v0] ✅ Copied Configuration from set:", productData.attributes.configuration)
-          } else {
-            // Try to extract AppleCare configuration from HTML
-            const appleCarePatterns = [
-              // Pattern 1: selectedVariations with configuration_name
-              /"selectedVariations"\s*:\s*\{[^}]*"configuration_name"\s*:\s*"([^"]+)"/i,
-              // Pattern 2: variation_configuration_name with selection
-              /variation_configuration_name[\s\S]{0,300}?selection[^>]*>[\s]*([^<]+)</i,
-              // Pattern 3: data-csa-c-dimension for configuration
-              /<span[^>]*data-csa-c-dimension-name=["']configuration_name["'][^>]*data-csa-c-dimension-value=["']([^"']+)["']/i,
-              // Pattern 4: configuration_name in JSON
-              /"configuration_name"\s*:\s*"([^"]+)"/i,
-              // Pattern 5: Selection text with AppleCare
-              /<span[^>]*class=["'][^"']*selection["'][^>]*>[^<]*?((?:With|Without)\s*AppleCare[^<]*)</i,
-            ]
-            
-            for (const pattern of appleCarePatterns) {
-              const match = htmlContent.match(pattern)
-              if (match && match[1]) {
-                let config = decodeHtmlEntities(match[1].trim())
-                // Only accept AppleCare-related values
-                if (config && config.length < 50 && 
-                    !config.toLowerCase().includes('select') &&
-                    (config.toLowerCase().includes('applecare') || 
-                     config.toLowerCase().includes('without') ||
-                     config.toLowerCase().includes('protection'))) {
-                  productData.attributes.configuration = config
-                  console.log("[v0] ✅ Extracted Configuration (AppleCare):", productData.attributes.configuration)
-                  break
-                }
+          console.log("[v0] 📦 Attempting to extract CONFIGURATION (AppleCare) for product...", { isAppleProduct })
+          
+          // Pattern set for AppleCare configuration
+          const configPatterns = [
+            // Pattern 1: data-csa-c-dimension attributes (HIGHEST PRIORITY)
+            /<span[^>]*data-csa-c-dimension-name=["']configuration_name["'][^>]*data-csa-c-dimension-value=["']([^"']+)["']/i,
+            /<[^>]*data-csa-c-dimension-name=["']configuration_name["'][^>]*>[\s\S]*?data-csa-c-dimension-value=["']([^"']+)["']/i,
+            // Pattern 2: selectedVariations with configuration_name
+            /"selectedVariations"\s*:\s*\{[^}]*"configuration_name"\s*:\s*"([^"]+)"/i,
+            /selectedDimensions[^}]*configuration_name[^}]*:\s*"([^"]+)"/i,
+            // Pattern 3: configuration_name in JSON contexts
+            /"configuration_name"\s*:\s*"([^"]+)"/i,
+            /configuration_name['"]\s*:\s*['"]([^'"]+)['"]/i,
+            // Pattern 4: Configuration selection text in UI
+            /<span[^>]*class=["'][^"']*selection["'][^>]*>[\s]*Configuration:?\s*([^<]+)</i,
+            /variation_configuration_name[\s\S]{0,300}?selection[^>]*>[\s]*([^<]+)</i,
+            // Pattern 5: Amazon's variation_configuration_name div with selection
+            /id=["']variation_configuration_name["'][\s\S]{0,500}?selection[^>]*>[\s]*([^<]+)</i,
+            // Pattern 6: Inline dimension values in JavaScript
+            /"dimensionValuesDisplayData"[\s\S]{0,2000}?"configuration_name"[\s\S]{0,200}?"([^"]+)"/i,
+          ]
+          
+          for (const pattern of configPatterns) {
+            const match = htmlContent.match(pattern)
+            if (match && match[1]) {
+              let config = decodeHtmlEntities(match[1].trim())
+              const configLower = config.toLowerCase()
+              
+              // Reject clearly invalid values
+              if (!config || 
+                  config.length > 100 || 
+                  configLower.includes('select') ||
+                  configLower.includes('choose') ||
+                  configLower.includes('null') ||
+                  configLower.includes('undefined') ||
+                  config.includes('{') ||
+                  config.includes('<')) {
+                console.log("[v0] ⚠️ Rejected invalid configuration value:", config)
+                continue
               }
+              
+              // ONLY accept AppleCare-related values for configuration
+              // Bundle options (iPad Only, iPad + Pencil) are NOT valid configuration
+              if (configLower.includes('applecare') || 
+                  configLower.includes('without applecare') ||
+                  configLower.includes('with applecare') ||
+                  configLower.includes('protection plan') ||
+                  configLower.includes('care+')) {
+                // Format nicely
+                let formattedConfig = config
+                if (configLower.includes('without')) {
+                  formattedConfig = 'Without AppleCare+'
+                } else if (configLower.includes('2 year') || configLower.includes('2-year')) {
+                  formattedConfig = 'With AppleCare+ (2 Years)'
+                } else if (configLower.includes('with applecare') || configLower.includes('care+')) {
+                  formattedConfig = 'With AppleCare+'
+                }
+                productData.attributes.configuration = formattedConfig
+                console.log("[v0] ✅ Extracted Configuration (AppleCare):", productData.attributes.configuration)
+                break
+              }
+              
+              console.log("[v0] ⚠️ Rejected non-AppleCare configuration value:", config)
+            }
+          }
+          
+          // Copy from 'set' if still not found and set contains AppleCare info
+          if (!productData.attributes.configuration && productData.attributes.set) {
+            const setLower = (productData.attributes.set || '').toLowerCase()
+            if (setLower.includes('applecare') || setLower.includes('protection')) {
+              productData.attributes.configuration = productData.attributes.set
+              console.log("[v0] ✅ Copied Configuration from set:", productData.attributes.configuration)
             }
           }
           
@@ -4620,20 +4767,10 @@ async function extractWithoutAI(
             }
           }
           
-          // FINAL FALLBACK: For Apple products, default to "Without AppleCare+" if no config found
-          // This is the most common selection and the base product option
-          if (!productData.attributes.configuration && productNameLower) {
-            const isAppleProduct = productNameLower.includes('apple') || 
-                                   productNameLower.includes('iphone') || 
-                                   productNameLower.includes('ipad') || 
-                                   productNameLower.includes('macbook') ||
-                                   productNameLower.includes('airpods') ||
-                                   productNameLower.includes('watch ultra') ||
-                                   productNameLower.includes('apple watch')
-            if (isAppleProduct) {
-              productData.attributes.configuration = 'Without AppleCare+'
-              console.log("[v0] ✅ Defaulting Configuration to: Without AppleCare+ (Apple product default)")
-            }
+          // FINAL FALLBACK: For ALL Apple products (including iPads), default to "Without AppleCare+"
+          if (!productData.attributes.configuration && isAppleProduct) {
+            productData.attributes.configuration = 'Without AppleCare+'
+            console.log("[v0] ✅ Defaulting Configuration to: Without AppleCare+ (Apple product default)")
           }
         }
         
@@ -7100,6 +7237,9 @@ async function extractWithoutAI(
         'screen size': 'screenSize',
         'display size': 'screenSize',
         'display type': 'displayType',
+        'display resolution maximum': 'displayResolutionMaximum',
+        'display resolution': 'displayResolutionMaximum',
+        'resolution': 'displayResolutionMaximum',
         'water resistance': 'waterResistance',
         'water resistant': 'waterResistance',
         'water resistance depth': 'waterResistance',
@@ -7247,6 +7387,9 @@ async function extractWithoutAI(
           } else if ((label.includes('screen size') || label.includes('display size')) && !productData.attributes.screenSize) {
             productData.attributes.screenSize = value
             log(`[v0] ✅ Table extracted screenSize: ${value}`)
+          } else if ((label.includes('display resolution') || label.includes('resolution maximum')) && !productData.attributes.displayResolutionMaximum) {
+            productData.attributes.displayResolutionMaximum = value
+            log(`[v0] ✅ Table extracted displayResolutionMaximum: ${value}`)
           } else if (label.includes('special feature') && !productData.attributes.specialFeatures) {
             productData.attributes.specialFeatures = value
             log(`[v0] ✅ Table extracted specialFeatures: ${value}`)
@@ -7282,6 +7425,72 @@ async function extractWithoutAI(
         }
       }
       
+      // AGGRESSIVE EXTRACTION: Amazon Product Overview Table (productOverview section)
+      // Format: <tr><td>Label</td><td>Value</td></tr> with various class patterns
+      const productOverviewLabels: Record<string, keyof typeof productData.attributes> = {
+        'brand': 'brand',
+        'model name': 'model',
+        'model': 'model',
+        'memory storage capacity': 'memoryStorageCapacity',
+        'storage capacity': 'memoryStorageCapacity',
+        'screen size': 'screenSize',
+        'display size': 'screenSize',
+        'display resolution maximum': 'displayResolutionMaximum',
+        'display resolution': 'displayResolutionMaximum',
+        'resolution': 'displayResolutionMaximum',
+        'operating system': 'operatingSystem',
+        'connectivity technology': 'connectivityTechnology',
+        'wireless type': 'wirelessType',
+        'color': 'color',
+        'size': 'size',
+      }
+      
+      // Pattern 1: Simple table row with two cells
+      const simpleTrPattern = /<tr[^>]*>\s*<td[^>]*>([^<]+)<\/td>\s*<td[^>]*>([^<]+)<\/td>\s*<\/tr>/gi
+      let simpleTrMatch
+      while ((simpleTrMatch = simpleTrPattern.exec(htmlContent)) !== null) {
+        const label = simpleTrMatch[1].trim().toLowerCase()
+        const value = decodeHtmlEntities(simpleTrMatch[2].trim())
+        
+        for (const [key, attrName] of Object.entries(productOverviewLabels)) {
+          if (label.includes(key) && !productData.attributes[attrName] && value && value.length < 300) {
+            productData.attributes[attrName] = value
+            log(`[v0] ✅ Simple TR extracted ${attrName}: ${value}`)
+          }
+        }
+      }
+      
+      // Pattern 2: Amazon's productOverview_feature format
+      // <tr class="po-brand"><td>Brand</td><td><span>Apple</span></td></tr>
+      const poFeaturePattern = /<tr[^>]*class="[^"]*po-[^"]*"[^>]*>[\s\S]*?<td[^>]*>\s*<span[^>]*>([^<]+)<\/span>\s*<\/td>\s*<td[^>]*>\s*<span[^>]*>([^<]+)<\/span>/gi
+      let poMatch
+      while ((poMatch = poFeaturePattern.exec(htmlContent)) !== null) {
+        const label = poMatch[1].trim().toLowerCase()
+        const value = decodeHtmlEntities(poMatch[2].trim())
+        
+        for (const [key, attrName] of Object.entries(productOverviewLabels)) {
+          if (label.includes(key) && !productData.attributes[attrName] && value && value.length < 300) {
+            productData.attributes[attrName] = value
+            log(`[v0] ✅ PO Feature extracted ${attrName}: ${value}`)
+          }
+        }
+      }
+      
+      // Pattern 3: Look for any span pair that looks like label/value
+      const anySpanPairPattern = /<span[^>]*class="[^"]*a-size-base[^"]*"[^>]*>([^<]{3,50})<\/span>[\s\S]{0,100}<span[^>]*>([^<]+)<\/span>/gi
+      let anySpanMatch
+      while ((anySpanMatch = anySpanPairPattern.exec(htmlContent)) !== null) {
+        const label = anySpanMatch[1].trim().toLowerCase()
+        const value = decodeHtmlEntities(anySpanMatch[2].trim())
+        
+        for (const [key, attrName] of Object.entries(productOverviewLabels)) {
+          if (label.includes(key) && !productData.attributes[attrName] && value && value.length < 300) {
+            productData.attributes[attrName] = value
+            log(`[v0] ✅ Span pair extracted ${attrName}: ${value}`)
+          }
+        }
+      }
+      
       // Log what specifications were extracted
       const extractedSpecs = Object.entries(productData.attributes)
         .filter(([key, value]) => value && [
@@ -7290,9 +7499,9 @@ async function extractWithoutAI(
           // Watch/Wearables
           'operatingSystem', 'memoryStorageCapacity', 'batteryCapacity', 'connectivityTechnology', 
           'wirelessCommunicationStandard', 'batteryCellComposition', 'gps', 'shape', 'screenSize', 
-          'displayType', 'waterResistance',
+          'displayType', 'displayResolutionMaximum', 'waterResistance',
           // General tech specs
-          'wattage', 'powerSource', 'controlMethod', 'specialFeatures'
+          'wattage', 'powerSource', 'controlMethod', 'specialFeatures', 'brand', 'model'
         ].includes(key))
         .map(([key, value]) => `${key}: ${value}`)
       
@@ -7607,11 +7816,15 @@ async function extractWithoutAI(
   if (productData.attributes?.set && !productData.set) {
     productData.set = productData.attributes.set
   }
+  if (productData.attributes?.configuration && !productData.configuration) {
+    productData.configuration = productData.attributes.configuration
+  }
   
   console.log("[v0] 🎯 FINAL VARIANT OPTIONS in response:", {
     color: productData.color || productData.attributes?.color || 'not set',
     style: productData.style || productData.attributes?.style || 'not set',
-    set: productData.set || productData.attributes?.set || 'not set'
+    set: productData.set || productData.attributes?.set || 'not set',
+    configuration: productData.configuration || productData.attributes?.configuration || 'not set'
   })
   
   return NextResponse.json(productData);
@@ -7955,7 +8168,13 @@ Return ONLY valid JSON, no markdown, no explanation.`
           if (structuredData.image) productData.imageUrl = structuredData.image
           if (structuredData.price) productData.price = Number.parseFloat(String(structuredData.price))
           if (structuredData.brand) productData.attributes.brand = structuredData.brand
-          if (structuredData.color) productData.attributes.color = structuredData.color
+          if (structuredData.color) {
+            const colorValue = String(structuredData.color).toLowerCase().trim()
+            const invalidColors = ['base', 'default', 'standard', 'normal', 'regular', 'basic', 'none', 'n/a']
+            if (!invalidColors.includes(colorValue)) {
+              productData.attributes.color = structuredData.color
+            }
+          }
           if (structuredData.material) productData.attributes.material = structuredData.material
           if (structuredData.type) productData.attributes.type = structuredData.type // Added type attribute
 
@@ -8470,6 +8689,81 @@ Return ONLY valid JSON, no markdown, no explanation.`
             if (!productData.attributes.kindleUnlimited) {
               productData.attributes.kindleUnlimited = 'Without Kindle Unlimited'
               console.log("[v0] ✅ Ensuring kindleUnlimited is included: Without Kindle Unlimited (preferred default)")
+            }
+          }
+          
+          // ===== AMAZON PRODUCT SPECS EXTRACTION (ScraperAPI Path) =====
+          // Extract specs from Amazon's product overview table
+          if (hostname.includes('amazon.com') && scraperHtml) {
+            console.log("[v0] 🔍 ScraperAPI: Extracting Amazon product specifications...")
+            
+            const productOverviewLabels: Record<string, string> = {
+              'brand': 'brand',
+              'model name': 'model',
+              'model': 'model',
+              'memory storage capacity': 'memoryStorageCapacity',
+              'storage capacity': 'memoryStorageCapacity',
+              'screen size': 'screenSize',
+              'display size': 'screenSize',
+              'display resolution maximum': 'displayResolutionMaximum',
+              'display resolution': 'displayResolutionMaximum',
+              'resolution': 'displayResolutionMaximum',
+              'operating system': 'operatingSystem',
+              'connectivity technology': 'connectivityTechnology',
+              'wireless type': 'wirelessType',
+            }
+            
+            // Pattern 1: Simple table row with two cells
+            const simpleTrPattern = /<tr[^>]*>\s*<td[^>]*>([^<]+)<\/td>\s*<td[^>]*>([^<]+)<\/td>\s*<\/tr>/gi
+            let simpleTrMatch
+            while ((simpleTrMatch = simpleTrPattern.exec(scraperHtml)) !== null) {
+              const label = simpleTrMatch[1].trim().toLowerCase()
+              const value = decodeHtmlEntities(simpleTrMatch[2].trim())
+              
+              for (const [key, attrName] of Object.entries(productOverviewLabels)) {
+                if (label.includes(key) && !(productData.attributes as any)[attrName] && value && value.length < 300) {
+                  (productData.attributes as any)[attrName] = value
+                  console.log(`[v0] ✅ ScraperAPI Simple TR extracted ${attrName}: ${value}`)
+                }
+              }
+            }
+            
+            // Pattern 2: Amazon's productOverview_feature format with spans
+            const poFeaturePattern = /<tr[^>]*class="[^"]*po-[^"]*"[^>]*>[\s\S]*?<td[^>]*>\s*<span[^>]*>([^<]+)<\/span>\s*<\/td>\s*<td[^>]*>\s*<span[^>]*>([^<]+)<\/span>/gi
+            let poMatch
+            while ((poMatch = poFeaturePattern.exec(scraperHtml)) !== null) {
+              const label = poMatch[1].trim().toLowerCase()
+              const value = decodeHtmlEntities(poMatch[2].trim())
+              
+              for (const [key, attrName] of Object.entries(productOverviewLabels)) {
+                if (label.includes(key) && !(productData.attributes as any)[attrName] && value && value.length < 300) {
+                  (productData.attributes as any)[attrName] = value
+                  console.log(`[v0] ✅ ScraperAPI PO Feature extracted ${attrName}: ${value}`)
+                }
+              }
+            }
+            
+            // Pattern 3: Look for any td pair that looks like label/value
+            const tdPairPattern = /<td[^>]*class="[^"]*a-span[^"]*"[^>]*>[\s\S]*?<span[^>]*>([^<]{3,50})<\/span>[\s\S]*?<\/td>\s*<td[^>]*>[\s\S]*?<span[^>]*>([^<]+)<\/span>/gi
+            let tdMatch
+            while ((tdMatch = tdPairPattern.exec(scraperHtml)) !== null) {
+              const label = tdMatch[1].trim().toLowerCase()
+              const value = decodeHtmlEntities(tdMatch[2].trim())
+              
+              for (const [key, attrName] of Object.entries(productOverviewLabels)) {
+                if (label.includes(key) && !(productData.attributes as any)[attrName] && value && value.length < 300) {
+                  (productData.attributes as any)[attrName] = value
+                  console.log(`[v0] ✅ ScraperAPI TD pair extracted ${attrName}: ${value}`)
+                }
+              }
+            }
+            
+            // Log extracted specs
+            const extractedSpecs = ['brand', 'model', 'memoryStorageCapacity', 'screenSize', 'displayResolutionMaximum', 'operatingSystem']
+              .filter(key => (productData.attributes as any)[key])
+              .map(key => `${key}: ${(productData.attributes as any)[key]}`)
+            if (extractedSpecs.length > 0) {
+              console.log(`[v0] 📋 ScraperAPI extracted specs: ${extractedSpecs.join(', ')}`)
             }
           }
           
@@ -9742,6 +10036,329 @@ Return ONLY valid JSON, no markdown, no explanation.`
       }
       productData.attributes = absoluteFinalDedupAI
       console.log("[v0] AI path ABSOLUTE FINAL: Deduplicated attributes before return:", Object.keys(productData.attributes))
+    }
+    
+    // ===== AMAZON PRODUCT OVERVIEW TABLE EXTRACTION (AI Path) =====
+    // Extract specs from Amazon's product overview table above "About this item"
+    // This extracts: Brand, Model Name, Memory Storage Capacity, Screen Size, Display Resolution Maximum
+    if (hostname.includes('amazon.com') && htmlContent) {
+      console.log("[v0] 🔍 AI Path: Extracting Amazon product overview specifications...")
+      
+      // Product overview labels to extract
+      const productOverviewLabels: Record<string, string> = {
+        'brand': 'brand',
+        'model name': 'model',
+        'model': 'model',
+        'memory storage capacity': 'memoryStorageCapacity',
+        'storage capacity': 'memoryStorageCapacity',
+        'screen size': 'screenSize',
+        'display size': 'screenSize',
+        'display resolution maximum': 'displayResolutionMaximum',
+        'display resolution': 'displayResolutionMaximum',
+        'resolution': 'displayResolutionMaximum',
+        'operating system': 'operatingSystem',
+        'connectivity technology': 'connectivityTechnology',
+        'wireless type': 'wirelessType',
+        'processor': 'processor',
+        'ram': 'ram',
+        'hard disk size': 'hardDiskSize',
+        'graphics coprocessor': 'graphicsCoprocessor',
+      }
+      
+      // Pattern 1: Amazon product overview table with po- classes
+      // <tr class="po-brand"><td><span>Brand</span></td><td><span>Apple</span></td></tr>
+      const poRowPattern = /<tr[^>]*class="[^"]*po-[^"]*"[^>]*>[\s\S]*?<td[^>]*>[\s\S]*?<span[^>]*>([^<]+)<\/span>[\s\S]*?<\/td>[\s\S]*?<td[^>]*>[\s\S]*?<span[^>]*>([^<]+)<\/span>/gi
+      let poMatch
+      while ((poMatch = poRowPattern.exec(htmlContent)) !== null) {
+        const label = poMatch[1].trim().toLowerCase()
+        const value = decodeHtmlEntities(poMatch[2].trim())
+        
+        for (const [key, attrName] of Object.entries(productOverviewLabels)) {
+          if (label.includes(key) && !productData.attributes[attrName] && value && value.length < 500) {
+            productData.attributes[attrName] = value
+            console.log(`[v0] ✅ AI Path PO extracted ${attrName}: ${value}`)
+          }
+        }
+      }
+      
+      // Pattern 2: Simple table rows with label/value cells
+      const simpleTrPattern = /<tr[^>]*>\s*<td[^>]*>\s*(?:<span[^>]*>)?([^<]+)(?:<\/span>)?\s*<\/td>\s*<td[^>]*>\s*(?:<span[^>]*>)?([^<]+)(?:<\/span>)?\s*<\/td>/gi
+      let simpleMatch
+      while ((simpleMatch = simpleTrPattern.exec(htmlContent)) !== null) {
+        const label = simpleMatch[1].trim().toLowerCase()
+        const value = decodeHtmlEntities(simpleMatch[2].trim())
+        
+        for (const [key, attrName] of Object.entries(productOverviewLabels)) {
+          if (label.includes(key) && !productData.attributes[attrName] && value && value.length < 500 && value.length > 1) {
+            productData.attributes[attrName] = value
+            console.log(`[v0] ✅ AI Path Simple TR extracted ${attrName}: ${value}`)
+          }
+        }
+      }
+      
+      // Pattern 3: Look for productOverview section with any structure
+      const productOverviewSection = htmlContent.match(/productOverview[\s\S]{0,5000}/i)
+      if (productOverviewSection) {
+        console.log("[v0] 🔍 Found productOverview section, length:", productOverviewSection[0].length)
+        
+        // Extract label-value pairs from this section
+        const labelValuePattern = />([^<]{2,50})<\/(?:span|td)[^>]*>[\s\S]{0,100}<(?:span|td)[^>]*>([^<]{2,500})</gi
+        let lvMatch
+        while ((lvMatch = labelValuePattern.exec(productOverviewSection[0])) !== null) {
+          const label = lvMatch[1].trim().toLowerCase()
+          const value = decodeHtmlEntities(lvMatch[2].trim())
+          
+          for (const [key, attrName] of Object.entries(productOverviewLabels)) {
+            if (label.includes(key) && !productData.attributes[attrName] && value && value.length < 500 && value.length > 1) {
+              productData.attributes[attrName] = value
+              console.log(`[v0] ✅ AI Path ProductOverview extracted ${attrName}: ${value}`)
+            }
+          }
+        }
+      }
+      
+      // Log extracted product overview specs
+      const extractedPoSpecs = ['brand', 'model', 'memoryStorageCapacity', 'screenSize', 'displayResolutionMaximum', 'operatingSystem']
+        .filter(key => productData.attributes[key])
+        .map(key => `${key}: ${productData.attributes[key]}`)
+      if (extractedPoSpecs.length > 0) {
+        console.log(`[v0] 📋 AI Path extracted product overview specs: ${extractedPoSpecs.join(', ')}`)
+      } else {
+        console.log("[v0] ⚠️ AI Path: No product overview specs found in HTML")
+      }
+      
+      // ===== AI PATH: EXTRACT STYLE AND CONFIGURATION VARIANTS =====
+      // Style = connectivity for tablets (Wi-Fi, Wi-Fi + Cellular)
+      // Configuration = AppleCare status for ALL Apple products
+      const productNameLowerAI = (productData.productName || '').toLowerCase()
+      const isTabletProductAI = productNameLowerAI.includes('ipad') || 
+                                productNameLowerAI.includes('tablet') ||
+                                productNameLowerAI.includes('galaxy tab')
+      const isAppleWatchProductAI =
+        productNameLowerAI.includes('apple watch') ||
+        productNameLowerAI.includes('watch ultra') ||
+        productNameLowerAI.includes('watch series')
+      const isAppleProductAI = productNameLowerAI.includes('apple') || 
+                               productNameLowerAI.includes('iphone') || 
+                               productNameLowerAI.includes('ipad') ||
+                               productNameLowerAI.includes('macbook') ||
+                               productNameLowerAI.includes('airpods') ||
+                               productNameLowerAI.includes('watch ultra') ||
+                               productNameLowerAI.includes('apple watch')
+      
+      // Valid style values for tablets (connectivity options ONLY)
+      const validTabletStylesAI = ['wi-fi', 'wifi', 'cellular', 'wi-fi + cellular', 'wifi + cellular', 'lte', '5g']
+      
+      console.log("[v0] 🔍 AI Path: Extracting Style and Configuration variants...", { isTablet: isTabletProductAI, isApple: isAppleProductAI })
+      
+      // Extract STYLE (connectivity for tablets: Wi-Fi, Cellular, Wi-Fi + Cellular)
+      if (!productData.attributes.style) {
+        const formatAppleWatchStyleAI = (textLower: string): string | null => {
+          if (textLower.includes('gps + cellular') || textLower.includes('gps+cellular')) return 'GPS + Cellular'
+          if (textLower.includes('gps') && textLower.includes('cellular')) return 'GPS + Cellular'
+          if (textLower.includes('cellular')) return 'GPS + Cellular'
+          if (/\bgps\b/i.test(textLower)) return 'GPS'
+          return null
+        }
+
+        const stylePatterns = [
+          // Pattern 1: data-csa-c-dimension attributes
+          /<span[^>]*data-csa-c-dimension-name=["']style_name["'][^>]*data-csa-c-dimension-value=["']([^"']+)["']/i,
+          /<[^>]*data-csa-c-dimension-name=["']style_name["'][^>]*>[\s\S]*?data-csa-c-dimension-value=["']([^"']+)["']/i,
+          // Pattern 2: selectedVariations with style_name
+          /"selectedVariations"\s*:\s*\{[^}]*"style_name"\s*:\s*"([^"]+)"/i,
+          /selectedDimensions[^}]*style_name[^}]*:\s*"([^"]+)"/i,
+          // Pattern 3: style_name in JSON
+          /"style_name"\s*:\s*"([^"]+)"/i,
+          /style_name['"]\s*:\s*['"]([^'"]+)['"]/i,
+          // Pattern 4: Style selection text in UI
+          /<span[^>]*class=["'][^"']*selection["'][^>]*>[\s]*Style:?\s*([^<]+)</i,
+          /variation_style_name[\s\S]{0,300}?selection[^>]*>[\s]*([^<]+)</i,
+          // Pattern 5: Amazon's variation_style_name div with selection
+          /id=["']variation_style_name["'][\s\S]{0,500}?selection[^>]*>[\s]*([^<]+)</i,
+        ]
+        
+        for (const pattern of stylePatterns) {
+          const match = htmlContent.match(pattern)
+          if (match && match[1]) {
+            let style = decodeHtmlEntities(match[1].trim())
+            const styleLower = style.toLowerCase()
+            
+            // Reject invalid values
+            if (!style || 
+                style.length > 80 || 
+                styleLower.includes('select') ||
+                styleLower.includes('choose') ||
+                styleLower.includes('null') ||
+                styleLower === 'square' ||
+                styleLower === 'round' ||
+                styleLower === 'rectangle' ||
+                styleLower.includes('shape') ||
+                (isAppleWatchProductAI && (styleLower.includes('rectangular') || styleLower.includes('circular') || styleLower.includes('oval'))) ||
+                style.includes('{') ||
+                style.includes('<')) {
+              console.log("[v0] ⚠️ AI Path: Rejected invalid style value:", style)
+              continue
+            }
+
+            // For Apple Watch, ONLY accept GPS/GPS + Cellular
+            if (isAppleWatchProductAI) {
+              const watchStyle = formatAppleWatchStyleAI(styleLower)
+              if (!watchStyle) {
+                console.log("[v0] ⚠️ AI Path: Rejected non-connectivity style for Apple Watch:", style)
+                continue
+              }
+              productData.attributes.style = watchStyle
+              console.log("[v0] ✅ AI Path: Extracted Style for Apple Watch:", productData.attributes.style)
+              break
+            }
+            
+            // For tablets, ONLY accept connectivity options
+            if (isTabletProductAI) {
+              const isValidTabletStyle = validTabletStylesAI.some(vts => styleLower.includes(vts))
+              if (!isValidTabletStyle) {
+                console.log("[v0] ⚠️ AI Path: Rejected non-connectivity style for tablet:", style)
+                continue
+              }
+            }
+            
+            // Format nicely for tablets
+            if (styleLower.includes('wi-fi + cellular') || styleLower.includes('wifi + cellular')) {
+              style = 'Wi-Fi + Cellular'
+            } else if (styleLower === 'wi-fi' || styleLower === 'wifi') {
+              style = 'Wi-Fi'
+            } else if (styleLower === 'cellular' || styleLower === 'lte' || styleLower === '5g') {
+              style = styleLower.toUpperCase()
+            }
+            
+            productData.attributes.style = style
+            console.log("[v0] ✅ AI Path: Extracted Style:", productData.attributes.style)
+            break
+          }
+        }
+        
+        // Fallback: Check product name for connectivity
+        if (!productData.attributes.style && isTabletProductAI) {
+          if (productNameLowerAI.includes('wi-fi + cellular') || 
+              (productNameLowerAI.includes('wi-fi') && productNameLowerAI.includes('cellular'))) {
+            productData.attributes.style = 'Wi-Fi + Cellular'
+            console.log("[v0] ✅ AI Path: Extracted Style from title: Wi-Fi + Cellular")
+          } else if (productNameLowerAI.includes('cellular') || productNameLowerAI.includes('5g') || productNameLowerAI.includes('lte')) {
+            productData.attributes.style = 'Cellular'
+            console.log("[v0] ✅ AI Path: Extracted Style from title: Cellular")
+          } else if (productNameLowerAI.includes('wi-fi') || productNameLowerAI.includes('wifi')) {
+            productData.attributes.style = 'Wi-Fi'
+            console.log("[v0] ✅ AI Path: Extracted Style from title: Wi-Fi")
+          }
+        }
+
+        // Fallback: Apple Watch connectivity from title / product overview specs
+        if (!productData.attributes.style && isAppleWatchProductAI) {
+          const connectivityLower = String(productData.attributes?.connectivityTechnology || '').toLowerCase()
+          const wirelessLower = String(productData.attributes?.wirelessType || '').toLowerCase()
+          const combinedLower = `${productNameLowerAI} ${connectivityLower} ${wirelessLower}`.trim()
+          const watchStyle = formatAppleWatchStyleAI(combinedLower)
+          if (watchStyle) {
+            productData.attributes.style = watchStyle
+            console.log("[v0] ✅ AI Path: Extracted Style for Apple Watch (fallback):", productData.attributes.style)
+          }
+        }
+      }
+      
+      // Extract CONFIGURATION (AppleCare status for ALL Apple products, including iPads)
+      if (!productData.attributes.configuration) {
+        const configPatterns = [
+          // Pattern 1: data-csa-c-dimension attributes
+          /<span[^>]*data-csa-c-dimension-name=["']configuration_name["'][^>]*data-csa-c-dimension-value=["']([^"']+)["']/i,
+          /<[^>]*data-csa-c-dimension-name=["']configuration_name["'][^>]*>[\s\S]*?data-csa-c-dimension-value=["']([^"']+)["']/i,
+          // Pattern 2: selectedVariations with configuration_name
+          /"selectedVariations"\s*:\s*\{[^}]*"configuration_name"\s*:\s*"([^"]+)"/i,
+          /selectedDimensions[^}]*configuration_name[^}]*:\s*"([^"]+)"/i,
+          // Pattern 3: configuration_name in JSON
+          /"configuration_name"\s*:\s*"([^"]+)"/i,
+          /configuration_name['"]\s*:\s*['"]([^'"]+)['"]/i,
+          // Pattern 4: Configuration selection text in UI
+          /<span[^>]*class=["'][^"']*selection["'][^>]*>[\s]*Configuration:?\s*([^<]+)</i,
+          /variation_configuration_name[\s\S]{0,300}?selection[^>]*>[\s]*([^<]+)</i,
+          // Pattern 5: Amazon's variation_configuration_name div with selection
+          /id=["']variation_configuration_name["'][\s\S]{0,500}?selection[^>]*>[\s]*([^<]+)</i,
+        ]
+        
+        for (const pattern of configPatterns) {
+          const match = htmlContent.match(pattern)
+          if (match && match[1]) {
+            let config = decodeHtmlEntities(match[1].trim())
+            const configLower = config.toLowerCase()
+            
+            // Reject invalid values
+            if (!config || 
+                config.length > 100 || 
+                configLower.includes('select') ||
+                configLower.includes('choose') ||
+                configLower.includes('null') ||
+                config.includes('{') ||
+                config.includes('<')) {
+              console.log("[v0] ⚠️ AI Path: Rejected invalid configuration value:", config)
+              continue
+            }
+            
+            // ONLY accept AppleCare-related values for configuration
+            // Bundle options (iPad Only, iPad + Pencil) are NOT valid configuration
+            if (configLower.includes('applecare') || 
+                configLower.includes('without applecare') ||
+                configLower.includes('with applecare') ||
+                configLower.includes('protection plan') ||
+                configLower.includes('care+')) {
+              // Format nicely
+              if (configLower.includes('without')) {
+                config = 'Without AppleCare+'
+              } else if (configLower.includes('2 year') || configLower.includes('2-year')) {
+                config = 'With AppleCare+ (2 Years)'
+              } else if (configLower.includes('with applecare') || configLower.includes('care+')) {
+                config = 'With AppleCare+'
+              }
+              productData.attributes.configuration = config
+              console.log("[v0] ✅ AI Path: Extracted Configuration (AppleCare):", productData.attributes.configuration)
+              break
+            }
+            
+            console.log("[v0] ⚠️ AI Path: Rejected non-AppleCare configuration value:", config)
+          }
+        }
+        
+        // Fallback: Check product name for AppleCare mention
+        if (!productData.attributes.configuration && productNameLowerAI) {
+          if (productNameLowerAI.includes('without applecare')) {
+            productData.attributes.configuration = 'Without AppleCare+'
+            console.log("[v0] ✅ AI Path: Extracted Configuration from title: Without AppleCare+")
+          } else if (productNameLowerAI.includes('with applecare+ (2 years)') || productNameLowerAI.includes('applecare+ (2 years)')) {
+            productData.attributes.configuration = 'With AppleCare+ (2 Years)'
+            console.log("[v0] ✅ AI Path: Extracted Configuration from title: With AppleCare+ (2 Years)")
+          } else if (productNameLowerAI.includes('with applecare')) {
+            productData.attributes.configuration = 'With AppleCare+'
+            console.log("[v0] ✅ AI Path: Extracted Configuration from title: With AppleCare+")
+          }
+        }
+        
+        // FINAL FALLBACK: For ALL Apple products (including iPads), default to "Without AppleCare+"
+        if (!productData.attributes.configuration && isAppleProductAI) {
+          productData.attributes.configuration = 'Without AppleCare+'
+          console.log("[v0] ✅ AI Path: Defaulting Configuration to: Without AppleCare+ (Apple product default)")
+        }
+      }
+      
+      console.log("[v0] 📋 AI Path variant extraction results:", {
+        style: productData.attributes.style || 'not found',
+        configuration: productData.attributes.configuration || 'not found'
+      })
+    }
+    
+    // Promote key variant options to top-level for easier client access
+    if (productData.attributes?.style && !productData.style) {
+      productData.style = productData.attributes.style
+    }
+    if (productData.attributes?.configuration && !productData.configuration) {
+      productData.configuration = productData.attributes.configuration
     }
     
     console.log("[v0] 🔍 ABSOLUTE FINAL imageUrl:", productData.imageUrl ? productData.imageUrl.substring(0, 100) : "null")

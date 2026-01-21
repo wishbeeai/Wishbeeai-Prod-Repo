@@ -11,11 +11,16 @@ import {
   ShoppingCart,
   Package,
   Gift,
+  Copy,
+  Mail,
+  MessageCircle,
+  X,
+  Check,
 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 
 export default function ActiveGiftsPage() {
   const router = useRouter()
@@ -23,6 +28,57 @@ export default function ActiveGiftsPage() {
   const [aiInsights, setAiInsights] = useState<{ [key: number]: any }>({})
   const [sharingGift, setSharingGift] = useState<number | null>(null)
   const [remindingGift, setRemindingGift] = useState<number | null>(null)
+  
+  // New gift share modal state
+  const [showShareModal, setShowShareModal] = useState(false)
+  const [newGiftLink, setNewGiftLink] = useState<string | null>(null)
+  const [newGiftId, setNewGiftId] = useState<string | null>(null)
+  const [linkCopied, setLinkCopied] = useState(false)
+  
+  // Check for newly created gift magic link on mount
+  useEffect(() => {
+    // Check all session storage keys for magic links
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const key = sessionStorage.key(i)
+      if (key && key.startsWith('gift_') && key.endsWith('_magicLink')) {
+        const magicLink = sessionStorage.getItem(key)
+        if (magicLink) {
+          const giftId = key.replace('gift_', '').replace('_magicLink', '')
+          setNewGiftLink(magicLink)
+          setNewGiftId(giftId)
+          setShowShareModal(true)
+          // Remove from session storage after showing
+          sessionStorage.removeItem(key)
+          break
+        }
+      }
+    }
+  }, [])
+  
+  const handleCopyNewGiftLink = async () => {
+    if (!newGiftLink) return
+    try {
+      await navigator.clipboard.writeText(newGiftLink)
+      setLinkCopied(true)
+      toast.success('Contribution link copied!')
+      setTimeout(() => setLinkCopied(false), 2000)
+    } catch (err) {
+      toast.error('Failed to copy link')
+    }
+  }
+  
+  const handleEmailNewGiftLink = () => {
+    if (!newGiftLink) return
+    const subject = encodeURIComponent('You\'re Invited to Contribute!')
+    const body = encodeURIComponent(`I've created a gift collection and would love for you to contribute!\n\nClick here to view and contribute: ${newGiftLink}`)
+    window.location.href = `mailto:?subject=${subject}&body=${body}`
+  }
+  
+  const handleWhatsAppNewGiftLink = () => {
+    if (!newGiftLink) return
+    const message = encodeURIComponent(`I've created a gift collection and would love for you to contribute!\n\nClick here to view and contribute: ${newGiftLink}`)
+    window.open(`https://wa.me/?text=${message}`, '_blank')
+  }
 
   const activeGifts = [
     {
@@ -305,7 +361,7 @@ export default function ActiveGiftsPage() {
     }
     return (
       <span
-        className={`px-2 py-1 rounded-full text-xs sm:text-sm font-semibold ${styles[urgency as keyof typeof styles]}`}
+        className={`px-1.5 py-0.5 rounded-md text-[9px] font-medium ${styles[urgency as keyof typeof styles]}`}
       >
         {urgency === "high" ? "🔥 Urgent" : urgency === "medium" ? "⚡ Active" : "✅ On Track"}
       </span>
@@ -446,44 +502,39 @@ export default function ActiveGiftsPage() {
                 </div>
               )}
 
-              <div className="space-y-2">
-                <div className="flex gap-2 md:gap-4">
+              <div className="space-y-1.5">
+                <div className="flex gap-1.5">
                   <button
                     onClick={() => handleViewDetails(gift.id, gift.name)}
-                    className="flex-1 px-3 py-2 bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#3B2F0F] rounded-lg text-xs sm:text-sm font-semibold hover:shadow-lg transition-all hover:scale-105"
+                    className="flex-1 px-2 py-1.5 bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#3B2F0F] rounded-md text-[10px] font-semibold hover:shadow-md transition-all hover:scale-105"
                   >
                     View Details
                   </button>
                   <button
                     onClick={() => handleShare(gift.id, gift.name)}
                     disabled={sharingGift === gift.id}
-                    className="w-16 sm:w-20 md:w-24 px-2 sm:px-3 py-2 border-2 border-[#DAA520] text-[#8B5A3C] rounded-lg text-xs sm:text-sm font-semibold hover:bg-[#DAA520]/10 transition-all flex items-center justify-center gap-1 sm:gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-2 py-1.5 border border-[#DAA520] text-[#8B5A3C] rounded-md text-[10px] font-semibold hover:bg-[#DAA520]/10 transition-all flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <Share2 className="w-2.5 h-2.5 sm:w-3 sm:h-3 md:w-4 md:h-4" />
+                    <Share2 className="w-3 h-3" />
                     {sharingGift === gift.id ? "..." : "Share"}
                   </button>
                 </div>
 
-                <div className="flex gap-2 md:gap-4">
+                <div className="flex gap-1.5">
                   <button
                     onClick={() => getAIInsights(gift.id, gift)}
                     disabled={loadingAI === gift.id}
-                    className="flex-1 px-2 sm:px-3 py-1.5 sm:py-2 bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 text-white rounded-lg text-xs sm:text-sm font-semibold hover:shadow-lg transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 whitespace-nowrap"
+                    className="flex-1 px-2 py-1.5 bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 text-white rounded-md text-[10px] font-semibold hover:shadow-md transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1 whitespace-nowrap"
                   >
-                    <Sparkles className="w-3 h-3 sm:w-4 sm:h-4" />
-                    <span className="hidden xs:inline">
-                      {loadingAI === gift.id ? "Analyzing..." : aiInsights[gift.id] ? "Refresh AI" : "Get AI Insights"}
-                    </span>
-                    <span className="xs:hidden">
-                      {loadingAI === gift.id ? "Analyzing..." : aiInsights[gift.id] ? "Refresh" : "AI Insights"}
-                    </span>
+                    <Sparkles className="w-3 h-3" />
+                    {loadingAI === gift.id ? "Analyzing..." : aiInsights[gift.id] ? "Refresh" : "AI Insights"}
                   </button>
                   <button
                     onClick={() => sendReminder(gift.id, gift.name, gift.contributors)}
                     disabled={remindingGift === gift.id}
-                    className="w-16 sm:w-20 md:w-24 px-2 sm:px-3 py-2 border-2 border-amber-500 text-[#8B5A3C] rounded-lg text-xs sm:text-sm font-semibold hover:bg-amber-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-2 py-1.5 border border-amber-500 text-[#8B5A3C] rounded-md text-[10px] font-semibold hover:bg-amber-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {remindingGift === gift.id ? "Sending..." : "Remind"}
+                    {remindingGift === gift.id ? "..." : "Remind"}
                   </button>
                 </div>
               </div>
@@ -491,108 +542,77 @@ export default function ActiveGiftsPage() {
           ))}
         </div>
 
-        <div className="mt-12">
-          {/* Recommended Gifts to Purchase */}
-          <div className="mb-6 flex flex-row items-center justify-center gap-2">
-            <Package className="w-4 h-4 sm:w-7 sm:h-7 md:w-8 md:h-8 text-[#DAA520] flex-shrink-0" />
-            <h2 className="text-base sm:text-lg font-bold text-black whitespace-nowrap">
-              Recommended Gifts to Purchase
-            </h2>
-          </div>
-          <p className="text-xs sm:text-sm text-[#8B4513]/70 text-center mb-6">
-            Browse and buy gifts for your active collections
-          </p>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {giftProducts.map((product) => (
-              <div
-                key={product.id}
-                className="bg-white rounded-xl shadow-lg border-2 border-[#DAA520]/20 overflow-hidden hover:shadow-xl transition-all hover:scale-[1.02] flex flex-col"
-              >
-                {/* Product Image */}
-                <div className="relative h-48 bg-gray-100 flex-shrink-0">
-                  <img
-                    src={product.image || "/placeholder.svg"}
-                    alt={product.name}
-                    className="w-full h-full object-contain p-4"
-                  />
-                  {product.stockStatus === "Low Stock" && (
-                    <span className="absolute top-2 right-2 bg-orange-500 text-white text-xs px-2 py-1 rounded-full font-semibold">
-                      Low Stock
-                    </span>
-                  )}
-                </div>
-
-                {/* For Gift Badge */}
-                <div className="p-4 flex flex-col flex-grow">
-                  <div className="mb-2 flex-shrink-0">
-                    <span className="text-xs bg-gradient-to-r from-amber-100 to-yellow-100 text-black px-2 py-1 rounded-full font-semibold truncate block max-w-full">
-                      For: {product.forGift}
-                    </span>
+      </div>
+      
+      {/* New Gift Share Modal */}
+      {showShareModal && newGiftLink && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-[#DAA520] to-[#F4C430] p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+                    <Gift className="w-5 h-5 text-white" />
                   </div>
-
-                  {/* Product Title */}
-                  <div className="h-12 mb-2 flex-shrink-0">
-                    <h3 className="font-bold text-base sm:text-lg text-black line-clamp-2 leading-tight">
-                      {product.name}
-                    </h3>
-                  </div>
-
-                  {/* Store and Category */}
-                  <div className="mb-2 h-10 flex-shrink-0 flex flex-col gap-1">
-                    <p className="text-xs text-gray-700 font-semibold truncate">
-                      <span className="text-gray-500">Brand:</span> {product.attributes.Brand || product.store}
-                    </p>
-                    <span className="text-xs text-gray-500">Category: {product.category}</span>
-                  </div>
-
-                  {/* Price */}
-                  <div className="mb-3 h-7 flex-shrink-0">
-                    <span className="text-sm sm:text-lg md:text-xl font-bold text-[#DAA520]">
-                      ${product.price.toFixed(2)}
-                    </span>
-                  </div>
-
-                  {/* Description */}
-                  <div className="h-10 mb-3 flex-shrink-0">
-                    <p className="text-xs text-gray-600 line-clamp-2">{product.description}</p>
-                  </div>
-
-                  {/* Product Attributes */}
-                  <div className="bg-gray-50 rounded-lg p-3 mb-4 min-h-[140px] flex-grow">
-                    <h4 className="text-xs font-semibold text-gray-700 uppercase mb-2">Product Details</h4>
-                    <div className="space-y-1 text-xs">
-                      {Object.entries(product.attributes).map(([key, value]) => (
-                        <div key={key}>
-                          <span className="font-semibold text-gray-700">{key}:</span>{" "}
-                          <span className="text-gray-600">{value}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="space-y-2 flex-shrink-0">
-                    <button
-                      onClick={() => handleBuyGift(product)}
-                      className="w-full px-3 py-2 bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-black rounded-lg text-xs sm:text-sm font-semibold hover:shadow-lg transition-all hover:scale-105 flex items-center justify-center gap-2"
-                    >
-                      <ShoppingCart className="w-4 h-4" />
-                      Buy Now
-                    </button>
-                    <button
-                      onClick={() => handleAddToCart(product)}
-                      className="w-full px-3 py-2 border-2 border-[#DAA520] text-[#8B5A3C] rounded-lg text-xs sm:text-sm font-semibold hover:bg-[#DAA520]/10 transition-all"
-                    >
-                      Add to Cart
-                    </button>
+                  <div>
+                    <h3 className="text-lg font-bold text-white">Gift Created!</h3>
+                    <p className="text-xs text-white/80">Share your contribution link</p>
                   </div>
                 </div>
+                <button
+                  onClick={() => setShowShareModal(false)}
+                  className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
+                >
+                  <X className="w-4 h-4 text-white" />
+                </button>
               </div>
-            ))}
+            </div>
+            
+            {/* Content */}
+            <div className="p-5 space-y-4">
+              {/* Link Display */}
+              <div className="bg-[#F5F1E8] rounded-lg p-3">
+                <p className="text-[10px] text-[#8B4513]/60 uppercase tracking-wide mb-1">Contribution Link</p>
+                <p className="text-xs text-[#654321] font-mono break-all">{newGiftLink}</p>
+              </div>
+              
+              {/* Share Buttons */}
+              <div className="flex justify-center gap-3">
+                <button
+                  onClick={handleCopyNewGiftLink}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-white shadow-sm hover:shadow-md hover:scale-105 transition-all"
+                >
+                  {linkCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span className="text-[10px] font-medium">{linkCopied ? 'Copied!' : 'Copy'}</span>
+                </button>
+                <button
+                  onClick={handleEmailNewGiftLink}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-[#EA580C] to-[#FB923C] text-white shadow-sm hover:shadow-md hover:scale-105 transition-all"
+                >
+                  <Mail className="w-3.5 h-3.5" />
+                  <span className="text-[10px] font-medium">Email</span>
+                </button>
+                <button
+                  onClick={handleWhatsAppNewGiftLink}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-[#25D366] to-[#128C7E] text-white shadow-sm hover:shadow-md hover:scale-105 transition-all"
+                >
+                  <MessageCircle className="w-3.5 h-3.5" />
+                  <span className="text-[10px] font-medium">WhatsApp</span>
+                </button>
+              </div>
+              
+              {/* Done Button */}
+              <button
+                onClick={() => setShowShareModal(false)}
+                className="w-full py-2.5 bg-[#F5F1E8] text-[#654321] font-semibold rounded-lg hover:bg-[#EDE9E0] transition-colors text-sm"
+              >
+                Done
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }

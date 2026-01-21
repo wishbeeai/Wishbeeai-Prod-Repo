@@ -1,4 +1,5 @@
 import { generateText } from "ai"
+import { openai } from "@ai-sdk/openai"
 import { NextResponse } from "next/server"
 
 export async function POST(req: Request) {
@@ -6,7 +7,7 @@ export async function POST(req: Request) {
     const { groupMembers, currentDate } = await req.json()
 
     const { text } = await generateText({
-      model: "openai/gpt-4o-mini",
+      model: openai("gpt-4o-mini"),
       prompt: `Detect upcoming gift-worthy occasions for group members.
 
 Current Date: ${currentDate}
@@ -50,6 +51,14 @@ IMPORTANT: Respond ONLY with valid JSON, no other text.`,
     return NextResponse.json(occasions)
   } catch (error) {
     console.error("Error detecting occasions:", error)
-    return NextResponse.json({ error: "Failed to detect occasions" }, { status: 500 })
+    const errorMessage = error instanceof Error ? error.message : "Unknown error"
+    const isAuthError = errorMessage.includes("authentication") || errorMessage.includes("Gateway")
+    
+    return NextResponse.json({ 
+      error: "Failed to detect occasions",
+      details: isAuthError 
+        ? "AI API key not configured. Please set OPENAI_API_KEY or AI_GATEWAY_API_KEY."
+        : errorMessage
+    }, { status: 500 })
   }
 }

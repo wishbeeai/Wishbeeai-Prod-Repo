@@ -1,4 +1,5 @@
 import { generateText } from "ai"
+import { openai } from "@ai-sdk/openai"
 import { NextResponse } from "next/server"
 
 export async function POST(request: Request) {
@@ -39,7 +40,7 @@ Research the best-selling, highest-rated product in this category at competitive
 Return ONLY valid JSON, no markdown, no explanation.`
 
     const { text } = await generateText({
-      model: "openai/gpt-4o-mini",
+      model: openai("gpt-4o-mini"),
       prompt,
       maxTokens: 1500,
     })

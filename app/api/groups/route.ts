@@ -1,71 +1,112 @@
-export async function POST(req: Request) {
-  try {
-    const groupData = await req.json()
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 
+// In-memory storage for groups (temporary until database table is created)
+// This will reset when the server restarts
+// Using global to persist across hot reloads in development
+const getGroupsStore = (): Map<string, any> => {
+  if (!(global as any).__groupsStore) {
+    (global as any).__groupsStore = new Map()
+  }
+  return (global as any).__groupsStore
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const supabase = await createClient()
+    
+    // Authenticate user
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const groupData = await req.json()
     console.log("[v0] Creating group:", groupData)
 
     // Validate required fields
     if (!groupData.groupName || !groupData.memberEmails || groupData.memberEmails.length === 0) {
-      return Response.json({ error: "Group name and at least one member email are required" }, { status: 400 })
+      return NextResponse.json({ error: "Group name and at least one member email are required" }, { status: 400 })
     }
 
-    // In production, this would save to a database
-    // For now, we'll simulate a successful save
-    const savedGroup = {
-      id: Date.now().toString(),
-      ...groupData,
-      createdDate: new Date().toISOString(),
-      memberCount: groupData.memberEmails.length,
-      status: "active",
-      invitationsSent: true,
+    // Generate a unique ID
+    const groupId = `group_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    
+    // Create group object
+    const group = {
+      id: groupId,
+      created_by: user.id,
+      group_name: groupData.groupName,
+      description: groupData.description || null,
+      group_photo: groupData.groupPhoto || null,
+      status: 'active',
+      created_at: new Date().toISOString(),
+      member_emails: groupData.memberEmails,
+      member_count: groupData.memberEmails.length,
     }
+    
+    // Store in memory
+    getGroupsStore().set(groupId, group)
+    
+    console.log("[v0] Group created successfully:", groupId)
 
-    console.log("[v0] Group created successfully:", savedGroup.id)
-
-    return Response.json({
+    return NextResponse.json({
       success: true,
-      id: savedGroup.id,
-      group: savedGroup,
+      id: groupId,
+      group: {
+        id: groupId,
+        groupName: group.group_name,
+        description: group.description,
+        groupPhoto: group.group_photo,
+        memberCount: group.member_count,
+        status: group.status,
+        createdDate: group.created_at,
+        invitationsSent: true,
+      },
     })
   } catch (error) {
     console.error("[v0] Error creating group:", error)
-    return Response.json({ error: "Failed to create group" }, { status: 500 })
+    return NextResponse.json({ error: "Failed to create group" }, { status: 500 })
   }
 }
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   try {
-    // In production, fetch from database
-    // For now, return mock data
-    const mockGroups = [
-      {
-        id: "1",
-        groupName: "Family Circle",
-        description: "Our close family group for special occasions",
-        groupPhoto: "/images/group-gifting-mainimage.png",
-        memberCount: 8,
-        memberEmails: ["john@example.com", "jane@example.com"],
-        createdDate: new Date().toISOString(),
-        status: "active",
-      },
-      {
-        id: "2",
-        groupName: "Work Friends",
-        description: "Colleagues who celebrate together",
-        groupPhoto: "/images/groups.png",
-        memberCount: 12,
-        memberEmails: ["alice@example.com", "bob@example.com"],
-        createdDate: new Date().toISOString(),
-        status: "active",
-      },
-    ]
+    const supabase = await createClient()
+    
+    // Authenticate user
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
-    return Response.json({
+    // Get groups from memory store for this user
+    const userGroups: any[] = []
+    getGroupsStore().forEach((group) => {
+      if (group.created_by === user.id) {
+        userGroups.push({
+          id: group.id,
+          groupName: group.group_name,
+          description: group.description,
+          groupPhoto: group.group_photo || '/images/groups.png',
+          memberCount: group.member_count,
+          memberEmails: group.member_emails,
+          createdDate: group.created_at,
+          status: group.status,
+          isOwner: true,
+        })
+      }
+    })
+
+    // Sort by created date descending
+    userGroups.sort((a, b) => new Date(b.createdDate).getTime() - new Date(a.createdDate).getTime())
+
+    return NextResponse.json({
       success: true,
-      groups: mockGroups,
+      groups: userGroups,
     })
   } catch (error) {
     console.error("[v0] Error fetching groups:", error)
-    return Response.json({ error: "Failed to fetch groups" }, { status: 500 })
+    return NextResponse.json({ error: "Failed to fetch groups" }, { status: 500 })
   }
 }

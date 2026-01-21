@@ -79,8 +79,8 @@ export function Header() {
       icon: Heart,
       submenu: [
         { title: "My Wishlist", href: "/wishlist", description: "Manage your personal wishlist" },
-        { title: "Friends' Wishlists", href: "/wishlist/friends", description: "Browse friends' wish items" },
-        { title: "Add Wishlist", href: "/wishlist/add", description: "Add new items to your wishlist" },
+        { title: "Shared Wishlists", href: "/wishlist/friends", description: "Browse Shared Wishlists" },
+        { title: "Add Wishlist", href: "/wishlist/add", description: "Add new Products to your Wishlist" },
       ],
     },
     // Admin-only menu item - only show if user is admin
