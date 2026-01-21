@@ -623,7 +623,7 @@ export function MyWishlistDisplay() {
                               <p className="text-[9px] font-bold text-[#6B4423] uppercase tracking-wider mb-2 flex items-center gap-1"><span className="w-1.5 h-1.5 bg-[#DAA520] rounded-full"></span>Specifications</p>
                               <table className="w-full">
                                 <tbody>
-                                  {Object.entries(item.specifications).filter(([k,v]) => v && !['color','size','style','configuration'].includes(k.toLowerCase())).slice(0,4).map(([k,v]) => (
+                                  {Object.entries(item.specifications).filter(([k,v]) => v && !['color','size','style','configuration'].includes(k.toLowerCase())).map(([k,v]) => (
                                     <tr key={k}>
                                       <td className="text-[9px] font-semibold text-[#6B4423] capitalize whitespace-nowrap pr-3 py-0.5 align-top w-[80px]">{k}:</td>
                                       <td className="text-[9px] text-[#654321] py-0.5 break-words">{String(v)}</td>
