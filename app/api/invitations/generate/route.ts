@@ -25,13 +25,28 @@ import { z } from 'zod'
 // CONFIGURATION
 // =============================================================================
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
+// Lazy initialization to avoid build errors when env vars are not set
+let openaiClient: OpenAI | null = null
 
-fal.config({
-  credentials: process.env.FAL_KEY,
-})
+function getOpenAIClient(): OpenAI {
+  if (!openaiClient) {
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error('OPENAI_API_KEY is not configured')
+    }
+    openaiClient = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    })
+  }
+  return openaiClient
+}
+
+function initFalClient() {
+  if (process.env.FAL_KEY) {
+    fal.config({
+      credentials: process.env.FAL_KEY,
+    })
+  }
+}
 
 // Validation schema
 const InvitationParamsSchema = z.object({
@@ -90,7 +105,7 @@ async function generateHeroImage(params: InvitationParams): Promise<{ url: strin
 
   console.log('[Invitation] Generating hero image with DALL-E 3...')
   
-  const response = await openai.images.generate({
+  const response = await getOpenAIClient().images.generate({
     model: 'dall-e-3',
     prompt: validation.sanitizedPrompt || prompt,
     n: 1,
@@ -171,6 +186,9 @@ export async function POST(request: NextRequest) {
         details: 'Please set FAL_KEY in environment variables',
       }, { status: 500 })
     }
+
+    // Initialize FAL client
+    initFalClient()
 
     // Authenticate user
     const supabase = await createClient()
