@@ -693,8 +693,34 @@ export default function AdminAffiliateProductsPage() {
           }
         }
         
-        // PRIORITY 1: Check for productSpecifications or specs object FIRST to preserve Amazon page order
-        // These contain specs in the order they appear on the product page
+        // Define Amazon's standard display order for product specs
+        // This matches the order shown on Amazon product pages above "About this item"
+        const amazonSpecOrder = [
+          // Watch/Wearables - Amazon standard order (matches user's expected order)
+          'operatingSystem', 'memoryStorageCapacity', 'specialFeature', 'specialFeatures',
+          'batteryCapacity', 'connectivityTechnology', 'wirelessCommunicationStandard',
+          'batteryCellComposition', 'gps', 'shape', 'screenSize', 'displayType', 'waterResistance',
+          // Audio/Headphones
+          'earPlacement', 'formFactor', 'noiseControl', 'impedance', 'connectivity', 'wirelessType',
+          'compatibleDevices', 'batteryLife',
+          // Kitchen/Appliances
+          'coffeeMakerType', 'filterType', 'finishType', 'numberOfSettings', 'maximumPressure',
+          'heatingElement', 'includedComponents', 'waterTankCapacity', 'capacity',
+          // Electronics general
+          'processorType', 'ramSize', 'storageCapacity', 'resolution', 'refreshRate',
+          // General specs (shown last)
+          'material', 'wattage', 'voltage', 'powerSource', 'controlMethod',
+          'sensorType', 'bandMaterial', 'caseMaterial',
+          'productDimensions', 'itemWeight', 'caratWeight',
+          'modelName', 'manufacturer', 'countryOfOrigin',
+          'outputWattage', 'inputVoltage', 'itemModelNumber', 'asin', 'upc', 'productType',
+          'numberOfItems', 'numberOfPieces', 'assemblyRequired', 'batteryRequired', 'batteriesIncluded'
+        ]
+        
+        // Collect all available specs from all sources into a single object
+        const allSpecs: Record<string, any> = {}
+        
+        // Gather from specsLocations (productSpecifications, specs, etc.)
         const specsLocations = [
           extracted.productSpecifications,
           extracted.specs,
@@ -708,66 +734,75 @@ export default function AdminAffiliateProductsPage() {
         for (const specs of specsLocations) {
           if (specs && typeof specs === 'object') {
             for (const [key, value] of Object.entries(specs)) {
-              // Use original key name to preserve order - just clean it up
-              const keyOriginal = key.replace(/\s+/g, ' ').trim()
               const keyLower = key.toLowerCase().replace(/\s+/g, '')
-              
-              // Skip variant options and brand (brand has a dedicated field)
               if (keyLower === 'color' || keyLower === 'size' || keyLower === 'style' || keyLower === 'configuration' || keyLower.includes('brand')) continue
-              
-              // Add with original key name (cleaned up) to preserve order
               if (value && String(value).trim()) {
-                const cleanKey = keyOriginal.replace(/[^a-zA-Z0-9\s]/g, '').trim()
-                if (cleanKey) {
-                  addAttr(cleanKey, value)
-                }
+                allSpecs[key] = value
               }
             }
           }
         }
         
-        // PRIORITY 2: Get from filteredAttributes (fills in any missing specs)
+        // Gather from filteredAttributes
         if (filteredAttributes && Object.keys(filteredAttributes).length > 0) {
           for (const [key, value] of Object.entries(filteredAttributes)) {
-            addAttr(key, value)
+            if (value && String(value).trim()) {
+              allSpecs[key] = value
+            }
           }
         }
         
-        // PRIORITY 3: Check extracted.attributes directly
+        // Gather from extracted.attributes
         if (extracted.attributes) {
           for (const [key, value] of Object.entries(extracted.attributes)) {
-            addAttr(key, value)
+            if (value && String(value).trim()) {
+              allSpecs[key] = value
+            }
           }
         }
         
-        // PRIORITY 4: Check top-level extracted properties for any remaining specs
-        const staticSpecAttrs = [
-          'modelName', 'manufacturer', 'countryOfOrigin', 'weight', 'dimensions', 'itemWeight',
-          'impedance', 'earPlacement', 'formFactor', 'noiseControl', 'connectivity', 'wirelessType', 
-          'compatibleDevices', 'batteryLife', 'capacity', 'material', 'wattage', 'voltage', 'powerSource', 
-          'controlMethod', 'specialFeature', 'specialFeatures',
-          'operatingSystem', 'memoryStorageCapacity', 'batteryCapacity', 'connectivityTechnology',
-          'wirelessCommunicationStandard', 'batteryCellComposition', 'gps', 'shape', 'screenSize',
-          'displayType', 'waterResistance', 'sensorType', 'bandMaterial', 'caseMaterial',
-          'processorType', 'ramSize', 'storageCapacity', 'resolution', 'refreshRate',
-          'coffeeMakerType', 'filterType', 'finishType', 'numberOfSettings', 'productDimensions',
-          'maximumPressure', 'heatingElement', 'includedComponents', 'waterTankCapacity',
-          'outputWattage', 'inputVoltage', 'itemModelNumber', 'asin', 'upc', 'productType',
-          'numberOfItems', 'numberOfPieces', 'assemblyRequired', 'batteryRequired', 'batteriesIncluded'
-        ]
-        for (const attrName of staticSpecAttrs) {
-          const value = extracted[attrName] || extracted.attributes?.[attrName]
-          addAttr(attrName, value)
+        // Gather from top-level extracted
+        for (const attrName of amazonSpecOrder) {
+          const value = extracted[attrName]
+          if (value && String(value).trim() && !allSpecs[attrName]) {
+            allSpecs[attrName] = value
+          }
         }
         
-        // 5. FALLBACK: Check ALL keys in extracted for any spec-like data
-        const specKeywords = ['operating', 'memory', 'storage', 'battery', 'connectivity', 'wireless', 'gps', 'screen', 'display', 'water', 'special', 'feature']
-        for (const [key, value] of Object.entries(extracted)) {
-          if (value && typeof value === 'string' && specKeywords.some(kw => key.toLowerCase().includes(kw))) {
-            const keyLower = key.toLowerCase()
-            if (!variantOptionsToExclude.includes(keyLower)) {
-              addAttr(key, value)
+        // Now add specs in the defined Amazon order
+        const addedKeys = new Set<string>()
+        
+        // Helper to normalize key for comparison
+        const normalizeKey = (key: string) => key.toLowerCase().replace(/[^a-z0-9]/g, '')
+        
+        for (const specKey of amazonSpecOrder) {
+          const normalizedSpecKey = normalizeKey(specKey)
+          
+          // Find matching key in allSpecs (case-insensitive)
+          let matchedKey: string | null = null
+          let value: any = null
+          
+          for (const [key, val] of Object.entries(allSpecs)) {
+            if (normalizeKey(key) === normalizedSpecKey) {
+              matchedKey = key
+              value = val
+              break
             }
+          }
+          
+          if (value && !addedKeys.has(normalizedSpecKey)) {
+            addAttr(specKey, value)
+            addedKeys.add(normalizedSpecKey)
+            if (matchedKey) addedKeys.add(normalizeKey(matchedKey))
+          }
+        }
+        
+        // Add any remaining specs that weren't in our defined order (at the end)
+        for (const [key, value] of Object.entries(allSpecs)) {
+          const normalizedKey = normalizeKey(key)
+          if (!addedKeys.has(normalizedKey) && !variantOptionsToExclude.includes(key.toLowerCase())) {
+            addAttr(key, value)
+            addedKeys.add(normalizedKey)
           }
         }
         
