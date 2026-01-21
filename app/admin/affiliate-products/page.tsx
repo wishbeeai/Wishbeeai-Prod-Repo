@@ -693,50 +693,8 @@ export default function AdminAffiliateProductsPage() {
           }
         }
         
-        // 1. Get from filteredAttributes (already processed)
-        if (filteredAttributes && Object.keys(filteredAttributes).length > 0) {
-          for (const [key, value] of Object.entries(filteredAttributes)) {
-            addAttr(key, value)
-          }
-        }
-        
-        // 2. Check extracted.attributes directly
-        if (extracted.attributes) {
-          for (const [key, value] of Object.entries(extracted.attributes)) {
-            addAttr(key, value)
-          }
-        }
-        
-        // 3. Check top-level extracted properties for STATIC product specifications only
-        // Excluded: color, size, style, configuration (these are variant options)
-        // NOTE: 'brand' is excluded because there's a separate Product Brand field
-        const staticSpecAttrs = [
-          // General (brand excluded - has dedicated field)
-          'modelName', 'manufacturer', 'countryOfOrigin', 'weight', 'dimensions', 'itemWeight',
-          // Audio/Headphones
-          'impedance', 'earPlacement', 'formFactor', 'noiseControl', 'connectivity', 'wirelessType', 
-          'compatibleDevices', 'batteryLife', 'capacity', 'material', 'wattage', 'voltage', 'powerSource', 
-          'controlMethod', 'specialFeature', 'specialFeatures',
-          // Watch/Wearables specific
-          'operatingSystem', 'memoryStorageCapacity', 'batteryCapacity', 'connectivityTechnology',
-          'wirelessCommunicationStandard', 'batteryCellComposition', 'gps', 'shape', 'screenSize',
-          'displayType', 'waterResistance', 'sensorType', 'bandMaterial', 'caseMaterial',
-          // Electronics general
-          'processorType', 'ramSize', 'storageCapacity', 'resolution', 'refreshRate',
-          // Kitchen/Appliances - Amazon Product Overview attributes
-          'coffeeMakerType', 'filterType', 'finishType', 'numberOfSettings', 'productDimensions',
-          'maximumPressure', 'heatingElement', 'includedComponents', 'waterTankCapacity',
-          // Additional Amazon Product Overview attributes
-          'outputWattage', 'inputVoltage', 'itemModelNumber', 'asin', 'upc', 'productType',
-          'numberOfItems', 'numberOfPieces', 'assemblyRequired', 'batteryRequired', 'batteriesIncluded'
-        ]
-        for (const attrName of staticSpecAttrs) {
-          // Check multiple locations for each attribute
-          const value = extracted[attrName] || extracted.attributes?.[attrName]
-          addAttr(attrName, value)
-        }
-        
-        // 4. Check for productSpecifications or specs object in MULTIPLE locations
+        // PRIORITY 1: Check for productSpecifications or specs object FIRST to preserve Amazon page order
+        // These contain specs in the order they appear on the product page
         const specsLocations = [
           extracted.productSpecifications,
           extracted.specs,
@@ -750,71 +708,56 @@ export default function AdminAffiliateProductsPage() {
         for (const specs of specsLocations) {
           if (specs && typeof specs === 'object') {
             for (const [key, value] of Object.entries(specs)) {
-              // Map common spec names to our attribute names
-              const keyLower = key.toLowerCase().replace(/\s+/g, '')
+              // Use original key name to preserve order - just clean it up
               const keyOriginal = key.replace(/\s+/g, ' ').trim()
+              const keyLower = key.toLowerCase().replace(/\s+/g, '')
               
               // Skip variant options and brand (brand has a dedicated field)
               if (keyLower === 'color' || keyLower === 'size' || keyLower === 'style' || keyLower === 'configuration' || keyLower.includes('brand')) continue
               
-              // General attributes
-              if (keyLower.includes('impedance')) addAttr('impedance', value)
-              else if (keyLower.includes('earplacement') || keyLower.includes('ear_placement')) addAttr('earPlacement', value)
-              else if (keyLower.includes('formfactor') || keyLower.includes('form_factor')) addAttr('formFactor', value)
-              else if (keyLower.includes('noisecontrol')) addAttr('noiseControl', value)
-              // Watch/Wearables specific
-              else if (keyLower.includes('operatingsystem') || keyLower === 'os') addAttr('operatingSystem', value)
-              else if (keyLower.includes('memorystoragecapacity') || keyLower.includes('storagecapacity') || keyLower.includes('internalmemory')) addAttr('memoryStorageCapacity', value)
-              else if (keyLower.includes('batterycapacity')) addAttr('batteryCapacity', value)
-              else if (keyLower.includes('batterycellcomposition') || keyLower.includes('batterytype')) addAttr('batteryCellComposition', value)
-              else if (keyLower.includes('connectivitytechnology')) addAttr('connectivityTechnology', value)
-              else if (keyLower.includes('wirelesscommunication') || keyLower.includes('wirelessstandard')) addAttr('wirelessCommunicationStandard', value)
-              else if (keyLower === 'gps' || keyLower.includes('gpstype')) addAttr('gps', value)
-              else if (keyLower === 'shape' || keyLower.includes('caseshape')) addAttr('shape', value)
-              else if (keyLower.includes('screensize') || keyLower.includes('displaysize')) addAttr('screenSize', value)
-              else if (keyLower.includes('displaytype')) addAttr('displayType', value)
-              else if (keyLower.includes('waterresist')) addAttr('waterResistance', value)
-              // Connectivity
-              else if (keyLower.includes('connectivity') && !keyLower.includes('technology')) addAttr('connectivity', value)
-              else if (keyLower.includes('wireless') && !keyLower.includes('communication')) addAttr('wirelessType', value)
-              else if (keyLower.includes('compatible')) addAttr('compatibleDevices', value)
-              // Battery
-              else if (keyLower.includes('batterylife')) addAttr('batteryLife', value)
-              else if (keyLower.includes('battery') && !keyLower.includes('capacity') && !keyLower.includes('composition') && !keyLower.includes('cell')) addAttr('batteryLife', value)
-              // Other specs
-              else if (keyLower.includes('capacity') && !keyLower.includes('battery') && !keyLower.includes('storage') && !keyLower.includes('memory')) addAttr('capacity', value)
-              else if (keyLower.includes('material') && !keyLower.includes('band') && !keyLower.includes('case')) addAttr('material', value)
-              else if (keyLower.includes('wattage') || keyLower.includes('outputwattage')) addAttr('wattage', value)
-              else if (keyLower.includes('powersource')) addAttr('powerSource', value)
-              else if (keyLower.includes('weight') || keyLower.includes('itemweight')) addAttr('itemWeight', value)
-              else if (keyLower.includes('specialfeature')) addAttr('specialFeature', value)
-              else if (keyLower.includes('dimension') || keyLower.includes('productdimension')) addAttr('productDimensions', value)
-              else if (keyLower.includes('resolution')) addAttr('resolution', value)
-              // Kitchen/Appliances - Amazon Product Overview
-              else if (keyLower.includes('coffeemakertype') || keyLower.includes('coffee maker type')) addAttr('coffeeMakerType', value)
-              else if (keyLower.includes('filtertype') || keyLower.includes('filter type')) addAttr('filterType', value)
-              else if (keyLower.includes('finishtype') || keyLower.includes('finish type')) addAttr('finishType', value)
-              else if (keyLower.includes('controlmethod') || keyLower.includes('control method') || keyLower.includes('controltype')) addAttr('controlMethod', value)
-              else if (keyLower.includes('numberofsettings')) addAttr('numberOfSettings', value)
-              else if (keyLower.includes('maximumpressure') || keyLower.includes('pressure')) addAttr('maximumPressure', value)
-              else if (keyLower.includes('heatingelement')) addAttr('heatingElement', value)
-              else if (keyLower.includes('includedcomponents') || keyLower.includes('included components')) addAttr('includedComponents', value)
-              else if (keyLower.includes('watertankcapacity') || keyLower.includes('water tank')) addAttr('waterTankCapacity', value)
-              else if (keyLower.includes('voltage') || keyLower.includes('inputvoltage')) addAttr('voltage', value)
-              else if (keyLower.includes('modelnumber') || keyLower.includes('model number') || keyLower.includes('itemmodelnumber')) addAttr('itemModelNumber', value)
-              else if (keyLower.includes('producttype') || keyLower.includes('product type')) addAttr('productType', value)
-              else if (keyLower.includes('manufacturer')) addAttr('manufacturer', value)
-              else if (keyLower.includes('countryoforigin') || keyLower.includes('country of origin')) addAttr('countryOfOrigin', value)
-              // If none of the above matched, add with the original key name (cleaned up)
-              else {
-                // Only add if it's not a variant option and has a valid value
+              // Add with original key name (cleaned up) to preserve order
+              if (value && String(value).trim()) {
                 const cleanKey = keyOriginal.replace(/[^a-zA-Z0-9\s]/g, '').trim()
-                if (cleanKey && value && String(value).trim()) {
+                if (cleanKey) {
                   addAttr(cleanKey, value)
                 }
               }
             }
           }
+        }
+        
+        // PRIORITY 2: Get from filteredAttributes (fills in any missing specs)
+        if (filteredAttributes && Object.keys(filteredAttributes).length > 0) {
+          for (const [key, value] of Object.entries(filteredAttributes)) {
+            addAttr(key, value)
+          }
+        }
+        
+        // PRIORITY 3: Check extracted.attributes directly
+        if (extracted.attributes) {
+          for (const [key, value] of Object.entries(extracted.attributes)) {
+            addAttr(key, value)
+          }
+        }
+        
+        // PRIORITY 4: Check top-level extracted properties for any remaining specs
+        const staticSpecAttrs = [
+          'modelName', 'manufacturer', 'countryOfOrigin', 'weight', 'dimensions', 'itemWeight',
+          'impedance', 'earPlacement', 'formFactor', 'noiseControl', 'connectivity', 'wirelessType', 
+          'compatibleDevices', 'batteryLife', 'capacity', 'material', 'wattage', 'voltage', 'powerSource', 
+          'controlMethod', 'specialFeature', 'specialFeatures',
+          'operatingSystem', 'memoryStorageCapacity', 'batteryCapacity', 'connectivityTechnology',
+          'wirelessCommunicationStandard', 'batteryCellComposition', 'gps', 'shape', 'screenSize',
+          'displayType', 'waterResistance', 'sensorType', 'bandMaterial', 'caseMaterial',
+          'processorType', 'ramSize', 'storageCapacity', 'resolution', 'refreshRate',
+          'coffeeMakerType', 'filterType', 'finishType', 'numberOfSettings', 'productDimensions',
+          'maximumPressure', 'heatingElement', 'includedComponents', 'waterTankCapacity',
+          'outputWattage', 'inputVoltage', 'itemModelNumber', 'asin', 'upc', 'productType',
+          'numberOfItems', 'numberOfPieces', 'assemblyRequired', 'batteryRequired', 'batteriesIncluded'
+        ]
+        for (const attrName of staticSpecAttrs) {
+          const value = extracted[attrName] || extracted.attributes?.[attrName]
+          addAttr(attrName, value)
         }
         
         // 5. FALLBACK: Check ALL keys in extracted for any spec-like data
