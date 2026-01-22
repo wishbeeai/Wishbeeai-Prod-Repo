@@ -84,7 +84,9 @@ export default function PastGiftsPage() {
         toast.success("Shared successfully!")
       } else {
         await navigator.clipboard.writeText(shareUrl)
-        toast.success("Link copied to clipboard!")
+        toast.success("🐝 Link copied!", {
+          style: { background: 'linear-gradient(to right, #FEF3C7, #FDE68A, #F4C430)', color: '#654321', border: '2px solid #DAA520' }
+        })
       }
     } catch (error: any) {
       if (error.name !== "AbortError") {

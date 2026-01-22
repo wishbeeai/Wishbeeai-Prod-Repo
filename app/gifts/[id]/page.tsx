@@ -272,7 +272,9 @@ export default function GiftDetailPage() {
         })
       } else {
         await navigator.clipboard.writeText(`${window.location.origin}/gifts/${gift.id}`)
-        toast.success("Gift link copied to clipboard!")
+        toast.success("🐝 Gift link copied!", {
+          style: { background: 'linear-gradient(to right, #FEF3C7, #FDE68A, #F4C430)', color: '#654321', border: '2px solid #DAA520' }
+        })
       }
     } catch (error) {
       console.error("[v0] Error sharing gift:", error)
@@ -646,7 +648,9 @@ export default function GiftDetailPage() {
     if (magicLink) {
       await navigator.clipboard.writeText(magicLink)
       setCopied(true)
-      toast.success("Link copied to clipboard!")
+      toast.success("🐝 Link copied!", {
+        style: { background: 'linear-gradient(to right, #FEF3C7, #FDE68A, #F4C430)', color: '#654321', border: '2px solid #DAA520' }
+      })
       setTimeout(() => setCopied(false), 2000)
     }
   }

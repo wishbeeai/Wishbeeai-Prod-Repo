@@ -60,7 +60,9 @@ export default function ActiveGiftsPage() {
     try {
       await navigator.clipboard.writeText(newGiftLink)
       setLinkCopied(true)
-      toast.success('Contribution link copied!')
+      toast.success('🐝 Contribution link copied!', {
+        style: { background: 'linear-gradient(to right, #FEF3C7, #FDE68A, #F4C430)', color: '#654321', border: '2px solid #DAA520' }
+      })
       setTimeout(() => setLinkCopied(false), 2000)
     } catch (err) {
       toast.error('Failed to copy link')
@@ -276,7 +278,9 @@ export default function ActiveGiftsPage() {
   const copyToClipboard = async (url: string, giftName: string) => {
     try {
       await navigator.clipboard.writeText(url)
-      toast.success(`Link for "${giftName}" copied to clipboard!`)
+      toast.success(`🐝 Link for "${giftName}" copied!`, {
+        style: { background: 'linear-gradient(to right, #FEF3C7, #FDE68A, #F4C430)', color: '#654321', border: '2px solid #DAA520' }
+      })
     } catch (error) {
       toast.error("Failed to copy link. Please try again.")
     }

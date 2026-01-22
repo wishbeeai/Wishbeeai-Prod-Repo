@@ -77,8 +77,9 @@ export default function PastGiftDetailsPage() {
           try {
             await navigator.clipboard.writeText(`${shareText}\n\n${shareUrl}`)
             toast({
-              title: "Link copied!",
-              description: "Share content copied to clipboard.",
+              title: "🐝 Link Copied!",
+              description: "Share content ready to paste",
+              variant: "warm",
             })
           } catch (clipError) {
             console.error("[v0] Clipboard error:", clipError)
@@ -95,8 +96,9 @@ export default function PastGiftDetailsPage() {
       try {
         await navigator.clipboard.writeText(`${shareText}\n\n${shareUrl}`)
         toast({
-          title: "Link copied!",
-          description: "Share content copied to clipboard. Paste to share with others.",
+          title: "🐝 Link Copied!",
+          description: "Share content ready - paste to share with others",
+          variant: "warm",
         })
       } catch (error) {
         console.error("[v0] Clipboard error:", error)

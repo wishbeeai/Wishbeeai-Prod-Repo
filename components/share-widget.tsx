@@ -56,8 +56,9 @@ export function ShareWidget() {
             // Fallback: Copy to clipboard
             await navigator.clipboard.writeText(giftMessage)
             toast({
-              title: "Link Copied!",
-              description: "Share the gift link via your favorite messaging app",
+              title: "🐝 Link Copied!",
+              description: "Share via your favorite messaging app",
+              variant: "warm",
             })
           }
           break
@@ -88,8 +89,9 @@ export function ShareWidget() {
             // Fallback: Copy to clipboard
             await navigator.clipboard.writeText(shareUrl)
             toast({
-              title: "Link Copied!",
-              description: "Paste it on your favorite social platform",
+              title: "🐝 Link Copied!",
+              description: "Paste on your favorite social platform",
+              variant: "warm",
             })
           }
           break
@@ -98,8 +100,9 @@ export function ShareWidget() {
           // Create shareable group invitation link
           await navigator.clipboard.writeText(giftMessage)
           toast({
-            title: "Group Invitation Ready",
-            description: "Link copied! Share with your group members",
+            title: "🐝 Group Invitation Ready!",
+            description: "Link copied - share with your group",
+            variant: "warm",
           })
           break
 

@@ -2225,13 +2225,41 @@ async function extractWithoutAI(
   // URL color codes might be variant identifiers, not the actual color name
   let colorExtracted = false
   
+  // PRIORITY 0: Extract ALL variant options from "Selected X is Y. Tap to collapse." accessibility text
+  // This runs ALWAYS for Amazon, not just when color is missing
+  if (hostname.includes('amazon.com') && htmlContent) {
+    log("[v0] 🔍 Amazon detected - extracting ALL selected variants from accessibility text")
+    
+    const selectedTextPatterns = [
+      { pattern: /Selected Color is ([^.]+?)(?:\.|Tap to collapse)/i, field: 'color' },
+      { pattern: /Selected Size is ([^.]+?)(?:\.|Tap to collapse)/i, field: 'size' },
+      { pattern: /Selected Style is ([^.]+?)(?:\.|Tap to collapse)/i, field: 'style' },
+      { pattern: /Selected Configuration is ([^.]+?)(?:\.|Tap to collapse)/i, field: 'configuration' },
+    ]
+    
+    for (const { pattern, field } of selectedTextPatterns) {
+      if (!(productData.attributes as any)[field]) {
+        const match = htmlContent.match(pattern)
+        if (match && match[1]) {
+          const value = decodeHtmlEntities(match[1].trim())
+          
+          if (value && value.length > 1 && value.length < 100) {
+            (productData.attributes as any)[field] = value
+            if (field === 'color') colorExtracted = true
+            log(`[v0] ✅ Extracted ${field} from "Selected ${field} is" text: ${value}`)
+          }
+        }
+      }
+    }
+  }
+
   // For Amazon, check description and product name for color FIRST (before HTML extraction)
   // Also check HTML directly if description is not populated yet
   if (!productData.attributes.color && hostname.includes('amazon.com')) {
     log("[v0] 🔍 Amazon detected - extracting color from selected variant/HTML/product name")
     
     // PRIORITY 1: Extract from HTML - look for selected color swatch/variant (most reliable)
-    if (htmlContent) {
+    if (htmlContent && !colorExtracted) {
       // Look for selected color in various HTML patterns
       const selectedColorPatterns = [
         // Pattern 1: Selected color button/swatch with "selected" or "active" class

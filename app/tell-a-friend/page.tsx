@@ -59,7 +59,9 @@ export default function TellAFriendPage() {
   const copyToClipboard = () => {
     navigator.clipboard.writeText(referralLink)
     setCopied(true)
-    toast.success("Referral link copied to clipboard!")
+    toast.success("🐝 Referral link copied!", {
+      style: { background: 'linear-gradient(to right, #FEF3C7, #FDE68A, #F4C430)', color: '#654321', border: '2px solid #DAA520' }
+    })
     setTimeout(() => setCopied(false), 2000)
   }
 

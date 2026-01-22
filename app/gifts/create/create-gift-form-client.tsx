@@ -871,7 +871,7 @@ export function CreateGiftFormClient() {
     if (item.list_price) setTargetAmount(item.list_price.toString())
     if (item.title && !giftName) setGiftName(item.title)
     
-    toast({ title: "Product Selected!", description: "Product details have been populated from shared wishlist." })
+    toast({ title: "🐝 Product Selected!", description: "Details synced from shared wishlist", variant: "warm" })
   }
 
   // Select a trending gift
@@ -908,7 +908,7 @@ export function CreateGiftFormClient() {
       setEditableSpecs(specs)
     }
     
-    toast({ title: "Product Selected!", description: "Product details have been populated from trending gifts." })
+    toast({ title: "🐝 Product Selected!", description: "Details synced from trending gifts", variant: "warm" })
   }
 
   // Filter shared items by wishlist

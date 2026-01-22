@@ -178,6 +178,10 @@ function isValidVariantValue(value: any): boolean {
   const v = cleanVariantValue(value)
   if (v.length === 0 || v.length > 100) return false
   
+  // Reject values with too many commas (indicates concatenated garbage)
+  const commaCount = (v.match(/,/g) || []).length
+  if (commaCount > 3) return false
+  
   // Reject values that look like garbage (contain common garbage patterns)
   const garbagePatterns = [
     /items?\s*in\s*cart/i,           // "items in cart" anywhere
@@ -193,6 +197,7 @@ function isValidVariantValue(value: any): boolean {
     /back\s*to\s*top/i,
     /customer\s*image/i,
     /applecare.*monthly/i,
+    /applecare.*years?\s*\$/i,        // "AppleCare+ for iPad - 2 Years $149.00"
     /^\|/,                            // Starts with pipe
     /^\d+\s*items?/i,                 // Starts with number of items
     /Array\(\d+\)/i,                  // Array notation
@@ -208,6 +213,28 @@ function isValidVariantValue(value: any): boolean {
     /collapse/i,                      // "collapse"
     /\d+\s*options?\s*from/i,         // "1 option from"
     /from\s*\$/i,                     // "from $"
+    /shift,?\s*alt/i,                 // Keyboard shortcuts "shift, alt, K"
+    /\balt,?\s*\w\b/i,                // "alt, K" keyboard shortcut
+    /accessories/i,                   // "Accessories" menu item
+    /airpods/i,                       // Product category
+    /apple\s*tv/i,                    // Product category
+    /apple\s*watch$/i,                // Category (not specific product)
+    /apple\s*products/i,              // Category
+    /amazon$/i,                       // Just "Amazon"
+    /^\d+\s*Customer/i,               // "1 Customer"
+    /verified\s*purchase/i,           // Review label
+    /positive\s*aspect/i,             // Review aspect
+    /report\s*review/i,               // Review action
+    /zoom\s*(in|out)/i,               // Image actions
+    /continue\s*shopping/i,           // Navigation
+    /buy\s*now/i,                     // Button text
+    /gift\s*cards?\s*details/i,       // Navigation
+    /prime\s*details/i,               // Navigation
+    /medical\s*care/i,                // Navigation
+    /groceries/i,                     // Navigation
+    /home,?\s*shift/i,                // Keyboard shortcut
+    /expand.*menu/i,                  // UI action
+    /search.*amazon/i,                // Search action
   ]
   
   for (const pattern of garbagePatterns) {
@@ -281,6 +308,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
   const [iWishRating, setIWishRating] = useState("")
   const [iWishReviewCount, setIWishReviewCount] = useState("")
   const [iWishPrice, setIWishPrice] = useState("")
+  const [iWishOriginalPrice, setIWishOriginalPrice] = useState("")
   const [iWishAmazonChoice, setIWishAmazonChoice] = useState(false)
   const [iWishBestSeller, setIWishBestSeller] = useState(false)
   const [iWishSpecs, setIWishSpecs] = useState<Record<string, string>>({})
@@ -293,6 +321,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
   const [altRating, setAltRating] = useState("")
   const [altReviewCount, setAltReviewCount] = useState("")
   const [altPrice, setAltPrice] = useState("")
+  const [altOriginalPrice, setAltOriginalPrice] = useState("")
   const [altAmazonChoice, setAltAmazonChoice] = useState(false)
   const [altBestSeller, setAltBestSeller] = useState(false)
   const [altSpecs, setAltSpecs] = useState<Record<string, string>>({})
@@ -343,6 +372,16 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
   const [okClippedImage, setOkClippedImage] = useState<string | null>(null)
   const [okClippedTitle, setOkClippedTitle] = useState<string | null>(null)
   
+  // "Change Options" popup states
+  const [showLikeRetailerPopup, setShowLikeRetailerPopup] = useState(false)
+  const [showAltRetailerPopup, setShowAltRetailerPopup] = useState(false)
+  const [likeRetailerUrl, setLikeRetailerUrl] = useState("")
+  const [altRetailerUrl, setAltRetailerUrl] = useState("")
+  const [isExtractingLikeRetailer, setIsExtractingLikeRetailer] = useState(false)
+  const [isExtractingAltRetailer, setIsExtractingAltRetailer] = useState(false)
+  // Flag to skip pre-fill useEffect when extracting from popup (prevents overwriting newly extracted values)
+  const skipPreFillRef = useRef(false)
+  
   // Ok to buy preference options (Coral)
   const [okSize, setOkSize] = useState("")
   const [okColor, setOkColor] = useState("")
@@ -363,10 +402,17 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
   useEffect(() => {
     if (!isOpen) return
     
+    // Skip pre-fill if we just extracted from popup (flag set by popup extraction)
+    if (skipPreFillRef.current) {
+      console.log('[Modal] Skipping pre-fill - just extracted from popup')
+      skipPreFillRef.current = false
+      return
+    }
+    
     // PRIORITY 1: Check top-level properties first (from admin affiliate products page)
     // These are saved as: gift.color, gift.size, gift.style, gift.configuration
     const topLevelColor = (gift as any)?.color || extractedProduct?.color
-    const topLevelSize = (gift as any)?.size || extractedProduct?.size
+    const topLevelSize = (gift as any)?.size || (gift as any)?.screenSize || (gift as any)?.memoryStorageCapacity || extractedProduct?.size || (extractedProduct as any)?.screenSize || (extractedProduct as any)?.memoryStorageCapacity
     const topLevelStyle = (gift as any)?.style || extractedProduct?.style
     const topLevelConfiguration = (gift as any)?.configuration || (gift as any)?.set || 
                                    extractedProduct?.configuration || extractedProduct?.set
@@ -419,7 +465,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
         } else if (lowerKey === 'color' && !topLevelColor) {
           setLikeColor(value as string)
           console.log('[Modal] Set likeColor from attrs:', value)
-        } else if (lowerKey === 'size' && !topLevelSize) {
+        } else if ((lowerKey === 'size' || lowerKey === 'screensize' || lowerKey === 'screen size' || lowerKey === 'displaysize' || lowerKey === 'display size' || lowerKey === 'memorystoragecapacity' || lowerKey === 'storagecapacity' || lowerKey === 'storage') && !topLevelSize && !likeSize) {
           setLikeSize(value as string)
           console.log('[Modal] Set likeSize from attrs:', value)
         } else if ((lowerKey === 'set' || lowerKey === 'configuration') && !topLevelConfiguration) {
@@ -953,10 +999,11 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
         ].filter(Boolean)
 
         toast({
-          title: hasAnyOption ? "Options Extracted!" : "Product Updated",
+          title: hasAnyOption ? "🐝 Options Extracted!" : "🐝 Product Updated!",
           description: hasAnyOption 
             ? `Found: ${extractedOptions.join(", ")}`
-            : "No variant options found. Please enter manually.",
+            : "Product details synced. Add your preferences below.",
+          variant: "warm",
         })
         
         // Move to step 2
@@ -999,11 +1046,11 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
         amazonChoice: gift.amazonChoice,
         bestSeller: gift.bestSeller,
       })
-      // Pre-fill variant options from gift attributes
-      if (gift.attributes?.color) setLikeColor(gift.attributes.color)
-      if (gift.attributes?.size) setLikeSize(gift.attributes.size)
-      if (gift.attributes?.style) setLikeStyle(gift.attributes.style)
-      if (gift.attributes?.configuration || gift.attributes?.set) setLikeConfiguration(gift.attributes.configuration || gift.attributes.set)
+      // Pre-fill variant options from gift attributes (with validation)
+      if (gift.attributes?.color && isValidVariantValue(gift.attributes.color)) setLikeColor(gift.attributes.color)
+      if (gift.attributes?.size && isValidVariantValue(gift.attributes.size)) setLikeSize(gift.attributes.size)
+      if (gift.attributes?.style && isValidVariantValue(gift.attributes.style)) setLikeStyle(gift.attributes.style)
+      if ((gift.attributes?.configuration || gift.attributes?.set) && isValidVariantValue(gift.attributes.configuration || gift.attributes.set)) setLikeConfiguration(gift.attributes.configuration || gift.attributes.set)
       setLikeSelected(true)
       
       // Pre-fill editable I Wish fields
@@ -1082,13 +1129,18 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
         },
       })
 
-      // Pre-fill I Wish options from extracted data
-      if (extracted.color || extracted.attributes?.color) setLikeColor(extracted.color || extracted.attributes?.color)
-      if (extracted.attributes?.size) setLikeSize(extracted.attributes.size)
-      if (extracted.style || extracted.attributes?.style) setLikeStyle(extracted.style || extracted.attributes?.style)
-      if (extracted.set || extracted.attributes?.set || extracted.attributes?.configuration) {
-        setLikeConfiguration(extracted.set || extracted.attributes?.set || extracted.attributes?.configuration)
-      }
+      // Pre-fill I Wish options from extracted data (with validation)
+      const extractedColor = extracted.color || extracted.attributes?.color
+      const extractedSize = extracted.size || extracted.attributes?.size || extracted.attributes?.screenSize || extracted.attributes?.memoryStorageCapacity || extracted.attributes?.storageCapacity
+      const extractedStyle = extracted.style || extracted.attributes?.style
+      const extractedConfig = extracted.set || extracted.attributes?.set || extracted.attributes?.configuration
+      
+      console.log('[Modal] Pre-fill extracted variants:', { extractedColor, extractedSize, extractedStyle, extractedConfig })
+      
+      if (extractedColor && isValidVariantValue(extractedColor)) setLikeColor(extractedColor)
+      if (extractedSize && isValidVariantValue(extractedSize)) setLikeSize(extractedSize)
+      if (extractedStyle && isValidVariantValue(extractedStyle)) setLikeStyle(extractedStyle)
+      if (extractedConfig && isValidVariantValue(extractedConfig)) setLikeConfiguration(extractedConfig)
     } catch (error) {
       console.error("[AddToWishlistModal] Extraction error:", error)
       if (gift) {
@@ -1571,8 +1623,9 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
       const imageUrl = event.target?.result as string
       setLikeClippedImage(imageUrl)
       toast({
-        title: "Image updated",
-        description: "Product image has been updated for I Wish section",
+        title: "🐝 Image Updated!",
+        description: "I Wish product image refreshed successfully",
+        variant: "warm",
       })
     }
     reader.readAsDataURL(file)
@@ -1584,8 +1637,8 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
   const handleLikeImageDelete = () => {
     setLikeClippedImage(null)
     toast({
-      title: "Image removed",
-      description: "Product image has been removed from I Wish section",
+      title: "Image Removed",
+      description: "I Wish product image cleared",
     })
   }
   
@@ -1645,8 +1698,9 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
       const imageUrl = event.target?.result as string
       setAltClippedImage(imageUrl)
       toast({
-        title: "Image updated",
-        description: "Product image has been updated for Alternative section",
+        title: "🐝 Image Updated!",
+        description: "Alternative product image refreshed successfully",
+        variant: "warm",
       })
     }
     reader.readAsDataURL(file)
@@ -1658,8 +1712,8 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
   const handleAltImageDelete = () => {
     setAltClippedImage(null)
     toast({
-      title: "Image removed",
-      description: "Product image has been removed from Alternative section",
+      title: "Image Removed",
+      description: "Alternative product image cleared",
     })
   }
   
@@ -1705,8 +1759,9 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
           // Accept any URL - let the browser try to load it
           setLikeClippedImage(trimmedText)
           toast({
-            title: "Image URL pasted!",
-            description: "Product image has been updated",
+            title: "🐝 Image Pasted!",
+            description: "I Wish product image updated from clipboard",
+            variant: "warm",
           })
           return
         } else {
@@ -1745,8 +1800,9 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
           // Accept any URL - let the browser try to load it
           setAltClippedImage(trimmedText)
           toast({
-            title: "Image URL pasted!",
-            description: "Alternative product image has been updated",
+            title: "🐝 Image Pasted!",
+            description: "Alternative product image updated from clipboard",
+            variant: "warm",
           })
           return
         } else {
@@ -1869,26 +1925,334 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                             <button
                               type="button"
                               onClick={() => {
-                                if (extractedProduct?.productLink) {
-                                  const url = addAffiliateTag(extractedProduct.productLink)
-                                  window.open(url, '_blank')
-                                  setLikeSelected(true)
-                                  // Clear previous data for fresh state
-                                  setLikeClippedImage(null)
-                                  setLikeClippedTitle(null)
-                                  setLikeStyle("")
-                                  setLikeColor("")
-                                  setLikeSize("")
-                                  setLikeConfiguration("")
-                                  setAwaitingExtensionFor("like")
-                                  console.log('[Modal] Like - Set awaitingExtensionFor to like, polling should start')
-                                }
+                                setShowLikeRetailerPopup(true)
+                                setLikeRetailerUrl("")
                               }}
                               className="text-[10px] text-[#4A2F1A] font-medium hover:underline flex items-center gap-1"
                             >
                               <ExternalLink className="w-2.5 h-2.5" />
-                              Select on Retailer
+                              Change Options
                             </button>
+                            
+                            {/* Change Options Popup for I Wish */}
+                            {showLikeRetailerPopup && (
+                              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]" onClick={(e) => { e.stopPropagation(); setShowLikeRetailerPopup(false) }}>
+                                <div className="bg-white rounded-2xl p-6 w-[400px] max-w-[90vw] shadow-2xl border-2 border-[#DAA520]/30" onClick={(e) => e.stopPropagation()}>
+                                  <div className="flex items-center justify-between mb-4">
+                                    <h3 className="text-lg font-bold text-[#4A2F1A]">Change Product</h3>
+                                    <button type="button" onClick={() => setShowLikeRetailerPopup(false)} className="p-1 hover:bg-gray-100 rounded-full">
+                                      <X className="w-5 h-5 text-gray-500" />
+                                    </button>
+                                  </div>
+                                  
+                                  {/* Paste Product URL */}
+                                  <div className="space-y-3">
+                                    <div>
+                                      <Label className="text-sm font-semibold text-[#4A2F1A] mb-2 block">Paste Product URL</Label>
+                                      <input
+                                        type="text"
+                                        value={likeRetailerUrl}
+                                        onChange={(e) => setLikeRetailerUrl(e.target.value)}
+                                        onPaste={async (e) => {
+                                          e.preventDefault()
+                                          const pastedUrl = e.clipboardData.getData('text').trim()
+                                          if (!pastedUrl) return
+                                          setLikeRetailerUrl(pastedUrl)
+                                          
+                                          // Auto-extract after paste
+                                          setIsExtractingLikeRetailer(true)
+                                          try {
+                                            const response = await fetch('/api/ai/extract-product', {
+                                              method: 'POST',
+                                              headers: { 'Content-Type': 'application/json' },
+                                              body: JSON.stringify({ url: pastedUrl }),
+                                            })
+                                            if (response.ok) {
+                                              const data = await response.json()
+                                              console.log('[Modal] Auto-extracted product data:', data)
+                                              
+                                              skipPreFillRef.current = true
+                                              
+                                              const productTitle = data.name || data.title || data.productName || ''
+                                              const imageUrl = data.image || data.imageUrl || ''
+                                              const storeName = data.store || data.source || data.storeName || 'Unknown'
+                                              const price = data.price || 0
+                                              const originalPrice = data.originalPrice || data.listPrice || data.wasPrice || null
+                                              const rating = data.rating || null
+                                              const reviewCount = data.reviewCount || null
+                                              const amazonChoice = data.amazonChoice || data.badges?.amazonChoice || false
+                                              const bestSeller = data.bestSeller || data.badges?.bestSeller || false
+                                              
+                                              setExtractedProduct({
+                                                productName: productTitle,
+                                                description: data.description || '',
+                                                price: price,
+                                                storeName: storeName,
+                                                imageUrl: imageUrl,
+                                                productLink: data.productLink || data.url || pastedUrl,
+                                                attributes: {
+                                                  color: data.attributes?.color || null,
+                                                  size: data.attributes?.size || null,
+                                                  brand: data.attributes?.brand || data.brand || null,
+                                                  material: data.attributes?.material || null,
+                                                },
+                                              })
+                                              
+                                              setIWishTitle(productTitle)
+                                              setIWishStore(storeName)
+                                              setIWishPrice(price.toString())
+                                              setIWishOriginalPrice(originalPrice ? originalPrice.toString() : '')
+                                              setIWishRating(rating ? rating.toString() : '')
+                                              setIWishReviewCount(reviewCount ? reviewCount.toString() : '')
+                                              setIWishAmazonChoice(amazonChoice)
+                                              setIWishBestSeller(bestSeller)
+                                              
+                                              if (data.attributes && typeof data.attributes === 'object') {
+                                                const specs: Record<string, string> = {}
+                                                for (const [key, value] of Object.entries(data.attributes)) {
+                                                  if (value && typeof value === 'string' && !['color', 'size', 'style', 'configuration'].includes(key.toLowerCase())) {
+                                                    specs[key] = value
+                                                  }
+                                                }
+                                                if (Object.keys(specs).length > 0) {
+                                                  setIWishSpecs(specs)
+                                                }
+                                              }
+                                              
+                                              setLikeClippedImage(imageUrl)
+                                              setLikeClippedTitle(productTitle)
+                                              
+                                              setLikeColor('')
+                                              setLikeSize('')
+                                              setLikeStyle('')
+                                              setLikeConfiguration('')
+                                              
+                                              const extractedColor = data.color || data.attributes?.color || data.styleName || data.attributes?.styleName || ''
+                                              const extractedSize = data.size || data.attributes?.size || data.screenSize || data.attributes?.screenSize || data.attributes?.memoryStorageCapacity || data.attributes?.storageCapacity || ''
+                                              const extractedStyle = data.style || data.attributes?.style || ''
+                                              const extractedConfig = data.configuration || data.attributes?.configuration || data.attributes?.appleCarePlus || ''
+                                              
+                                              // Log all possible size locations for debugging
+                                              console.log('[Modal] Size debug:', { 
+                                                'data.size': data.size, 
+                                                'data.attributes?.size': data.attributes?.size, 
+                                                'data.screenSize': data.screenSize,
+                                                'data.attributes?.screenSize': data.attributes?.screenSize,
+                                                extractedSize 
+                                              })
+                                              console.log('[Modal] Popup extracted variants:', { extractedColor, extractedSize, extractedStyle, extractedConfig })
+                                              console.log('[Modal] Validation results:', { 
+                                                colorValid: isValidVariantValue(extractedColor), 
+                                                sizeValid: isValidVariantValue(extractedSize), 
+                                                styleValid: isValidVariantValue(extractedStyle), 
+                                                configValid: isValidVariantValue(extractedConfig) 
+                                              })
+                                              
+                                              // Only set variant values if they pass validation (not garbage)
+                                              if (isValidVariantValue(extractedColor)) setLikeColor(extractedColor)
+                                              if (isValidVariantValue(extractedSize)) setLikeSize(extractedSize)
+                                              if (isValidVariantValue(extractedStyle)) setLikeStyle(extractedStyle)
+                                              if (isValidVariantValue(extractedConfig)) setLikeConfiguration(extractedConfig)
+                                              
+                                              setIWishProductUrl(pastedUrl)
+                                              setIWishCleared(false)
+                                              setLikeSelected(true)
+                                              setShowLikeRetailerPopup(false)
+                                              
+                                              toast({
+                                                title: "🐝 Product Extracted!",
+                                                description: "I Wish product replaced with new product.",
+                                                variant: "warm",
+                                              })
+                                            }
+                                          } catch (err) {
+                                            console.error('[Modal] Auto-extract error:', err)
+                                            toast({
+                                              title: "Extraction Failed",
+                                              description: "Could not extract product details.",
+                                              variant: "destructive",
+                                            })
+                                          } finally {
+                                            setIsExtractingLikeRetailer(false)
+                                          }
+                                        }}
+                                        placeholder="Paste product link to extract product details"
+                                        className="w-full px-3 py-2.5 text-sm border-2 border-[#DAA520]/30 rounded-lg focus:outline-none focus:border-[#DAA520] bg-[#FFF8DC]/30"
+                                      />
+                                      {isExtractingLikeRetailer && (
+                                        <div className="flex items-center gap-2 mt-2 text-sm text-[#DAA520]">
+                                          <Loader2 className="w-4 h-4 animate-spin" />
+                                          <span>Extracting product details...</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                    
+                                    <Button
+                                      type="button"
+                                      disabled={!likeRetailerUrl || isExtractingLikeRetailer}
+                                      onClick={async () => {
+                                        if (!likeRetailerUrl) return
+                                        setIsExtractingLikeRetailer(true)
+                                        try {
+                                          const response = await fetch('/api/ai/extract-product', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ url: likeRetailerUrl }),
+                                          })
+                                          if (response.ok) {
+                                            const data = await response.json()
+                                            console.log('[Modal] Extracted product data:', data)
+                                            
+                                            // SET FLAG TO SKIP PRE-FILL BEFORE updating extractedProduct
+                                            // This prevents the useEffect from overwriting our newly extracted values
+                                            skipPreFillRef.current = true
+                                            console.log('[Modal] Set skipPreFillRef to true')
+                                            
+                                            // Extract values from response
+                                            const productTitle = data.name || data.title || data.productName || ''
+                                            const imageUrl = data.image || data.imageUrl || ''
+                                            const storeName = data.store || data.source || data.storeName || 'Unknown'
+                                            const price = data.price || 0
+                                            const rating = data.rating || null
+                                            const reviewCount = data.reviewCount || null
+                                            const amazonChoice = data.amazonChoice || data.badges?.amazonChoice || false
+                                            const bestSeller = data.bestSeller || data.badges?.bestSeller || false
+                                            
+                                            // Update the main extracted product
+                                            setExtractedProduct({
+                                              productName: productTitle,
+                                              description: data.description || '',
+                                              price: price,
+                                              storeName: storeName,
+                                              imageUrl: imageUrl,
+                                              productLink: data.productLink || data.url || likeRetailerUrl,
+                                              attributes: {
+                                                color: data.attributes?.color || null,
+                                                size: data.attributes?.size || null,
+                                                brand: data.attributes?.brand || data.brand || null,
+                                                material: data.attributes?.material || null,
+                                              },
+                                            })
+                                            
+                                            // Update ALL I Wish display states
+                                            setIWishTitle(productTitle)
+                                            setIWishStore(storeName)
+                                            setIWishPrice(price.toString())
+                                            setIWishRating(rating ? rating.toString() : '')
+                                            setIWishReviewCount(reviewCount ? reviewCount.toString() : '')
+                                            setIWishAmazonChoice(amazonChoice)
+                                            setIWishBestSeller(bestSeller)
+                                            
+                                            // Update specs if available
+                                            if (data.attributes && typeof data.attributes === 'object') {
+                                              const specs: Record<string, string> = {}
+                                              for (const [key, value] of Object.entries(data.attributes)) {
+                                                if (value && typeof value === 'string' && !['color', 'size', 'style', 'configuration'].includes(key.toLowerCase())) {
+                                                  specs[key] = value
+                                                }
+                                              }
+                                              if (Object.keys(specs).length > 0) {
+                                                setIWishSpecs(specs)
+                                              }
+                                            }
+                                            
+                                            // Update clipped data for display
+                                            setLikeClippedImage(imageUrl)
+                                            setLikeClippedTitle(productTitle)
+                                            
+                                            // ALWAYS clear old variant values first when replacing product
+                                            setLikeColor('')
+                                            setLikeSize('')
+                                            setLikeStyle('')
+                                            setLikeConfiguration('')
+                                            
+                                            // Check multiple locations for variant options (Apple Watch uses styleName for color)
+                                            const extractedColor = data.color || data.attributes?.color || data.selectedColor || data.variants?.color || data.styleName || data.attributes?.styleName || ''
+                                            const extractedSize = data.size || data.attributes?.size || data.selectedSize || data.variants?.size || data.attributes?.screenSize || ''
+                                            const extractedStyle = data.style || data.attributes?.style || data.selectedStyle || data.variants?.style || ''
+                                            const extractedConfig = data.configuration || data.attributes?.configuration || data.selectedConfiguration || data.variants?.configuration || data.attributes?.appleCarePlus || ''
+                                            
+                                            // Log full data for debugging
+                                            console.log('[Modal] Full extracted data:', JSON.stringify(data, null, 2))
+                                            
+                                            console.log('[Modal] Extracted variants:', { extractedColor, extractedSize, extractedStyle, extractedConfig })
+                                            
+                                            // Set new variant values only if they pass validation (not garbage)
+                                            if (isValidVariantValue(extractedColor)) setLikeColor(extractedColor)
+                                            if (isValidVariantValue(extractedSize)) setLikeSize(extractedSize)
+                                            if (isValidVariantValue(extractedStyle)) setLikeStyle(extractedStyle)
+                                            if (isValidVariantValue(extractedConfig)) setLikeConfiguration(extractedConfig)
+                                            
+                                            // Update URL state
+                                            setIWishProductUrl(likeRetailerUrl)
+                                            setIWishCleared(false)
+                                            setLikeSelected(true)
+                                            setShowLikeRetailerPopup(false)
+                                            
+                                            toast({
+                                              title: "🐝 Product Extracted!",
+                                              description: "I Wish product replaced with new product.",
+                                              variant: "warm",
+                                            })
+                                          }
+                                        } catch (err) {
+                                          console.error('[Modal] Extract error:', err)
+                                          toast({
+                                            title: "Extraction Failed",
+                                            description: "Could not extract product details.",
+                                            variant: "destructive",
+                                          })
+                                        } finally {
+                                          setIsExtractingLikeRetailer(false)
+                                        }
+                                      }}
+                                      className="w-full h-10 bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#4A2F1A] font-semibold rounded-lg hover:from-[#F4C430] hover:to-[#DAA520] transition-all"
+                                    >
+                                      {isExtractingLikeRetailer ? (
+                                        <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Extracting...</>
+                                      ) : (
+                                        <><Sparkles className="w-4 h-4 mr-2" /> AI Extract</>
+                                      )}
+                                    </Button>
+                                    
+                                    {/* OR Divider */}
+                                    <div className="flex items-center gap-3 my-4">
+                                      <div className="flex-1 h-px bg-[#DAA520]/30"></div>
+                                      <span className="text-sm font-medium text-[#8B6914]">OR</span>
+                                      <div className="flex-1 h-px bg-[#DAA520]/30"></div>
+                                    </div>
+                                    
+                                    {/* Clip via Extension */}
+                                    <Button
+                                      type="button"
+                                      onClick={() => {
+                                        if (extractedProduct?.productLink) {
+                                          const url = addAffiliateTag(extractedProduct.productLink)
+                                          window.open(url, '_blank')
+                                          setLikeSelected(true)
+                                          setLikeClippedImage(null)
+                                          setLikeClippedTitle(null)
+                                          setLikeStyle("")
+                                          setLikeColor("")
+                                          setLikeSize("")
+                                          setLikeConfiguration("")
+                                          setAwaitingExtensionFor("like")
+                                          setShowLikeRetailerPopup(false)
+                                          toast({
+                                            title: "🐝 Extension Mode",
+                                            description: "Select options on the retailer page, then click the extension.",
+                                            variant: "warm",
+                                          })
+                                        }
+                                      }}
+                                      className="w-full h-10 bg-gradient-to-r from-[#8B4513] to-[#A0522D] text-white font-semibold rounded-lg hover:from-[#A0522D] hover:to-[#8B4513] transition-all"
+                                    >
+                                      <Scissors className="w-4 h-4 mr-2" /> Clip via Extension
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                             {/* Manual refresh button when waiting */}
                             {awaitingExtensionFor === "like" && (
                               <button
@@ -1911,16 +2275,16 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                                           console.log('[Modal] Like - Set image:', data.image)
                                         }
                                         if (data.title) setLikeClippedTitle(data.title)
-                                        // Set variant fields
+                                        // Set variant fields (with validation)
                                         const variants = data.variants
-                                        if (variants.color) setLikeColor(variants.color)
-                                        if (variants.style) setLikeStyle(variants.style)
-                                        if (variants.set) setLikeConfiguration(variants.set)
-                                        if (variants.size) setLikeSize(variants.size)
+                                        if (variants.color && isValidVariantValue(variants.color)) setLikeColor(variants.color)
+                                        if (variants.style && isValidVariantValue(variants.style)) setLikeStyle(variants.style)
+                                        if (variants.set && isValidVariantValue(variants.set)) setLikeConfiguration(variants.set)
+                                        if (variants.size && isValidVariantValue(variants.size)) setLikeSize(variants.size)
                                         // Check specifications for Style
                                         if (!variants.style && data.specifications?.Style) {
                                           const styleVal = data.specifications.Style.replace(/^[\u200E\u200F\u202A-\u202E]+/, '').trim()
-                                          if (styleVal) setLikeStyle(styleVal)
+                                          if (styleVal && isValidVariantValue(styleVal)) setLikeStyle(styleVal)
                                         }
                                         setAwaitingExtensionFor(null)
                                         toast({
@@ -2355,24 +2719,46 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                               </div>
                             )}
                             
-                            {/* Price */}
+                            {/* Price - List Price and Sale Price */}
                             {isEditingIWish ? (
-                              <div className="flex items-center gap-1">
-                                <span className="text-sm font-bold text-[#654321]">$</span>
-                                <input
-                                  type="text"
-                                  value={iWishPrice}
-                                  onChange={(e) => setIWishPrice(e.target.value)}
-                                  placeholder="0.00"
-                                  className="w-24 text-sm font-bold text-[#654321] bg-white border border-[#DAA520]/30 rounded px-2 py-0.5 focus:outline-none focus:border-[#DAA520]"
-                                />
+                              <div className="flex flex-col gap-1">
+                                <div className="flex items-center gap-1">
+                                  <span className="text-[9px] text-gray-500 w-14">List:</span>
+                                  <span className="text-xs text-gray-400">$</span>
+                                  <input
+                                    type="text"
+                                    value={iWishOriginalPrice}
+                                    onChange={(e) => setIWishOriginalPrice(e.target.value)}
+                                    placeholder="0.00"
+                                    className="w-20 text-xs text-gray-400 line-through bg-white border border-[#DAA520]/30 rounded px-2 py-0.5 focus:outline-none focus:border-[#DAA520]"
+                                  />
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <span className="text-[9px] text-[#654321] w-14">Sale:</span>
+                                  <span className="text-sm font-bold text-[#654321]">$</span>
+                                  <input
+                                    type="text"
+                                    value={iWishPrice}
+                                    onChange={(e) => setIWishPrice(e.target.value)}
+                                    placeholder="0.00"
+                                    className="w-20 text-sm font-bold text-[#654321] bg-white border border-[#DAA520]/30 rounded px-2 py-0.5 focus:outline-none focus:border-[#DAA520]"
+                                  />
+                                </div>
                               </div>
                             ) : (parseFloat(iWishPrice) || extractedProduct?.price || gift?.targetAmount) ? (
-                              <p className="text-sm font-bold text-[#654321]">
-                                ${typeof (parseFloat(iWishPrice) || extractedProduct?.price || gift?.targetAmount) === 'number' 
-                                  ? (parseFloat(iWishPrice) || extractedProduct?.price || gift?.targetAmount)?.toFixed(2) 
-                                  : iWishPrice || extractedProduct?.price || gift?.targetAmount}
-                              </p>
+                              <div className="flex flex-col">
+                                {(parseFloat(iWishOriginalPrice) || extractedProduct?.originalPrice || gift?.originalPrice) && 
+                                 (parseFloat(iWishOriginalPrice) || extractedProduct?.originalPrice || gift?.originalPrice) > (parseFloat(iWishPrice) || extractedProduct?.price || gift?.targetAmount) && (
+                                  <p className="text-xs text-gray-400 line-through">
+                                    ${(parseFloat(iWishOriginalPrice) || extractedProduct?.originalPrice || gift?.originalPrice)?.toFixed(2)}
+                                  </p>
+                                )}
+                                <p className="text-sm font-bold text-[#654321]">
+                                  ${typeof (parseFloat(iWishPrice) || extractedProduct?.price || gift?.targetAmount) === 'number' 
+                                    ? (parseFloat(iWishPrice) || extractedProduct?.price || gift?.targetAmount)?.toFixed(2) 
+                                    : iWishPrice || extractedProduct?.price || gift?.targetAmount}
+                                </p>
+                              </div>
                             ) : null}
                           </div>
                         </div>
@@ -2649,7 +3035,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                              !(likeConfiguration && isValidVariantValue(likeConfiguration)) &&
                              !isAddingLikeField && (
                               <p className="text-[10px] text-gray-500 italic">
-                                Click "Select on Retailer" to choose your options
+                                Click "Change Options" to choose your options
                               </p>
                             )}
                               </div>
@@ -2747,104 +3133,183 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                           <>
                             <button
                               type="button"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                if (extractedProduct?.productLink) {
-                                  const url = addAffiliateTag(extractedProduct.productLink)
-                                  window.open(url, '_blank')
-                                  setAltSelected(true)
-                                  // Clear any previous alt data to ensure fresh state
-                                  setAltClippedImage(null)
-                                  setAltClippedTitle(null)
-                                  setAltStyle("")
-                                  setAltColor("")
-                                  setAltSize("")
-                                  setAltConfiguration("")
-                                  setAwaitingExtensionFor("alt")
-                                  console.log('[Modal] Alt - Set awaitingExtensionFor to alt, polling should start')
-                                }
+                              onClick={() => {
+                                setShowAltRetailerPopup(true)
+                                setAltRetailerUrl("")
                               }}
                               className="text-[10px] text-[#4A2F1A] font-medium hover:underline flex items-center gap-1"
                             >
                               <ExternalLink className="w-2.5 h-2.5" />
-                              Select on Retailer
+                              Change Options
                             </button>
-                            {/* Manual refresh button when waiting */}
-                            {awaitingExtensionFor === "alt" && (
-                              <button
-                                type="button"
-                                onClick={async (e) => {
-                                  e.stopPropagation()
-                                  console.log('[Modal] Manual refresh triggered for alt')
-                                  try {
-                                    const response = await fetch('/api/extension/save-variants', {
-                                      method: 'GET',
-                                      credentials: 'include',
-                                    })
-                                    if (response.ok) {
-                                      const data = await response.json()
-                                      console.log('[Modal] Manual refresh data:', data)
-                                      if (data.variants && Object.keys(data.variants).length > 0) {
-                                        console.log('[Modal] Alt Refresh - Raw variants:', JSON.stringify(data.variants))
-                                        
-                                        // Process the data for Alternative
-                                        if (data.image) {
-                                          setAltClippedImage(data.image)
-                                          console.log('[Modal] Alt - Set image:', data.image)
-                                        }
-                                        if (data.title) setAltClippedTitle(data.title)
-                                        
-                                        // Normalize and set variant fields (handle both lowercase and capitalized keys)
-                                        const variants = data.variants
-                                        const colorVal = variants.color || variants.Color
-                                        const styleVal = variants.style || variants.Style
-                                        const setVal = variants.set || variants.Set || variants.configuration || variants.Configuration
-                                        const sizeVal = variants.size || variants.Size
-                                        
-                                        console.log('[Modal] Alt Refresh - Normalized: color=', colorVal, 'style=', styleVal, 'set=', setVal, 'size=', sizeVal)
-                                        
-                                        if (colorVal && isValidVariantValue(colorVal)) {
-                                          setAltColor(colorVal)
-                                          console.log('[Modal] Alt - Set color:', colorVal)
-                                        }
-                                        if (styleVal && isValidVariantValue(styleVal)) {
-                                          setAltStyle(styleVal)
-                                          console.log('[Modal] Alt - Set style:', styleVal)
-                                        }
-                                        if (setVal && isValidVariantValue(setVal)) {
-                                          setAltConfiguration(setVal)
-                                          console.log('[Modal] Alt - Set configuration:', setVal)
-                                        }
-                                        if (sizeVal && isValidVariantValue(sizeVal)) {
-                                          setAltSize(sizeVal)
-                                          console.log('[Modal] Alt - Set size:', sizeVal)
-                                        }
-                                        
-                                        // Check specifications for Style as fallback
-                                        if (!styleVal && data.specifications?.Style) {
-                                          const specStyleVal = data.specifications.Style.replace(/^[\u200E\u200F\u202A-\u202E]+/, '').trim()
-                                          if (specStyleVal && isValidVariantValue(specStyleVal)) {
-                                            setAltStyle(specStyleVal)
-                                            console.log('[Modal] Alt - Set style from specs:', specStyleVal)
+                            
+                            {/* Change Product Popup for Alternative */}
+                            {showAltRetailerPopup && (
+                              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]" onClick={(e) => { e.stopPropagation(); setShowAltRetailerPopup(false) }}>
+                                <div className="bg-white rounded-2xl p-6 w-[400px] max-w-[90vw] shadow-2xl border-2 border-[#D97706]/30" onClick={(e) => e.stopPropagation()}>
+                                  <div className="flex items-center justify-between mb-4">
+                                    <h3 className="text-lg font-bold text-[#4A2F1A]">Change Alternative Product</h3>
+                                    <button type="button" onClick={() => setShowAltRetailerPopup(false)} className="p-1 hover:bg-gray-100 rounded-full">
+                                      <X className="w-5 h-5 text-gray-500" />
+                                    </button>
+                                  </div>
+                                  
+                                  {/* Paste Product URL */}
+                                  <div className="space-y-3">
+                                    <div>
+                                      <Label className="text-sm font-semibold text-[#4A2F1A] mb-2 block">Paste Product URL</Label>
+                                      <input
+                                        type="text"
+                                        value={altRetailerUrl}
+                                        onChange={(e) => setAltRetailerUrl(e.target.value)}
+                                        onPaste={async (e) => {
+                                          e.preventDefault()
+                                          const pastedUrl = e.clipboardData.getData('text').trim()
+                                          if (!pastedUrl) return
+                                          setAltRetailerUrl(pastedUrl)
+                                          
+                                          // Auto-extract after paste
+                                          setIsExtractingAltRetailer(true)
+                                          try {
+                                            const response = await fetch('/api/ai/extract-product', {
+                                              method: 'POST',
+                                              headers: { 'Content-Type': 'application/json' },
+                                              body: JSON.stringify({ url: pastedUrl }),
+                                            })
+                                            if (response.ok) {
+                                              const data = await response.json()
+                                              console.log('[Modal] Alt Auto-extracted product data:', data)
+                                              
+                                              const productTitle = data.name || data.title || data.productName || ''
+                                              const imageUrl = data.image || data.imageUrl || ''
+                                              const storeName = data.store || data.source || data.storeName || 'Unknown'
+                                              const price = data.price || 0
+                                              const originalPrice = data.originalPrice || data.listPrice || data.wasPrice || null
+                                              const rating = data.rating || null
+                                              const reviewCount = data.reviewCount || null
+                                              const amazonChoice = data.amazonChoice || data.badges?.amazonChoice || false
+                                              const bestSeller = data.bestSeller || data.badges?.bestSeller || false
+                                              
+                                              // Update Alternative display states
+                                              setAltTitle(productTitle)
+                                              setAltStore(storeName)
+                                              setAltPrice(price.toString())
+                                              setAltOriginalPrice(originalPrice ? originalPrice.toString() : '')
+                                              setAltRating(rating ? rating.toString() : '')
+                                              setAltReviewCount(reviewCount ? reviewCount.toString() : '')
+                                              setAltAmazonChoice(amazonChoice)
+                                              setAltBestSeller(bestSeller)
+                                              
+                                              // Update specs if available
+                                              if (data.attributes && typeof data.attributes === 'object') {
+                                                const specs: Record<string, string> = {}
+                                                for (const [key, value] of Object.entries(data.attributes)) {
+                                                  if (value && typeof value === 'string' && !['color', 'size', 'style', 'configuration'].includes(key.toLowerCase())) {
+                                                    specs[key] = value
+                                                  }
+                                                }
+                                                if (Object.keys(specs).length > 0) {
+                                                  setAltSpecs(specs)
+                                                }
+                                              }
+                                              
+                                              // Update clipped data
+                                              setAltClippedImage(imageUrl)
+                                              setAltClippedTitle(productTitle)
+                                              
+                                              // Clear and set variant options
+                                              setAltColor('')
+                                              setAltSize('')
+                                              setAltStyle('')
+                                              setAltConfiguration('')
+                                              
+                                              const extractedColor = data.color || data.attributes?.color || data.styleName || data.attributes?.styleName || ''
+                                              const extractedSize = data.size || data.attributes?.size || data.screenSize || data.attributes?.screenSize || data.attributes?.memoryStorageCapacity || data.attributes?.storageCapacity || ''
+                                              const extractedStyle = data.style || data.attributes?.style || ''
+                                              const extractedConfig = data.configuration || data.attributes?.configuration || data.attributes?.appleCarePlus || ''
+                                              
+                                              console.log('[Modal] Alt Size debug:', { 
+                                                'data.size': data.size, 
+                                                'data.attributes?.size': data.attributes?.size, 
+                                                extractedSize 
+                                              })
+                                              
+                                              // Only set variant values if they pass validation (not garbage)
+                                              if (isValidVariantValue(extractedColor)) setAltColor(extractedColor)
+                                              if (isValidVariantValue(extractedSize)) setAltSize(extractedSize)
+                                              if (isValidVariantValue(extractedStyle)) setAltStyle(extractedStyle)
+                                              if (isValidVariantValue(extractedConfig)) setAltConfiguration(extractedConfig)
+                                              
+                                              setAltProductUrl(pastedUrl)
+                                              setAltCleared(false)
+                                              setAltSelected(true)
+                                              setShowAltRetailerPopup(false)
+                                              
+                                              toast({
+                                                title: "🐝 Product Extracted!",
+                                                description: "Alternative product updated.",
+                                                variant: "warm",
+                                              })
+                                            }
+                                          } catch (err) {
+                                            console.error('[Modal] Alt Auto-extract error:', err)
+                                            toast({
+                                              title: "Extraction Failed",
+                                              description: "Could not extract product details.",
+                                              variant: "destructive",
+                                            })
+                                          } finally {
+                                            setIsExtractingAltRetailer(false)
                                           }
+                                        }}
+                                        placeholder="Paste product link to extract product details"
+                                        className="w-full px-3 py-2.5 text-sm border-2 border-[#D97706]/30 rounded-lg focus:outline-none focus:border-[#D97706] bg-[#FFF8DC]/30"
+                                      />
+                                      {isExtractingAltRetailer && (
+                                        <div className="flex items-center gap-2 mt-2 text-sm text-[#D97706]">
+                                          <Loader2 className="w-4 h-4 animate-spin" />
+                                          <span>Extracting product details...</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                    
+                                    {/* OR Divider */}
+                                    <div className="flex items-center gap-3 my-4">
+                                      <div className="flex-1 h-px bg-[#D97706]/30"></div>
+                                      <span className="text-sm font-medium text-[#92400E]">OR</span>
+                                      <div className="flex-1 h-px bg-[#D97706]/30"></div>
+                                    </div>
+                                    
+                                    {/* Clip via Extension */}
+                                    <Button
+                                      type="button"
+                                      onClick={() => {
+                                        if (extractedProduct?.productLink) {
+                                          const url = addAffiliateTag(extractedProduct.productLink)
+                                          window.open(url, '_blank')
+                                          setAltSelected(true)
+                                          setAltClippedImage(null)
+                                          setAltClippedTitle(null)
+                                          setAltStyle("")
+                                          setAltColor("")
+                                          setAltSize("")
+                                          setAltConfiguration("")
+                                          setAwaitingExtensionFor("alt")
+                                          setShowAltRetailerPopup(false)
+                                          toast({
+                                            title: "🐝 Extension Mode",
+                                            description: "Select options on the retailer page, then click the extension.",
+                                            variant: "warm",
+                                          })
                                         }
-                                        
-                                        setAwaitingExtensionFor(null)
-                                        toast({
-                                          title: "🐝 Options Received!",
-                                          description: "Alternative options updated from extension.",
-                                          variant: "warm",
-                                        })
-                                      }
-                                    }
-                                  } catch (err) {
-                                    console.log('[Modal] Manual refresh error:', err)
-                                  }
-                                }}
-                                className="text-[10px] text-[#D97706] font-medium hover:underline flex items-center gap-1 animate-pulse"
-                              >
-                                🔄 Refresh
-                              </button>
+                                      }}
+                                      className="w-full h-10 bg-gradient-to-r from-[#D97706] to-[#F59E0B] text-white font-semibold rounded-lg hover:from-[#F59E0B] hover:to-[#D97706] transition-all"
+                                    >
+                                      <Scissors className="w-4 h-4 mr-2" /> Clip via Extension
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
                             )}
                             {/* Edit and Delete buttons for Alternative */}
                             {altSelected && (
@@ -3289,24 +3754,46 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                               </div>
                             )}
                             
-                            {/* Price */}
+                            {/* Price - List Price and Sale Price */}
                             {isEditingAlt ? (
-                              <div className="flex items-center gap-1">
-                                <span className="text-sm font-bold text-[#654321]">$</span>
-                                <input
-                                  type="text"
-                                  value={altPrice}
-                                  onChange={(e) => setAltPrice(e.target.value)}
-                                  placeholder="0.00"
-                                  className="w-24 text-sm font-bold text-[#654321] bg-white border border-[#D97706]/30 rounded px-2 py-0.5 focus:outline-none focus:border-[#D97706]"
-                                />
+                              <div className="flex flex-col gap-1">
+                                <div className="flex items-center gap-1">
+                                  <span className="text-[9px] text-gray-500 w-14">List:</span>
+                                  <span className="text-xs text-gray-400">$</span>
+                                  <input
+                                    type="text"
+                                    value={altOriginalPrice}
+                                    onChange={(e) => setAltOriginalPrice(e.target.value)}
+                                    placeholder="0.00"
+                                    className="w-20 text-xs text-gray-400 line-through bg-white border border-[#D97706]/30 rounded px-2 py-0.5 focus:outline-none focus:border-[#D97706]"
+                                  />
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <span className="text-[9px] text-[#654321] w-14">Sale:</span>
+                                  <span className="text-sm font-bold text-[#654321]">$</span>
+                                  <input
+                                    type="text"
+                                    value={altPrice}
+                                    onChange={(e) => setAltPrice(e.target.value)}
+                                    placeholder="0.00"
+                                    className="w-20 text-sm font-bold text-[#654321] bg-white border border-[#D97706]/30 rounded px-2 py-0.5 focus:outline-none focus:border-[#D97706]"
+                                  />
+                                </div>
                               </div>
                             ) : (parseFloat(altPrice) || extractedProduct?.price || gift?.targetAmount) ? (
-                              <p className="text-sm font-bold text-[#654321]">
-                                ${typeof (parseFloat(altPrice) || extractedProduct?.price || gift?.targetAmount) === 'number' 
-                                  ? (parseFloat(altPrice) || extractedProduct?.price || gift?.targetAmount)?.toFixed(2) 
-                                  : altPrice || extractedProduct?.price || gift?.targetAmount}
-                              </p>
+                              <div className="flex flex-col">
+                                {(parseFloat(altOriginalPrice) || extractedProduct?.originalPrice || gift?.originalPrice) && 
+                                 (parseFloat(altOriginalPrice) || extractedProduct?.originalPrice || gift?.originalPrice) > (parseFloat(altPrice) || extractedProduct?.price || gift?.targetAmount) && (
+                                  <p className="text-xs text-gray-400 line-through">
+                                    ${(parseFloat(altOriginalPrice) || extractedProduct?.originalPrice || gift?.originalPrice)?.toFixed(2)}
+                                  </p>
+                                )}
+                                <p className="text-sm font-bold text-[#654321]">
+                                  ${typeof (parseFloat(altPrice) || extractedProduct?.price || gift?.targetAmount) === 'number' 
+                                    ? (parseFloat(altPrice) || extractedProduct?.price || gift?.targetAmount)?.toFixed(2) 
+                                    : altPrice || extractedProduct?.price || gift?.targetAmount}
+                                </p>
+                              </div>
                             ) : null}
                             
                             {/* Helper text - only show when not editing */}
@@ -3587,7 +4074,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                              !(altConfiguration && isValidVariantValue(altConfiguration)) &&
                              !isAddingAltField && (
                               <p className="text-[10px] text-gray-500 italic">
-                                Click "Select on Retailer" to choose alternative options
+                                Click "Change" to choose alternative options
                               </p>
                             )}
                               </div>
@@ -3787,3 +4274,4 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
     </div>
   )
 }
+

@@ -137,8 +137,9 @@ export function ShareModal({
     if (success) {
       setCopied(true)
       toast({
-        title: "Link copied!",
-        description: "The share link has been copied to your clipboard.",
+        title: "🐝 Link Copied!",
+        description: "Share link ready to paste",
+        variant: "warm",
       })
       setTimeout(() => setCopied(false), 3000)
     } else {

@@ -1935,8 +1935,9 @@ export function UnifiedAddWishlist() {
     }))
     setIsEditingProduct(false)
     toast({
-      title: "Success",
-      description: "Product details updated",
+      title: "🐝 Product Updated!",
+      description: "Product details saved successfully",
+      variant: "warm",
     })
   }
 
@@ -1957,8 +1958,9 @@ export function UnifiedAddWishlist() {
       setExtractedProduct(data)
 
       toast({
-        title: "Success",
-        description: "Product details refreshed",
+        title: "🐝 Product Refreshed!",
+        description: "Latest product details synced",
+        variant: "warm",
       })
     } catch (error) {
       toast({

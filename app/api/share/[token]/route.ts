@@ -4,6 +4,9 @@
  * Retrieves shared wishlist data by token.
  * This endpoint is PUBLIC - no authentication required.
  * 
+ * Uses admin client to bypass RLS since this is a public share endpoint
+ * that needs to access wishlist data regardless of the current user.
+ * 
  * Output:
  * - wishlist: Wishlist data (public fields only)
  * - items: Array of wishlist items (public fields only)
@@ -13,7 +16,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createPublicClient } from '@/lib/supabase/server'
 
 interface RouteParams {
   params: Promise<{ token: string }>
@@ -33,7 +36,8 @@ export async function GET(
       )
     }
 
-    const supabase = await createClient()
+    // Use public client (admin if available, otherwise anon with RLS)
+    const supabase = await createPublicClient()
 
     // 1. Find the share link by token
     const { data: shareLink, error: shareLinkError } = await supabase
@@ -43,11 +47,19 @@ export async function GET(
       .single()
 
     if (shareLinkError || !shareLink) {
+      console.error('[Share API] Share link not found for token:', token, shareLinkError)
       return NextResponse.json(
         { error: 'Share link not found or has expired' },
         { status: 404 }
       )
     }
+
+    console.log('[Share API] Found share link:', {
+      token,
+      wishlist_id: shareLink.wishlist_id,
+      product_id: shareLink.product_id,
+      created_by: shareLink.created_by_user_id
+    })
 
     // 2. Check if the link has expired
     if (shareLink.expires_at) {
@@ -71,11 +83,14 @@ export async function GET(
       .single()
 
     if (wishlistError || !wishlist) {
+      console.error('[Share API] Wishlist not found for id:', shareLink.wishlist_id, wishlistError)
       return NextResponse.json(
         { error: 'Wishlist not found' },
         { status: 404 }
       )
     }
+
+    console.log('[Share API] Found wishlist:', { id: wishlist.id, title: wishlist.title })
 
     // 5. Get owner's profile for display name
     const { data: profile } = await supabase
@@ -106,16 +121,23 @@ export async function GET(
         .from('wishlist_items')
         .select(`
           id,
+          title,
           product_name,
           product_url,
+          list_price,
           product_price,
+          image_url,
           product_image,
           quantity,
           priority,
           description,
           category,
           stock_status,
-          created_at
+          created_at,
+          review_star,
+          review_count,
+          source,
+          store_name
         `)
         .eq('id', shareLink.product_id)
         .single()
@@ -129,22 +151,35 @@ export async function GET(
         .from('wishlist_items')
         .select(`
           id,
+          title,
           product_name,
           product_url,
+          list_price,
           product_price,
+          image_url,
           product_image,
           quantity,
           priority,
           description,
           category,
           stock_status,
-          created_at
+          created_at,
+          review_star,
+          review_count,
+          source,
+          store_name
         `)
         .eq('wishlist_id', shareLink.wishlist_id)
         .order('created_at', { ascending: false })
 
-      if (!itemsError && wishlistItems) {
-        items = wishlistItems.map(formatProductForPublic)
+      if (itemsError) {
+        console.error('[Share API] Error fetching wishlist items:', itemsError)
+      } else {
+        console.log(`[Share API] Found ${wishlistItems?.length || 0} items for wishlist_id: ${shareLink.wishlist_id}`)
+        if (wishlistItems && wishlistItems.length > 0) {
+          console.log('[Share API] First item sample:', JSON.stringify(wishlistItems[0], null, 2))
+        }
+        items = (wishlistItems || []).map(formatProductForPublic)
       }
     }
 
@@ -175,20 +210,45 @@ export async function GET(
 
 /**
  * Format a product for public display
- * Removes any sensitive or internal fields
+ * Handles both old (product_name, product_price, product_image) and 
+ * new (title, list_price, image_url) column formats
  */
 function formatProductForPublic(product: any) {
+  // Handle name: prefer title, fallback to product_name
+  const name = product.title || product.product_name || 'Unnamed Product'
+  
+  // Handle price: prefer list_price, fallback to product_price
+  const price = product.list_price ?? product.product_price ?? null
+  
+  // Handle image: prefer image_url, fallback to product_image
+  const image = product.image_url || product.product_image || null
+  
+  // Handle rating: convert review_star to number if needed
+  let rating = null
+  if (product.review_star) {
+    if (typeof product.review_star === 'object' && product.review_star.value) {
+      rating = parseFloat(product.review_star.value)
+    } else if (typeof product.review_star === 'number') {
+      rating = product.review_star
+    } else if (typeof product.review_star === 'string') {
+      rating = parseFloat(product.review_star)
+    }
+  }
+  
   return {
     id: product.id,
-    name: product.product_name,
+    name,
     url: product.product_url,
-    price: product.product_price,
-    image: product.product_image,
+    price,
+    image,
     quantity: product.quantity || 1,
     priority: product.priority,
     description: product.description,
     category: product.category,
     stockStatus: product.stock_status,
     addedAt: product.created_at,
+    rating,
+    reviewCount: product.review_count,
+    storeName: product.store_name || product.source,
   }
 }

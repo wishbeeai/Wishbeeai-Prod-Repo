@@ -372,7 +372,10 @@ export function EviteWizard({
     
     try {
       await navigator.clipboard.writeText(shareText)
-      toast.success('Invitation text copied! Link will be added after gift creation.')
+      toast.success('🐝 Invitation text copied!', {
+        description: 'Link will be added after gift creation',
+        style: { background: 'linear-gradient(to right, #FEF3C7, #FDE68A, #F4C430)', color: '#654321', border: '2px solid #DAA520' }
+      })
     } catch (err) {
       // Fallback for older browsers
       const textArea = document.createElement('textarea')
@@ -381,7 +384,10 @@ export function EviteWizard({
       textArea.select()
       document.execCommand('copy')
       document.body.removeChild(textArea)
-      toast.success('Invitation text copied! Link will be added after gift creation.')
+      toast.success('🐝 Invitation text copied!', {
+        description: 'Link will be added after gift creation',
+        style: { background: 'linear-gradient(to right, #FEF3C7, #FDE68A, #F4C430)', color: '#654321', border: '2px solid #DAA520' }
+      })
     }
   }
 

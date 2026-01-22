@@ -121,12 +121,16 @@ export default function AnalyticsPage() {
       } catch (error) {
         if ((error as Error).name !== "AbortError") {
           navigator.clipboard.writeText(window.location.href)
-          toast.success("Link copied to clipboard!")
+          toast.success("🐝 Link copied!", {
+            style: { background: 'linear-gradient(to right, #FEF3C7, #FDE68A, #F4C430)', color: '#654321', border: '2px solid #DAA520' }
+          })
         }
       }
     } else {
       navigator.clipboard.writeText(window.location.href)
-      toast.success("Link copied to clipboard!")
+      toast.success("🐝 Link copied!", {
+        style: { background: 'linear-gradient(to right, #FEF3C7, #FDE68A, #F4C430)', color: '#654321', border: '2px solid #DAA520' }
+      })
     }
   }
 

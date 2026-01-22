@@ -45,7 +45,9 @@ export function InvitationShareModal({
     try {
       await navigator.clipboard.writeText(shareUrl)
       setCopied(true)
-      toast.success('Link copied to clipboard!')
+      toast.success('🐝 Link copied!', {
+        style: { background: 'linear-gradient(to right, #FEF3C7, #FDE68A, #F4C430)', color: '#654321', border: '2px solid #DAA520' }
+      })
       setTimeout(() => setCopied(false), 3000)
     } catch (error) {
       toast.error('Failed to copy link')

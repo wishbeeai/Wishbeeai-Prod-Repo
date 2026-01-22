@@ -55,7 +55,7 @@ export async function PATCH(
       )
     }
 
-    // Parse existing description and merge with new preference options
+    // Parse existing description and merge with new data
     let descriptionData: any = {}
     try {
       if (item.description) {
@@ -70,10 +70,33 @@ export async function PATCH(
       descriptionData.preferenceOptions = preferenceOptions
     }
 
+    // Update other fields stored in description JSON
+    const { giftName, storeName, rating, reviewCount, badges, originalPrice, currentPrice, specifications } = body
+    
+    if (storeName !== undefined) descriptionData.storeName = storeName
+    if (rating !== undefined) descriptionData.rating = rating
+    if (reviewCount !== undefined) descriptionData.reviewCount = reviewCount
+    if (badges !== undefined) descriptionData.badges = badges
+    if (originalPrice !== undefined) descriptionData.originalPrice = originalPrice
+    if (specifications !== undefined) descriptionData.specifications = specifications
+
+    // Build update object
+    const updateFields: any = { description: JSON.stringify(descriptionData) }
+    
+    // Update title field directly if giftName is provided
+    if (giftName !== undefined) {
+      updateFields.title = giftName
+    }
+    
+    // Update list_price if currentPrice is provided (convert to cents)
+    if (currentPrice !== undefined) {
+      updateFields.list_price = Math.round(currentPrice * 100)
+    }
+
     // Update the item
     const { data: updatedItem, error: updateError } = await supabase
       .from("wishlist_items")
-      .update({ description: JSON.stringify(descriptionData) })
+      .update(updateFields)
       .eq("id", id)
       .select()
       .single()
