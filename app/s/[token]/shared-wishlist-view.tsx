@@ -5,6 +5,7 @@
  * 
  * Displays a publicly shared wishlist or product.
  * Enhanced UI with empty state onboarding experience.
+ * Includes standard Wishbee Header and Footer.
  */
 
 import { useState, useEffect } from "react"
@@ -26,7 +27,11 @@ import {
   Sparkles,
 } from "lucide-react"
 
-// Import new components for empty state
+// Import standard Wishbee Header and Footer
+import { Header } from "@/components/header"
+import { Footer } from "@/components/footer"
+
+// Import components for empty state and shared wishlist
 import {
   SharedWishlistHeader,
   EmptyWishlistState,
@@ -128,14 +133,18 @@ export function SharedWishlistView({ token }: SharedWishlistViewProps) {
   // Loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 rounded-full bg-[#EBF5FB] flex items-center justify-center mx-auto mb-4 animate-pulse">
-            <Gift className="w-8 h-8 text-[#3498DB]" />
+      <div className="min-h-screen bg-white flex flex-col">
+        <Header />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-16 h-16 rounded-full bg-[#FFF8DC] flex items-center justify-center mx-auto mb-4 animate-pulse">
+              <Gift className="w-8 h-8 text-[#DAA520]" />
+            </div>
+            <Loader2 className="w-8 h-8 animate-spin text-[#DAA520] mx-auto mb-3" />
+            <p className="text-[#8B4513] font-medium text-sm">Loading wishlist...</p>
           </div>
-          <Loader2 className="w-8 h-8 animate-spin text-[#3498DB] mx-auto mb-3" />
-          <p className="text-[#7F8C8D] font-medium text-sm">Loading wishlist...</p>
         </div>
+        <Footer />
       </div>
     )
   }
@@ -143,23 +152,27 @@ export function SharedWishlistView({ token }: SharedWishlistViewProps) {
   // Error state (Invalid or expired link)
   if (error || !data) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center p-4">
-        <Card className="max-w-md w-full p-8 text-center bg-white border border-[#ECF0F1] shadow-lg rounded-xl">
-          <div className="w-16 h-16 rounded-full bg-[#FDEDEC] flex items-center justify-center mx-auto mb-4">
-            <AlertTriangle className="w-8 h-8 text-[#E74C3C]" />
-          </div>
-          <h1 className="text-2xl font-bold text-[#2C3E50] mb-2">
-            Wishlist Not Found
-          </h1>
-          <p className="text-[#7F8C8D] mb-6 text-sm">
-            {error || "This share link is invalid or has expired."}
-          </p>
-          <Link href="/">
-            <Button className="h-12 px-6 rounded-lg bg-[#3498DB] hover:bg-[#2980B9] text-white font-semibold transition-all">
-              Go to Wishbee.ai
-            </Button>
-          </Link>
-        </Card>
+      <div className="min-h-screen bg-white flex flex-col">
+        <Header />
+        <div className="flex-1 flex items-center justify-center p-4">
+          <Card className="max-w-md w-full p-8 text-center bg-gradient-to-br from-[#FFF8DC] to-[#FFEFD5] border-2 border-[#DAA520]/30 shadow-lg rounded-xl">
+            <div className="w-16 h-16 rounded-full bg-[#FDEDEC] flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle className="w-8 h-8 text-[#E74C3C]" />
+            </div>
+            <h1 className="text-2xl font-bold text-[#8B4513] mb-2">
+              Wishlist Not Found
+            </h1>
+            <p className="text-[#A0522D] mb-6 text-sm">
+              {error || "This share link is invalid or has expired."}
+            </p>
+            <Link href="/">
+              <Button className="h-12 px-6 rounded-full bg-gradient-to-r from-[#DAA520] to-[#F4C430] hover:from-[#F4C430] hover:to-[#DAA520] text-[#654321] font-semibold transition-all shadow-md hover:shadow-lg">
+                Go to Wishbee.ai
+              </Button>
+            </Link>
+          </Card>
+        </div>
+        <Footer />
       </div>
     )
   }
@@ -172,72 +185,80 @@ export function SharedWishlistView({ token }: SharedWishlistViewProps) {
   // EMPTY WISHLIST STATE - New enhanced experience
   if (data.items.length === 0) {
     return (
-      <div className="min-h-screen bg-white">
-        <div className="max-w-3xl mx-auto px-4">
-          {/* Header */}
-          <SharedWishlistHeader
-            wishlistTitle={data.wishlist.title}
-            sharedBy={data.sharedBy}
-            description={data.wishlist.description}
-          />
+      <div className="min-h-screen bg-white flex flex-col">
+        <Header />
+        <main className="flex-1">
+          <div className="max-w-3xl mx-auto px-4">
+            {/* Wishlist Title Section */}
+            <SharedWishlistHeader
+              wishlistTitle={data.wishlist.title}
+              sharedBy={data.sharedBy}
+              description={data.wishlist.description}
+            />
 
-          {/* Empty State Hero */}
-          <EmptyWishlistState
-            shareId={token}
-            wishlistTitle={data.wishlist.title}
-          />
+            {/* Empty State Hero */}
+            <EmptyWishlistState
+              shareId={token}
+              wishlistTitle={data.wishlist.title}
+            />
 
-          {/* How Wishbee Works */}
-          <HowWishbeeWorks />
+            {/* How Wishbee Works */}
+            <HowWishbeeWorks />
 
-          {/* Social Proof */}
-          <SocialProof />
+            {/* Social Proof */}
+            <SocialProof />
 
-          {/* CTA Section */}
-          <WishlistCTA isLoggedIn={isLoggedIn} />
+            {/* CTA Section */}
+            <WishlistCTA isLoggedIn={isLoggedIn} />
 
-          {/* Footer Disclaimer */}
-          <FooterDisclaimer />
-        </div>
+            {/* Footer Disclaimer */}
+            <FooterDisclaimer />
+          </div>
 
-        {/* Mobile Sticky CTA */}
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-[#ECF0F1] sm:hidden z-50">
-          <Link href={isLoggedIn ? "/wishlist/add" : "/signup"} className="block">
-            <Button className="w-full h-12 rounded-lg bg-[#3498DB] hover:bg-[#2980B9] text-white font-semibold">
-              Create My Wishlist
-            </Button>
-          </Link>
-        </div>
+          {/* Mobile Sticky CTA */}
+          <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-[#DAA520]/20 sm:hidden z-50">
+            <Link href={isLoggedIn ? "/wishlist/add" : "/signup"} className="block">
+              <Button className="w-full h-12 rounded-full bg-gradient-to-r from-[#DAA520] to-[#F4C430] hover:from-[#F4C430] hover:to-[#DAA520] text-[#654321] font-semibold shadow-md">
+                Create My Wishlist
+              </Button>
+            </Link>
+          </div>
+        </main>
+        <Footer />
       </div>
     )
   }
 
   // WISHLIST WITH ITEMS - Enhanced version of original
   return (
-    <div className="min-h-screen bg-white pb-20 sm:pb-8">
-      <div className="max-w-6xl mx-auto px-4">
-        {/* Header */}
-        <SharedWishlistHeader
-          wishlistTitle={data.wishlist.title}
-          sharedBy={data.sharedBy}
-          description={data.wishlist.description}
-        />
+    <div className="min-h-screen bg-white flex flex-col">
+      <Header />
+      <main className="flex-1 pb-20 sm:pb-8">
+        <div className="max-w-6xl mx-auto px-4">
+          {/* Wishlist Title Section */}
+          <SharedWishlistHeader
+            wishlistTitle={data.wishlist.title}
+            sharedBy={data.sharedBy}
+            description={data.wishlist.description}
+          />
 
-        {/* Items Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-          {data.items.map((item) => (
-            <ProductCard key={item.id} item={item} />
-          ))}
+          {/* Items Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+            {data.items.map((item) => (
+              <ProductCard key={item.id} item={item} />
+            ))}
+          </div>
+
+          {/* Footer Disclaimer */}
+          <div className="mt-8">
+            <FooterDisclaimer />
+          </div>
+
+          {/* CTA Section */}
+          <WishlistCTA isLoggedIn={isLoggedIn} />
         </div>
-
-        {/* Footer Disclaimer */}
-        <div className="mt-8">
-          <FooterDisclaimer />
-        </div>
-
-        {/* CTA Section */}
-        <WishlistCTA isLoggedIn={isLoggedIn} />
-      </div>
+      </main>
+      <Footer />
     </div>
   )
 }
@@ -252,16 +273,19 @@ function SingleProductView({ data }: { data: SharedData }) {
     : 0
 
   return (
-    <div className="min-h-screen bg-white py-8 px-4">
-      <div className="max-w-2xl mx-auto">
-        {/* Logo */}
-        <div className="flex items-center justify-center gap-2 mb-8">
-          <span className="text-2xl">🐝</span>
-          <span className="text-xl font-bold text-[#8B4513]">Wishbee</span>
-        </div>
+    <div className="min-h-screen bg-white flex flex-col">
+      <Header />
+      <main className="flex-1 py-8 px-4">
+        <div className="max-w-2xl mx-auto">
+          {/* Shared By Info */}
+          <div className="text-center mb-6">
+            <p className="text-sm text-[#A0522D]">
+              Shared by <span className="font-semibold text-[#8B4513]">{data.sharedBy}</span>
+            </p>
+          </div>
 
-        {/* Product Card */}
-        <Card className="overflow-hidden bg-white border border-[#ECF0F1] shadow-lg rounded-xl">
+          {/* Product Card */}
+          <Card className="overflow-hidden bg-white border-2 border-[#DAA520]/30 shadow-lg rounded-xl">
           <div className="aspect-square relative bg-[#F8F9FA]">
             {data.product.image ? (
               <Image
@@ -357,7 +381,7 @@ function SingleProductView({ data }: { data: SharedData }) {
                 rel="noopener noreferrer"
                 className="block"
               >
-                <Button className="w-full h-12 rounded-lg bg-[#3498DB] hover:bg-[#2980B9] text-white font-semibold">
+                <Button className="w-full h-12 rounded-full bg-gradient-to-r from-[#DAA520] to-[#F4C430] hover:from-[#F4C430] hover:to-[#DAA520] text-[#654321] font-semibold shadow-md hover:shadow-lg transition-all">
                   <ShoppingCart className="w-5 h-5 mr-2" />
                   View on Store
                   <ExternalLink className="w-4 h-4 ml-2" />
@@ -367,11 +391,13 @@ function SingleProductView({ data }: { data: SharedData }) {
           </div>
         </Card>
 
-        {/* Disclaimer */}
-        <p className="text-xs text-[#95A5A6] text-center mt-6">
-          {data.disclaimer}
-        </p>
-      </div>
+          {/* Disclaimer */}
+          <p className="text-xs text-[#A0522D] text-center mt-6">
+            {data.disclaimer}
+          </p>
+        </div>
+      </main>
+      <Footer />
     </div>
   )
 }
