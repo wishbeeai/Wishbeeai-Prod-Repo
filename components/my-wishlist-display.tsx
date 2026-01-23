@@ -823,6 +823,27 @@ export function MyWishlistDisplay() {
                                 </div>
                                 
                                 <div className="space-y-4">
+                                  {/* Select on Retailer Button */}
+                                  {item.webLink && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        window.open(item.webLink, '_blank')
+                                      }}
+                                      className="w-full h-11 bg-gradient-to-r from-[#8B4513] to-[#A0522D] text-white font-semibold rounded-xl hover:from-[#A0522D] hover:to-[#8B4513] transition-all flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
+                                    >
+                                      <ExternalLink className="w-4 h-4" />
+                                      Select on Retailer
+                                    </button>
+                                  )}
+                                  
+                                  {/* Divider */}
+                                  <div className="flex items-center gap-3">
+                                    <div className="flex-1 h-px bg-[#DAA520]/30"></div>
+                                    <span className="text-xs font-medium text-[#8B6914]">OR</span>
+                                    <div className="flex-1 h-px bg-[#DAA520]/30"></div>
+                                  </div>
+                                  
                                   {/* URL Input */}
                                   <input
                                     type="text"
@@ -1134,32 +1155,35 @@ export function MyWishlistDisplay() {
                             </div>
                           ) : (
                             <>
-                              {/* Product Image & Details Row - Display Mode */}
-                              <div className="flex gap-3 mb-3">
-                                <div className="w-16 h-16 flex-shrink-0 bg-white rounded-lg border border-[#DAA520]/20 p-1">
-                                  <Image src={item.productImageUrl || "/placeholder.svg"} alt={item.giftName} width={56} height={56} className="w-full h-full object-contain" />
+                              {/* Product Image - Display Mode (Large, Centered) */}
+                              <div className="flex justify-center mb-4">
+                                <div className="w-40 h-40 sm:w-48 sm:h-48 bg-white rounded-2xl border-2 border-[#DAA520]/30 p-3 shadow-md">
+                                  <Image src={item.productImageUrl || "/placeholder.svg"} alt={item.giftName} width={180} height={180} className="w-full h-full object-contain" />
                                 </div>
-                                <div className="flex-1 min-w-0">
-                                  <h5 className="text-xs font-bold text-[#4A2F1A] line-clamp-2 leading-tight mb-1">{item.giftName}</h5>
-                                  <p className="text-[10px] text-[#8B6914] mb-1 flex items-center gap-1"><span className="w-1 h-1 bg-[#DAA520] rounded-full"></span>{item.storeName}</p>
-                                  {item.rating && (
-                                    <div className="flex items-center gap-1 mb-1">
-                                      <div className="flex items-center gap-0.5">
-                                        {[1,2,3,4,5].map((s) => (<svg key={s} className="w-2.5 h-2.5" viewBox="0 0 24 24" fill={s <= Math.round(item.rating || 0) ? "#F4C430" : "#E5E7EB"} stroke="#F4C430" strokeWidth="1"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>))}
-                                      </div>
-                                      <span className="text-[9px] font-bold text-[#654321]">{item.rating?.toFixed(1)}</span>
-                                      {item.reviewCount && <span className="text-[8px] text-gray-500">({item.reviewCount.toLocaleString()})</span>}
+                              </div>
+                              
+                              {/* Product Details - Below Image */}
+                              <div className="bg-white/70 rounded-xl p-3 border border-[#DAA520]/20 mb-3">
+                                <h5 className="text-sm font-bold text-[#4A2F1A] line-clamp-2 leading-snug mb-2">{item.giftName}</h5>
+                                <p className="text-[11px] text-[#8B6914] mb-2 font-medium">
+                                  {item.storeName}
+                                </p>
+                                {item.rating && (
+                                  <div className="flex items-center gap-1.5 mb-2">
+                                    <div className="flex items-center gap-0.5">
+                                      {[1,2,3,4,5].map((s) => (<svg key={s} className="w-3.5 h-3.5" viewBox="0 0 24 24" fill={s <= Math.round(item.rating || 0) ? "#F4C430" : "#E5E7EB"} stroke="#F4C430" strokeWidth="1"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>))}
                                     </div>
-                                  )}
-                                  <div className="flex flex-wrap gap-1 mb-1 min-h-[18px]">
-                                    {item.badges?.amazonChoice && <span className="text-[8px] bg-gradient-to-r from-gray-900 to-black text-white px-1.5 py-0.5 rounded-full font-bold">Amazon&apos;s Choice</span>}
-                                    {item.badges?.bestSeller && <span className="text-[8px] text-white px-1.5 py-0.5 rounded-full font-bold" style={{backgroundColor:'#D14900'}}>#1 Best Seller</span>}
-                                    {!item.badges?.amazonChoice && !item.badges?.bestSeller && <span className="invisible text-[8px]">&nbsp;</span>}
+                                    <span className="text-[11px] font-bold text-[#654321]">{item.rating?.toFixed(1)}</span>
+                                    {item.reviewCount && <span className="text-[10px] text-gray-500">({item.reviewCount.toLocaleString()})</span>}
                                   </div>
-                                  <div className="flex items-baseline gap-1">
-                                    {item.originalPrice && item.originalPrice > item.currentPrice && <span className="text-[9px] text-gray-400 line-through">${item.originalPrice.toFixed(2)}</span>}
-                                    <span className="text-sm font-bold text-[#654321]">${item.currentPrice.toFixed(2)}</span>
-                                  </div>
+                                )}
+                                <div className="flex flex-wrap gap-1.5 mb-2">
+                                  {item.badges?.amazonChoice && <span className="text-[9px] bg-gradient-to-r from-gray-900 to-black text-white px-2 py-0.5 rounded-full font-bold">Amazon&apos;s Choice</span>}
+                                  {item.badges?.bestSeller && <span className="text-[9px] text-white px-2 py-0.5 rounded-full font-bold" style={{backgroundColor:'#D14900'}}>#1 Best Seller</span>}
+                                </div>
+                                <div className="flex items-baseline gap-2">
+                                  {item.originalPrice && item.originalPrice > item.currentPrice && <span className="text-xs text-gray-400 line-through">${item.originalPrice.toFixed(2)}</span>}
+                                  <span className="text-lg font-extrabold text-[#654321]">${item.currentPrice.toFixed(2)}</span>
                                 </div>
                               </div>
 
@@ -1298,6 +1322,27 @@ export function MyWishlistDisplay() {
                                       </div>
                                       
                                       <div className="space-y-4">
+                                        {/* Select on Retailer Button */}
+                                        {item.webLink && (
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              window.open(item.webLink, '_blank')
+                                            }}
+                                            className="w-full h-11 bg-gradient-to-r from-[#8B4513] to-[#A0522D] text-white font-semibold rounded-xl hover:from-[#A0522D] hover:to-[#8B4513] transition-all flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
+                                          >
+                                            <ExternalLink className="w-4 h-4" />
+                                            Select on Retailer
+                                          </button>
+                                        )}
+                                        
+                                        {/* Divider */}
+                                        <div className="flex items-center gap-3">
+                                          <div className="flex-1 h-px bg-[#DAA520]/30"></div>
+                                          <span className="text-xs font-medium text-[#8B6914]">OR</span>
+                                          <div className="flex-1 h-px bg-[#DAA520]/30"></div>
+                                        </div>
+                                        
                                         {/* URL Input */}
                                         <input
                                           type="text"
@@ -1336,6 +1381,15 @@ export function MyWishlistDisplay() {
                                                       style: data.style || data.attributes?.style || '',
                                                       configuration: data.configuration || data.attributes?.configuration || data.attributes?.appleCarePlus || '',
                                                       specifications: data.specifications || data.attributes || {},
+                                                      storeName: data.storeName || data.store || 'Amazon',
+                                                      rating: data.rating || data.stars || null,
+                                                      reviewCount: data.reviewCount || data.reviews || null,
+                                                      badges: {
+                                                        amazonChoice: data.amazonChoice || data.badges?.amazonChoice || false,
+                                                        bestSeller: data.bestSeller || data.badges?.bestSeller || false,
+                                                      },
+                                                      originalPrice: data.originalPrice || data.listPrice || null,
+                                                      currentPrice: data.currentPrice || data.price || data.salePrice || null,
                                                     }
                                                   }
                                                 }
@@ -1470,15 +1524,48 @@ export function MyWishlistDisplay() {
                               ) : (
                                 <>
                                   {/* Alternative Product Details - Display Mode */}
+                                  {/* Alternative Product Image - Large, Centered */}
                                   {item.preferenceOptions?.alternative?.image && (
-                                    <div className="flex gap-3 mb-3">
-                                      <div className="w-16 h-16 flex-shrink-0 bg-white rounded-lg border border-[#D97706]/20 p-1">
-                                        <Image src={item.preferenceOptions.alternative.image as string || "/placeholder.svg"} alt="Alternative" width={56} height={56} className="w-full h-full object-contain" />
+                                    <div className="flex justify-center mb-4">
+                                      <div className="w-40 h-40 sm:w-48 sm:h-48 bg-white rounded-2xl border-2 border-[#D97706]/30 p-3 shadow-md">
+                                        <Image src={item.preferenceOptions.alternative.image as string || "/placeholder.svg"} alt="Alternative" width={180} height={180} className="w-full h-full object-contain" />
                                       </div>
-                                      <div className="flex-1 min-w-0">
-                                        {item.preferenceOptions.alternative.title && <h5 className="text-xs font-bold text-[#4A2F1A] line-clamp-2 leading-tight mb-1">{item.preferenceOptions.alternative.title as string}</h5>}
-                                        <p className="text-[10px] text-[#92400E] mb-1 flex items-center gap-1"><span className="w-1 h-1 bg-[#D97706] rounded-full"></span>{item.storeName}</p>
+                                    </div>
+                                  )}
+                                  
+                                  {/* Alternative Product Details - Below Image */}
+                                  {item.preferenceOptions?.alternative && (
+                                    <div className="bg-white/70 rounded-xl p-3 border border-[#D97706]/20 mb-3">
+                                      {item.preferenceOptions.alternative.title && (
+                                        <h5 className="text-sm font-bold text-[#4A2F1A] line-clamp-2 leading-snug mb-2">{item.preferenceOptions.alternative.title as string}</h5>
+                                      )}
+                                      <p className="text-[11px] text-[#92400E] font-medium mb-2">
+                                        {(item.preferenceOptions.alternative as any).storeName || item.storeName}
+                                      </p>
+                                      {/* Rating and Review Count */}
+                                      {(item.preferenceOptions.alternative as any).rating && (
+                                        <div className="flex items-center gap-1.5 mb-2">
+                                          <div className="flex items-center gap-0.5">
+                                            {[1,2,3,4,5].map((s) => (<svg key={s} className="w-3.5 h-3.5" viewBox="0 0 24 24" fill={s <= Math.round((item.preferenceOptions.alternative as any).rating || 0) ? "#F4C430" : "#E5E7EB"} stroke="#F4C430" strokeWidth="1"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>))}
+                                          </div>
+                                          <span className="text-[11px] font-bold text-[#654321]">{((item.preferenceOptions.alternative as any).rating as number)?.toFixed(1)}</span>
+                                          {(item.preferenceOptions.alternative as any).reviewCount && <span className="text-[10px] text-gray-500">({((item.preferenceOptions.alternative as any).reviewCount as number).toLocaleString()})</span>}
+                                        </div>
+                                      )}
+                                      {/* Badges */}
+                                      <div className="flex flex-wrap gap-1.5 mb-2">
+                                        {(item.preferenceOptions.alternative as any).badges?.amazonChoice && <span className="text-[9px] bg-gradient-to-r from-gray-900 to-black text-white px-2 py-0.5 rounded-full font-bold">Amazon&apos;s Choice</span>}
+                                        {(item.preferenceOptions.alternative as any).badges?.bestSeller && <span className="text-[9px] text-white px-2 py-0.5 rounded-full font-bold" style={{backgroundColor:'#D14900'}}>#1 Best Seller</span>}
                                       </div>
+                                      {/* Price */}
+                                      {((item.preferenceOptions.alternative as any).currentPrice || (item.preferenceOptions.alternative as any).price) && (
+                                        <div className="flex items-baseline gap-2">
+                                          {(item.preferenceOptions.alternative as any).originalPrice && (item.preferenceOptions.alternative as any).originalPrice > ((item.preferenceOptions.alternative as any).currentPrice || (item.preferenceOptions.alternative as any).price) && (
+                                            <span className="text-xs text-gray-400 line-through">${((item.preferenceOptions.alternative as any).originalPrice as number).toFixed(2)}</span>
+                                          )}
+                                          <span className="text-lg font-extrabold text-[#654321]">${(((item.preferenceOptions.alternative as any).currentPrice || (item.preferenceOptions.alternative as any).price) as number).toFixed(2)}</span>
+                                        </div>
+                                      )}
                                     </div>
                                   )}
 

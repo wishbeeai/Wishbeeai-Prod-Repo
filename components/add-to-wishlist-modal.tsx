@@ -2359,7 +2359,14 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                             <div className="flex items-center gap-2">
                               <button
                                 type="button"
-                                onClick={() => setIWishAddMethod("url")}
+                                onClick={() => {
+                                  setIWishAddMethod("url")
+                                  // Open product URL in new tab
+                                  const productUrl = extractedProduct?.productLink || gift?.webLink
+                                  if (productUrl) {
+                                    window.open(productUrl, '_blank')
+                                  }
+                                }}
                                 className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
                                   iWishAddMethod === "url"
                                     ? "bg-gradient-to-r from-[#B8860B] to-[#DAA520] text-white shadow-md"
@@ -2372,7 +2379,17 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                               <span className="text-xs font-semibold text-[#8B6914]">OR</span>
                               <button
                                 type="button"
-                                onClick={() => setIWishAddMethod("extension")}
+                                onClick={() => {
+                                  setIWishAddMethod("extension")
+                                  // Auto-start listening for extension clip
+                                  setIsWaitingForIWishClip(true)
+                                  setAwaitingExtensionFor("like")
+                                  // Open product URL in new tab
+                                  const productUrl = extractedProduct?.productLink || gift?.webLink
+                                  if (productUrl) {
+                                    window.open(productUrl, '_blank')
+                                  }
+                                }}
                                 className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
                                   iWishAddMethod === "extension"
                                     ? "bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-white shadow-md"
@@ -2523,43 +2540,26 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                             {/* Clip via Extension Option */}
                             {iWishAddMethod === "extension" && (
                               <div className="bg-white/80 rounded-lg p-4 border border-[#DAA520]/20">
-                                {isWaitingForIWishClip ? (
-                                  <div className="flex flex-col items-center gap-3">
-                                    <div className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#DAA520]/20 to-[#F4C430]/20 rounded-full border border-[#DAA520]/40">
-                                      <Loader2 className="w-4 h-4 animate-spin text-[#DAA520]" />
-                                      <span className="text-sm font-semibold text-[#654321]">Listening for clip...</span>
-                                    </div>
-                                    <p className="text-xs text-[#8B6914] text-center">Open a product page and use the Wishbee extension to clip it.</p>
-                                    <button
-                                      type="button"
-                                      onClick={() => setIsWaitingForIWishClip(false)}
-                                      className="text-xs text-red-500 hover:text-red-700 font-medium px-3 py-1 rounded-lg hover:bg-red-50 transition-colors"
-                                    >
-                                      Cancel
-                                    </button>
+                                <div className="flex flex-col items-center gap-3">
+                                  <div className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#DAA520]/20 to-[#F4C430]/20 rounded-full border border-[#DAA520]/40">
+                                    <Loader2 className="w-4 h-4 animate-spin text-[#DAA520]" />
+                                    <span className="text-sm font-semibold text-[#654321]">Listening for clip...</span>
                                   </div>
-                                ) : (
-                                  <div className="space-y-3">
-                                    <p className="text-xs text-[#654321] text-center">
-                                      Click <span className="font-semibold text-[#DAA520]">Start Listening</span>, then browse any product page and clip it with the Wishbee extension.
-                                    </p>
-                                    <div className="flex justify-center">
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setIsWaitingForIWishClip(true)
-                                          setAwaitingExtensionFor("like")
-                                        }}
-                                        className="bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] hover:from-[#F4C430] hover:to-[#DAA520] font-semibold px-4 py-1.5 rounded-lg text-xs shadow-sm"
-                                      >
-                                        Start Listening
-                                      </button>
-                                    </div>
-                                    <p className="text-[10px] text-[#8B6914]/70 text-center">
-                                      Don't have the extension? <a href="https://wishbee.ai/extension" target="_blank" rel="noopener noreferrer" className="text-[#DAA520] font-semibold hover:underline">Get it free →</a>
-                                    </p>
-                                  </div>
-                                )}
+                                  <p className="text-xs text-[#8B6914] text-center">Select your options on the retailer page, then use the Wishbee extension to clip it.</p>
+                                  <p className="text-[10px] text-[#8B6914]/70 text-center">
+                                    Don't have the extension? <a href="https://wishbee.ai/extension" target="_blank" rel="noopener noreferrer" className="text-[#DAA520] font-semibold hover:underline">Get it free →</a>
+                                  </p>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setIsWaitingForIWishClip(false)
+                                      setIWishAddMethod("url")
+                                    }}
+                                    className="text-xs text-red-500 hover:text-red-700 font-medium px-3 py-1 rounded-lg hover:bg-red-50 transition-colors"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
                               </div>
                             )}
                           </div>
@@ -3372,7 +3372,14 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                             <div className="flex items-center gap-2">
                               <button
                                 type="button"
-                                onClick={() => setAltAddMethod("url")}
+                                onClick={() => {
+                                  setAltAddMethod("url")
+                                  // Open product URL in new tab
+                                  const productUrl = extractedProduct?.productLink || gift?.webLink
+                                  if (productUrl) {
+                                    window.open(productUrl, '_blank')
+                                  }
+                                }}
                                 className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
                                   altAddMethod === "url"
                                     ? "bg-gradient-to-r from-[#B45309] to-[#D97706] text-white shadow-md"
@@ -3385,7 +3392,17 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                               <span className="text-xs font-semibold text-[#92400E]">OR</span>
                               <button
                                 type="button"
-                                onClick={() => setAltAddMethod("extension")}
+                                onClick={() => {
+                                  setAltAddMethod("extension")
+                                  // Auto-start listening for extension clip
+                                  setIsWaitingForAltClip(true)
+                                  setAwaitingExtensionFor("alt")
+                                  // Open product URL in new tab
+                                  const productUrl = extractedProduct?.productLink || gift?.webLink
+                                  if (productUrl) {
+                                    window.open(productUrl, '_blank')
+                                  }
+                                }}
                                 className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
                                   altAddMethod === "extension"
                                     ? "bg-gradient-to-r from-[#D97706] to-[#F59E0B] text-white shadow-md"
@@ -3556,43 +3573,26 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                             {/* Clip via Extension Option */}
                             {altAddMethod === "extension" && (
                               <div className="bg-white/80 rounded-lg p-4 border border-[#D97706]/20">
-                                {isWaitingForAltClip ? (
-                                  <div className="flex flex-col items-center gap-3">
-                                    <div className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#D97706]/20 to-[#F59E0B]/20 rounded-full border border-[#D97706]/40">
-                                      <Loader2 className="w-4 h-4 animate-spin text-[#D97706]" />
-                                      <span className="text-sm font-semibold text-[#654321]">Listening for clip...</span>
-                                    </div>
-                                    <p className="text-xs text-[#92400E] text-center">Open a product page and use the Wishbee extension to clip it.</p>
-                                    <button
-                                      type="button"
-                                      onClick={() => setIsWaitingForAltClip(false)}
-                                      className="text-xs text-red-500 hover:text-red-700 font-medium px-3 py-1 rounded-lg hover:bg-red-50 transition-colors"
-                                    >
-                                      Cancel
-                                    </button>
+                                <div className="flex flex-col items-center gap-3">
+                                  <div className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#D97706]/20 to-[#F59E0B]/20 rounded-full border border-[#D97706]/40">
+                                    <Loader2 className="w-4 h-4 animate-spin text-[#D97706]" />
+                                    <span className="text-sm font-semibold text-[#654321]">Listening for clip...</span>
                                   </div>
-                                ) : (
-                                  <div className="space-y-3">
-                                    <p className="text-xs text-[#654321] text-center">
-                                      Click <span className="font-semibold text-[#D97706]">Start Listening</span>, then browse any product page and clip it with the Wishbee extension.
-                                    </p>
-                                    <div className="flex justify-center">
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setIsWaitingForAltClip(true)
-                                          setAwaitingExtensionFor("alt")
-                                        }}
-                                        className="bg-gradient-to-r from-[#D97706] to-[#F59E0B] text-white hover:from-[#F59E0B] hover:to-[#D97706] font-semibold px-4 py-1.5 rounded-lg text-xs shadow-sm"
-                                      >
-                                        Start Listening
-                                      </button>
-                                    </div>
-                                    <p className="text-[10px] text-[#92400E]/70 text-center">
-                                      Don't have the extension? <a href="https://wishbee.ai/extension" target="_blank" rel="noopener noreferrer" className="text-[#D97706] font-semibold hover:underline">Get it free →</a>
-                                    </p>
-                                  </div>
-                                )}
+                                  <p className="text-xs text-[#92400E] text-center">Select your options on the retailer page, then use the Wishbee extension to clip it.</p>
+                                  <p className="text-[10px] text-[#92400E]/70 text-center">
+                                    Don't have the extension? <a href="https://wishbee.ai/extension" target="_blank" rel="noopener noreferrer" className="text-[#D97706] font-semibold hover:underline">Get it free →</a>
+                                  </p>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setIsWaitingForAltClip(false)
+                                      setAltAddMethod("url")
+                                    }}
+                                    className="text-xs text-red-500 hover:text-red-700 font-medium px-3 py-1 rounded-lg hover:bg-red-50 transition-colors"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
                               </div>
                             )}
                           </div>
