@@ -123,10 +123,10 @@ export default function AdminAffiliateProductsPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [isExtracting, setIsExtracting] = useState(false)
   const [extractedProduct, setExtractedProduct] = useState<any>(null)
-  // Variant options extracted from URL (color, size, style, set/configuration) - displayed in "Selected Options" layout
-  const [variantOptions, setVariantOptions] = useState<{color?: string, size?: string, style?: string, configuration?: string}>({})
+  // Variant options extracted from URL (color, size, style, set/configuration, capacity) - displayed in "Selected Options" layout
+  const [variantOptions, setVariantOptions] = useState<{color?: string, size?: string, style?: string, configuration?: string, capacity?: string}>({})
   // State for editing variant options
-  const [editingOption, setEditingOption] = useState<'style' | 'color' | 'size' | 'set' | null>(null)
+  const [editingOption, setEditingOption] = useState<'style' | 'color' | 'size' | 'set' | 'configuration' | 'capacity' | null>(null)
   const [editOptionValue, setEditOptionValue] = useState('')
   // Custom variant options (user-added fields beyond Style, Color, Size, Set)
   const [customVariantOptions, setCustomVariantOptions] = useState<Array<{id: string, name: string, value: string}>>([])
@@ -139,6 +139,8 @@ export default function AdminAffiliateProductsPage() {
   const [customFields, setCustomFields] = useState<Array<{name: string, value: string}>>([])
   // Product attributes (Brand, Color, Ear Placement, etc.) - include id for stable React keys
   const [productAttributes, setProductAttributes] = useState<Array<{id: string, name: string, value: string}>>([])
+  // View mode for Product Attributes (true = display mode like product page, false = edit mode)
+  const [productAttributesViewMode, setProductAttributesViewMode] = useState(true)
   // Custom badges for product
   const [customBadges, setCustomBadges] = useState<Array<{name: string, enabled: boolean}>>([])
   // Temporary string values to preserve decimal points while typing
@@ -293,10 +295,11 @@ export default function AdminAffiliateProductsPage() {
     setVariantOptions(savedVariantOptions)
     console.log('[Admin] Loaded variant options for editing:', savedVariantOptions)
     // Populate extractedProduct with existing product data for editing
-    // Filter out color, size, and style from existing product attributes
+    // Filter out variant options (color, size, style, configuration, capacity) from existing product attributes
+    // These are shown in "Selected Options", not in "Product Attributes"
     let filteredEditAttributes = null
     if (product.attributes) {
-      const { color, size, style, ...restAttributes } = product.attributes
+      const { color, size, style, configuration, capacity, ...restAttributes } = product.attributes
       if (Object.keys(restAttributes).length > 0) {
         filteredEditAttributes = restAttributes
       }
@@ -312,7 +315,14 @@ export default function AdminAffiliateProductsPage() {
       price: product.price || null,
       originalPrice: product.originalPrice || null,
       productLink: product.productLink || "",
-      brand: product.attributes?.brand || null,
+      brand: (() => {
+        const brandValue = product.attributes?.brand
+        // Filter out "Unknown" and empty values
+        if (!brandValue || brandValue.toString().toLowerCase().trim() === 'unknown' || brandValue.toString().trim() === '') {
+          return null
+        }
+        return brandValue.toString().trim()
+      })(),
       amazonChoice: product.amazonChoice || false,
       bestSeller: product.bestSeller || false,
       // Include product attributes/specifications for editing (excluding color, size, style)
@@ -365,8 +375,8 @@ export default function AdminAffiliateProductsPage() {
         }
       }
     }
-    // Limit to maximum 8 product attributes
-    setProductAttributes(attrPairs.slice(0, 8))
+    // Include ALL product attributes (no limit)
+    setProductAttributes(attrPairs)
     setIsEditModalOpen(true)
   }
 
@@ -543,7 +553,7 @@ export default function AdminAffiliateProductsPage() {
           return true
         }
         
-        const extractedVariants: {color?: string, size?: string, style?: string, configuration?: string} = {}
+        const extractedVariants: {color?: string, size?: string, style?: string, configuration?: string, capacity?: string} = {}
         
         // Helper to get a string value (handles arrays by taking first element)
         const getStringValue = (val: any): string | undefined => {
@@ -573,6 +583,8 @@ export default function AdminAffiliateProductsPage() {
         console.log('[Admin] extracted.set:', extracted.set)
         console.log('[Admin] extracted.attributes?.configuration:', extracted.attributes?.configuration)
         console.log('[Admin] extracted.configuration:', extracted.configuration)
+        console.log('[Admin] extracted.attributes?.capacity:', extracted.attributes?.capacity)
+        console.log('[Admin] extracted.capacity:', extracted.capacity)
         // Also check for watch-specific fields
         console.log('[Admin] extracted.attributes?.connectivity:', extracted.attributes?.connectivity)
         console.log('[Admin] extracted.attributes?.connectivityTechnology:', extracted.attributes?.connectivityTechnology)
@@ -586,11 +598,42 @@ export default function AdminAffiliateProductsPage() {
         // Note: connectivity (GPS, GPS + Cellular) is a SPEC, not a variant - don't include it here
         const configVal = getStringValue(extracted.attributes?.set) || getStringValue(extracted.set) ||
                           getStringValue(extracted.attributes?.configuration) || getStringValue(extracted.configuration)
+        // Capacity: Memory and storage options (e.g., "16GB Unified Memory, 1TB SSD Storage")
+        // Check multiple sources: attributes.capacity, top-level capacity, or extract from features
+        let capacityVal = getStringValue(extracted.attributes?.capacity) || getStringValue(extracted.capacity)
+        
+        // Fallback: Extract from features field if capacity not found
+        if (!capacityVal && extracted.attributes?.features) {
+          const features = String(extracted.attributes.features)
+          // Pattern: "16GB Unified Memory, 1TB SSD Storage" - more flexible to handle variations
+          const capacityPattern = /(\d+\s*(?:GB|TB))\s*(?:Unified\s*)?Memory[,\s]+(\d+\s*(?:GB|TB))\s*SSD\s*Storage/i
+          const match = features.match(capacityPattern)
+          if (match && match[1] && match[2]) {
+            capacityVal = `${match[1]} Unified Memory, ${match[2]} SSD Storage`
+            console.log('[Admin] ✅ Extracted capacity from features field:', capacityVal)
+          } else {
+            // Fallback: Try combining ram and hardDiskSize if available
+            const ram = extracted.attributes?.ram || extracted.attributes?.memoryStorageCapacity || ''
+            const storage = extracted.attributes?.hardDiskSize || ''
+            if (ram && storage) {
+              const ramMatch = String(ram).match(/(\d+)\s*(GB|TB)/i)
+              const storageMatch = String(storage).match(/(\d+)\s*(GB|TB)/i)
+              if (ramMatch && storageMatch) {
+                capacityVal = `${ramMatch[1]}${ramMatch[2]} Unified Memory, ${storageMatch[1]}${storageMatch[2]} SSD Storage`
+                console.log('[Admin] ✅ Extracted capacity from ram + storage:', capacityVal)
+              }
+            }
+          }
+        }
         
         console.log('[Admin] colorVal (processed):', colorVal, 'isValid:', isValidVariantValue(colorVal))
         console.log('[Admin] sizeVal (processed):', sizeVal, 'isValid:', isValidVariantValue(sizeVal))
         console.log('[Admin] styleVal (processed):', styleVal, 'isValid:', isValidVariantValue(styleVal))
         console.log('[Admin] configVal (processed):', configVal, 'isValid:', isValidVariantValue(configVal))
+        console.log('[Admin] capacityVal (processed):', capacityVal, 'isValid:', isValidVariantValue(capacityVal))
+        console.log('[Admin] extracted.attributes?.features:', extracted.attributes?.features)
+        console.log('[Admin] extracted.attributes?.ram:', extracted.attributes?.ram)
+        console.log('[Admin] extracted.attributes?.hardDiskSize:', extracted.attributes?.hardDiskSize)
         
         // Additional validation: reject shape values for style (e.g., "SQUARE" is shape, not style)
         const isValidStyleValue = (val: string | undefined): boolean => {
@@ -608,18 +651,19 @@ export default function AdminAffiliateProductsPage() {
         if (isValidVariantValue(sizeVal)) extractedVariants.size = sizeVal!.trim()
         if (isValidStyleValue(styleVal)) extractedVariants.style = styleVal!.trim()
         if (isValidVariantValue(configVal)) extractedVariants.configuration = configVal!.trim()
+        if (isValidVariantValue(capacityVal)) extractedVariants.capacity = capacityVal!.trim()
         
         setVariantOptions(extractedVariants)
         console.log('[Admin] Final extracted variant options for I Wish display:', extractedVariants)
         
         // Filter out ALL variant-related properties from extracted attributes
-        // Variant options (Color, Size, Style, Configuration) will be selected in "Add to My Wishlist" modal
-        // Only keep static product specifications here
+        // Variant options (Color, Size, Style, Configuration/Set) will be selected in "Add to My Wishlist" modal
+        // Only keep static product specifications here - exclude anything shown in Selected Options
         let filteredAttributes = null
         if (extracted.attributes) {
           const variantKeys = [
             // Variant options - these are selectable, not static specs
-            'color', 'size', 'style', 'configuration',
+            'color', 'size', 'style', 'configuration', 'set',
             // Variant-related arrays and options
             'colorVariants', 'sizeOptions', 'combinedVariants', 'styleOptions',
             'styleName', 'patternName', 'configurationOptions',
@@ -628,7 +672,8 @@ export default function AdminAffiliateProductsPage() {
           ]
           const restAttributes: Record<string, any> = {}
           for (const [key, value] of Object.entries(extracted.attributes)) {
-            if (!variantKeys.includes(key) && value !== null && value !== undefined && value !== '') {
+            const keyLower = key.toLowerCase()
+            if (!variantKeys.includes(keyLower) && value !== null && value !== undefined && value !== '') {
               restAttributes[key] = value
             }
           }
@@ -649,7 +694,14 @@ export default function AdminAffiliateProductsPage() {
           originalPrice: originalPriceValue,
           rating: ratingValue,
           reviewCount: reviewCountValue,
-          brand: extracted.attributes?.brand || extracted.brand || null,
+          brand: (() => {
+            const brandValue = extracted.attributes?.brand || extracted.brand
+            // Filter out "Unknown" and empty values
+            if (!brandValue || brandValue.toString().toLowerCase().trim() === 'unknown' || brandValue.toString().trim() === '') {
+              return null
+            }
+            return brandValue.toString().trim()
+          })(),
           amazonChoice: extracted.amazonChoice || false,
           bestSeller: extracted.bestSeller || false,
           // Include filtered product attributes (excluding color, size, style)
@@ -662,12 +714,13 @@ export default function AdminAffiliateProductsPage() {
         let attrIdCounter = 0
         
         // Variant options to exclude - these are selectable in "Add to My Wishlist" modal
-        // NOTE: 'brand' is excluded because there's a separate Product Brand field
+        // NOTE: 'capacity' is a variant option (users can choose different memory/storage) - NOT a static spec
+        // NOTE: 'brand' and 'model' are now included in Product Attributes (even though brand has a separate field)
         const variantOptionsToExclude = [
-          'color', 'size', 'style', 'configuration',
+          'color', 'size', 'style', 'configuration', 'set', 'capacity',
           'colorVariants', 'sizeOptions', 'combinedVariants', 'styleOptions',
           'styleName', 'patternName', 'configurationOptions',
-          'customFields', 'customBadges', 'model', 'brand'
+          'customFields', 'customBadges'
         ]
         
         // Helper to format attribute name with first letter caps and spaces
@@ -682,8 +735,10 @@ export default function AdminAffiliateProductsPage() {
         }
         
         // Helper to add attribute if valid (only static specs, not variants)
+        // Exclude variant options (Set, Configuration, etc.) - they are in Selected Options only
         const addAttr = (name: string, value: any) => {
-          if (!variantOptionsToExclude.includes(name) && value && !attrPairs.find(p => p.name === name)) {
+          const nameLower = name.toLowerCase()
+          if (!variantOptionsToExclude.includes(nameLower) && value && !attrPairs.find(p => p.name === formatAttrName(name))) {
             const strValue = typeof value === 'string' ? value : String(value)
             if (strValue && strValue !== 'null' && strValue !== 'undefined' && strValue.trim() !== '') {
               // Format the attribute name with proper capitalization
@@ -696,6 +751,8 @@ export default function AdminAffiliateProductsPage() {
         // Define Amazon's standard display order for product specs
         // This matches the order shown on Amazon product pages above "About this item"
         const amazonSpecOrder = [
+          // Brand and Model (shown first)
+          'brand', 'modelName', 'model',
           // Watch/Wearables - Amazon standard order (matches user's expected order)
           'operatingSystem', 'memoryStorageCapacity', 'specialFeature', 'specialFeatures',
           'batteryCapacity', 'connectivityTechnology', 'wirelessCommunicationStandard',
@@ -705,14 +762,18 @@ export default function AdminAffiliateProductsPage() {
           'compatibleDevices', 'batteryLife',
           // Kitchen/Appliances
           'coffeeMakerType', 'filterType', 'finishType', 'numberOfSettings', 'maximumPressure',
-          'heatingElement', 'includedComponents', 'waterTankCapacity', 'capacity',
-          // Electronics general
-          'processorType', 'ramSize', 'storageCapacity', 'resolution', 'refreshRate',
+          'heatingElement', 'includedComponents', 'waterTankCapacity',
+          // NOTE: 'capacity' is NOT here - it's a variant option (excluded above) for products like MacBooks
+          // Electronics general - CPU, RAM, Storage, Graphics
+          'processorType', 'cpuModel', 'cpu', 'ramSize', 'ram', 'ramMemoryInstalledSize', 'memoryInstalledSize',
+          'storageCapacity', 'hardDiskSize', 'hardDriveSize', 'ssdCapacity',
+          'graphicsCardDescription', 'graphicsCard', 'graphicsProcessor',
+          'resolution', 'refreshRate',
           // General specs (shown last)
           'material', 'wattage', 'voltage', 'powerSource', 'controlMethod',
           'sensorType', 'bandMaterial', 'caseMaterial',
           'productDimensions', 'itemWeight', 'caratWeight',
-          'modelName', 'manufacturer', 'countryOfOrigin',
+          'manufacturer', 'countryOfOrigin',
           'outputWattage', 'inputVoltage', 'itemModelNumber', 'asin', 'upc', 'productType',
           'numberOfItems', 'numberOfPieces', 'assemblyRequired', 'batteryRequired', 'batteriesIncluded'
         ]
@@ -735,7 +796,8 @@ export default function AdminAffiliateProductsPage() {
           if (specs && typeof specs === 'object') {
             for (const [key, value] of Object.entries(specs)) {
               const keyLower = key.toLowerCase().replace(/\s+/g, '')
-              if (keyLower === 'color' || keyLower === 'size' || keyLower === 'style' || keyLower === 'configuration' || keyLower.includes('brand')) continue
+              // Only exclude variant options, not brand/model
+              if (keyLower === 'color' || keyLower === 'size' || keyLower === 'style' || keyLower === 'configuration' || keyLower === 'set') continue
               if (value && String(value).trim()) {
                 allSpecs[key] = value
               }
@@ -743,7 +805,7 @@ export default function AdminAffiliateProductsPage() {
           }
         }
         
-        // Gather from filteredAttributes
+        // Gather from filteredAttributes (already excludes variant options)
         if (filteredAttributes && Object.keys(filteredAttributes).length > 0) {
           for (const [key, value] of Object.entries(filteredAttributes)) {
             if (value && String(value).trim()) {
@@ -752,9 +814,11 @@ export default function AdminAffiliateProductsPage() {
           }
         }
         
-        // Gather from extracted.attributes
+        // Gather from extracted.attributes (skip Set/Configuration - they go to Selected Options only)
         if (extracted.attributes) {
+          const skipKeys = ['color', 'size', 'style', 'configuration', 'set']
           for (const [key, value] of Object.entries(extracted.attributes)) {
+            if (skipKeys.includes(key.toLowerCase())) continue
             if (value && String(value).trim()) {
               allSpecs[key] = value
             }
@@ -806,6 +870,17 @@ export default function AdminAffiliateProductsPage() {
           }
         }
         
+        // Add Brand to Product Attributes if it exists (even though it has a separate field)
+        // Get brand from extracted data, not extractedProduct (which may not be set yet)
+        const brandValue = extracted.attributes?.brand || extracted.brand
+        if (brandValue && brandValue.toString().toLowerCase().trim() !== 'unknown' && brandValue.toString().trim() !== '') {
+          const brandNormalized = normalizeKey('brand')
+          if (!addedKeys.has(brandNormalized)) {
+            addAttr('brand', brandValue)
+            addedKeys.add(brandNormalized)
+          }
+        }
+        
         console.log('[Admin] Static product specs (excluding variant options):', { 
           filteredAttributes, 
           extractedAttrs: extracted.attributes,
@@ -819,10 +894,9 @@ export default function AdminAffiliateProductsPage() {
         console.log('[Admin] Product Attributes (static specs only):', attrPairs)
 
         if (attrPairs.length > 0) {
-          // Limit to maximum 8 product attributes
-          const limitedAttrPairs = attrPairs.slice(0, 8)
-          setProductAttributes(limitedAttrPairs)
-          console.log('[Admin] ✅ Auto-populated productAttributes (max 8):', limitedAttrPairs)
+          // Include ALL product attributes (no limit)
+          setProductAttributes(attrPairs)
+          console.log('[Admin] ✅ Auto-populated productAttributes (all):', attrPairs)
         } else {
           // Clear any existing attributes if none found
           setProductAttributes([])
@@ -957,10 +1031,19 @@ export default function AdminAffiliateProductsPage() {
       } else {
         const error = await response.json().catch(() => ({ error: `HTTP ${response.status}: ${response.statusText}` }))
         console.error(`[handleAddToWishlist] Error response:`, error)
-        toast.error("Failed to add product", {
-          description: error.error || "Something went wrong. Please try again.",
-          duration: 4000,
-        })
+        
+        // Handle duplicate product (409 Conflict)
+        if (response.status === 409) {
+          toast.warning("🐝 Already Added", {
+            description: error.message || error.error || "This product is already in Trending Gifts.",
+            duration: 4000,
+          })
+        } else {
+          toast.error("Failed to add product", {
+            description: error.error || "Something went wrong. Please try again.",
+            duration: 4000,
+          })
+        }
       }
     } catch (error) {
       console.error("Error adding to trending gifts:", error)
@@ -1057,15 +1140,24 @@ export default function AdminAffiliateProductsPage() {
           : (formData.productLink || extractedProduct.productLink || "").trim() || undefined,
         amazonChoice: extractedProduct?.amazonChoice ?? formData.amazonChoice,
         bestSeller: extractedProduct?.bestSeller ?? formData.bestSeller,
-        // Include variant options (Style, Color, Size, Configuration) as top-level fields
+        // Include variant options (Style, Color, Size, Configuration, Capacity) as top-level fields
         style: variantOptions.style || undefined,
         color: variantOptions.color || undefined,
         size: variantOptions.size || undefined,
         configuration: variantOptions.configuration || undefined,
+        capacity: variantOptions.capacity || undefined,
         // Include ALL product specifications/attributes dynamically
         attributes: (() => {
           // Start with an EMPTY object - only include what user has in productAttributes
           const attrs: Record<string, any> = {}
+          
+          // Add brand if it exists and is not "Unknown"
+          if (extractedProduct.brand) {
+            const brandValue = extractedProduct.brand.toString().trim()
+            if (brandValue && brandValue.toLowerCase() !== 'unknown') {
+              attrs.brand = brandValue
+            }
+          }
           
           // Keep ONLY variant arrays from extracted attributes (these are needed for variant detection)
           // These are not editable in the UI, but needed for "Add to My Wishlist" modal logic
@@ -1808,7 +1900,7 @@ export default function AdminAffiliateProductsPage() {
                     </div>
                     
                     {/* Selected Options - Variant Options from URL */}
-                    {(variantOptions.style || variantOptions.color || variantOptions.size || variantOptions.configuration || editingOption || customVariantOptions.length > 0 || isAddingCustomOption || extractedProduct) && (
+                    {(variantOptions.style || variantOptions.color || variantOptions.size || variantOptions.configuration || variantOptions.capacity || editingOption || customVariantOptions.length > 0 || isAddingCustomOption || extractedProduct) && (
                       <div className="bg-gradient-to-br from-[#FEF7ED] via-[#FFF7ED] to-[#FFFBEB] border-2 border-[#DAA520]/40 rounded-xl p-4 shadow-lg">
                         <div className="flex items-center gap-2 mb-2 pb-2 border-b border-[#DAA520]/20">
                           <SlidersHorizontal className="w-4 h-4 text-[#DAA520]" />
@@ -2002,7 +2094,7 @@ export default function AdminAffiliateProductsPage() {
                           {/* Configuration Option - For AppleCare options */}
                           {(variantOptions.configuration || editingOption === 'configuration') && (
                             <div className="flex items-center gap-2 group">
-                              <span className="text-xs font-semibold text-[#654321] min-w-[80px]">Configuration:</span>
+                              <span className="text-xs font-semibold text-[#654321] min-w-[80px]">Set:</span>
                               {editingOption === 'configuration' ? (
                                 <div className="flex items-center gap-1 flex-1">
                                   <Input
@@ -2051,6 +2143,66 @@ export default function AdminAffiliateProductsPage() {
                                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); setVariantOptions(prev => ({ ...prev, configuration: undefined })) }}
                                     className="p-1 hover:bg-red-100 rounded"
                                     title="Delete Configuration"
+                                  >
+                                    <Trash2 className="w-3 h-3 text-red-500" />
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          )}
+                          
+                          {/* Capacity Option - For memory/storage (e.g., "16GB Unified Memory, 1TB SSD Storage") */}
+                          {(variantOptions.capacity || editingOption === 'capacity') && (
+                            <div className="flex items-center gap-2 group">
+                              <span className="text-xs font-semibold text-[#654321] min-w-[80px]">Capacity:</span>
+                              {editingOption === 'capacity' ? (
+                                <div className="flex items-center gap-1 flex-1">
+                                  <Input
+                                    value={editOptionValue}
+                                    onChange={(e) => setEditOptionValue(e.target.value)}
+                                    className="h-7 text-xs flex-1"
+                                    placeholder="e.g., 16GB Unified Memory, 1TB SSD Storage"
+                                    autoFocus
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault()
+                                      e.stopPropagation()
+                                      setVariantOptions({ ...variantOptions, capacity: editOptionValue || undefined })
+                                      setEditingOption(null)
+                                      setEditOptionValue('')
+                                    }}
+                                    className="p-1 hover:bg-green-100 rounded"
+                                  >
+                                    <Check className="w-3 h-3 text-green-600" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingOption(null); setEditOptionValue('') }}
+                                    className="p-1 hover:bg-red-100 rounded"
+                                  >
+                                    <X className="w-3 h-3 text-red-500" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <>
+                                  <span className="px-2 py-1 bg-[#DAA520]/20 text-[#654321] text-xs font-medium rounded-md border border-[#DAA520]/30 flex-1">
+                                    {variantOptions.capacity}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingOption('capacity'); setEditOptionValue(variantOptions.capacity || '') }}
+                                    className="p-1 hover:bg-amber-100 rounded"
+                                    title="Edit Capacity"
+                                  >
+                                    <Edit2 className="w-3 h-3 text-[#F59E0B]" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setVariantOptions(prev => ({ ...prev, capacity: undefined })) }}
+                                    className="p-1 hover:bg-red-100 rounded"
+                                    title="Delete Capacity"
                                   >
                                     <Trash2 className="w-3 h-3 text-red-500" />
                                   </button>
@@ -2210,18 +2362,19 @@ export default function AdminAffiliateProductsPage() {
                     </div>
                     
                     {/* Product Brand */}
-                    {extractedProduct.brand && (
-                      <div className="bg-white rounded-xl p-4 shadow-md border border-amber-200">
-                        <label className="block text-sm font-bold text-[#654321] mb-2">Product Brand <span className="text-red-500">*</span></label>
-                        <Input
-                          required
-                          value={extractedProduct.brand || ""}
-                          onChange={(e) => setExtractedProduct({ ...extractedProduct, brand: e.target.value })}
-                          placeholder="Brand"
-                          className="text-sm border-2 border-gray-300 focus:border-[#DAA520] focus:ring-2 focus:ring-amber-200 rounded-lg"
-                        />
-                      </div>
-                    )}
+                    <div className="bg-white rounded-xl p-4 shadow-md border border-amber-200">
+                      <label className="block text-sm font-bold text-[#654321] mb-2">Product Brand <span className="text-red-500">*</span></label>
+                      <Input
+                        required
+                        value={(extractedProduct.brand && extractedProduct.brand.toLowerCase() !== 'unknown') ? extractedProduct.brand : ""}
+                        onChange={(e) => {
+                          const newValue = e.target.value.trim()
+                          setExtractedProduct({ ...extractedProduct, brand: newValue || null })
+                        }}
+                        placeholder="Brand"
+                        className="text-sm border-2 border-gray-300 focus:border-[#DAA520] focus:ring-2 focus:ring-amber-200 rounded-lg"
+                      />
+                    </div>
                     
                     {/* Category */}
                     <div className="bg-white rounded-xl p-4 shadow-md border border-amber-200">
@@ -2671,104 +2824,139 @@ export default function AdminAffiliateProductsPage() {
 
                     {/* Product Attributes Section */}
                     <div className="bg-white rounded-xl p-4 shadow-md border border-amber-200">
-                      <label className="block text-sm font-bold text-[#654321] mb-3">Product Attributes</label>
-                      <div className="space-y-2">
-                        {productAttributes.map((attr, index) => (
-                          <div key={attr.id} className="flex items-center gap-2">
-                            {/* Move Up/Down Arrows */}
-                            <div className="flex flex-col gap-0.5">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  if (index > 0) {
-                                    setProductAttributes(prev => {
-                                      const newArr = [...prev]
-                                      const temp = newArr[index]
-                                      newArr[index] = newArr[index - 1]
-                                      newArr[index - 1] = temp
-                                      return newArr
-                                    })
-                                  }
-                                }}
-                                disabled={index === 0}
-                                className="h-5 w-5 p-0 text-gray-400 hover:text-amber-600 hover:bg-amber-50 disabled:opacity-30 disabled:cursor-not-allowed"
-                                title="Move up"
-                              >
-                                <ChevronUp className="w-3.5 h-3.5" />
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  if (index < productAttributes.length - 1) {
-                                    setProductAttributes(prev => {
-                                      const newArr = [...prev]
-                                      const temp = newArr[index]
-                                      newArr[index] = newArr[index + 1]
-                                      newArr[index + 1] = temp
-                                      return newArr
-                                    })
-                                  }
-                                }}
-                                disabled={index === productAttributes.length - 1}
-                                className="h-5 w-5 p-0 text-gray-400 hover:text-amber-600 hover:bg-amber-50 disabled:opacity-30 disabled:cursor-not-allowed"
-                                title="Move down"
-                              >
-                                <ChevronDown className="w-3.5 h-3.5" />
-                              </Button>
-                            </div>
-                            <Input
-                              value={attr.name || ''}
-                              onChange={(e) => {
-                                setProductAttributes(prev => prev.map(a => 
-                                  a.id === attr.id ? { ...a, name: e.target.value } : a
-                                ))
-                              }}
-                              className="w-36 h-8 text-sm font-medium border-gray-300 focus:border-amber-500"
-                              placeholder="Attribute name"
-                            />
-                            <Input
-                              value={attr.value || ''}
-                              onChange={(e) => {
-                                setProductAttributes(prev => prev.map(a => 
-                                  a.id === attr.id ? { ...a, value: e.target.value } : a
-                                ))
-                              }}
-                              className="flex-1 h-8 text-sm border-gray-300 focus:border-amber-500"
-                              placeholder="Enter value"
-                            />
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                console.log('[Admin] Deleting attribute:', attr.id, attr.name)
-                                setProductAttributes(prev => prev.filter(a => a.id !== attr.id))
-                              }}
-                              className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-                            >
-                              ×
-                            </Button>
-                          </div>
-                        ))}
-                        {productAttributes.length === 0 && (
-                          <p className="text-sm text-gray-400 italic">No attributes extracted</p>
-                        )}
+                      <div className="flex items-center justify-between mb-3">
+                        <label className="block text-sm font-bold text-[#654321]">Product Attributes</label>
                         <Button
                           type="button"
-                          variant="outline"
+                          variant="ghost"
                           size="sm"
-                          onClick={() => {
-                            setProductAttributes(prev => [...prev, { id: `new-attr-${Date.now()}`, name: '', value: '' }])
-                          }}
-                          className="text-xs h-7 border-amber-400 text-amber-700 hover:bg-amber-50 mt-2"
+                          onClick={() => setProductAttributesViewMode(!productAttributesViewMode)}
+                          className="text-xs h-7 text-amber-700 hover:bg-amber-50"
                         >
-                          + Add Field
+                          {productAttributesViewMode ? <><Edit2 className="w-3 h-3 mr-1" /> Edit</> : <><Check className="w-3 h-3 mr-1" /> View</>}
                         </Button>
                       </div>
+                      
+                      {productAttributesViewMode ? (
+                        /* Display Mode - Same format as Product Page */
+                        <div className="space-y-1.5">
+                          {productAttributes.length > 0 ? (
+                            productAttributes.map((attr) => (
+                              <div key={attr.id} className="flex items-center text-sm h-[20px]">
+                                <span className="font-semibold text-[#6B4423] w-[200px] flex-shrink-0 truncate">
+                                  {attr.name.replace(/([A-Z])/g, ' $1').trim().split(' ').map(word => 
+                                    word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+                                  ).join(' ')}:
+                                </span>
+                                <span className="text-[#654321] truncate flex-1" title={attr.value}>
+                                  {attr.value}
+                                </span>
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-sm text-gray-400 italic">No attributes extracted</p>
+                          )}
+                        </div>
+                      ) : (
+                        /* Edit Mode */
+                        <div className="space-y-2">
+                          {productAttributes.map((attr, index) => (
+                            <div key={attr.id} className="flex items-center gap-2">
+                              {/* Move Up/Down Arrows */}
+                              <div className="flex flex-col gap-0.5">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    if (index > 0) {
+                                      setProductAttributes(prev => {
+                                        const newArr = [...prev]
+                                        const temp = newArr[index]
+                                        newArr[index] = newArr[index - 1]
+                                        newArr[index - 1] = temp
+                                        return newArr
+                                      })
+                                    }
+                                  }}
+                                  disabled={index === 0}
+                                  className="h-5 w-5 p-0 text-gray-400 hover:text-amber-600 hover:bg-amber-50 disabled:opacity-30 disabled:cursor-not-allowed"
+                                  title="Move up"
+                                >
+                                  <ChevronUp className="w-3.5 h-3.5" />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    if (index < productAttributes.length - 1) {
+                                      setProductAttributes(prev => {
+                                        const newArr = [...prev]
+                                        const temp = newArr[index]
+                                        newArr[index] = newArr[index + 1]
+                                        newArr[index + 1] = temp
+                                        return newArr
+                                      })
+                                    }
+                                  }}
+                                  disabled={index === productAttributes.length - 1}
+                                  className="h-5 w-5 p-0 text-gray-400 hover:text-amber-600 hover:bg-amber-50 disabled:opacity-30 disabled:cursor-not-allowed"
+                                  title="Move down"
+                                >
+                                  <ChevronDown className="w-3.5 h-3.5" />
+                                </Button>
+                              </div>
+                              <Input
+                                value={attr.name || ''}
+                                onChange={(e) => {
+                                  setProductAttributes(prev => prev.map(a => 
+                                    a.id === attr.id ? { ...a, name: e.target.value } : a
+                                  ))
+                                }}
+                                className="w-36 h-8 text-sm font-medium border-gray-300 focus:border-amber-500"
+                                placeholder="Attribute name"
+                              />
+                              <Input
+                                value={attr.value || ''}
+                                onChange={(e) => {
+                                  setProductAttributes(prev => prev.map(a => 
+                                    a.id === attr.id ? { ...a, value: e.target.value } : a
+                                  ))
+                                }}
+                                className="flex-1 h-8 text-sm border-gray-300 focus:border-amber-500"
+                                placeholder="Enter value"
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  console.log('[Admin] Deleting attribute:', attr.id, attr.name)
+                                  setProductAttributes(prev => prev.filter(a => a.id !== attr.id))
+                                }}
+                                className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                              >
+                                ×
+                              </Button>
+                            </div>
+                          ))}
+                          {productAttributes.length === 0 && (
+                            <p className="text-sm text-gray-400 italic">No attributes extracted</p>
+                          )}
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setProductAttributes(prev => [...prev, { id: `new-attr-${Date.now()}`, name: '', value: '' }])
+                            }}
+                            className="text-xs h-7 border-amber-400 text-amber-700 hover:bg-amber-50 mt-2"
+                          >
+                            + Add Field
+                          </Button>
+                        </div>
+                      )}
                     </div>
 
                   </div>

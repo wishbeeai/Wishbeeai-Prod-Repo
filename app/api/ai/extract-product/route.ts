@@ -6,9 +6,16 @@ import * as fal from "@fal-ai/serverless-client"
 import { appendFile } from 'fs/promises'
 import { join } from 'path'
 
-fal.config({
-  credentials: process.env.FAL_KEY,
-})
+// Configure FAL only if key is available (optional dependency)
+try {
+  if (process.env.FAL_KEY) {
+    fal.config({
+      credentials: process.env.FAL_KEY,
+    })
+  }
+} catch (falError) {
+  console.warn("[v0] WARNING: Failed to configure FAL (optional):", falError)
+}
 
 // Logging utility to write to both console and file
 const LOG_FILE = join(process.cwd(), 'logs', 'product-extraction.log')
@@ -2235,6 +2242,7 @@ async function extractWithoutAI(
       { pattern: /Selected Size is ([^.]+?)(?:\.|Tap to collapse)/i, field: 'size' },
       { pattern: /Selected Style is ([^.]+?)(?:\.|Tap to collapse)/i, field: 'style' },
       { pattern: /Selected Configuration is ([^.]+?)(?:\.|Tap to collapse)/i, field: 'configuration' },
+      { pattern: /Selected Capacity is ([^.]+?)(?:\.|Tap to collapse)/i, field: 'capacity' },
     ]
     
     for (const { pattern, field } of selectedTextPatterns) {
@@ -4256,6 +4264,52 @@ async function extractWithoutAI(
             productData.attributes.size = size
             console.log("[v0] Extracted size/storage for Electronics:", productData.attributes.size)
             break
+          }
+        }
+      }
+      
+      // Extract Capacity variant (e.g., "16GB Unified Memory, 1TB SSD Storage")
+      // This is a variant option for products like MacBooks, iPhones, etc.
+      if (!productData.attributes.capacity) {
+        // Check features field first (most reliable for MacBooks)
+        const featuresText = productData.attributes.features || ''
+        const searchText = featuresText + ' ' + (productData.productName || '') + ' ' + (htmlContent?.substring(0, 10000) || '')
+        
+        // Pattern 1: "16GB Unified Memory, 1TB SSD Storage" or similar
+        // Use [,\s]+ to require at least one comma/space between Memory and storage
+        const capacityPattern1 = /(\d+\s*(?:GB|TB))\s*(?:Unified\s*)?Memory[,\s]+(\d+\s*(?:GB|TB))\s*SSD\s*Storage/i
+        const match1 = searchText.match(capacityPattern1)
+        if (match1 && match1[1] && match1[2]) {
+          productData.attributes.capacity = `${match1[1]} Unified Memory, ${match1[2]} SSD Storage`
+          log(`[v0] ✅ Extracted capacity from features/product name: ${productData.attributes.capacity}`)
+        } else {
+          // Pattern 2: Just memory and storage (e.g., "16GB, 1TB")
+          const capacityPattern2 = /(\d+\s*(?:GB|TB))[,\s]+(\d+\s*(?:GB|TB))\s*(?:SSD|Storage|Unified\s*Memory)?/i
+          const match2 = searchText.match(capacityPattern2)
+          if (match2 && match2[1] && match2[2]) {
+            productData.attributes.capacity = `${match2[1]}, ${match2[2]}`
+            log(`[v0] ✅ Extracted capacity (simplified): ${productData.attributes.capacity}`)
+          } else {
+            // Pattern 3: Look for "Capacity:" in product details
+            const capacityPattern3 = /Capacity[:\s]+([^,\n]{10,100}?(?:\d+\s*(?:GB|TB)[^,\n]*?)(?:,\s*\d+\s*(?:GB|TB)[^,\n]*?)?)/i
+            const match3 = searchText.match(capacityPattern3)
+            if (match3 && match3[1]) {
+              productData.attributes.capacity = match3[1].trim()
+              log(`[v0] ✅ Extracted capacity from "Capacity:" text: ${productData.attributes.capacity}`)
+            } else {
+              // Pattern 4: Extract from hardDiskSize and ram if available (fallback)
+              const ram = productData.attributes.ram || productData.attributes.memoryStorageCapacity || ''
+              const storage = productData.attributes.hardDiskSize || ''
+              if (ram && storage) {
+                // Format: "16 GB Unified Memory, 1 TB SSD Storage"
+                const ramMatch = ram.match(/(\d+)\s*(GB|TB)/i)
+                const storageMatch = storage.match(/(\d+)\s*(GB|TB)/i)
+                if (ramMatch && storageMatch) {
+                  productData.attributes.capacity = `${ramMatch[1]}${ramMatch[2]} Unified Memory, ${storageMatch[1]}${storageMatch[2]} SSD Storage`
+                  log(`[v0] ✅ Extracted capacity from ram + storage: ${productData.attributes.capacity}`)
+                }
+              }
+            }
           }
         }
       }
@@ -7394,6 +7448,12 @@ async function extractWithoutAI(
           } else if ((label.includes('memory storage') || label.includes('storage capacity')) && !productData.attributes.memoryStorageCapacity) {
             productData.attributes.memoryStorageCapacity = value
             log(`[v0] ✅ Table extracted memoryStorageCapacity: ${value}`)
+          } else if (label === 'capacity' || (label.includes('capacity') && !label.includes('battery') && !label.includes('seating') && !label.includes('water'))) {
+            // Extract Capacity as variant option (e.g., "16GB Unified Memory, 1TB SSD Storage")
+            if (!productData.attributes.capacity && value && value.length < 200) {
+              productData.attributes.capacity = value
+              log(`[v0] ✅ Table extracted capacity: ${value}`)
+            }
           } else if (label.includes('battery capacity') && !productData.attributes.batteryCapacity) {
             productData.attributes.batteryCapacity = value
             log(`[v0] ✅ Table extracted batteryCapacity: ${value}`)
@@ -7461,6 +7521,7 @@ async function extractWithoutAI(
         'model': 'model',
         'memory storage capacity': 'memoryStorageCapacity',
         'storage capacity': 'memoryStorageCapacity',
+        'capacity': 'capacity',
         'screen size': 'screenSize',
         'display size': 'screenSize',
         'display resolution maximum': 'displayResolutionMaximum',
@@ -7977,7 +8038,19 @@ export async function POST(request: Request) {
       log(`[v0] OPENAI_API_KEY is configured: ${!!process.env.OPENAI_API_KEY}`)
     }
 
-    const body = await request.json()
+    // Parse request body with error handling
+    let body: any
+    try {
+      body = await request.json()
+    } catch (jsonError) {
+      log("[v0] ERROR: Failed to parse request body as JSON")
+      console.error("[v0] JSON parse error:", jsonError)
+      return NextResponse.json({ 
+        error: "Invalid request body. Expected JSON with 'url' or 'productUrl' field.",
+        message: jsonError instanceof Error ? jsonError.message : String(jsonError)
+      }, { status: 400 })
+    }
+
     const { productUrl, url } = body
     const finalUrl = productUrl || url
 
@@ -8015,10 +8088,31 @@ Based on this gift idea, research and provide detailed product information. Retu
 Research the best-selling, highest-rated product in this category at competitive pricing from trusted stores.
 Return ONLY valid JSON, no markdown, no explanation.`
 
-      const { text } = await generateText({
-        model: openai("gpt-4o-mini"),
-        prompt: giftIdeaPrompt,
-      })
+      // Check if OPENAI_API_KEY is available for gift idea extraction
+      if (!process.env.OPENAI_API_KEY) {
+        log("[v0] ERROR: OPENAI_API_KEY is required for gift idea extraction")
+        return NextResponse.json({ 
+          error: "OPENAI_API_KEY is required for gift idea extraction. Please provide a product URL instead.",
+          suggestion: "Set OPENAI_API_KEY in .env.local or provide a direct product URL"
+        }, { status: 400 })
+      }
+
+      let text: string
+      try {
+        const result = await generateText({
+          model: openai("gpt-4o-mini"),
+          prompt: giftIdeaPrompt,
+        })
+        text = result.text
+      } catch (aiError) {
+        log("[v0] ERROR: Failed to generate text from OpenAI")
+        console.error("[v0] OpenAI error:", aiError)
+        return NextResponse.json({ 
+          error: "Failed to generate product details from gift idea",
+          message: aiError instanceof Error ? aiError.message : String(aiError),
+          suggestion: "Please provide a direct product URL instead"
+        }, { status: 500 })
+      }
 
       console.log("[v0] AI gift idea response:", text)
 
@@ -8032,7 +8126,19 @@ Return ONLY valid JSON, no markdown, no explanation.`
         cleanedText = cleanedText.slice(jsonStart, jsonEnd + 1)
       }
 
-      const productData = JSON.parse(cleanedText)
+      let productData: any
+      try {
+        productData = JSON.parse(cleanedText)
+      } catch (parseError) {
+        log("[v0] ERROR: Failed to parse AI response as JSON")
+        console.error("[v0] JSON parse error:", parseError)
+        console.error("[v0] AI response text:", cleanedText.substring(0, 500))
+        return NextResponse.json({ 
+          error: "Failed to parse AI response",
+          message: parseError instanceof Error ? parseError.message : String(parseError),
+          suggestion: "Please try again or provide a direct product URL"
+        }, { status: 500 })
+      }
       productData.notice =
         "Product details generated from your gift idea. You can refine by pasting a specific product URL."
       productData.isFromGiftIdea = true
@@ -8053,7 +8159,20 @@ Return ONLY valid JSON, no markdown, no explanation.`
 
     console.log("[v0] Extracting product from URL:", finalUrl)
 
-    const urlObj = new URL(finalUrl)
+    // Parse URL with error handling
+    let urlObj: URL
+    try {
+      urlObj = new URL(finalUrl)
+    } catch (urlError) {
+      log("[v0] ERROR: Invalid URL format")
+      console.error("[v0] URL parse error:", urlError)
+      return NextResponse.json({ 
+        error: "Invalid URL format",
+        message: urlError instanceof Error ? urlError.message : String(urlError),
+        receivedUrl: finalUrl
+      }, { status: 400 })
+    }
+
     let hostname = urlObj.hostname.replace("www.", "")
     
     // Determine store name - handle subdomains properly
@@ -10427,6 +10546,47 @@ Return ONLY valid JSON, no markdown, no explanation.`
       }
     }
 
+    // FINAL CAPACITY EXTRACTION: Check all populated attributes (features, ram, hardDiskSize)
+    // This runs after all other extractions to ensure we catch capacity from any source
+    if (!productData.attributes.capacity) {
+      const features = productData.attributes.features || ''
+      const ram = productData.attributes.ram || productData.attributes.memoryStorageCapacity || ''
+      const storage = productData.attributes.hardDiskSize || ''
+      const searchText = features + ' ' + (productData.productName || '')
+      
+      // Pattern 1: "16GB Unified Memory, 1TB SSD Storage" from features
+      // More flexible pattern to handle variations
+      const capacityPattern1 = /(\d+\s*(?:GB|TB))\s*(?:Unified\s*)?Memory[,\s]+(\d+\s*(?:GB|TB))\s*SSD\s*Storage/i
+      const match1 = searchText.match(capacityPattern1)
+      if (match1 && match1[1] && match1[2]) {
+        productData.attributes.capacity = `${match1[1]} Unified Memory, ${match1[2]} SSD Storage`
+        log(`[v0] ✅ FINAL: Extracted capacity from features: ${productData.attributes.capacity}`)
+      } else if (ram && storage) {
+        // Pattern 2: Combine ram and hardDiskSize if available
+        const ramMatch = ram.match(/(\d+)\s*(GB|TB)/i)
+        const storageMatch = storage.match(/(\d+)\s*(GB|TB)/i)
+        if (ramMatch && storageMatch) {
+          productData.attributes.capacity = `${ramMatch[1]}${ramMatch[2]} Unified Memory, ${storageMatch[1]}${storageMatch[2]} SSD Storage`
+          log(`[v0] ✅ FINAL: Extracted capacity from ram + storage: ${productData.attributes.capacity}`)
+        }
+      } else {
+        // Pattern 3: Just memory and storage (e.g., "16GB, 1TB")
+        const capacityPattern3 = /(\d+\s*(?:GB|TB))[,\s]+(\d+\s*(?:GB|TB))\s*(?:SSD|Storage|Unified\s*Memory)?/i
+        const match3 = searchText.match(capacityPattern3)
+        if (match3 && match3[1] && match3[2]) {
+          productData.attributes.capacity = `${match3[1]}, ${match3[2]}`
+          log(`[v0] ✅ FINAL: Extracted capacity (simplified): ${productData.attributes.capacity}`)
+        }
+      }
+    }
+
+    // Debug: Log capacity extraction result
+    if (productData.attributes.capacity) {
+      log(`[v0] ✅ FINAL RESULT: Capacity will be returned: ${productData.attributes.capacity}`)
+    } else {
+      log(`[v0] ⚠️ FINAL RESULT: Capacity NOT extracted. Features: ${productData.attributes.features?.substring(0, 100)}`)
+    }
+
     return NextResponse.json(productData)
   } catch (error) {
     console.error("[v0] === TOP LEVEL ERROR IN PRODUCT EXTRACTION API ===")
@@ -10446,18 +10606,39 @@ Return ONLY valid JSON, no markdown, no explanation.`
       errorDetails.stack = error.stack
     }
     
-    // Add common error context
+    // Add common error context and suggestions
     if (error instanceof Error) {
-      if (error.message.includes('API key') || error.message.includes('OPENAI')) {
+      const errorMsg = error.message.toLowerCase()
+      
+      if (errorMsg.includes('api key') || errorMsg.includes('openai') || errorMsg.includes('authentication')) {
         errorDetails.suggestion = "Check that OPENAI_API_KEY is set in .env.local"
-      } else if (error.message.includes('fetch') || error.message.includes('network')) {
-        errorDetails.suggestion = "Network error - check internet connection or API service status"
-      } else if (error.message.includes('JSON') || error.message.includes('parse')) {
-        errorDetails.suggestion = "JSON parsing error - check API response format"
+        errorDetails.statusCode = 401
+      } else if (errorMsg.includes('fetch') || errorMsg.includes('network') || errorMsg.includes('timeout') || errorMsg.includes('econnrefused')) {
+        errorDetails.suggestion = "Network error - check internet connection or API service status. The product URL may be unreachable."
+        errorDetails.statusCode = 503
+      } else if (errorMsg.includes('json') || errorMsg.includes('parse') || errorMsg.includes('syntax')) {
+        errorDetails.suggestion = "JSON parsing error - the API response may be malformed. Try a different product URL."
+        errorDetails.statusCode = 502
+      } else if (errorMsg.includes('url') || errorMsg.includes('invalid')) {
+        errorDetails.suggestion = "Invalid URL format. Please provide a valid product URL starting with http:// or https://"
+        errorDetails.statusCode = 400
+      } else if (errorMsg.includes('rate limit') || errorMsg.includes('too many requests')) {
+        errorDetails.suggestion = "Rate limit exceeded. Please wait a moment and try again."
+        errorDetails.statusCode = 429
+      } else {
+        errorDetails.suggestion = "An unexpected error occurred. Please check the server logs for more details."
+        errorDetails.statusCode = 500
       }
+    } else {
+      errorDetails.suggestion = "An unexpected error occurred. Please check the server logs for more details."
+      errorDetails.statusCode = 500
     }
 
-    return NextResponse.json(errorDetails, { status: 500 })
+    // Use appropriate status code if available, otherwise default to 500
+    const statusCode = errorDetails.statusCode || 500
+    delete errorDetails.statusCode // Remove from response body
+
+    return NextResponse.json(errorDetails, { status: statusCode })
   }
 }
 

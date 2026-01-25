@@ -1,9 +1,44 @@
 // Import store at module level to ensure shared state
 import { getTrendingGifts } from '../../trending-gifts/store'
+import { createClient } from '@/lib/supabase/server'
 
 export async function GET(req: Request) {
   try {
-    const trendingGifts = getTrendingGifts()
+    // Fetch from database (primary source)
+    const supabase = await createClient()
+    const { data: dbGifts, error } = await supabase
+      .from('trending_gifts')
+      .select('*')
+      .order('created_at', { ascending: false })
+    
+    let trendingGifts: any[] = []
+    
+    if (error) {
+      console.error('[gifts-browse-api] Database error, falling back to in-memory store:', error)
+      // Fallback to in-memory store if database fails
+      trendingGifts = getTrendingGifts()
+    } else {
+      // Convert database format to TrendingGift format
+      trendingGifts = (dbGifts || []).map((gift) => ({
+        id: gift.id,
+        productName: gift.product_name,
+        image: gift.image,
+        category: gift.category,
+        source: gift.source,
+        price: parseFloat(gift.price.toString()),
+        originalPrice: gift.original_price ? parseFloat(gift.original_price.toString()) : undefined,
+        rating: parseFloat(gift.rating.toString()),
+        reviewCount: gift.review_count,
+        productLink: gift.product_link,
+        description: gift.description,
+        amazonChoice: gift.amazon_choice,
+        bestSeller: gift.best_seller,
+        overallPick: gift.overall_pick,
+        attributes: gift.attributes,
+        createdAt: gift.created_at,
+        updatedAt: gift.updated_at,
+      }))
+    }
 
     console.log(`[gifts-browse-api] Fetching browse gifts, found ${trendingGifts.length} trending gifts`)
     if (trendingGifts.length > 0) {

@@ -184,10 +184,14 @@ function isValidVariantValue(value: any): boolean {
   
   // Reject values that look like garbage (contain common garbage patterns)
   const garbagePatterns = [
-    /items?\s*in\s*cart/i,           // "items in cart" anywhere
+    /^[\s|]+$/,                       // Only pipes, spaces, or empty
+    /\|/,                             // Contains pipe (e.g. "|", "0 items in cart|...")
+    /items?\s*in\s*cart/i,            // "items in cart", "0 items in cart"
     /in\s*cart/i,                     // "in cart" anywhere
-    /percent/i,                       // "percent" anywhere
-    /out\s*of\s*\d+\s*stars/i,
+    /percent/i,                       // "percent" (e.g. "0 percent of reviews...")
+    /out\s*of\s*\d+\s*stars?/i,       // "out of 5 stars"
+    /\d+\.\d+\s*out\s*of\s*\d+/i,    // "4.7 out of 5"
+    /reviews?\s*have\s*\d+\s*stars?/i, // "reviews have 2 stars"
     /customer\s*review/i,
     /about\s*this\s*item/i,
     /add\s*to\s*(cart|list)/i,
@@ -198,15 +202,13 @@ function isValidVariantValue(value: any): boolean {
     /customer\s*image/i,
     /applecare.*monthly/i,
     /applecare.*years?\s*\$/i,        // "AppleCare+ for iPad - 2 Years $149.00"
-    /^\|/,                            // Starts with pipe
     /^\d+\s*items?/i,                 // Starts with number of items
     /Array\(\d+\)/i,                  // Array notation
     /undefined/i,
     /null/i,
     /^\$/,                            // Starts with dollar sign
-    /\d+\.\d+\s*out\s*of/i,           // Rating pattern
     /reviews?/i,                      // Contains "review" or "reviews"
-    /\bstars?\b/i,                    // Contains standalone "star" or "stars" (not "Starlight")
+    /\b\d+\s*stars?\b/i,              // "2 stars", "5 star" (rating)
     /^\d+\s+\d+/,                     // Starts with multiple numbers
     /selected\s*(color|style|size|set)/i, // "Selected Color is..."
     /tap\s*to/i,                      // "Tap to collapse"
@@ -292,10 +294,12 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
   const [likeColor, setLikeColor] = useState("")
   const [likeStyle, setLikeStyle] = useState("")
   const [likeConfiguration, setLikeConfiguration] = useState("")
+  const [likeCapacity, setLikeCapacity] = useState("")
   const [altSize, setAltSize] = useState("")
   const [altColor, setAltColor] = useState("")
   const [altStyle, setAltStyle] = useState("")
   const [altConfiguration, setAltConfiguration] = useState("")
+  const [altCapacity, setAltCapacity] = useState("")
   
   // Editing state for I Wish section
   const [editingLikeField, setEditingLikeField] = useState<string | null>(null)
@@ -410,18 +414,20 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
     }
     
     // PRIORITY 1: Check top-level properties first (from admin affiliate products page)
-    // These are saved as: gift.color, gift.size, gift.style, gift.configuration
+    // These are saved as: gift.color, gift.size, gift.style, gift.configuration, gift.capacity
     const topLevelColor = (gift as any)?.color || extractedProduct?.color
     const topLevelSize = (gift as any)?.size || (gift as any)?.screenSize || (gift as any)?.memoryStorageCapacity || extractedProduct?.size || (extractedProduct as any)?.screenSize || (extractedProduct as any)?.memoryStorageCapacity
     const topLevelStyle = (gift as any)?.style || extractedProduct?.style
     const topLevelConfiguration = (gift as any)?.configuration || (gift as any)?.set || 
                                    extractedProduct?.configuration || extractedProduct?.set
+    const topLevelCapacity = (gift as any)?.capacity || gift?.attributes?.capacity || extractedProduct?.capacity || (extractedProduct as any)?.attributes?.capacity
     
     console.log('[Modal] Pre-filling from top-level:', { 
       color: topLevelColor, 
       size: topLevelSize, 
       style: topLevelStyle, 
-      configuration: topLevelConfiguration 
+      configuration: topLevelConfiguration,
+      capacity: topLevelCapacity
     })
     
     // Set from top-level properties
@@ -441,6 +447,10 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
       setLikeConfiguration(topLevelConfiguration)
       console.log('[Modal] Set likeConfiguration from top-level:', topLevelConfiguration)
     }
+    if (topLevelCapacity && isValidVariantValue(topLevelCapacity)) {
+      setLikeCapacity(topLevelCapacity)
+      console.log('[Modal] Set likeCapacity from top-level:', topLevelCapacity)
+    }
     
     // PRIORITY 2: Also check attributes object for any fields not found at top level
     const attrs = gift?.attributes || extractedProduct?.attributes || {}
@@ -450,7 +460,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
       
       // Known standard variant fields (case-insensitive matching)
       // Only these are shown - product specs like Material, Item Weight, etc. are excluded
-      const standardFields = ['style', 'color', 'size', 'set', 'configuration']
+      const standardFields = ['style', 'color', 'size', 'set', 'configuration', 'capacity']
       
       // Process all attributes
       for (const [key, value] of Object.entries(attrs)) {
@@ -471,11 +481,77 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
         } else if ((lowerKey === 'set' || lowerKey === 'configuration') && !topLevelConfiguration) {
           setLikeConfiguration(value as string)
           console.log('[Modal] Set likeConfiguration from attrs:', value)
+        } else if (lowerKey === 'capacity' && !topLevelCapacity) {
+          setLikeCapacity(value as string)
+          console.log('[Modal] Set likeCapacity from attrs:', value)
         }
         // NOTE: We intentionally do NOT auto-populate custom fields from product specs
         // like Material, Item Weight, Operating System, etc.
         // Only variant options (Style, Color, Size, Configuration) should be shown
         // Custom fields should only come from explicitly saved user preferences
+      }
+      
+      // PRIORITY 3: Derive capacity from features, ram+hardDiskSize, or scan all attrs for pattern
+      if (!topLevelCapacity) {
+        let derivedCapacity: string | null = null
+        
+        const getAttr = (keys: string[]) => {
+          const keyMap = Object.fromEntries(
+            Object.entries(attrs).map(([k, v]) => [k.toLowerCase().replace(/\s+/g, ''), { v }])
+          )
+          for (const q of keys) {
+            const n = q.toLowerCase().replace(/\s+/g, '')
+            const entry = keyMap[n]
+            if (entry?.v != null && String(entry.v).trim()) return String(entry.v).trim()
+          }
+          return null
+        }
+        
+        // 1. Explicit capacity-like key
+        const capVal = getAttr(['capacity', 'memorycapacity', 'storagecapacity'])
+        if (capVal && /Unified\s+Memory|SSD\s+Storage|GB.*TB/i.test(capVal)) {
+          derivedCapacity = capVal
+        }
+        
+        // 2. Features string: "16GB Unified Memory, 1TB SSD Storage" (flexible spacing)
+        if (!derivedCapacity) {
+          const featuresVal = getAttr(['features', 'feature', 'specialfeature', 'specialfeatures'])
+          if (featuresVal) {
+            const match = featuresVal.match(/(\d+)\s*GB\s+Unified\s+Memory[,\s]+(\d+)\s*(TB|GB)\s+SSD\s+Storage/i)
+            if (match) {
+              derivedCapacity = `${match[1]}GB Unified Memory, ${match[2]}${match[3]} SSD Storage`
+            }
+          }
+        }
+        
+        // 3. Scan ALL attribute values for the pattern (in case it's under another key)
+        if (!derivedCapacity) {
+          const capacityPattern = /(\d+)\s*GB\s+Unified\s+Memory[,\s]+(\d+)\s*(TB|GB)\s+SSD\s+Storage/i
+          for (const v of Object.values(attrs)) {
+            const s = typeof v === 'string' ? v : String(v ?? '')
+            const m = s.match(capacityPattern)
+            if (m) {
+              derivedCapacity = `${m[1]}GB Unified Memory, ${m[2]}${m[3]} SSD Storage`
+              break
+            }
+          }
+        }
+        
+        // 4. Build from ram + hardDiskSize
+        if (!derivedCapacity) {
+          const ramVal = getAttr(['ram', 'ramsize', 'rammemoryinstalledsize', 'rammemory', 'memoryinstalledsize', 'memorystoragecapacity'])
+          const storageVal = getAttr(['harddisksize', 'harddrivesize', 'storagecapacity', 'ssdcapacity'])
+          if (ramVal && storageVal) {
+            const r = ramVal.replace(/\s+/g, '')
+            const s = storageVal.replace(/\s+/g, '')
+            derivedCapacity = `${r} Unified Memory, ${s} SSD Storage`
+          }
+        }
+        
+        if (derivedCapacity && isValidVariantValue(derivedCapacity)) {
+          setLikeCapacity(derivedCapacity)
+          console.log('[Modal] Set likeCapacity (derived):', derivedCapacity)
+        }
       }
     }
   }, [isOpen, gift, extractedProduct])
@@ -504,24 +580,31 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
       if (iLike.color) setLikeColor(iLike.color)
       if (iLike.style) setLikeStyle(iLike.style)
       if (iLike.configuration) setLikeConfiguration(iLike.configuration)
+      if (iLike.capacity) setLikeCapacity(iLike.capacity)
       if (iLike.customFields) setLikeCustomFields(iLike.customFields.map((f: any) => ({ ...f, id: Date.now().toString() + Math.random() })))
       if (iLike.notes) setLikeNotes(iLike.notes)
+      if (iLike.specifications && typeof iLike.specifications === 'object' && Object.keys(iLike.specifications).length > 0) {
+        setIWishSpecs(iLike.specifications as Record<string, string>)
+      }
       setLikeSelected(true)
       loaded = true
       console.log('[Modal] ✅ Loaded I Wish preferences')
     }
     
-    // Load Alternative preferences
+    // Load Alternative preferences (no size — not used in Alternative Selected Options)
     if (prefs.alternative) {
       const alt = prefs.alternative
       if (alt.image) setAltClippedImage(alt.image)
       if (alt.title) setAltClippedTitle(alt.title)
-      if (alt.size) setAltSize(alt.size)
       if (alt.color) setAltColor(alt.color)
       if (alt.style) setAltStyle(alt.style)
       if (alt.configuration) setAltConfiguration(alt.configuration)
+      if (alt.capacity) setAltCapacity(alt.capacity)
       if (alt.customFields) setAltCustomFields(alt.customFields.map((f: any) => ({ ...f, id: Date.now().toString() + Math.random() })))
       if (alt.notes) setAltNotes(alt.notes)
+      if (alt.specifications && typeof alt.specifications === 'object' && Object.keys(alt.specifications).length > 0) {
+        setAltSpecs(alt.specifications as Record<string, string>)
+      }
       setAltSelected(true)
       loaded = true
       console.log('[Modal] ✅ Loaded Alternative preferences')
@@ -624,6 +707,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
       setAltColor("")
       setAltStyle("")
       setAltConfiguration("")
+      setAltCapacity("")
       setAltSelected(false) // Collapsed by default (optional)
       // Reset Ok to buy options
       setOkSize("")
@@ -646,6 +730,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
     if (keyLower.includes('size') || keyLower === 'formfactor') return 'Size'
     if (keyLower.includes('style') || keyLower.includes('earplacement') || keyLower === 'headphonestyle') return 'Style'
     if (keyLower.includes('config') || keyLower.includes('pattern') || keyLower === 'set') return 'Set'
+    if (keyLower.includes('capacity') || keyLower.includes('memory') && keyLower.includes('storage')) return 'Capacity'
     if (keyLower.includes('brand')) return 'Brand'
     if (keyLower.includes('material')) return 'Material'
     if (keyLower.includes('connectivity')) return 'Connectivity'
@@ -722,10 +807,22 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
               }
             }
             
-            console.log('[Modal] Normalized attributes (variants + style from specs):', normalizedAttributes)
+            // Also check specifications for Capacity if not already in variants
+            if (!normalizedAttributes['Capacity'] && data.specifications) {
+              const specs = data.specifications as Record<string, string>
+              if (specs['Capacity'] && typeof specs['Capacity'] === 'string') {
+                const capacityVal = specs['Capacity'].replace(/^[\u200E\u200F\u202A-\u202E]+/, '').trim()
+                if (capacityVal && isValidVariantValue(capacityVal)) {
+                  console.log(`[Modal] Adding Capacity from specifications: ${capacityVal}`)
+                  normalizedAttributes['Capacity'] = capacityVal
+                }
+              }
+            }
+            
+            console.log('[Modal] Normalized attributes (variants + style/capacity from specs):', normalizedAttributes)
             
             // Determine available attribute keys in preferred order
-            const preferredOrder = ['Style', 'Color', 'Size', 'Set', 'Configuration', 'Brand', 'Material']
+            const preferredOrder = ['Style', 'Color', 'Size', 'Set', 'Configuration', 'Capacity', 'Brand', 'Material']
             const attrKeys = [
               ...preferredOrder.filter(k => normalizedAttributes[k]),
               ...Object.keys(normalizedAttributes).filter(k => !preferredOrder.includes(k))
@@ -764,6 +861,21 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
               if (normalizedAttributes['Style'] && isValidVariantValue(normalizedAttributes['Style'])) setLikeStyle(normalizedAttributes['Style'])
               const configVal = normalizedAttributes['Set'] || normalizedAttributes['Configuration']
               if (configVal && isValidVariantValue(configVal)) setLikeConfiguration(configVal)
+              
+              // Populate I Wish specifications from extension (exclude variant keys)
+              const excludedKeysLike = ['color', 'size', 'style', 'brand', 'sizeOptions', 'colorVariants', 'combinedVariants', 'styleOptions', 'styleName', 'patternName', 'configuration', 'set', 'capacity']
+              const specObjLike = (data.specifications && typeof data.specifications === 'object') ? data.specifications as Record<string, string> : {}
+              const likeSpecsFromExt: Record<string, string> = {}
+              Object.entries(specObjLike).forEach(([key, value]) => {
+                if (!excludedKeysLike.includes(key.toLowerCase()) && value && String(value).trim()) {
+                  likeSpecsFromExt[key] = String(value).trim()
+                }
+              })
+              if (Object.keys(likeSpecsFromExt).length > 0) {
+                setIWishSpecs(likeSpecsFromExt)
+                console.log('[Modal] I Wish - ✅ Set specs from extension:', Object.keys(likeSpecsFromExt))
+              }
+              
               setLikeSelected(true)
               
               console.log('[Modal] ✅ Filled I wish fields with extension data:', normalizedAttributes)
@@ -795,20 +907,16 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
               // Also set legacy fields for backward compatibility (with validation)
               console.log('[Modal] ALT - Setting legacy fields from normalizedAttributes:', normalizedAttributes)
               
-              const altSizeVal = normalizedAttributes['Size']
               const altColorVal = normalizedAttributes['Color']
               const altStyleVal = normalizedAttributes['Style']
               const altConfigVal = normalizedAttributes['Set'] || normalizedAttributes['Configuration']
+              const altCapacityVal = normalizedAttributes['Capacity']
               
-              console.log('[Modal] ALT - Size:', altSizeVal, 'valid:', isValidVariantValue(altSizeVal))
               console.log('[Modal] ALT - Color:', altColorVal, 'valid:', isValidVariantValue(altColorVal))
               console.log('[Modal] ALT - Style:', altStyleVal, 'valid:', isValidVariantValue(altStyleVal))
               console.log('[Modal] ALT - Config:', altConfigVal, 'valid:', isValidVariantValue(altConfigVal))
+              console.log('[Modal] ALT - Capacity:', altCapacityVal, 'valid:', isValidVariantValue(altCapacityVal))
               
-              if (altSizeVal && isValidVariantValue(altSizeVal)) {
-                setAltSize(altSizeVal)
-                console.log('[Modal] ALT - ✅ Set Size:', altSizeVal)
-              }
               if (altColorVal && isValidVariantValue(altColorVal)) {
                 setAltColor(altColorVal)
                 console.log('[Modal] ALT - ✅ Set Color:', altColorVal)
@@ -820,6 +928,23 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
               if (altConfigVal && isValidVariantValue(altConfigVal)) {
                 setAltConfiguration(altConfigVal)
                 console.log('[Modal] ALT - ✅ Set Config:', altConfigVal)
+              }
+              if (altCapacityVal && isValidVariantValue(altCapacityVal)) {
+                setAltCapacity(altCapacityVal)
+                console.log('[Modal] ALT - ✅ Set Capacity:', altCapacityVal)
+              }
+              // Populate Alternative specifications from extension (exclude variant keys)
+              const excludedKeys = ['color', 'size', 'style', 'brand', 'sizeOptions', 'colorVariants', 'combinedVariants', 'styleOptions', 'styleName', 'patternName', 'configuration', 'set', 'capacity']
+              const specObj = (data.specifications && typeof data.specifications === 'object') ? data.specifications as Record<string, string> : {}
+              const altSpecsFromExt: Record<string, string> = {}
+              Object.entries(specObj).forEach(([key, value]) => {
+                if (!excludedKeys.includes(key.toLowerCase()) && value && String(value).trim()) {
+                  altSpecsFromExt[key] = String(value).trim()
+                }
+              })
+              if (Object.keys(altSpecsFromExt).length > 0) {
+                setAltSpecs(altSpecsFromExt)
+                console.log('[Modal] ALT - ✅ Set specs from extension:', Object.keys(altSpecsFromExt))
               }
               setAltSelected(true)
               
@@ -876,14 +1001,21 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
             // Even without variants, if we got image/title, show success
             console.log('[Modal] Got image/title but no variants')
             if (awaitingExtensionFor) {
-              // Set the image/title for the correct preference
+              const excl = ['color', 'size', 'style', 'brand', 'sizeOptions', 'colorVariants', 'combinedVariants', 'styleOptions', 'styleName', 'patternName', 'configuration', 'set', 'capacity']
+              const specSrc = (data.specifications && typeof data.specifications === 'object') ? data.specifications as Record<string, string> : {}
+              const specsFallback: Record<string, string> = {}
+              Object.entries(specSrc).forEach(([k, v]) => {
+                if (!excl.includes(k.toLowerCase()) && v && String(v).trim()) specsFallback[k] = String(v).trim()
+              })
               if (awaitingExtensionFor === "like") {
                 if (data.image) setLikeClippedImage(data.image)
                 if (data.title) setLikeClippedTitle(data.title)
+                if (Object.keys(specsFallback).length > 0) setIWishSpecs(specsFallback)
                 setLikeSelected(true)
               } else if (awaitingExtensionFor === "alt") {
                 if (data.image) setAltClippedImage(data.image)
                 if (data.title) setAltClippedTitle(data.title)
+                if (Object.keys(specsFallback).length > 0) setAltSpecs(specsFallback)
                 setAltSelected(true)
               } else if (awaitingExtensionFor === "ok") {
                 if (data.image) setOkClippedImage(data.image)
@@ -1051,6 +1183,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
       if (gift.attributes?.size && isValidVariantValue(gift.attributes.size)) setLikeSize(gift.attributes.size)
       if (gift.attributes?.style && isValidVariantValue(gift.attributes.style)) setLikeStyle(gift.attributes.style)
       if ((gift.attributes?.configuration || gift.attributes?.set) && isValidVariantValue(gift.attributes.configuration || gift.attributes.set)) setLikeConfiguration(gift.attributes.configuration || gift.attributes.set)
+      if (gift.attributes?.capacity && isValidVariantValue(gift.attributes.capacity)) setLikeCapacity(gift.attributes.capacity)
       setLikeSelected(true)
       
       // Pre-fill editable I Wish fields
@@ -1065,7 +1198,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
       // Pre-fill specifications from gift attributes
       if (gift.attributes) {
         const specs: Record<string, string> = {}
-        const excludedKeys = ['color', 'size', 'style', 'brand', 'sizeOptions', 'colorVariants', 'combinedVariants', 'styleOptions', 'styleName', 'patternName', 'configuration', 'set']
+        const excludedKeys = ['color', 'size', 'style', 'brand', 'sizeOptions', 'colorVariants', 'combinedVariants', 'styleOptions', 'styleName', 'patternName', 'configuration', 'set', 'capacity']
         Object.entries(gift.attributes).forEach(([key, value]) => {
           if (!excludedKeys.includes(key.toLowerCase()) && value !== null && value !== undefined && value !== '') {
             specs[key] = String(value)
@@ -1134,13 +1267,15 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
       const extractedSize = extracted.size || extracted.attributes?.size || extracted.attributes?.screenSize || extracted.attributes?.memoryStorageCapacity || extracted.attributes?.storageCapacity
       const extractedStyle = extracted.style || extracted.attributes?.style
       const extractedConfig = extracted.set || extracted.attributes?.set || extracted.attributes?.configuration
+      const extractedCapacity = extracted.capacity || extracted.attributes?.capacity
       
-      console.log('[Modal] Pre-fill extracted variants:', { extractedColor, extractedSize, extractedStyle, extractedConfig })
+      console.log('[Modal] Pre-fill extracted variants:', { extractedColor, extractedSize, extractedStyle, extractedConfig, extractedCapacity })
       
       if (extractedColor && isValidVariantValue(extractedColor)) setLikeColor(extractedColor)
       if (extractedSize && isValidVariantValue(extractedSize)) setLikeSize(extractedSize)
       if (extractedStyle && isValidVariantValue(extractedStyle)) setLikeStyle(extractedStyle)
       if (extractedConfig && isValidVariantValue(extractedConfig)) setLikeConfiguration(extractedConfig)
+      if (extractedCapacity && isValidVariantValue(extractedCapacity)) setLikeCapacity(extractedCapacity)
     } catch (error) {
       console.error("[AddToWishlistModal] Extraction error:", error)
       if (gift) {
@@ -1253,18 +1388,21 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
           color: cleanOptionValue(likeColor),
           style: cleanOptionValue(likeStyle),
           configuration: cleanOptionValue(likeConfiguration),
+          capacity: cleanOptionValue(likeCapacity),
           customFields: likeCustomFields.filter(f => f.key && f.value).map(f => ({ key: f.key, value: f.value })),
           notes: likeNotes.trim() || null,
+          specifications: Object.keys(iWishSpecs).length > 0 ? iWishSpecs : null,
         } : null,
         alternative: altSelected ? {
           image: altClippedImage || null,
           title: altClippedTitle || null,
-          size: cleanOptionValue(altSize),
           color: cleanOptionValue(altColor),
           style: cleanOptionValue(altStyle),
           configuration: cleanOptionValue(altConfiguration),
+          capacity: cleanOptionValue(altCapacity),
           customFields: altCustomFields.filter(f => f.key && f.value).map(f => ({ key: f.key, value: f.value })),
           notes: altNotes.trim() || null,
+          specifications: Object.keys(altSpecs).length > 0 ? altSpecs : null,
         } : null,
         okToBuy: okSelected ? {
           image: okClippedImage || null,
@@ -1416,16 +1554,18 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
         configuration: cleanOptionValue(likeConfiguration),
         customFields: likeCustomFields.filter(f => f.key && f.value).map(f => ({ key: f.key, value: f.value })),
         notes: likeNotes.trim() || null,
+        specifications: Object.keys(iWishSpecs).length > 0 ? iWishSpecs : null,
       } : null,
       alternative: altSelected ? {
         image: altClippedImage || null,
         title: altClippedTitle || null,
-        size: cleanOptionValue(altSize),
         color: cleanOptionValue(altColor),
         style: cleanOptionValue(altStyle),
         configuration: cleanOptionValue(altConfiguration),
+        capacity: cleanOptionValue(altCapacity),
         customFields: altCustomFields.filter(f => f.key && f.value).map(f => ({ key: f.key, value: f.value })),
         notes: altNotes.trim() || null,
+        specifications: Object.keys(altSpecs).length > 0 ? altSpecs : null,
       } : null,
       okToBuy: okSelected ? {
         image: okClippedImage || null,
@@ -1523,6 +1663,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
       case 'color': setLikeColor(""); break
       case 'size': setLikeSize(""); break
       case 'set': setLikeConfiguration(""); break
+      case 'capacity': setLikeCapacity(""); break
     }
   }
   
@@ -1536,6 +1677,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
     else if (name === 'color') setLikeColor(value)
     else if (name === 'size') setLikeSize(value)
     else if (name === 'set' || name === 'configuration') setLikeConfiguration(value)
+    else if (name === 'capacity') setLikeCapacity(value)
     else {
       // Add as custom field
       setLikeCustomFields(prev => [...prev, { id: Date.now().toString(), key: newLikeFieldName.trim(), value }])
@@ -1544,6 +1686,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
     setNewLikeFieldName("")
     setNewLikeFieldValue("")
     setIsAddingLikeField(false)
+    setIsEditingIWish(false) // Exit edit mode so new value shows in display mode
   }
   
   // Helper functions for editing Alternative variant fields
@@ -1560,6 +1703,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
       case 'color': setAltColor(value); break
       case 'size': setAltSize(value); break
       case 'set': setAltConfiguration(value); break
+      case 'capacity': setAltCapacity(value); break
     }
     setEditingAltField(null)
     setEditingAltValue("")
@@ -1571,6 +1715,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
       case 'color': setAltColor(""); break
       case 'size': setAltSize(""); break
       case 'set': setAltConfiguration(""); break
+      case 'capacity': setAltCapacity(""); break
     }
   }
   
@@ -1583,6 +1728,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
     else if (name === 'color') setAltColor(value)
     else if (name === 'size') setAltSize(value)
     else if (name === 'set' || name === 'configuration') setAltConfiguration(value)
+    else if (name === 'capacity') setAltCapacity(value)
     else {
       setAltCustomFields(prev => [...prev, { id: Date.now().toString(), key: newAltFieldName.trim(), value }])
     }
@@ -1590,6 +1736,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
     setNewAltFieldName("")
     setNewAltFieldValue("")
     setIsAddingAltField(false)
+    setIsEditingAlt(false) // Exit edit mode so new value shows in display mode
   }
 
   // Image upload handlers for I Wish section
@@ -2165,23 +2312,26 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                                             setLikeSize('')
                                             setLikeStyle('')
                                             setLikeConfiguration('')
+                                            setLikeCapacity('')
                                             
                                             // Check multiple locations for variant options (Apple Watch uses styleName for color)
                                             const extractedColor = data.color || data.attributes?.color || data.selectedColor || data.variants?.color || data.styleName || data.attributes?.styleName || ''
                                             const extractedSize = data.size || data.attributes?.size || data.selectedSize || data.variants?.size || data.attributes?.screenSize || ''
                                             const extractedStyle = data.style || data.attributes?.style || data.selectedStyle || data.variants?.style || ''
                                             const extractedConfig = data.configuration || data.attributes?.configuration || data.selectedConfiguration || data.variants?.configuration || data.attributes?.appleCarePlus || ''
+                                            const extractedCapacity = data.capacity || data.attributes?.capacity || ''
                                             
                                             // Log full data for debugging
                                             console.log('[Modal] Full extracted data:', JSON.stringify(data, null, 2))
                                             
-                                            console.log('[Modal] Extracted variants:', { extractedColor, extractedSize, extractedStyle, extractedConfig })
+                                            console.log('[Modal] Extracted variants:', { extractedColor, extractedSize, extractedStyle, extractedConfig, extractedCapacity })
                                             
                                             // Set new variant values only if they pass validation (not garbage)
                                             if (isValidVariantValue(extractedColor)) setLikeColor(extractedColor)
                                             if (isValidVariantValue(extractedSize)) setLikeSize(extractedSize)
                                             if (isValidVariantValue(extractedStyle)) setLikeStyle(extractedStyle)
                                             if (isValidVariantValue(extractedConfig)) setLikeConfiguration(extractedConfig)
+                                            if (isValidVariantValue(extractedCapacity)) setLikeCapacity(extractedCapacity)
                                             
                                             // Update URL state
                                             setIWishProductUrl(likeRetailerUrl)
@@ -2253,62 +2403,47 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                                 </div>
                               </div>
                             )}
-                            {/* Manual refresh button when waiting */}
-                            {awaitingExtensionFor === "like" && (
-                              <button
-                                type="button"
-                                onClick={async (e) => {
-                                  e.stopPropagation()
-                                  console.log('[Modal] Manual refresh triggered for like')
-                                  try {
-                                    const response = await fetch('/api/extension/save-variants', {
-                                      method: 'GET',
-                                      credentials: 'include',
-                                    })
-                                    if (response.ok) {
-                                      const data = await response.json()
-                                      console.log('[Modal] Manual refresh data:', data)
-                                      if (data.variants && Object.keys(data.variants).length > 0) {
-                                        // Process the data for I Wish
-                                        if (data.image) {
-                                          setLikeClippedImage(data.image)
-                                          console.log('[Modal] Like - Set image:', data.image)
-                                        }
-                                        if (data.title) setLikeClippedTitle(data.title)
-                                        // Set variant fields (with validation)
-                                        const variants = data.variants
-                                        if (variants.color && isValidVariantValue(variants.color)) setLikeColor(variants.color)
-                                        if (variants.style && isValidVariantValue(variants.style)) setLikeStyle(variants.style)
-                                        if (variants.set && isValidVariantValue(variants.set)) setLikeConfiguration(variants.set)
-                                        if (variants.size && isValidVariantValue(variants.size)) setLikeSize(variants.size)
-                                        // Check specifications for Style
-                                        if (!variants.style && data.specifications?.Style) {
-                                          const styleVal = data.specifications.Style.replace(/^[\u200E\u200F\u202A-\u202E]+/, '').trim()
-                                          if (styleVal && isValidVariantValue(styleVal)) setLikeStyle(styleVal)
-                                        }
-                                        setAwaitingExtensionFor(null)
-                                        toast({
-                                          title: "🐝 Options Received!",
-                                          description: "I Wish options updated from extension.",
-                                          variant: "warm",
-                                        })
-                                      }
-                                    }
-                                  } catch (err) {
-                                    console.log('[Modal] Manual refresh error:', err)
-                                  }
-                                }}
-                                className="text-[10px] text-[#DAA520] font-medium hover:underline flex items-center gap-1 animate-pulse"
-                              >
-                                🔄 Refresh
-                              </button>
-                            )}
                             {/* Edit and Delete buttons for I Wish */}
                             {likeSelected && (
                               <div className="flex items-center gap-1">
                                 <button
                                   type="button"
-                                  onClick={() => setIsEditingIWish(!isEditingIWish)}
+                                  onClick={() => {
+                                    if (isEditingIWish) {
+                                      // Exiting edit mode - close Add form
+                                      setIsAddingLikeField(false)
+                                      setNewLikeFieldName("")
+                                      setNewLikeFieldValue("")
+                                    } else {
+                                      // Entering edit mode - populate state from existing data
+                                      if (!iWishTitle && (likeClippedTitle || extractedProduct?.productName || gift?.giftName)) {
+                                        setIWishTitle(likeClippedTitle || extractedProduct?.productName || gift?.giftName || "")
+                                      }
+                                      if (!iWishStore && (extractedProduct?.storeName || gift?.source)) {
+                                        setIWishStore(extractedProduct?.storeName || gift?.source || "")
+                                      }
+                                      if (!iWishRating && (extractedProduct?.rating || gift?.rating)) {
+                                        setIWishRating((extractedProduct?.rating || gift?.rating || 0).toString())
+                                      }
+                                      if (!iWishReviewCount && (extractedProduct?.reviewCount || gift?.reviewCount)) {
+                                        setIWishReviewCount((extractedProduct?.reviewCount || gift?.reviewCount || 0).toString())
+                                      }
+                                      if (!iWishPrice && (extractedProduct?.price || gift?.targetAmount || gift?.currentPrice)) {
+                                        setIWishPrice((extractedProduct?.price || gift?.targetAmount || gift?.currentPrice || 0).toString())
+                                      }
+                                      if (!iWishOriginalPrice && (extractedProduct?.originalPrice || gift?.originalPrice)) {
+                                        setIWishOriginalPrice((extractedProduct?.originalPrice || gift?.originalPrice || 0).toString())
+                                      }
+                                      // Set badges from existing data if not already set
+                                      if (!iWishAmazonChoice && (extractedProduct?.amazonChoice || gift?.amazonChoice)) {
+                                        setIWishAmazonChoice(extractedProduct?.amazonChoice || gift?.amazonChoice || false)
+                                      }
+                                      if (!iWishBestSeller && (extractedProduct?.bestSeller || gift?.bestSeller)) {
+                                        setIWishBestSeller(extractedProduct?.bestSeller || gift?.bestSeller || false)
+                                      }
+                                    }
+                                    setIsEditingIWish(!isEditingIWish)
+                                  }}
                                   className={`p-1.5 rounded-full transition-colors ${isEditingIWish ? 'bg-[#DAA520] text-white' : 'bg-[#DAA520]/20 hover:bg-[#DAA520]/40 text-[#654321]'}`}
                                   title={isEditingIWish ? "Done editing" : "Edit I Wish details"}
                                 >
@@ -2330,6 +2465,11 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                                     setLikeColor("")
                                     setLikeSize("")
                                     setLikeConfiguration("")
+                                    setLikeCapacity("")
+                                    setLikeCustomFields([])
+                                    setIsAddingLikeField(false)
+                                    setNewLikeFieldName("")
+                                    setNewLikeFieldValue("")
                                     setLikeClippedImage(null)
                                     setLikeClippedTitle(null)
                                     setLikeNotes("")
@@ -2404,6 +2544,9 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                             {/* Paste URL Option */}
                             {iWishAddMethod === "url" && (
                               <div className="bg-white/80 rounded-lg p-3 border border-[#DAA520]/20">
+                                <p className="text-[10px] text-[#6B4423] mb-2 italic">
+                                  Select your options on the product page, then copy &amp; paste the product URL here.
+                                </p>
                                 <div className="flex gap-2">
                                   <input
                                     type="url"
@@ -2443,7 +2586,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                                             // Populate specs
                                             if (extracted.attributes) {
                                               const specs: Record<string, string> = {}
-                                              const excludedKeys = ['color', 'size', 'style', 'brand', 'sizeOptions', 'colorVariants', 'combinedVariants', 'styleOptions', 'styleName', 'patternName', 'configuration', 'set']
+                                              const excludedKeys = ['color', 'size', 'style', 'brand', 'sizeOptions', 'colorVariants', 'combinedVariants', 'styleOptions', 'styleName', 'patternName', 'configuration', 'set', 'capacity']
                                               Object.entries(extracted.attributes).forEach(([key, value]) => {
                                                 if (!excludedKeys.includes(key.toLowerCase()) && value) {
                                                   specs[key] = String(value)
@@ -2499,7 +2642,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                                           // Populate specs
                                           if (extracted.attributes) {
                                             const specs: Record<string, string> = {}
-                                            const excludedKeys = ['color', 'size', 'style', 'brand', 'sizeOptions', 'colorVariants', 'combinedVariants', 'styleOptions', 'styleName', 'patternName', 'configuration', 'set']
+                                            const excludedKeys = ['color', 'size', 'style', 'brand', 'sizeOptions', 'colorVariants', 'combinedVariants', 'styleOptions', 'styleName', 'patternName', 'configuration', 'set', 'capacity']
                                             Object.entries(extracted.attributes).forEach(([key, value]) => {
                                               if (!excludedKeys.includes(key.toLowerCase()) && value) {
                                                 specs[key] = String(value)
@@ -2545,7 +2688,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                                     <Loader2 className="w-4 h-4 animate-spin text-[#DAA520]" />
                                     <span className="text-sm font-semibold text-[#654321]">Listening for clip...</span>
                                   </div>
-                                  <p className="text-xs text-[#8B6914] text-center">Select your options on the retailer page, then use the Wishbee extension to clip it.</p>
+                                  <p className="text-xs text-[#8B6914] text-center">Select your options on the product page, then click the Wishbee extension to clip it.</p>
                                   <p className="text-[10px] text-[#8B6914]/70 text-center">
                                     Don't have the extension? <a href="https://wishbee.ai/extension" target="_blank" rel="noopener noreferrer" className="text-[#DAA520] font-semibold hover:underline">Get it free →</a>
                                   </p>
@@ -2862,12 +3005,23 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                                   <span className="w-1 h-1 bg-[#B8860B] rounded-full"></span>
                                   Selected Options
                                 </p>
+                                {isEditingIWish && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setIsAddingLikeField(true)}
+                                    className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold text-[#DAA520] hover:text-[#B8860B] hover:bg-[#DAA520]/10 rounded-md transition-colors border border-[#DAA520]/30"
+                                    title="Add new field"
+                                  >
+                                    <Plus className="w-3 h-3" />
+                                    Add
+                                  </button>
+                                )}
                               </div>
                               <div className="space-y-1.5">
-                            {/* Selected Options - Style, Color, Size, Set - editable when isEditingIWish is true */}
-                            {/* Style */}
-                            {(likeStyle || isEditingIWish) && (
-                              <div className="flex items-center gap-2">
+                            {/* Selected Options - Style, Color, Size, Set - editable when isEditingIWish; delete clears and hides row */}
+                            {/* Style — only show when has value */}
+                            {likeStyle && (
+                              <div className="flex items-center gap-2 group/row">
                                 <span className="text-[10px] font-medium text-[#6B4423] w-16 shrink-0">Style:</span>
                                 {isEditingIWish ? (
                                   <>
@@ -2880,23 +3034,21 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                                     />
                                     <button
                                       type="button"
-                                      onClick={() => setLikeStyle("")}
-                                      className="p-1 hover:bg-red-100 rounded transition-colors"
-                                      title="Remove style"
+                                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); deleteLikeField("style"); }}
+                                      className="min-w-[28px] min-h-[28px] flex items-center justify-center p-1 rounded-md border border-red-200 bg-red-50 hover:bg-red-100 hover:border-red-300 text-red-500 transition-colors cursor-pointer"
+                                      title="Delete style"
                                     >
-                                      <X className="w-3 h-3 text-red-500" />
+                                      <X className="w-3.5 h-3.5" />
                                     </button>
                                   </>
-                                ) : likeStyle && isValidVariantValue(likeStyle) ? (
-                                  <span className="text-[10px] text-[#654321] font-semibold">{getCleanVariantDisplay(likeStyle)}</span>
                                 ) : (
-                                  <span className="text-[10px] text-gray-400 italic">Not set</span>
+                                  <span className="text-[10px] text-[#654321] font-semibold">{getCleanVariantDisplay(likeStyle)}</span>
                                 )}
                               </div>
                             )}
-                            {/* Color */}
-                            {(likeColor || isEditingIWish) && (
-                              <div className="flex items-center gap-2">
+                            {/* Color — only show when has value */}
+                            {likeColor && (
+                              <div className="flex items-center gap-2 group/row">
                                 <span className="text-[10px] font-medium text-[#6B4423] w-16 shrink-0">Color:</span>
                                 {isEditingIWish ? (
                                   <>
@@ -2909,23 +3061,21 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                                     />
                                     <button
                                       type="button"
-                                      onClick={() => setLikeColor("")}
-                                      className="p-1 hover:bg-red-100 rounded transition-colors"
-                                      title="Remove color"
+                                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); deleteLikeField("color"); }}
+                                      className="min-w-[28px] min-h-[28px] flex items-center justify-center p-1 rounded-md border border-red-200 bg-red-50 hover:bg-red-100 hover:border-red-300 text-red-500 transition-colors cursor-pointer"
+                                      title="Delete color"
                                     >
-                                      <X className="w-3 h-3 text-red-500" />
+                                      <X className="w-3.5 h-3.5" />
                                     </button>
                                   </>
-                                ) : likeColor && isValidVariantValue(likeColor) ? (
-                                  <span className="text-[10px] text-[#654321] font-semibold">{getCleanVariantDisplay(likeColor)}</span>
                                 ) : (
-                                  <span className="text-[10px] text-gray-400 italic">Not set</span>
+                                  <span className="text-[10px] text-[#654321] font-semibold">{getCleanVariantDisplay(likeColor)}</span>
                                 )}
                               </div>
                             )}
-                            {/* Size */}
-                            {(likeSize || isEditingIWish) && (
-                              <div className="flex items-center gap-2">
+                            {/* Size — only show when has value */}
+                            {likeSize && (
+                              <div className="flex items-center gap-2 group/row">
                                 <span className="text-[10px] font-medium text-[#6B4423] w-16 shrink-0">Size:</span>
                                 {isEditingIWish ? (
                                   <>
@@ -2938,24 +3088,22 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                                     />
                                     <button
                                       type="button"
-                                      onClick={() => setLikeSize("")}
-                                      className="p-1 hover:bg-red-100 rounded transition-colors"
-                                      title="Remove size"
+                                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); deleteLikeField("size"); }}
+                                      className="min-w-[28px] min-h-[28px] flex items-center justify-center p-1 rounded-md border border-red-200 bg-red-50 hover:bg-red-100 hover:border-red-300 text-red-500 transition-colors cursor-pointer"
+                                      title="Delete size"
                                     >
-                                      <X className="w-3 h-3 text-red-500" />
+                                      <X className="w-3.5 h-3.5" />
                                     </button>
                                   </>
-                                ) : likeSize && isValidVariantValue(likeSize) ? (
-                                  <span className="text-[10px] text-[#654321] font-semibold">{getCleanVariantDisplay(likeSize)}</span>
                                 ) : (
-                                  <span className="text-[10px] text-gray-400 italic">Not set</span>
+                                  <span className="text-[10px] text-[#654321] font-semibold">{getCleanVariantDisplay(likeSize)}</span>
                                 )}
                               </div>
                             )}
-                            {/* Configuration/Set */}
-                            {(likeConfiguration || isEditingIWish) && (
-                              <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-medium text-[#6B4423] w-16 shrink-0">Config:</span>
+                            {/* Configuration/Set — only show when has value */}
+                            {likeConfiguration && (
+                              <div className="flex items-center gap-2 group/row">
+                                <span className="text-[10px] font-medium text-[#6B4423] w-16 shrink-0">Set:</span>
                                 {isEditingIWish ? (
                                   <>
                                     <input
@@ -2967,23 +3115,97 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                                     />
                                     <button
                                       type="button"
-                                      onClick={() => setLikeConfiguration("")}
-                                      className="p-1 hover:bg-red-100 rounded transition-colors"
-                                      title="Remove configuration"
+                                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); deleteLikeField("set"); }}
+                                      className="min-w-[28px] min-h-[28px] flex items-center justify-center p-1 rounded-md border border-red-200 bg-red-50 hover:bg-red-100 hover:border-red-300 text-red-500 transition-colors cursor-pointer"
+                                      title="Delete configuration"
                                     >
-                                      <X className="w-3 h-3 text-red-500" />
+                                      <X className="w-3.5 h-3.5" />
                                     </button>
                                   </>
-                                ) : likeConfiguration && isValidVariantValue(likeConfiguration) ? (
-                                  <span className="text-[10px] text-[#654321] font-semibold">{getCleanVariantDisplay(likeConfiguration)}</span>
                                 ) : (
-                                  <span className="text-[10px] text-gray-400 italic">Not set</span>
+                                  <span className="text-[10px] text-[#654321] font-semibold">{getCleanVariantDisplay(likeConfiguration)}</span>
                                 )}
                               </div>
                             )}
-                            
-                            {/* Add Field UI */}
-                            {isAddingLikeField ? (
+                            {/* Capacity — only show when has value */}
+                            {likeCapacity && (
+                              <div className="flex items-center gap-2 group/row">
+                                <span className="text-[10px] font-medium text-[#6B4423] w-16 shrink-0">Capacity:</span>
+                                {isEditingIWish ? (
+                                  <>
+                                    <input
+                                      type="text"
+                                      value={likeCapacity}
+                                      onChange={(e) => setLikeCapacity(e.target.value)}
+                                      placeholder="Enter capacity..."
+                                      className="flex-1 px-2 py-1 text-[10px] border border-[#DAA520]/30 rounded bg-white focus:outline-none focus:border-[#DAA520]"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); deleteLikeField("capacity"); }}
+                                      className="min-w-[28px] min-h-[28px] flex items-center justify-center p-1 rounded-md border border-red-200 bg-red-50 hover:bg-red-100 hover:border-red-300 text-red-500 transition-colors cursor-pointer"
+                                      title="Delete capacity"
+                                    >
+                                      <X className="w-3.5 h-3.5" />
+                                    </button>
+                                  </>
+                                ) : (
+                                  <span className="text-[10px] text-[#654321] font-semibold">{getCleanVariantDisplay(likeCapacity)}</span>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Custom fields (newly added) — before Add Field; display vs edit like standard fields */}
+                            {likeCustomFields.length > 0 && (
+                              <div className="space-y-1.5">
+                                {likeCustomFields.map((field) => (
+                                  <div key={field.id} className="flex items-center gap-2 group/row">
+                                    {isEditingIWish ? (
+                                      <>
+                                        <input
+                                          type="text"
+                                          value={field.key}
+                                          onChange={(e) => setLikeCustomFields(prev =>
+                                            prev.map(f => f.id === field.id ? { ...f, key: e.target.value } : f)
+                                          )}
+                                          placeholder="Field name"
+                                          className="w-20 shrink-0 px-2 py-1 text-[10px] border border-[#DAA520]/30 rounded bg-white focus:outline-none focus:border-[#DAA520]"
+                                        />
+                                        <input
+                                          type="text"
+                                          value={field.value}
+                                          onChange={(e) => setLikeCustomFields(prev =>
+                                            prev.map(f => f.id === field.id ? { ...f, value: e.target.value } : f)
+                                          )}
+                                          placeholder="Value"
+                                          className="flex-1 px-2 py-1 text-[10px] border border-[#DAA520]/30 rounded bg-white focus:outline-none focus:border-[#DAA520]"
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            setLikeCustomFields(prev => prev.filter(f => f.id !== field.id));
+                                          }}
+                                          className="min-w-[28px] min-h-[28px] flex items-center justify-center p-0.5 rounded-md border border-red-200 bg-red-50 hover:bg-red-100 hover:border-red-300 text-red-500 transition-colors cursor-pointer"
+                                          title="Remove field"
+                                        >
+                                          <X className="w-3 h-3" />
+                                        </button>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <span className="text-[10px] font-medium text-[#6B4423] w-16 shrink-0 capitalize">{field.key}:</span>
+                                        <span className="text-[10px] text-[#654321] font-semibold">{getCleanVariantDisplay(field.value)}</span>
+                                      </>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Add Field UI — only when editing */}
+                            {isAddingLikeField && isEditingIWish && (
                               <div className="flex items-center gap-2">
                                 <input
                                   type="text"
@@ -3000,15 +3222,15 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                                   className="flex-1 px-2 py-1 text-[10px] border border-[#DAA520]/30 rounded bg-white focus:outline-none focus:border-[#DAA520]"
                                   onKeyDown={(e) => e.key === 'Enter' && addNewLikeField()}
                                 />
-                                <button 
+                                <button
                                   type="button"
-                                  onClick={addNewLikeField} 
+                                  onClick={addNewLikeField}
                                   className="p-1 hover:bg-green-100 rounded transition-colors"
                                   title="Save field"
                                 >
                                   <Check className="w-3 h-3 text-green-600" />
                                 </button>
-                                <button 
+                                <button
                                   type="button"
                                   onClick={() => { setIsAddingLikeField(false); setNewLikeFieldName(""); setNewLikeFieldValue(""); }} 
                                   className="p-1 hover:bg-red-100 rounded transition-colors"
@@ -3017,66 +3239,23 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                                   <X className="w-3 h-3 text-red-500" />
                                 </button>
                               </div>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => setIsAddingLikeField(true)}
-                                className="flex items-center gap-1 text-[10px] text-[#DAA520] hover:text-[#B8860B] mt-1"
-                              >
-                                <Plus className="w-3 h-3" />
-                                Add Field
-                              </button>
                             )}
-                            
-                            {/* Show message if no valid options are set */}
+
+                            {/* Show message if no variant options and not adding a field */}
                             {!(likeStyle && isValidVariantValue(likeStyle)) && 
                              !(likeColor && isValidVariantValue(likeColor)) && 
                              !(likeSize && isValidVariantValue(likeSize)) && 
                              !(likeConfiguration && isValidVariantValue(likeConfiguration)) &&
+                             likeCustomFields.length === 0 &&
                              !isAddingLikeField && (
                               <p className="text-[10px] text-gray-500 italic">
-                                Click "Change Options" to choose your options
+                                Click &quot;Change Options&quot; to choose your options or &quot;Add Field&quot; to add Style, Color, Size, Config.
                               </p>
                             )}
                               </div>
                             </div>
                           </div>
                         </div>
-
-                        {/* Custom Fields Section */}
-                        {likeCustomFields.length > 0 && (
-                          <div className="space-y-1.5 mt-2">
-                            {likeCustomFields.map((field) => (
-                              <div key={field.id} className="flex items-center gap-2 group">
-                                <input
-                                  type="text"
-                                  value={field.key}
-                                  onChange={(e) => setLikeCustomFields(prev => 
-                                    prev.map(f => f.id === field.id ? { ...f, key: e.target.value } : f)
-                                  )}
-                                  placeholder="Field name"
-                                  className="w-20 px-2 py-0.5 text-xs border border-[#DAA520]/30 rounded bg-white focus:outline-none focus:ring-1 focus:ring-[#DAA520] text-[#4A2F1A]"
-                                />
-                                <input
-                                  type="text"
-                                  value={field.value}
-                                  onChange={(e) => setLikeCustomFields(prev => 
-                                    prev.map(f => f.id === field.id ? { ...f, value: e.target.value } : f)
-                                  )}
-                                  placeholder="Value"
-                                  className="flex-1 px-2 py-0.5 text-xs border border-[#DAA520]/30 rounded bg-white focus:outline-none focus:ring-1 focus:ring-[#DAA520] text-[#4A2F1A]"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => setLikeCustomFields(prev => prev.filter(f => f.id !== field.id))}
-                                  className="p-0.5 text-red-500 hover:text-red-700 hover:bg-red-100 rounded transition-colors opacity-0 group-hover:opacity-100"
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        )}
 
                         {/* Notes Section - Styled box like create page */}
                         <div className="bg-white/60 rounded-lg p-2 border border-[#DAA520]/20 mt-2">
@@ -3200,17 +3379,23 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                                               setAltAmazonChoice(amazonChoice)
                                               setAltBestSeller(bestSeller)
                                               
-                                              // Update specs if available
-                                              if (data.attributes && typeof data.attributes === 'object') {
-                                                const specs: Record<string, string> = {}
-                                                for (const [key, value] of Object.entries(data.attributes)) {
-                                                  if (value && typeof value === 'string' && !['color', 'size', 'style', 'configuration'].includes(key.toLowerCase())) {
-                                                    specs[key] = value
+                                              // Update specs from attributes and/or specifications (exclude variant keys)
+                                              const attrs = (data.productData?.attributes ?? data.attributes) as Record<string, string> | undefined
+                                              const specData = (data.specifications ?? data.productData?.specifications) as Record<string, string> | undefined
+                                              const excludedSpecKeys = ['color', 'size', 'style', 'brand', 'sizeOptions', 'colorVariants', 'combinedVariants', 'styleOptions', 'styleName', 'patternName', 'configuration', 'set', 'capacity']
+                                              const specs: Record<string, string> = {}
+                                              const addToSpecs = (src: Record<string, string> | undefined) => {
+                                                if (!src || typeof src !== 'object') return
+                                                for (const [key, value] of Object.entries(src)) {
+                                                  if (value != null && String(value).trim() && !excludedSpecKeys.includes(key.toLowerCase())) {
+                                                    specs[key] = String(value).trim()
                                                   }
                                                 }
-                                                if (Object.keys(specs).length > 0) {
-                                                  setAltSpecs(specs)
-                                                }
+                                              }
+                                              addToSpecs(attrs)
+                                              addToSpecs(specData)
+                                              if (Object.keys(specs).length > 0) {
+                                                setAltSpecs(specs)
                                               }
                                               
                                               // Update clipped data
@@ -3222,23 +3407,88 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                                               setAltSize('')
                                               setAltStyle('')
                                               setAltConfiguration('')
+                                              setAltCapacity('')
                                               
                                               const extractedColor = data.color || data.attributes?.color || data.styleName || data.attributes?.styleName || ''
-                                              const extractedSize = data.size || data.attributes?.size || data.screenSize || data.attributes?.screenSize || data.attributes?.memoryStorageCapacity || data.attributes?.storageCapacity || ''
                                               const extractedStyle = data.style || data.attributes?.style || ''
                                               const extractedConfig = data.configuration || data.attributes?.configuration || data.attributes?.appleCarePlus || ''
+                                              const extractedCapacity = data.capacity || data.attributes?.capacity || ''
                                               
-                                              console.log('[Modal] Alt Size debug:', { 
-                                                'data.size': data.size, 
-                                                'data.attributes?.size': data.attributes?.size, 
-                                                extractedSize 
+                                              console.log('[Modal] Alt Capacity debug:', { 
+                                                'data.capacity': data.capacity, 
+                                                'data.attributes?.capacity': data.attributes?.capacity, 
+                                                extractedCapacity 
                                               })
                                               
-                                              // Only set variant values if they pass validation (not garbage)
+                                              // Only set variant values if they pass validation (Size not used in Alternative)
                                               if (isValidVariantValue(extractedColor)) setAltColor(extractedColor)
-                                              if (isValidVariantValue(extractedSize)) setAltSize(extractedSize)
                                               if (isValidVariantValue(extractedStyle)) setAltStyle(extractedStyle)
                                               if (isValidVariantValue(extractedConfig)) setAltConfiguration(extractedConfig)
+                                              if (isValidVariantValue(extractedCapacity)) {
+                                                setAltCapacity(extractedCapacity)
+                                              } else {
+                                                // Derive capacity from features or ram+hardDiskSize if not found
+                                                let derivedCapacity: string | null = null
+                                                
+                                                const getAttr = (keys: string[]) => {
+                                                  const attrs = data.attributes || {}
+                                                  const keyMap = Object.fromEntries(
+                                                    Object.entries(attrs).map(([k, v]) => [k.toLowerCase().replace(/\s+/g, ''), { v }])
+                                                  )
+                                                  for (const q of keys) {
+                                                    const n = q.toLowerCase().replace(/\s+/g, '')
+                                                    const entry = keyMap[n]
+                                                    if (entry?.v != null && String(entry.v).trim()) return String(entry.v).trim()
+                                                  }
+                                                  return null
+                                                }
+                                                
+                                                // 1. Explicit capacity-like key
+                                                const capVal = getAttr(['capacity', 'memorycapacity', 'storagecapacity'])
+                                                if (capVal && /Unified\s+Memory|SSD\s+Storage|GB.*TB/i.test(capVal)) {
+                                                  derivedCapacity = capVal
+                                                }
+                                                
+                                                // 2. Features string: "16GB Unified Memory, 1TB SSD Storage"
+                                                if (!derivedCapacity) {
+                                                  const featuresVal = getAttr(['features', 'feature', 'specialfeature', 'specialfeatures'])
+                                                  if (featuresVal) {
+                                                    const match = featuresVal.match(/(\d+)\s*GB\s+Unified\s+Memory[,\s]+(\d+)\s*(TB|GB)\s+SSD\s+Storage/i)
+                                                    if (match) {
+                                                      derivedCapacity = `${match[1]}GB Unified Memory, ${match[2]}${match[3]} SSD Storage`
+                                                    }
+                                                  }
+                                                }
+                                                
+                                                // 3. Scan ALL attribute values for the pattern
+                                                if (!derivedCapacity && data.attributes) {
+                                                  const capacityPattern = /(\d+)\s*GB\s+Unified\s+Memory[,\s]+(\d+)\s*(TB|GB)\s+SSD\s+Storage/i
+                                                  for (const v of Object.values(data.attributes)) {
+                                                    const s = typeof v === 'string' ? v : String(v ?? '')
+                                                    const m = s.match(capacityPattern)
+                                                    if (m) {
+                                                      derivedCapacity = `${m[1]}GB Unified Memory, ${m[2]}${m[3]} SSD Storage`
+                                                      break
+                                                    }
+                                                  }
+                                                }
+                                                
+                                                // 4. Build from ram + hardDiskSize
+                                                if (!derivedCapacity) {
+                                                  const ramVal = getAttr(['ram', 'ramsize', 'rammemoryinstalledsize', 'rammemory', 'memoryinstalledsize', 'memorystoragecapacity'])
+                                                  const storageVal = getAttr(['harddisksize', 'harddrivesize', 'storagecapacity', 'ssdcapacity'])
+                                                  if (ramVal && storageVal) {
+                                                    const r = ramVal.replace(/\s+/g, '')
+                                                    const s = storageVal.replace(/\s+/g, '')
+                                                    derivedCapacity = `${r} Unified Memory, ${s} SSD Storage`
+                                                  }
+                                                }
+                                                
+                                                if (derivedCapacity && isValidVariantValue(derivedCapacity)) {
+                                                  setAltCapacity(derivedCapacity)
+                                                  console.log('[Modal] Set altCapacity (derived):', derivedCapacity)
+                                                }
+                                              }
                                               
                                               setAltProductUrl(pastedUrl)
                                               setAltCleared(false)
@@ -3316,7 +3566,43 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                               <div className="flex items-center gap-1">
                                 <button
                                   type="button"
-                                  onClick={(e) => { e.stopPropagation(); setIsEditingAlt(!isEditingAlt); }}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    if (isEditingAlt) {
+                                      // Exiting edit mode - close Add form
+                                      setIsAddingAltField(false)
+                                      setNewAltFieldName("")
+                                      setNewAltFieldValue("")
+                                    } else {
+                                      // Entering edit mode - populate state from existing data
+                                      if (!altTitle && (altClippedTitle || extractedProduct?.productName || gift?.giftName)) {
+                                        setAltTitle(altClippedTitle || extractedProduct?.productName || gift?.giftName || "")
+                                      }
+                                      if (!altStore && (extractedProduct?.storeName || gift?.source)) {
+                                        setAltStore(extractedProduct?.storeName || gift?.source || "")
+                                      }
+                                      if (!altRating && (extractedProduct?.rating || gift?.rating)) {
+                                        setAltRating((extractedProduct?.rating || gift?.rating || 0).toString())
+                                      }
+                                      if (!altReviewCount && (extractedProduct?.reviewCount || gift?.reviewCount)) {
+                                        setAltReviewCount((extractedProduct?.reviewCount || gift?.reviewCount || 0).toString())
+                                      }
+                                      if (!altPrice && (extractedProduct?.price || gift?.targetAmount || gift?.currentPrice)) {
+                                        setAltPrice((extractedProduct?.price || gift?.targetAmount || gift?.currentPrice || 0).toString())
+                                      }
+                                      if (!altOriginalPrice && (extractedProduct?.originalPrice || gift?.originalPrice)) {
+                                        setAltOriginalPrice((extractedProduct?.originalPrice || gift?.originalPrice || 0).toString())
+                                      }
+                                      // Set badges from existing data if not already set
+                                      if (!altAmazonChoice && (extractedProduct?.amazonChoice || gift?.amazonChoice)) {
+                                        setAltAmazonChoice(extractedProduct?.amazonChoice || gift?.amazonChoice || false)
+                                      }
+                                      if (!altBestSeller && (extractedProduct?.bestSeller || gift?.bestSeller)) {
+                                        setAltBestSeller(extractedProduct?.bestSeller || gift?.bestSeller || false)
+                                      }
+                                    }
+                                    setIsEditingAlt(!isEditingAlt)
+                                  }}
                                   className={`p-1.5 rounded-full transition-colors ${isEditingAlt ? 'bg-[#D97706] text-white' : 'bg-[#D97706]/20 hover:bg-[#D97706]/40 text-[#654321]'}`}
                                   title={isEditingAlt ? "Done editing" : "Edit Alternative details"}
                                 >
@@ -3339,6 +3625,11 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                                     setAltColor("")
                                     setAltSize("")
                                     setAltConfiguration("")
+                                    setAltCapacity("")
+                                    setAltCustomFields([])
+                                    setIsAddingAltField(false)
+                                    setNewAltFieldName("")
+                                    setNewAltFieldValue("")
                                     setAltClippedImage(null)
                                     setAltClippedTitle(null)
                                     setAltNotes("")
@@ -3417,6 +3708,9 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                             {/* Paste URL Option */}
                             {altAddMethod === "url" && (
                               <div className="bg-white/80 rounded-lg p-3 border border-[#D97706]/20">
+                                <p className="text-[10px] text-[#6B4423] mb-2 italic">
+                                  Select your options on the product page, then copy &amp; paste the product URL here.
+                                </p>
                                 <div className="flex gap-2">
                                   <input
                                     type="url"
@@ -3453,21 +3747,26 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                                             setAltBestSeller(extracted.bestSeller || false)
                                             setAltClippedImage(extracted.imageUrl || null)
                                             setAltClippedTitle(extracted.productName || null)
-                                            // Populate specs
-                                            if (extracted.attributes) {
-                                              const specs: Record<string, string> = {}
-                                              const excludedKeys = ['color', 'size', 'style', 'brand', 'sizeOptions', 'colorVariants', 'combinedVariants', 'styleOptions', 'styleName', 'patternName', 'configuration', 'set']
-                                              Object.entries(extracted.attributes).forEach(([key, value]) => {
-                                                if (!excludedKeys.includes(key.toLowerCase()) && value) {
-                                                  specs[key] = String(value)
+                                            // Populate specs from attributes and/or specifications
+                                            const excludedKeysAlt = ['color', 'size', 'style', 'brand', 'sizeOptions', 'colorVariants', 'combinedVariants', 'styleOptions', 'styleName', 'patternName', 'configuration', 'set', 'capacity']
+                                            const specsAlt: Record<string, string> = {}
+                                            const addSpec = (src: Record<string, unknown> | undefined) => {
+                                              if (!src || typeof src !== 'object') return
+                                              Object.entries(src).forEach(([key, value]) => {
+                                                if (!excludedKeysAlt.includes(key.toLowerCase()) && value != null && String(value).trim()) {
+                                                  specsAlt[key] = String(value).trim()
                                                 }
                                               })
-                                              setAltSpecs(specs)
-                                              // Populate variant options
+                                            }
+                                            addSpec(extracted.attributes as Record<string, unknown>)
+                                            addSpec(extracted.specifications as Record<string, unknown>)
+                                            if (Object.keys(specsAlt).length > 0) setAltSpecs(specsAlt)
+                                            // Populate variant options (no size — not used in Alternative)
+                                            if (extracted.attributes) {
                                               if (extracted.attributes.color) setAltColor(extracted.attributes.color)
-                                              if (extracted.attributes.size) setAltSize(extracted.attributes.size)
                                               if (extracted.attributes.style) setAltStyle(extracted.attributes.style)
                                               if (extracted.attributes.configuration || extracted.attributes.set) setAltConfiguration(extracted.attributes.configuration || extracted.attributes.set)
+                                              if (extracted.attributes.capacity) setAltCapacity(extracted.attributes.capacity)
                                             }
                                             setAltCleared(false) // Show product details
                                             setAltSelected(true) // Ensure Alternative is selected
@@ -3519,21 +3818,26 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                                           setAltBestSeller(extracted.bestSeller || false)
                                           setAltClippedImage(extracted.imageUrl || null)
                                           setAltClippedTitle(extracted.productName || null)
-                                          // Populate specs
-                                          if (extracted.attributes) {
-                                            const specs: Record<string, string> = {}
-                                            const excludedKeys = ['color', 'size', 'style', 'brand', 'sizeOptions', 'colorVariants', 'combinedVariants', 'styleOptions', 'styleName', 'patternName', 'configuration', 'set']
-                                            Object.entries(extracted.attributes).forEach(([key, value]) => {
-                                              if (!excludedKeys.includes(key.toLowerCase()) && value) {
-                                                specs[key] = String(value)
+                                          // Populate specs from attributes and/or specifications
+                                          const excludedKeysAltBtn = ['color', 'size', 'style', 'brand', 'sizeOptions', 'colorVariants', 'combinedVariants', 'styleOptions', 'styleName', 'patternName', 'configuration', 'set', 'capacity']
+                                          const specsAltBtn: Record<string, string> = {}
+                                          const addSpecBtn = (src: Record<string, unknown> | undefined) => {
+                                            if (!src || typeof src !== 'object') return
+                                            Object.entries(src).forEach(([key, value]) => {
+                                              if (!excludedKeysAltBtn.includes(key.toLowerCase()) && value != null && String(value).trim()) {
+                                                specsAltBtn[key] = String(value).trim()
                                               }
                                             })
-                                            setAltSpecs(specs)
-                                            // Populate variant options
+                                          }
+                                          addSpecBtn(extracted.attributes as Record<string, unknown>)
+                                          addSpecBtn(extracted.specifications as Record<string, unknown>)
+                                          if (Object.keys(specsAltBtn).length > 0) setAltSpecs(specsAltBtn)
+                                          // Populate variant options (no size — not used in Alternative)
+                                          if (extracted.attributes) {
                                             if (extracted.attributes.color) setAltColor(extracted.attributes.color)
-                                            if (extracted.attributes.size) setAltSize(extracted.attributes.size)
                                             if (extracted.attributes.style) setAltStyle(extracted.attributes.style)
                                             if (extracted.attributes.configuration || extracted.attributes.set) setAltConfiguration(extracted.attributes.configuration || extracted.attributes.set)
+                                            if (extracted.attributes.capacity) setAltCapacity(extracted.attributes.capacity)
                                           }
                                           setAltCleared(false) // Show product details
                                           setAltSelected(true) // Ensure Alternative is selected
@@ -3578,7 +3882,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                                     <Loader2 className="w-4 h-4 animate-spin text-[#D97706]" />
                                     <span className="text-sm font-semibold text-[#654321]">Listening for clip...</span>
                                   </div>
-                                  <p className="text-xs text-[#92400E] text-center">Select your options on the retailer page, then use the Wishbee extension to clip it.</p>
+                                  <p className="text-xs text-[#92400E] text-center">Select your options on the product page, then click the Wishbee extension to clip it.</p>
                                   <p className="text-[10px] text-[#92400E]/70 text-center">
                                     Don't have the extension? <a href="https://wishbee.ai/extension" target="_blank" rel="noopener noreferrer" className="text-[#D97706] font-semibold hover:underline">Get it free →</a>
                                   </p>
@@ -3901,12 +4205,23 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                                   <span className="w-1 h-1 bg-[#D97706] rounded-full"></span>
                                   Selected Options
                                 </p>
+                                {isEditingAlt && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setIsAddingAltField(true)}
+                                    className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold text-[#D97706] hover:text-[#B45309] hover:bg-[#D97706]/10 rounded-md transition-colors border border-[#D97706]/30"
+                                    title="Add new field"
+                                  >
+                                    <Plus className="w-3 h-3" />
+                                    Add
+                                  </button>
+                                )}
                               </div>
                               <div className="space-y-1.5">
                             {/* Selected Options - Style, Color, Size, Set - editable when isEditingAlt is true */}
-                            {/* Style */}
-                            {(altStyle || isEditingAlt) && (
-                              <div className="flex items-center gap-2">
+                            {/* Style — only show when has value; delete clears and hides row */}
+                            {altStyle && (
+                              <div className="flex items-center gap-2 group/row">
                                 <span className="text-[10px] font-medium text-[#6B4423] w-16 shrink-0">Style:</span>
                                 {isEditingAlt ? (
                                   <>
@@ -3919,23 +4234,21 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                                     />
                                     <button
                                       type="button"
-                                      onClick={() => setAltStyle("")}
-                                      className="p-1 hover:bg-red-100 rounded transition-colors"
-                                      title="Remove style"
+                                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); deleteAltField("style"); }}
+                                      className="min-w-[28px] min-h-[28px] flex items-center justify-center p-1 rounded-md border border-red-200 bg-red-50 hover:bg-red-100 hover:border-red-300 text-red-500 transition-colors cursor-pointer"
+                                      title="Delete style"
                                     >
-                                      <X className="w-3 h-3 text-red-500" />
+                                      <X className="w-3.5 h-3.5" />
                                     </button>
                                   </>
-                                ) : altStyle && isValidVariantValue(altStyle) ? (
-                                  <span className="text-[10px] text-[#654321] font-semibold">{getCleanVariantDisplay(altStyle)}</span>
                                 ) : (
-                                  <span className="text-[10px] text-gray-400 italic">Not set</span>
+                                  <span className="text-[10px] text-[#654321] font-semibold">{getCleanVariantDisplay(altStyle)}</span>
                                 )}
                               </div>
                             )}
-                            {/* Color */}
-                            {(altColor || isEditingAlt) && (
-                              <div className="flex items-center gap-2">
+                            {/* Color — only show when has value; delete clears and hides row */}
+                            {altColor && (
+                              <div className="flex items-center gap-2 group/row">
                                 <span className="text-[10px] font-medium text-[#6B4423] w-16 shrink-0">Color:</span>
                                 {isEditingAlt ? (
                                   <>
@@ -3948,53 +4261,23 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                                     />
                                     <button
                                       type="button"
-                                      onClick={() => setAltColor("")}
-                                      className="p-1 hover:bg-red-100 rounded transition-colors"
-                                      title="Remove color"
+                                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); deleteAltField("color"); }}
+                                      className="min-w-[28px] min-h-[28px] flex items-center justify-center p-1 rounded-md border border-red-200 bg-red-50 hover:bg-red-100 hover:border-red-300 text-red-500 transition-colors cursor-pointer"
+                                      title="Delete color"
                                     >
-                                      <X className="w-3 h-3 text-red-500" />
+                                      <X className="w-3.5 h-3.5" />
                                     </button>
                                   </>
-                                ) : altColor && isValidVariantValue(altColor) ? (
+                                ) : (
                                   <span className="text-[10px] text-[#654321] font-semibold">{getCleanVariantDisplay(altColor)}</span>
-                                ) : (
-                                  <span className="text-[10px] text-gray-400 italic">Not set</span>
                                 )}
                               </div>
                             )}
-                            {/* Size */}
-                            {(altSize || isEditingAlt) && (
-                              <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-medium text-[#6B4423] w-16 shrink-0">Size:</span>
-                                {isEditingAlt ? (
-                                  <>
-                                    <input
-                                      type="text"
-                                      value={altSize}
-                                      onChange={(e) => setAltSize(e.target.value)}
-                                      placeholder="Enter size..."
-                                      className="flex-1 px-2 py-1 text-[10px] border border-[#D97706]/30 rounded bg-white focus:outline-none focus:border-[#D97706]"
-                                    />
-                                    <button
-                                      type="button"
-                                      onClick={() => setAltSize("")}
-                                      className="p-1 hover:bg-red-100 rounded transition-colors"
-                                      title="Remove size"
-                                    >
-                                      <X className="w-3 h-3 text-red-500" />
-                                    </button>
-                                  </>
-                                ) : altSize && isValidVariantValue(altSize) ? (
-                                  <span className="text-[10px] text-[#654321] font-semibold">{getCleanVariantDisplay(altSize)}</span>
-                                ) : (
-                                  <span className="text-[10px] text-gray-400 italic">Not set</span>
-                                )}
-                              </div>
-                            )}
-                            {/* Configuration/Set */}
-                            {(altConfiguration || isEditingAlt) && (
-                              <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-medium text-[#6B4423] w-16 shrink-0">Config:</span>
+                            {/* Size removed from Alternative — not used in Selected Options */}
+                            {/* Configuration/Set — only show when has value; delete clears and hides row */}
+                            {altConfiguration && (
+                              <div className="flex items-center gap-2 group/row">
+                                <span className="text-[10px] font-medium text-[#6B4423] w-16 shrink-0">Set:</span>
                                 {isEditingAlt ? (
                                   <>
                                     <input
@@ -4006,23 +4289,93 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                                     />
                                     <button
                                       type="button"
-                                      onClick={() => setAltConfiguration("")}
-                                      className="p-1 hover:bg-red-100 rounded transition-colors"
-                                      title="Remove configuration"
+                                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); deleteAltField("set"); }}
+                                      className="min-w-[28px] min-h-[28px] flex items-center justify-center p-1 rounded-md border border-red-200 bg-red-50 hover:bg-red-100 hover:border-red-300 text-red-500 transition-colors cursor-pointer"
+                                      title="Delete configuration"
                                     >
-                                      <X className="w-3 h-3 text-red-500" />
+                                      <X className="w-3.5 h-3.5" />
                                     </button>
                                   </>
-                                ) : altConfiguration && isValidVariantValue(altConfiguration) ? (
-                                  <span className="text-[10px] text-[#654321] font-semibold">{getCleanVariantDisplay(altConfiguration)}</span>
                                 ) : (
-                                  <span className="text-[10px] text-gray-400 italic">Not set</span>
+                                  <span className="text-[10px] text-[#654321] font-semibold">{getCleanVariantDisplay(altConfiguration)}</span>
+                                )}
+                              </div>
+                            )}
+                            {/* Capacity — only show when has value; delete clears and hides row */}
+                            {altCapacity && (
+                              <div className="flex items-center gap-2 group/row">
+                                <span className="text-[10px] font-medium text-[#6B4423] w-16 shrink-0">Capacity:</span>
+                                {isEditingAlt ? (
+                                  <>
+                                    <input
+                                      type="text"
+                                      value={altCapacity}
+                                      onChange={(e) => setAltCapacity(e.target.value)}
+                                      placeholder="Enter capacity..."
+                                      className="flex-1 px-2 py-1 text-[10px] border border-[#D97706]/30 rounded bg-white focus:outline-none focus:border-[#D97706]"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); deleteAltField("capacity"); }}
+                                      className="min-w-[28px] min-h-[28px] flex items-center justify-center p-1 rounded-md border border-red-200 bg-red-50 hover:bg-red-100 hover:border-red-300 text-red-500 transition-colors cursor-pointer"
+                                      title="Delete capacity"
+                                    >
+                                      <X className="w-3.5 h-3.5" />
+                                    </button>
+                                  </>
+                                ) : (
+                                  <span className="text-[10px] text-[#654321] font-semibold">{getCleanVariantDisplay(altCapacity)}</span>
                                 )}
                               </div>
                             )}
                             
-                            {/* Add Field UI for Alternative */}
-                            {isAddingAltField ? (
+                            {/* Custom fields (newly added) — display vs edit like standard fields */}
+                            {altCustomFields.length > 0 && (
+                              <div className="space-y-1.5">
+                                {altCustomFields.map((field) => (
+                                  <div key={field.id} className="flex items-center gap-2 group/row">
+                                    {isEditingAlt ? (
+                                      <>
+                                        <input
+                                          type="text"
+                                          value={field.key}
+                                          onChange={(e) => setAltCustomFields(prev => prev.map(f => f.id === field.id ? { ...f, key: e.target.value } : f))}
+                                          placeholder="Field name"
+                                          className="w-20 shrink-0 px-2 py-1 text-[10px] border border-[#D97706]/30 rounded bg-white focus:outline-none focus:border-[#D97706]"
+                                        />
+                                        <input
+                                          type="text"
+                                          value={field.value}
+                                          onChange={(e) => setAltCustomFields(prev => prev.map(f => f.id === field.id ? { ...f, value: e.target.value } : f))}
+                                          placeholder="Value"
+                                          className="flex-1 px-2 py-1 text-[10px] border border-[#D97706]/30 rounded bg-white focus:outline-none focus:border-[#D97706]"
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            setAltCustomFields(prev => prev.filter(f => f.id !== field.id));
+                                          }}
+                                          className="min-w-[28px] min-h-[28px] flex items-center justify-center p-0.5 rounded-md border border-red-200 bg-red-50 hover:bg-red-100 hover:border-red-300 text-red-500 transition-colors cursor-pointer"
+                                          title="Remove field"
+                                        >
+                                          <X className="w-3 h-3" />
+                                        </button>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <span className="text-[10px] font-medium text-[#6B4423] w-16 shrink-0 capitalize">{field.key}:</span>
+                                        <span className="text-[10px] text-[#654321] font-semibold">{getCleanVariantDisplay(field.value)}</span>
+                                      </>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Add Field UI for Alternative — only when editing */}
+                            {isAddingAltField && isEditingAlt && (
                               <div className="flex items-center gap-2">
                                 <input
                                   type="text"
@@ -4039,79 +4392,40 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                                   className="flex-1 px-2 py-1 text-[10px] border border-[#D97706]/30 rounded bg-white focus:outline-none focus:border-[#D97706]"
                                   onKeyDown={(e) => e.key === 'Enter' && addNewAltField()}
                                 />
-                                <button 
+                                <button
                                   type="button"
-                                  onClick={addNewAltField} 
+                                  onClick={addNewAltField}
                                   className="p-1 hover:bg-green-100 rounded transition-colors"
                                   title="Save field"
                                 >
                                   <Check className="w-3 h-3 text-green-600" />
                                 </button>
-                                <button 
+                                <button
                                   type="button"
-                                  onClick={() => { setIsAddingAltField(false); setNewAltFieldName(""); setNewAltFieldValue(""); }} 
+                                  onClick={() => { setIsAddingAltField(false); setNewAltFieldName(""); setNewAltFieldValue(""); }}
                                   className="p-1 hover:bg-red-100 rounded transition-colors"
                                   title="Cancel"
                                 >
                                   <X className="w-3 h-3 text-red-500" />
                                 </button>
                               </div>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => setIsAddingAltField(true)}
-                                className="flex items-center gap-1 text-[10px] text-[#D97706] hover:text-[#B45309] mt-1"
-                              >
-                                <Plus className="w-3 h-3" />
-                                Add Field
-                              </button>
                             )}
-                            
-                            {/* Show message if no valid options are set */}
+
+                            {/* Show message if no variant options and not adding a field */}
                             {!(altStyle && isValidVariantValue(altStyle)) && 
                              !(altColor && isValidVariantValue(altColor)) && 
-                             !(altSize && isValidVariantValue(altSize)) && 
                              !(altConfiguration && isValidVariantValue(altConfiguration)) &&
+                             !(altCapacity && isValidVariantValue(altCapacity)) &&
+                             altCustomFields.length === 0 &&
                              !isAddingAltField && (
                               <p className="text-[10px] text-gray-500 italic">
-                                Click "Change" to choose alternative options
+                                Click &quot;Change&quot; to choose alternative options or &quot;Add Field&quot; to add Style, Color, Set, Capacity.
                               </p>
                             )}
                               </div>
                             </div>
                           </div>
                         </div>
-                        
-                        {/* Custom Fields Section for Alternative */}
-                        {altCustomFields.length > 0 && (
-                          <div className="space-y-1.5 mt-2">
-                            {altCustomFields.map((field) => (
-                              <div key={field.id} className="flex items-center gap-2 group">
-                                <input
-                                  type="text"
-                                  value={field.key}
-                                  onChange={(e) => setAltCustomFields(prev => prev.map(f => f.id === field.id ? { ...f, key: e.target.value } : f))}
-                                  placeholder="Field name"
-                                  className="w-20 px-2 py-0.5 text-xs border border-[#D97706]/30 rounded bg-white focus:outline-none focus:ring-1 focus:ring-[#D97706] text-[#4A2F1A]"
-                                />
-                                <input
-                                  type="text"
-                                  value={field.value}
-                                  onChange={(e) => setAltCustomFields(prev => prev.map(f => f.id === field.id ? { ...f, value: e.target.value } : f))}
-                                  placeholder="Value"
-                                  className="flex-1 px-2 py-0.5 text-xs border border-[#D97706]/30 rounded bg-white focus:outline-none focus:ring-1 focus:ring-[#D97706] text-[#4A2F1A]"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => setAltCustomFields(prev => prev.filter(f => f.id !== field.id))}
-                                  className="p-0.5 text-red-500 hover:text-red-700 hover:bg-red-100 rounded transition-colors opacity-0 group-hover:opacity-100"
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        )}
 
                         {/* Notes Section for Alternative - Styled box like create page */}
                         <div className="bg-white/60 rounded-lg p-2 border border-[#D97706]/20 mt-2">

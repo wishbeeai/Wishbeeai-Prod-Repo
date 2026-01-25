@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast"
 import Link from "next/link"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { ShareModal } from "@/components/share-modal"
+import { useAuth } from "@/lib/auth-context"
 
 interface PreferenceOption {
   [key: string]: string | null | undefined | Array<{ key: string; value: string }>  // Dynamic variant keys
@@ -65,6 +66,7 @@ interface AIInsight {
 
 export function MyWishlistDisplay() {
   const { toast } = useToast()
+  const { user, loading: authLoading } = useAuth()
   const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([])
   const [aiInsights, setAiInsights] = useState<AIInsight | null>(null)
   const [isLoadingInsights, setIsLoadingInsights] = useState(false)
@@ -102,10 +104,12 @@ export function MyWishlistDisplay() {
     title: string
     storeName: string
     selectedOptions: Array<{ key: string; value: string }>
+    specifications: Array<{ key: string; value: string }>
   }>({
     title: '',
     storeName: '',
-    selectedOptions: []
+    selectedOptions: [],
+    specifications: []
   })
 
   // State for Share Modal
@@ -154,11 +158,24 @@ export function MyWishlistDisplay() {
     const fetchWishlistItems = async () => {
       try {
         setIsLoading(true)
-        const response = await fetch("/api/wishlist-items/all")
+        // Add cache-busting and credentials to ensure auth cookies are sent
+        const response = await fetch("/api/wishlist-items/all", {
+          cache: 'no-store',
+          credentials: 'include', // Include cookies for authentication
+          headers: {
+            'Cache-Control': 'no-cache',
+          },
+        })
         
         if (!response.ok) {
           if (response.status === 401) {
-            // User not authenticated - show empty state
+            // User not authenticated - show message and empty state
+            console.error("[My Wishlist] Authentication failed - user not logged in")
+            toast({
+              title: "Please Log In",
+              description: "You need to be logged in to view your wishlist. Please log in and try again.",
+              variant: "destructive",
+            })
             setWishlistItems([])
             return
           }
@@ -178,6 +195,8 @@ export function MyWishlistDisplay() {
 
         const data = await response.json()
         const dbItems = data.items || []
+
+        console.log("[My Wishlist] Received items from API:", dbItems.length)
 
         // Transform database items to component format
         const transformedItems: WishlistItem[] = dbItems.map((item: any) => {
@@ -254,12 +273,13 @@ export function MyWishlistDisplay() {
           }
         })
 
+        console.log("[My Wishlist] Transformed items:", transformedItems.length)
         setWishlistItems(transformedItems)
       } catch (error) {
         console.error("Error fetching wishlist items:", error)
         toast({
           title: "Error",
-          description: "Failed to load wishlist items",
+          description: "Failed to load wishlist items. Check browser console for details.",
           variant: "destructive",
         })
         setWishlistItems([])
@@ -269,7 +289,7 @@ export function MyWishlistDisplay() {
     }
 
     fetchWishlistItems()
-  }, [toast])
+  }, [toast, user, authLoading])
 
   useEffect(() => {
     if (wishlistItems.length > 0) {
@@ -352,7 +372,7 @@ export function MyWishlistDisplay() {
     const specsArray: Array<{ key: string; value: string }> = []
     if (item.specifications) {
       Object.entries(item.specifications).forEach(([key, value]) => {
-        if (value && !['color', 'size', 'style', 'configuration'].includes(key.toLowerCase())) {
+        if (value && !['color', 'size', 'style', 'configuration', 'set'].includes(key.toLowerCase())) {
           specsArray.push({ key, value: String(value) })
         }
       })
@@ -541,10 +561,20 @@ export function MyWishlistDisplay() {
     setEditingAltItemId(item.id)
     const alt = item.preferenceOptions?.alternative
     
+    // Convert alternative specifications to array
+    const specsArray: Array<{ key: string; value: string }> = []
+    if (alt?.specifications && typeof alt.specifications === 'object') {
+      Object.entries(alt.specifications).forEach(([key, value]) => {
+        if (value && !['color', 'size', 'style', 'configuration', 'set'].includes(key.toLowerCase())) {
+          specsArray.push({ key, value: String(value) })
+        }
+      })
+    }
+    
     // Convert alternative options to array (excluding metadata)
     const optionsArray: Array<{ key: string; value: string }> = []
     if (alt) {
-      const excludeKeys = ['image', 'title', 'customFields', 'notes']
+      const excludeKeys = ['image', 'title', 'customFields', 'notes', 'specifications']
       Object.entries(alt).forEach(([key, value]) => {
         if (value && typeof value === 'string' && !excludeKeys.includes(key)) {
           optionsArray.push({ key, value })
@@ -555,7 +585,8 @@ export function MyWishlistDisplay() {
     setEditedAltItem({
       title: (alt?.title as string) || '',
       storeName: item.storeName || '',
-      selectedOptions: optionsArray.length > 0 ? optionsArray : [{ key: '', value: '' }]
+      selectedOptions: optionsArray.length > 0 ? optionsArray : [{ key: '', value: '' }],
+      specifications: specsArray.length > 0 ? specsArray : []
     })
   }
 
@@ -565,7 +596,8 @@ export function MyWishlistDisplay() {
     setEditedAltItem({
       title: '',
       storeName: '',
-      selectedOptions: []
+      selectedOptions: [],
+      specifications: []
     })
   }
 
@@ -595,6 +627,32 @@ export function MyWishlistDisplay() {
     }))
   }
 
+  // Add a new alternative specification field
+  const addAltSpecification = () => {
+    setEditedAltItem(prev => ({
+      ...prev,
+      specifications: [...prev.specifications, { key: '', value: '' }]
+    }))
+  }
+
+  // Remove an alternative specification field
+  const removeAltSpecification = (index: number) => {
+    setEditedAltItem(prev => ({
+      ...prev,
+      specifications: prev.specifications.filter((_, i) => i !== index)
+    }))
+  }
+
+  // Update an alternative specification field
+  const updateAltSpecification = (index: number, field: 'key' | 'value', value: string) => {
+    setEditedAltItem(prev => ({
+      ...prev,
+      specifications: prev.specifications.map((spec, i) => 
+        i === index ? { ...spec, [field]: value } : spec
+      )
+    }))
+  }
+
   // Save edited Alternative preferences
   const saveEditedAltPreferences = async (itemId: string) => {
     try {
@@ -609,12 +667,21 @@ export function MyWishlistDisplay() {
         }
       })
 
+      // Convert specifications array back to object
+      const altSpecsObject: Record<string, string> = {}
+      editedAltItem.specifications.forEach(spec => {
+        if (spec.key && spec.value) {
+          altSpecsObject[spec.key] = spec.value
+        }
+      })
+
       const updatedPreferenceOptions = {
         ...item.preferenceOptions,
         alternative: {
           ...item.preferenceOptions?.alternative,
           title: editedAltItem.title || null,
           ...altOptions,
+          specifications: Object.keys(altSpecsObject).length > 0 ? altSpecsObject : null,
         }
       }
 
@@ -756,7 +823,8 @@ export function MyWishlistDisplay() {
                     const garbagePatterns = [
                       'stars', 'rating', 'review', 'cart', 'slide', 'percent', 
                       'protection plan', 'about this', 'add to', 'widget', 
-                      'feedback', 'out of 5', 'customer'
+                      'feedback', 'out of 5', 'customer', 'items in cart',
+                      '|'
                     ]
                     const lowerStr = str.toLowerCase()
                     if (garbagePatterns.some(p => lowerStr.includes(p))) return false
@@ -774,6 +842,7 @@ export function MyWishlistDisplay() {
                   
                   const iLikeEntries = getValidEntries(item.preferenceOptions.iLike)
                   const altEntries = getValidEntries(item.preferenceOptions.alternative)
+                    .filter(([k]) => k.toLowerCase() !== 'size') // Size not used in Alternative Selected Options
                   const okToBuyEntries = getValidEntries(item.preferenceOptions.okToBuy)
                   
                   return (
@@ -1189,7 +1258,7 @@ export function MyWishlistDisplay() {
 
                               {/* Specifications - Display Mode */}
                               {item.specifications && Object.keys(item.specifications).length > 0 && (() => {
-                                const allSpecs = Object.entries(item.specifications).filter(([k,v]) => v && !['color','size','style','configuration'].includes(k.toLowerCase()))
+                                const allSpecs = Object.entries(item.specifications).filter(([k,v]) => v && !['color','size','style','configuration','set'].includes(k.toLowerCase()))
                                 const visibleSpecs = allSpecs.slice(0, 5)
                                 const hasMore = allSpecs.length > 5
                                 
@@ -1235,12 +1304,16 @@ export function MyWishlistDisplay() {
                                     <>
                                       <table className="w-full">
                                         <tbody>
-                                          {(expandedSelectedOptions[item.id] ? iLikeEntries : iLikeEntries.slice(0, 3)).map(([key, value]) => (
-                                            <tr key={key}>
-                                              <td className="text-[9px] font-semibold text-[#6B4423] capitalize whitespace-nowrap pr-3 py-0.5 align-top w-[60px]">{key}:</td>
-                                              <td className="text-[9px] text-[#654321] font-medium py-0.5 break-words">{value}</td>
-                                            </tr>
-                                          ))}
+                                          {(expandedSelectedOptions[item.id] ? iLikeEntries : iLikeEntries.slice(0, 3)).map(([key, value]) => {
+                                            // Map "configuration" key to "Set" for display
+                                            const displayKey = key.toLowerCase() === 'configuration' ? 'Set' : key
+                                            return (
+                                              <tr key={key}>
+                                                <td className="text-[9px] font-semibold text-[#6B4423] capitalize whitespace-nowrap pr-3 py-0.5 align-top w-[60px]">{displayKey}:</td>
+                                                <td className="text-[9px] text-[#654321] font-medium py-0.5 break-words">{value}</td>
+                                              </tr>
+                                            )
+                                          })}
                                           {/* Empty rows to maintain consistent height when less than 3 options */}
                                           {!expandedSelectedOptions[item.id] && iLikeEntries.length < 3 && Array.from({ length: 3 - iLikeEntries.length }).map((_, i) => (
                                             <tr key={`empty-${i}`}>
@@ -1267,6 +1340,18 @@ export function MyWishlistDisplay() {
                                   <p className="text-[9px] text-[#8B6914] italic">Click edit to add preferences</p>
                                 )}
                               </div>
+
+                              {/* I Wish Notes — from Choose Your Preferred Options */}
+                              {item.preferenceOptions?.iLike?.notes && (
+                                <div className="bg-white/60 rounded-lg p-2.5 border border-[#DAA520]/20 mt-2">
+                                  <p className="text-[9px] font-bold text-[#6B4423] uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                                    <span className="w-1 h-1 bg-[#DAA520] rounded-full"></span>Notes
+                                  </p>
+                                  <p className="text-[10px] text-[#654321] font-medium whitespace-pre-wrap break-words">
+                                    {item.preferenceOptions.iLike.notes}
+                                  </p>
+                                </div>
+                              )}
                             </div>
                             </>
                           )}
@@ -1484,6 +1569,43 @@ export function MyWishlistDisplay() {
                                     />
                                   </div>
 
+                                  {/* Specifications */}
+                                  <div className="bg-white/60 rounded-lg p-2.5 border border-[#D97706]/20">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <p className="text-[9px] font-bold text-[#6B4423] uppercase tracking-wider flex items-center gap-1"><span className="w-1.5 h-1.5 bg-[#D97706] rounded-full"></span>Specifications</p>
+                                      <button type="button" onClick={addAltSpecification} className="text-[9px] text-[#D97706] font-semibold hover:underline flex items-center gap-0.5">
+                                        <Plus className="w-3 h-3" /> Add
+                                      </button>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                      {editedAltItem.specifications.map((spec, idx) => (
+                                        <div key={idx} className="flex items-center gap-1">
+                                          <input 
+                                            type="text" 
+                                            value={spec.key} 
+                                            onChange={(e) => updateAltSpecification(idx, 'key', e.target.value)} 
+                                            className="w-[80px] px-2 py-1 text-[9px] border border-[#D97706]/30 rounded bg-white focus:outline-none focus:border-[#D97706]" 
+                                            placeholder="Field"
+                                          />
+                                          <span className="text-[9px] text-[#6B4423]">:</span>
+                                          <input 
+                                            type="text" 
+                                            value={spec.value} 
+                                            onChange={(e) => updateAltSpecification(idx, 'value', e.target.value)} 
+                                            className="flex-1 px-2 py-1 text-[9px] border border-[#D97706]/30 rounded bg-white focus:outline-none focus:border-[#D97706]" 
+                                            placeholder="Value"
+                                          />
+                                          <button type="button" onClick={() => removeAltSpecification(idx)} className="p-0.5 hover:bg-red-100 rounded">
+                                            <Trash2 className="w-3 h-3 text-red-500" />
+                                          </button>
+                                        </div>
+                                      ))}
+                                      {editedAltItem.specifications.length === 0 && (
+                                        <p className="text-[9px] text-[#92400E] italic">No specifications. Click Add to create one.</p>
+                                      )}
+                                    </div>
+                                  </div>
+
                                   {/* Selected Options */}
                                   <div className="bg-white/60 rounded-lg p-2.5 border border-[#D97706]/20">
                                     <div className="flex items-center justify-between mb-2">
@@ -1572,7 +1694,7 @@ export function MyWishlistDisplay() {
                                   {/* Specifications - Display Mode for Alternative */}
                                   {item.preferenceOptions?.alternative?.specifications && Object.keys(item.preferenceOptions.alternative.specifications).length > 0 && (() => {
                                     const altSpecs = item.preferenceOptions.alternative.specifications as Record<string, any>
-                                    const allAltSpecs = Object.entries(altSpecs).filter(([k,v]) => v && !['color','size','style','configuration'].includes(k.toLowerCase()))
+                                    const allAltSpecs = Object.entries(altSpecs).filter(([k,v]) => v && !['color','size','style','configuration','set'].includes(k.toLowerCase()))
                                     const visibleAltSpecs = allAltSpecs.slice(0, 5)
                                     const hasMoreAltSpecs = allAltSpecs.length > 5
                                     
@@ -1616,18 +1738,34 @@ export function MyWishlistDisplay() {
                                     {altEntries.length > 0 ? (
                                       <table className="w-full">
                                         <tbody>
-                                          {altEntries.map(([key, value]) => (
-                                            <tr key={key}>
-                                              <td className="text-[9px] font-semibold text-[#6B4423] capitalize whitespace-nowrap pr-3 py-0.5 align-top w-[60px]">{key}:</td>
-                                              <td className="text-[9px] text-[#654321] font-medium py-0.5 break-words">{value}</td>
-                                            </tr>
-                                          ))}
+                                          {altEntries.map(([key, value]) => {
+                                            // Map "configuration" key to "Set" for display
+                                            const displayKey = key.toLowerCase() === 'configuration' ? 'Set' : key
+                                            return (
+                                              <tr key={key}>
+                                                <td className="text-[9px] font-semibold text-[#6B4423] capitalize whitespace-nowrap pr-3 py-0.5 align-top w-[60px]">{displayKey}:</td>
+                                                <td className="text-[9px] text-[#654321] font-medium py-0.5 break-words">{value}</td>
+                                              </tr>
+                                            )
+                                          })}
                                         </tbody>
                                       </table>
                                     ) : (
                                       <p className="text-[9px] text-[#92400E] italic">No alternative options yet. Click edit to add.</p>
                                     )}
                                   </div>
+
+                                  {/* Alternative Notes — from Choose Your Preferred Options */}
+                                  {item.preferenceOptions?.alternative?.notes && (
+                                    <div className="bg-white/60 rounded-lg p-2.5 border border-[#D97706]/20 mt-2">
+                                      <p className="text-[9px] font-bold text-[#6B4423] uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                                        <span className="w-1 h-1 bg-[#D97706] rounded-full"></span>Notes
+                                      </p>
+                                      <p className="text-[10px] text-[#654321] font-medium whitespace-pre-wrap break-words">
+                                        {item.preferenceOptions.alternative.notes}
+                                      </p>
+                                    </div>
+                                  )}
                                 </>
                               )}
                             </div>
@@ -1669,12 +1807,16 @@ export function MyWishlistDisplay() {
                                   <p className="text-[9px] font-bold text-[#6B4423] uppercase tracking-wider mb-2 flex items-center gap-1"><span className="w-1.5 h-1.5 bg-[#C2410C] rounded-full"></span>Selected Options</p>
                                   <table className="w-full">
                                     <tbody>
-                                      {okToBuyEntries.map(([key, value]) => (
-                                        <tr key={key}>
-                                          <td className="text-[9px] font-semibold text-[#6B4423] capitalize whitespace-nowrap pr-3 py-0.5 align-top w-[60px]">{key}:</td>
-                                          <td className="text-[9px] text-[#654321] font-medium py-0.5 break-words">{value}</td>
-                                        </tr>
-                                      ))}
+                                      {okToBuyEntries.map(([key, value]) => {
+                                        // Map "configuration" key to "Set" for display
+                                        const displayKey = key.toLowerCase() === 'configuration' ? 'Set' : key
+                                        return (
+                                          <tr key={key}>
+                                            <td className="text-[9px] font-semibold text-[#6B4423] capitalize whitespace-nowrap pr-3 py-0.5 align-top w-[60px]">{displayKey}:</td>
+                                            <td className="text-[9px] text-[#654321] font-medium py-0.5 break-words">{value}</td>
+                                          </tr>
+                                        )
+                                      })}
                                     </tbody>
                                   </table>
                                 </div>
@@ -1763,7 +1905,7 @@ export function MyWishlistDisplay() {
                     if (strValue.length === 0 || strValue.length > 200) return false
                     const lowerKey = key.toLowerCase()
                     // Exclude variant options (shown in Selected Options)
-                    if (['color', 'size', 'style', 'configuration'].includes(lowerKey)) return false
+                    if (['color', 'size', 'style', 'configuration', 'set'].includes(lowerKey)) return false
                     const garbageKeys = ['asin', 'item model number', 'date first available', 'department', 'manufacturer']
                     if (garbageKeys.some(g => lowerKey.includes(g))) return false
                     return true
