@@ -383,6 +383,8 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
   const [altRetailerUrl, setAltRetailerUrl] = useState("")
   const [isExtractingLikeRetailer, setIsExtractingLikeRetailer] = useState(false)
   const [isExtractingAltRetailer, setIsExtractingAltRetailer] = useState(false)
+  const [likeRetailerMethod, setLikeRetailerMethod] = useState<"url" | "extension">("url")
+  const [altRetailerMethod, setAltRetailerMethod] = useState<"url" | "extension">("url")
   // Flag to skip pre-fill useEffect when extracting from popup (prevents overwriting newly extracted values)
   const skipPreFillRef = useRef(false)
   
@@ -877,6 +879,8 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
               }
               
               setLikeSelected(true)
+              setShowLikeRetailerPopup(false)
+              setLikeRetailerMethod("url")
               
               console.log('[Modal] ✅ Filled I wish fields with extension data:', normalizedAttributes)
               toast({
@@ -899,7 +903,11 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
               if (data.title) {
                 console.log('[Modal] Setting altClippedTitle:', data.title.substring(0, 50))
                 setAltClippedTitle(data.title)
+                setAltTitle(data.title)
               }
+              if (data.url) setAltProductUrl(data.url)
+              if (data.price != null) setAltPrice(String(data.price))
+              setAltCleared(false)
               
               // Auto-fill Alternative fields with normalized attributes
               setAltAttributes(normalizedAttributes)
@@ -947,6 +955,8 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                 console.log('[Modal] ALT - ✅ Set specs from extension:', Object.keys(altSpecsFromExt))
               }
               setAltSelected(true)
+              setShowAltRetailerPopup(false)
+              setAltRetailerMethod("url")
               
               console.log('[Modal] ✅ Filled Alternative fields with extension data:', normalizedAttributes)
               console.log('[Modal] === END ALTERNATIVE ===')
@@ -1012,11 +1022,21 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                 if (data.title) setLikeClippedTitle(data.title)
                 if (Object.keys(specsFallback).length > 0) setIWishSpecs(specsFallback)
                 setLikeSelected(true)
+                setShowLikeRetailerPopup(false)
+                setLikeRetailerMethod("url")
               } else if (awaitingExtensionFor === "alt") {
                 if (data.image) setAltClippedImage(data.image)
-                if (data.title) setAltClippedTitle(data.title)
+                if (data.title) {
+                  setAltClippedTitle(data.title)
+                  setAltTitle(data.title)
+                }
+                if (data.url) setAltProductUrl(data.url)
+                if (data.price != null) setAltPrice(String(data.price))
                 if (Object.keys(specsFallback).length > 0) setAltSpecs(specsFallback)
+                setAltCleared(false)
                 setAltSelected(true)
+                setShowAltRetailerPopup(false)
+                setAltRetailerMethod("url")
               } else if (awaitingExtensionFor === "ok") {
                 if (data.image) setOkClippedImage(data.image)
                 if (data.title) setOkClippedTitle(data.title)
@@ -2074,6 +2094,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                               onClick={() => {
                                 setShowLikeRetailerPopup(true)
                                 setLikeRetailerUrl("")
+                                setLikeRetailerMethod("url")
                               }}
                               className="text-[10px] text-[#4A2F1A] font-medium hover:underline flex items-center gap-1"
                             >
@@ -2081,325 +2102,230 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                               Change Options
                             </button>
                             
-                            {/* Change Options Popup for I Wish */}
+                            {/* Change Options Popup for I Wish - matches /wishlist I Wish Change Options */}
                             {showLikeRetailerPopup && (
-                              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]" onClick={(e) => { e.stopPropagation(); setShowLikeRetailerPopup(false) }}>
-                                <div className="bg-white rounded-2xl p-6 w-[400px] max-w-[90vw] shadow-2xl border-2 border-[#DAA520]/30" onClick={(e) => e.stopPropagation()}>
-                                  <div className="flex items-center justify-between mb-4">
-                                    <h3 className="text-lg font-bold text-[#4A2F1A]">Change Product</h3>
-                                    <button type="button" onClick={() => setShowLikeRetailerPopup(false)} className="p-1 hover:bg-gray-100 rounded-full">
-                                      <X className="w-5 h-5 text-gray-500" />
+                              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]" onClick={(e) => { e.stopPropagation(); setShowLikeRetailerPopup(false); setLikeRetailerMethod("url") }}>
+                                <div className="w-[400px] max-w-[90vw] rounded-2xl shadow-2xl border-2 border-[#4A2F1A] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                                  {/* Header - matches Choose Your Preferred Options */}
+                                  <div className="h-[64px] bg-gradient-to-r from-[#6B4423] via-[#8B5A3C] to-[#6B4423] px-4 border-b-2 border-[#4A2F1A] flex items-center justify-center relative">
+                                    <h3 className="text-base font-bold text-[#F5DEB3]">Change Options</h3>
+                                    <button type="button" onClick={() => { setShowLikeRetailerPopup(false); setLikeRetailerMethod("url") }} className="absolute right-3 p-1.5 hover:bg-[#4A2F1A] rounded-full transition-colors">
+                                      <X className="w-5 h-5 text-[#F5DEB3]" />
                                     </button>
                                   </div>
-                                  
-                                  {/* Paste Product URL */}
-                                  <div className="space-y-3">
-                                    <div>
-                                      <Label className="text-sm font-semibold text-[#4A2F1A] mb-2 block">Paste Product URL</Label>
-                                      <input
-                                        type="text"
-                                        value={likeRetailerUrl}
-                                        onChange={(e) => setLikeRetailerUrl(e.target.value)}
-                                        onPaste={async (e) => {
-                                          e.preventDefault()
-                                          const pastedUrl = e.clipboardData.getData('text').trim()
-                                          if (!pastedUrl) return
-                                          setLikeRetailerUrl(pastedUrl)
-                                          
-                                          // Auto-extract after paste
-                                          setIsExtractingLikeRetailer(true)
-                                          try {
-                                            const response = await fetch('/api/ai/extract-product', {
-                                              method: 'POST',
-                                              headers: { 'Content-Type': 'application/json' },
-                                              body: JSON.stringify({ url: pastedUrl }),
-                                            })
-                                            if (response.ok) {
-                                              const data = await response.json()
-                                              console.log('[Modal] Auto-extracted product data:', data)
-                                              
-                                              skipPreFillRef.current = true
-                                              
-                                              const productTitle = data.name || data.title || data.productName || ''
-                                              const imageUrl = data.image || data.imageUrl || ''
-                                              const storeName = data.store || data.source || data.storeName || 'Unknown'
-                                              const price = data.price || 0
-                                              const originalPrice = data.originalPrice || data.listPrice || data.wasPrice || null
-                                              const rating = data.rating || null
-                                              const reviewCount = data.reviewCount || null
-                                              const amazonChoice = data.amazonChoice || data.badges?.amazonChoice || false
-                                              const bestSeller = data.bestSeller || data.badges?.bestSeller || false
-                                              
-                                              setExtractedProduct({
-                                                productName: productTitle,
-                                                description: data.description || '',
-                                                price: price,
-                                                storeName: storeName,
-                                                imageUrl: imageUrl,
-                                                productLink: data.productLink || data.url || pastedUrl,
-                                                attributes: {
-                                                  color: data.attributes?.color || null,
-                                                  size: data.attributes?.size || null,
-                                                  brand: data.attributes?.brand || data.brand || null,
-                                                  material: data.attributes?.material || null,
-                                                },
-                                              })
-                                              
-                                              setIWishTitle(productTitle)
-                                              setIWishStore(storeName)
-                                              setIWishPrice(price.toString())
-                                              setIWishOriginalPrice(originalPrice ? originalPrice.toString() : '')
-                                              setIWishRating(rating ? rating.toString() : '')
-                                              setIWishReviewCount(reviewCount ? reviewCount.toString() : '')
-                                              setIWishAmazonChoice(amazonChoice)
-                                              setIWishBestSeller(bestSeller)
-                                              
-                                              if (data.attributes && typeof data.attributes === 'object') {
-                                                const specs: Record<string, string> = {}
-                                                for (const [key, value] of Object.entries(data.attributes)) {
-                                                  if (value && typeof value === 'string' && !['color', 'size', 'style', 'configuration'].includes(key.toLowerCase())) {
-                                                    specs[key] = value
+                                  {/* Body - warm gradient, min-height so modal doesn't shrink when Clip via Extension */}
+                                  <div className="p-4 bg-gradient-to-br from-[#FEF7ED] via-[#FFF7ED] to-[#FFFBEB] max-h-[60vh] min-h-[200px] overflow-y-auto">
+                                    <div className="space-y-3">
+                                      {/* Method Toggle - Paste URL or Clip via Extension */}
+                                      <div className="flex items-center gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setLikeRetailerMethod("url")
+                                            const productUrl = extractedProduct?.productLink || likeRetailerUrl || gift?.productLink || ""
+                                            if (productUrl) window.open(addAffiliateTag(productUrl), "_blank")
+                                          }}
+                                          className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${(likeRetailerMethod === "url" || likeRetailerMethod === undefined) ? "bg-gradient-to-r from-[#B8860B] to-[#DAA520] text-white shadow-md" : "bg-white text-[#654321] border border-[#DAA520]/30 hover:border-[#DAA520]"}`}
+                                        >
+                                          <Link2 className="w-4 h-4" />
+                                          Paste Product URL
+                                        </button>
+                                        <span className="text-xs font-semibold text-[#8B6914]">OR</span>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setLikeRetailerMethod("extension")
+                                            setAwaitingExtensionFor("like")
+                                            const productUrl = extractedProduct?.productLink || likeRetailerUrl || gift?.productLink || ""
+                                            if (productUrl) window.open(addAffiliateTag(productUrl), "_blank")
+                                            toast({ title: "🐝 Extension Mode", description: "Select options on the product page, then click the Wishbee extension to clip it.", variant: "warm" })
+                                          }}
+                                          className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${likeRetailerMethod === "extension" ? "bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-white shadow-md" : "bg-white text-[#654321] border border-[#DAA520]/30 hover:border-[#DAA520]"}`}
+                                        >
+                                          <Scissors className="w-4 h-4" />
+                                          Clip via Extension
+                                        </button>
+                                      </div>
+
+                                      {/* Paste URL Option */}
+                                      {(likeRetailerMethod === "url" || likeRetailerMethod === undefined) && (
+                                        <div className="bg-white/80 rounded-lg p-3 border border-[#DAA520]/20">
+                                          <p className="text-[10px] text-[#6B4423] mb-2 italic">Select your options on the product page, then copy &amp; paste the product URL here.</p>
+                                          <div className="flex gap-2">
+                                            <input
+                                              type="text"
+                                              value={likeRetailerUrl}
+                                              onChange={(e) => setLikeRetailerUrl(e.target.value)}
+                                              onPaste={async (e) => {
+                                                e.preventDefault()
+                                                const pastedUrl = e.clipboardData.getData("text").trim()
+                                                if (!pastedUrl) return
+                                                setLikeRetailerUrl(pastedUrl)
+                                                if (!pastedUrl.startsWith("http://") && !pastedUrl.startsWith("https://")) return
+                                                setIsExtractingLikeRetailer(true)
+                                                try {
+                                                  const response = await fetch("/api/ai/extract-product", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: pastedUrl }) })
+                                                  if (response.ok) {
+                                                    const data = await response.json()
+                                                    skipPreFillRef.current = true
+                                                    const productTitle = data.name || data.title || data.productName || ""
+                                                    const imageUrl = data.image || data.imageUrl || ""
+                                                    const storeName = data.store || data.source || data.storeName || "Unknown"
+                                                    const price = data.price || 0
+                                                    const originalPrice = data.originalPrice || data.listPrice || data.wasPrice || null
+                                                    const rating = data.rating || null
+                                                    const reviewCount = data.reviewCount || null
+                                                    const amazonChoice = data.amazonChoice || data.badges?.amazonChoice || false
+                                                    const bestSeller = data.bestSeller || data.badges?.bestSeller || false
+                                                    setExtractedProduct({ productName: productTitle, description: data.description || "", price, storeName, imageUrl, productLink: data.productLink || data.url || pastedUrl, attributes: { color: data.attributes?.color ?? null, size: data.attributes?.size ?? null, brand: (data.attributes?.brand || data.brand) ?? null, material: data.attributes?.material ?? null } })
+                                                    setIWishTitle(productTitle)
+                                                    setIWishStore(storeName)
+                                                    setIWishPrice(price.toString())
+                                                    setIWishOriginalPrice(originalPrice ? originalPrice.toString() : "")
+                                                    setIWishRating(rating ? rating.toString() : "")
+                                                    setIWishReviewCount(reviewCount ? reviewCount.toString() : "")
+                                                    setIWishAmazonChoice(amazonChoice)
+                                                    setIWishBestSeller(bestSeller)
+                                                    if (data.attributes && typeof data.attributes === "object") {
+                                                      const specs: Record<string, string> = {}
+                                                      for (const [k, v] of Object.entries(data.attributes)) { if (v && typeof v === "string" && !["color", "size", "style", "configuration"].includes(k.toLowerCase())) specs[k] = v }
+                                                      if (Object.keys(specs).length > 0) setIWishSpecs(specs)
+                                                    }
+                                                    setLikeClippedImage(imageUrl)
+                                                    setLikeClippedTitle(productTitle)
+                                                    setLikeColor("")
+                                                    setLikeSize("")
+                                                    setLikeStyle("")
+                                                    setLikeConfiguration("")
+                                                    const extractedColor = data.color || data.attributes?.color || data.styleName || data.attributes?.styleName || ""
+                                                    const extractedSize = data.size || data.attributes?.size || data.screenSize || data.attributes?.screenSize || data.attributes?.memoryStorageCapacity || data.attributes?.storageCapacity || ""
+                                                    const extractedStyle = data.style || data.attributes?.style || ""
+                                                    const extractedConfig = data.configuration || data.attributes?.configuration || data.attributes?.appleCarePlus || ""
+                                                    if (isValidVariantValue(extractedColor)) setLikeColor(extractedColor)
+                                                    if (isValidVariantValue(extractedSize)) setLikeSize(extractedSize)
+                                                    if (isValidVariantValue(extractedStyle)) setLikeStyle(extractedStyle)
+                                                    if (isValidVariantValue(extractedConfig)) setLikeConfiguration(extractedConfig)
+                                                    setIWishProductUrl(pastedUrl)
+                                                    setIWishCleared(false)
+                                                    setLikeSelected(true)
+                                                    setShowLikeRetailerPopup(false)
+                                                    toast({ title: "🐝 Product Extracted!", description: "I Wish product replaced with new product.", variant: "warm" })
                                                   }
+                                                } catch (err) {
+                                                  console.error("[Modal] Auto-extract error:", err)
+                                                  toast({ title: "Extraction Failed", description: "Could not extract product details.", variant: "destructive" })
+                                                } finally {
+                                                  setIsExtractingLikeRetailer(false)
                                                 }
-                                                if (Object.keys(specs).length > 0) {
-                                                  setIWishSpecs(specs)
+                                              }}
+                                              placeholder="Paste product link to extract product details"
+                                              className="w-full px-3 py-2 border-2 border-[#DAA520]/30 rounded-lg focus:border-[#DAA520] focus:ring-2 focus:ring-amber-200 text-xs flex-1 bg-white"
+                                            />
+                                            <button
+                                              type="button"
+                                              onClick={async () => {
+                                                if (!likeRetailerUrl.trim()) return
+                                                setIsExtractingLikeRetailer(true)
+                                                try {
+                                                  const response = await fetch("/api/ai/extract-product", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: likeRetailerUrl }) })
+                                                  if (response.ok) {
+                                                    const data = await response.json()
+                                                    skipPreFillRef.current = true
+                                                    const productTitle = data.name || data.title || data.productName || ""
+                                                    const imageUrl = data.image || data.imageUrl || ""
+                                                    const storeName = data.store || data.source || data.storeName || "Unknown"
+                                                    const price = data.price || 0
+                                                    const rating = data.rating || null
+                                                    const reviewCount = data.reviewCount || null
+                                                    const amazonChoice = data.amazonChoice || data.badges?.amazonChoice || false
+                                                    const bestSeller = data.bestSeller || data.badges?.bestSeller || false
+                                                    setExtractedProduct({ productName: productTitle, description: data.description || "", price, storeName, imageUrl, productLink: data.productLink || data.url || likeRetailerUrl, attributes: { color: data.attributes?.color ?? null, size: data.attributes?.size ?? null, brand: (data.attributes?.brand || data.brand) ?? null, material: data.attributes?.material ?? null } })
+                                                    setIWishTitle(productTitle)
+                                                    setIWishStore(storeName)
+                                                    setIWishPrice(price.toString())
+                                                    setIWishRating(rating ? rating.toString() : "")
+                                                    setIWishReviewCount(reviewCount ? reviewCount.toString() : "")
+                                                    setIWishAmazonChoice(amazonChoice)
+                                                    setIWishBestSeller(bestSeller)
+                                                    if (data.attributes && typeof data.attributes === "object") {
+                                                      const specs: Record<string, string> = {}
+                                                      for (const [k, v] of Object.entries(data.attributes)) { if (v && typeof v === "string" && !["color", "size", "style", "configuration"].includes(k.toLowerCase())) specs[k] = v }
+                                                      if (Object.keys(specs).length > 0) setIWishSpecs(specs)
+                                                    }
+                                                    setLikeClippedImage(imageUrl)
+                                                    setLikeClippedTitle(productTitle)
+                                                    setLikeColor("")
+                                                    setLikeSize("")
+                                                    setLikeStyle("")
+                                                    setLikeConfiguration("")
+                                                    setLikeCapacity("")
+                                                    const extractedColor = data.color || data.attributes?.color || data.selectedColor || data.variants?.color || data.styleName || data.attributes?.styleName || ""
+                                                    const extractedSize = data.size || data.attributes?.size || data.selectedSize || data.variants?.size || data.attributes?.screenSize || ""
+                                                    const extractedStyle = data.style || data.attributes?.style || data.selectedStyle || data.variants?.style || ""
+                                                    const extractedConfig = data.configuration || data.attributes?.configuration || data.selectedConfiguration || data.variants?.configuration || data.attributes?.appleCarePlus || ""
+                                                    const extractedCapacity = data.capacity || data.attributes?.capacity || ""
+                                                    if (isValidVariantValue(extractedColor)) setLikeColor(extractedColor)
+                                                    if (isValidVariantValue(extractedSize)) setLikeSize(extractedSize)
+                                                    if (isValidVariantValue(extractedStyle)) setLikeStyle(extractedStyle)
+                                                    if (isValidVariantValue(extractedConfig)) setLikeConfiguration(extractedConfig)
+                                                    if (isValidVariantValue(extractedCapacity)) setLikeCapacity(extractedCapacity)
+                                                    setIWishProductUrl(likeRetailerUrl)
+                                                    setIWishCleared(false)
+                                                    setLikeSelected(true)
+                                                    setShowLikeRetailerPopup(false)
+                                                    setLikeRetailerUrl("")
+                                                    toast({ title: "🐝 Product Extracted!", description: "I Wish product replaced with new product.", variant: "warm" })
+                                                  }
+                                                } catch (err) {
+                                                  console.error("[Modal] Extract error:", err)
+                                                  toast({ title: "Extraction Failed", description: "Could not extract product details.", variant: "destructive" })
+                                                } finally {
+                                                  setIsExtractingLikeRetailer(false)
                                                 }
-                                              }
-                                              
-                                              setLikeClippedImage(imageUrl)
-                                              setLikeClippedTitle(productTitle)
-                                              
-                                              setLikeColor('')
-                                              setLikeSize('')
-                                              setLikeStyle('')
-                                              setLikeConfiguration('')
-                                              
-                                              const extractedColor = data.color || data.attributes?.color || data.styleName || data.attributes?.styleName || ''
-                                              const extractedSize = data.size || data.attributes?.size || data.screenSize || data.attributes?.screenSize || data.attributes?.memoryStorageCapacity || data.attributes?.storageCapacity || ''
-                                              const extractedStyle = data.style || data.attributes?.style || ''
-                                              const extractedConfig = data.configuration || data.attributes?.configuration || data.attributes?.appleCarePlus || ''
-                                              
-                                              // Log all possible size locations for debugging
-                                              console.log('[Modal] Size debug:', { 
-                                                'data.size': data.size, 
-                                                'data.attributes?.size': data.attributes?.size, 
-                                                'data.screenSize': data.screenSize,
-                                                'data.attributes?.screenSize': data.attributes?.screenSize,
-                                                extractedSize 
-                                              })
-                                              console.log('[Modal] Popup extracted variants:', { extractedColor, extractedSize, extractedStyle, extractedConfig })
-                                              console.log('[Modal] Validation results:', { 
-                                                colorValid: isValidVariantValue(extractedColor), 
-                                                sizeValid: isValidVariantValue(extractedSize), 
-                                                styleValid: isValidVariantValue(extractedStyle), 
-                                                configValid: isValidVariantValue(extractedConfig) 
-                                              })
-                                              
-                                              // Only set variant values if they pass validation (not garbage)
-                                              if (isValidVariantValue(extractedColor)) setLikeColor(extractedColor)
-                                              if (isValidVariantValue(extractedSize)) setLikeSize(extractedSize)
-                                              if (isValidVariantValue(extractedStyle)) setLikeStyle(extractedStyle)
-                                              if (isValidVariantValue(extractedConfig)) setLikeConfiguration(extractedConfig)
-                                              
-                                              setIWishProductUrl(pastedUrl)
-                                              setIWishCleared(false)
-                                              setLikeSelected(true)
+                                              }}
+                                              disabled={isExtractingLikeRetailer || !likeRetailerUrl.trim()}
+                                              className="bg-gradient-to-r from-[#B8860B] to-[#DAA520] text-white hover:from-[#DAA520] hover:to-[#B8860B] whitespace-nowrap px-3 py-2 rounded-lg font-semibold text-xs disabled:opacity-50"
+                                            >
+                                              {isExtractingLikeRetailer ? <><Loader2 className="w-3 h-3 animate-spin inline mr-1" />Extracting...</> : <><Sparkles className="w-3 h-3 inline mr-1" />AI Extract</>}
+                                            </button>
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      {/* Clip via Extension - keep modal height consistent */}
+                                      {likeRetailerMethod === "extension" && (
+                                        <div className="bg-white/80 rounded-lg p-4 border border-[#DAA520]/20 flex flex-col items-center">
+                                          {/* Listening for clip... - pill badge with icon */}
+                                          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-[#D97706] bg-[#FFF4E6] mb-3">
+                                            <Loader2 className="w-4 h-4 text-[#D97706] animate-spin" />
+                                            <span className="text-xs font-semibold text-[#6B4423]">Listening for clip...</span>
+                                          </div>
+                                          <p className="text-[10px] text-[#6B4423] mb-3 italic text-center">
+                                            Select your options on the product page, then click the Wishbee extension to clip it.
+                                          </p>
+                                          <p className="text-[10px] text-[#6B4423]/80 mb-4 text-center">
+                                            Don&apos;t have the extension?{' '}
+                                            <a href="https://wishbee.ai/extension" target="_blank" rel="noopener noreferrer" className="text-[#DAA520] font-semibold hover:underline">
+                                              Get it free →
+                                            </a>
+                                          </p>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
                                               setShowLikeRetailerPopup(false)
-                                              
-                                              toast({
-                                                title: "🐝 Product Extracted!",
-                                                description: "I Wish product replaced with new product.",
-                                                variant: "warm",
-                                              })
-                                            }
-                                          } catch (err) {
-                                            console.error('[Modal] Auto-extract error:', err)
-                                            toast({
-                                              title: "Extraction Failed",
-                                              description: "Could not extract product details.",
-                                              variant: "destructive",
-                                            })
-                                          } finally {
-                                            setIsExtractingLikeRetailer(false)
-                                          }
-                                        }}
-                                        placeholder="Paste product link to extract product details"
-                                        className="w-full px-3 py-2.5 text-sm border-2 border-[#DAA520]/30 rounded-lg focus:outline-none focus:border-[#DAA520] bg-[#FFF8DC]/30"
-                                      />
-                                      {isExtractingLikeRetailer && (
-                                        <div className="flex items-center gap-2 mt-2 text-sm text-[#DAA520]">
-                                          <Loader2 className="w-4 h-4 animate-spin" />
-                                          <span>Extracting product details...</span>
+                                              setLikeRetailerMethod("url")
+                                              setAwaitingExtensionFor(null)
+                                            }}
+                                            className="text-xs text-red-500 hover:text-red-700 font-medium transition-colors"
+                                          >
+                                            Cancel
+                                          </button>
                                         </div>
                                       )}
                                     </div>
-                                    
-                                    <Button
-                                      type="button"
-                                      disabled={!likeRetailerUrl || isExtractingLikeRetailer}
-                                      onClick={async () => {
-                                        if (!likeRetailerUrl) return
-                                        setIsExtractingLikeRetailer(true)
-                                        try {
-                                          const response = await fetch('/api/ai/extract-product', {
-                                            method: 'POST',
-                                            headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({ url: likeRetailerUrl }),
-                                          })
-                                          if (response.ok) {
-                                            const data = await response.json()
-                                            console.log('[Modal] Extracted product data:', data)
-                                            
-                                            // SET FLAG TO SKIP PRE-FILL BEFORE updating extractedProduct
-                                            // This prevents the useEffect from overwriting our newly extracted values
-                                            skipPreFillRef.current = true
-                                            console.log('[Modal] Set skipPreFillRef to true')
-                                            
-                                            // Extract values from response
-                                            const productTitle = data.name || data.title || data.productName || ''
-                                            const imageUrl = data.image || data.imageUrl || ''
-                                            const storeName = data.store || data.source || data.storeName || 'Unknown'
-                                            const price = data.price || 0
-                                            const rating = data.rating || null
-                                            const reviewCount = data.reviewCount || null
-                                            const amazonChoice = data.amazonChoice || data.badges?.amazonChoice || false
-                                            const bestSeller = data.bestSeller || data.badges?.bestSeller || false
-                                            
-                                            // Update the main extracted product
-                                            setExtractedProduct({
-                                              productName: productTitle,
-                                              description: data.description || '',
-                                              price: price,
-                                              storeName: storeName,
-                                              imageUrl: imageUrl,
-                                              productLink: data.productLink || data.url || likeRetailerUrl,
-                                              attributes: {
-                                                color: data.attributes?.color || null,
-                                                size: data.attributes?.size || null,
-                                                brand: data.attributes?.brand || data.brand || null,
-                                                material: data.attributes?.material || null,
-                                              },
-                                            })
-                                            
-                                            // Update ALL I Wish display states
-                                            setIWishTitle(productTitle)
-                                            setIWishStore(storeName)
-                                            setIWishPrice(price.toString())
-                                            setIWishRating(rating ? rating.toString() : '')
-                                            setIWishReviewCount(reviewCount ? reviewCount.toString() : '')
-                                            setIWishAmazonChoice(amazonChoice)
-                                            setIWishBestSeller(bestSeller)
-                                            
-                                            // Update specs if available
-                                            if (data.attributes && typeof data.attributes === 'object') {
-                                              const specs: Record<string, string> = {}
-                                              for (const [key, value] of Object.entries(data.attributes)) {
-                                                if (value && typeof value === 'string' && !['color', 'size', 'style', 'configuration'].includes(key.toLowerCase())) {
-                                                  specs[key] = value
-                                                }
-                                              }
-                                              if (Object.keys(specs).length > 0) {
-                                                setIWishSpecs(specs)
-                                              }
-                                            }
-                                            
-                                            // Update clipped data for display
-                                            setLikeClippedImage(imageUrl)
-                                            setLikeClippedTitle(productTitle)
-                                            
-                                            // ALWAYS clear old variant values first when replacing product
-                                            setLikeColor('')
-                                            setLikeSize('')
-                                            setLikeStyle('')
-                                            setLikeConfiguration('')
-                                            setLikeCapacity('')
-                                            
-                                            // Check multiple locations for variant options (Apple Watch uses styleName for color)
-                                            const extractedColor = data.color || data.attributes?.color || data.selectedColor || data.variants?.color || data.styleName || data.attributes?.styleName || ''
-                                            const extractedSize = data.size || data.attributes?.size || data.selectedSize || data.variants?.size || data.attributes?.screenSize || ''
-                                            const extractedStyle = data.style || data.attributes?.style || data.selectedStyle || data.variants?.style || ''
-                                            const extractedConfig = data.configuration || data.attributes?.configuration || data.selectedConfiguration || data.variants?.configuration || data.attributes?.appleCarePlus || ''
-                                            const extractedCapacity = data.capacity || data.attributes?.capacity || ''
-                                            
-                                            // Log full data for debugging
-                                            console.log('[Modal] Full extracted data:', JSON.stringify(data, null, 2))
-                                            
-                                            console.log('[Modal] Extracted variants:', { extractedColor, extractedSize, extractedStyle, extractedConfig, extractedCapacity })
-                                            
-                                            // Set new variant values only if they pass validation (not garbage)
-                                            if (isValidVariantValue(extractedColor)) setLikeColor(extractedColor)
-                                            if (isValidVariantValue(extractedSize)) setLikeSize(extractedSize)
-                                            if (isValidVariantValue(extractedStyle)) setLikeStyle(extractedStyle)
-                                            if (isValidVariantValue(extractedConfig)) setLikeConfiguration(extractedConfig)
-                                            if (isValidVariantValue(extractedCapacity)) setLikeCapacity(extractedCapacity)
-                                            
-                                            // Update URL state
-                                            setIWishProductUrl(likeRetailerUrl)
-                                            setIWishCleared(false)
-                                            setLikeSelected(true)
-                                            setShowLikeRetailerPopup(false)
-                                            
-                                            toast({
-                                              title: "🐝 Product Extracted!",
-                                              description: "I Wish product replaced with new product.",
-                                              variant: "warm",
-                                            })
-                                          }
-                                        } catch (err) {
-                                          console.error('[Modal] Extract error:', err)
-                                          toast({
-                                            title: "Extraction Failed",
-                                            description: "Could not extract product details.",
-                                            variant: "destructive",
-                                          })
-                                        } finally {
-                                          setIsExtractingLikeRetailer(false)
-                                        }
-                                      }}
-                                      className="w-full h-10 bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#4A2F1A] font-semibold rounded-lg hover:from-[#F4C430] hover:to-[#DAA520] transition-all"
-                                    >
-                                      {isExtractingLikeRetailer ? (
-                                        <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Extracting...</>
-                                      ) : (
-                                        <><Sparkles className="w-4 h-4 mr-2" /> AI Extract</>
-                                      )}
-                                    </Button>
-                                    
-                                    {/* OR Divider */}
-                                    <div className="flex items-center gap-3 my-4">
-                                      <div className="flex-1 h-px bg-[#DAA520]/30"></div>
-                                      <span className="text-sm font-medium text-[#8B6914]">OR</span>
-                                      <div className="flex-1 h-px bg-[#DAA520]/30"></div>
-                                    </div>
-                                    
-                                    {/* Clip via Extension */}
-                                    <Button
-                                      type="button"
-                                      onClick={() => {
-                                        if (extractedProduct?.productLink) {
-                                          const url = addAffiliateTag(extractedProduct.productLink)
-                                          window.open(url, '_blank')
-                                          setLikeSelected(true)
-                                          setLikeClippedImage(null)
-                                          setLikeClippedTitle(null)
-                                          setLikeStyle("")
-                                          setLikeColor("")
-                                          setLikeSize("")
-                                          setLikeConfiguration("")
-                                          setAwaitingExtensionFor("like")
-                                          setShowLikeRetailerPopup(false)
-                                          toast({
-                                            title: "🐝 Extension Mode",
-                                            description: "Select options on the retailer page, then click the extension.",
-                                            variant: "warm",
-                                          })
-                                        }
-                                      }}
-                                      className="w-full h-10 bg-gradient-to-r from-[#8B4513] to-[#A0522D] text-white font-semibold rounded-lg hover:from-[#A0522D] hover:to-[#8B4513] transition-all"
-                                    >
-                                      <Scissors className="w-4 h-4 mr-2" /> Clip via Extension
-                                    </Button>
                                   </div>
+                                  {/* Footer - matches Choose Your Preferred Options */}
+                                  <div className="h-[48px] bg-gradient-to-r from-[#6B4423] via-[#8B5A3C] to-[#6B4423] border-t-2 border-[#4A2F1A]" />
                                 </div>
                               </div>
                             )}
@@ -3315,6 +3241,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                               onClick={() => {
                                 setShowAltRetailerPopup(true)
                                 setAltRetailerUrl("")
+                                setAltRetailerMethod("url")
                               }}
                               className="text-[10px] text-[#4A2F1A] font-medium hover:underline flex items-center gap-1"
                             >
@@ -3322,31 +3249,66 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                               Change Options
                             </button>
                             
-                            {/* Change Product Popup for Alternative */}
+                            {/* Change Options Popup for Alternative - same UI as I Wish */}
                             {showAltRetailerPopup && (
-                              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]" onClick={(e) => { e.stopPropagation(); setShowAltRetailerPopup(false) }}>
-                                <div className="bg-white rounded-2xl p-6 w-[400px] max-w-[90vw] shadow-2xl border-2 border-[#D97706]/30" onClick={(e) => e.stopPropagation()}>
-                                  <div className="flex items-center justify-between mb-4">
-                                    <h3 className="text-lg font-bold text-[#4A2F1A]">Change Alternative Product</h3>
-                                    <button type="button" onClick={() => setShowAltRetailerPopup(false)} className="p-1 hover:bg-gray-100 rounded-full">
-                                      <X className="w-5 h-5 text-gray-500" />
+                              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]" onClick={(e) => { e.stopPropagation(); setShowAltRetailerPopup(false); setAltRetailerMethod("url") }}>
+                                <div className="w-[400px] max-w-[90vw] rounded-2xl shadow-2xl border-2 border-[#4A2F1A] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                                  {/* Header - matches Choose Your Preferred Options */}
+                                  <div className="h-[64px] bg-gradient-to-r from-[#6B4423] via-[#8B5A3C] to-[#6B4423] px-4 border-b-2 border-[#4A2F1A] flex items-center justify-center relative">
+                                    <h3 className="text-base font-bold text-[#F5DEB3]">Change Options</h3>
+                                    <button type="button" onClick={() => { setShowAltRetailerPopup(false); setAltRetailerMethod("url") }} className="absolute right-3 p-1.5 hover:bg-[#4A2F1A] rounded-full transition-colors">
+                                      <X className="w-5 h-5 text-[#F5DEB3]" />
                                     </button>
                                   </div>
-                                  
-                                  {/* Paste Product URL */}
-                                  <div className="space-y-3">
-                                    <div>
-                                      <Label className="text-sm font-semibold text-[#4A2F1A] mb-2 block">Paste Product URL</Label>
-                                      <input
+                                  {/* Body - warm gradient, min-height so modal doesn't shrink when Clip via Extension */}
+                                  <div className="p-4 bg-gradient-to-br from-[#FEF7ED] via-[#FFF7ED] to-[#FFFBEB] max-h-[60vh] min-h-[200px] overflow-y-auto">
+                                    <div className="space-y-3">
+                                      {/* Method Toggle - Paste URL or Clip via Extension */}
+                                      <div className="flex items-center gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setAltRetailerMethod("url")
+                                            const productUrl = extractedProduct?.productLink || altRetailerUrl || gift?.productLink || ""
+                                            if (productUrl) window.open(addAffiliateTag(productUrl), "_blank")
+                                          }}
+                                          className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${(altRetailerMethod === "url" || altRetailerMethod === undefined) ? "bg-gradient-to-r from-[#B8860B] to-[#DAA520] text-white shadow-md" : "bg-white text-[#654321] border border-[#DAA520]/30 hover:border-[#DAA520]"}`}
+                                        >
+                                          <Link2 className="w-4 h-4" />
+                                          Paste Product URL
+                                        </button>
+                                        <span className="text-xs font-semibold text-[#8B6914]">OR</span>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setAltRetailerMethod("extension")
+                                            setAwaitingExtensionFor("alt")
+                                            const productUrl = extractedProduct?.productLink || altRetailerUrl || gift?.productLink || ""
+                                            if (productUrl) window.open(addAffiliateTag(productUrl), "_blank")
+                                            toast({ title: "🐝 Extension Mode", description: "Select options on the product page, then click the Wishbee extension to clip it.", variant: "warm" })
+                                          }}
+                                          className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${altRetailerMethod === "extension" ? "bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-white shadow-md" : "bg-white text-[#654321] border border-[#DAA520]/30 hover:border-[#DAA520]"}`}
+                                        >
+                                          <Scissors className="w-4 h-4" />
+                                          Clip via Extension
+                                        </button>
+                                      </div>
+
+                                      {/* Paste URL Option */}
+                                      {(altRetailerMethod === "url" || altRetailerMethod === undefined) && (
+                                        <div className="bg-white/80 rounded-lg p-3 border border-[#DAA520]/20">
+                                          <p className="text-[10px] text-[#6B4423] mb-2 italic">Select your options on the product page, then copy &amp; paste the product URL here.</p>
+                                          <div className="flex gap-2">
+                                            <input
                                         type="text"
                                         value={altRetailerUrl}
                                         onChange={(e) => setAltRetailerUrl(e.target.value)}
                                         onPaste={async (e) => {
                                           e.preventDefault()
-                                          const pastedUrl = e.clipboardData.getData('text').trim()
+                                          const pastedUrl = e.clipboardData.getData("text").trim()
                                           if (!pastedUrl) return
                                           setAltRetailerUrl(pastedUrl)
-                                          
+                                          if (!pastedUrl.startsWith("http://") && !pastedUrl.startsWith("https://")) return
                                           // Auto-extract after paste
                                           setIsExtractingAltRetailer(true)
                                           try {
@@ -3513,51 +3475,119 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                                           }
                                         }}
                                         placeholder="Paste product link to extract product details"
-                                        className="w-full px-3 py-2.5 text-sm border-2 border-[#D97706]/30 rounded-lg focus:outline-none focus:border-[#D97706] bg-[#FFF8DC]/30"
+                                        className="w-full px-3 py-2 border-2 border-[#DAA520]/30 rounded-lg focus:border-[#DAA520] focus:ring-2 focus:ring-amber-200 text-xs flex-1 bg-white"
                                       />
-                                      {isExtractingAltRetailer && (
-                                        <div className="flex items-center gap-2 mt-2 text-sm text-[#D97706]">
-                                          <Loader2 className="w-4 h-4 animate-spin" />
-                                          <span>Extracting product details...</span>
+                                      <button
+                                        type="button"
+                                        onClick={async () => {
+                                          if (!altRetailerUrl.trim()) return
+                                          setIsExtractingAltRetailer(true)
+                                          try {
+                                            const response = await fetch("/api/ai/extract-product", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: altRetailerUrl }) })
+                                            if (response.ok) {
+                                              const data = await response.json()
+                                              const productTitle = data.name || data.title || data.productName || ""
+                                              const imageUrl = data.image || data.imageUrl || ""
+                                              const storeName = data.store || data.source || data.storeName || "Unknown"
+                                              const price = data.price || 0
+                                              const originalPrice = data.originalPrice || data.listPrice || data.wasPrice || null
+                                              const rating = data.rating || null
+                                              const reviewCount = data.reviewCount || null
+                                              const amazonChoice = data.amazonChoice || data.badges?.amazonChoice || false
+                                              const bestSeller = data.bestSeller || data.badges?.bestSeller || false
+                                              setAltTitle(productTitle)
+                                              setAltStore(storeName)
+                                              setAltPrice(price.toString())
+                                              setAltOriginalPrice(originalPrice ? originalPrice.toString() : "")
+                                              setAltRating(rating ? rating.toString() : "")
+                                              setAltReviewCount(reviewCount ? reviewCount.toString() : "")
+                                              setAltAmazonChoice(amazonChoice)
+                                              setAltBestSeller(bestSeller)
+                                              const attrs = (data.productData?.attributes ?? data.attributes) as Record<string, string> | undefined
+                                              const specData = (data.specifications ?? data.productData?.specifications) as Record<string, string> | undefined
+                                              const excludedSpecKeys = ["color", "size", "style", "brand", "sizeOptions", "colorVariants", "combinedVariants", "styleOptions", "styleName", "patternName", "configuration", "set", "capacity"]
+                                              const specs: Record<string, string> = {}
+                                              const addToSpecs = (src: Record<string, string> | undefined) => {
+                                                if (!src || typeof src !== "object") return
+                                                for (const [key, value] of Object.entries(src)) {
+                                                  if (value != null && String(value).trim() && !excludedSpecKeys.includes(key.toLowerCase())) specs[key] = String(value).trim()
+                                                }
+                                              }
+                                              addToSpecs(attrs)
+                                              addToSpecs(specData)
+                                              if (Object.keys(specs).length > 0) setAltSpecs(specs)
+                                              setAltClippedImage(imageUrl)
+                                              setAltClippedTitle(productTitle)
+                                              setAltColor("")
+                                              setAltSize("")
+                                              setAltStyle("")
+                                              setAltConfiguration("")
+                                              setAltCapacity("")
+                                              const extractedColor = data.color || data.attributes?.color || data.styleName || data.attributes?.styleName || ""
+                                              const extractedStyle = data.style || data.attributes?.style || ""
+                                              const extractedConfig = data.configuration || data.attributes?.configuration || data.attributes?.appleCarePlus || ""
+                                              const extractedCapacity = data.capacity || data.attributes?.capacity || ""
+                                              if (isValidVariantValue(extractedColor)) setAltColor(extractedColor)
+                                              if (isValidVariantValue(extractedStyle)) setAltStyle(extractedStyle)
+                                              if (isValidVariantValue(extractedConfig)) setAltConfiguration(extractedConfig)
+                                              if (isValidVariantValue(extractedCapacity)) setAltCapacity(extractedCapacity)
+                                              setAltProductUrl(altRetailerUrl)
+                                              setAltCleared(false)
+                                              setAltSelected(true)
+                                              setShowAltRetailerPopup(false)
+                                              setAltRetailerUrl("")
+                                              toast({ title: "🐝 Product Extracted!", description: "Alternative product updated.", variant: "warm" })
+                                            }
+                                          } catch (err) {
+                                            console.error("[Modal] Alt Extract error:", err)
+                                            toast({ title: "Extraction Failed", description: "Could not extract product details.", variant: "destructive" })
+                                          } finally {
+                                            setIsExtractingAltRetailer(false)
+                                          }
+                                        }}
+                                        disabled={isExtractingAltRetailer || !altRetailerUrl.trim()}
+                                        className="bg-gradient-to-r from-[#B8860B] to-[#DAA520] text-white hover:from-[#DAA520] hover:to-[#B8860B] whitespace-nowrap px-3 py-2 rounded-lg font-semibold text-xs disabled:opacity-50"
+                                      >
+                                        {isExtractingAltRetailer ? <><Loader2 className="w-3 h-3 animate-spin inline mr-1" />Extracting...</> : <><Sparkles className="w-3 h-3 inline mr-1" />AI Extract</>}
+                                      </button>
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      {/* Clip via Extension - keep modal height consistent */}
+                                      {altRetailerMethod === "extension" && (
+                                        <div className="bg-white/80 rounded-lg p-4 border border-[#DAA520]/20 flex flex-col items-center">
+                                          {/* Listening for clip... - pill badge with icon */}
+                                          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-[#D97706] bg-[#FFF4E6] mb-3">
+                                            <Loader2 className="w-4 h-4 text-[#D97706] animate-spin" />
+                                            <span className="text-xs font-semibold text-[#6B4423]">Listening for clip...</span>
+                                          </div>
+                                          <p className="text-[10px] text-[#6B4423] mb-3 italic text-center">
+                                            Select your options on the product page, then click the Wishbee extension to clip it.
+                                          </p>
+                                          <p className="text-[10px] text-[#6B4423]/80 mb-4 text-center">
+                                            Don&apos;t have the extension?{" "}
+                                            <a href="https://wishbee.ai/extension" target="_blank" rel="noopener noreferrer" className="text-[#DAA520] font-semibold hover:underline">
+                                              Get it free →
+                                            </a>
+                                          </p>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setShowAltRetailerPopup(false)
+                                              setAltRetailerMethod("url")
+                                              setAwaitingExtensionFor(null)
+                                            }}
+                                            className="text-xs text-red-500 hover:text-red-700 font-medium transition-colors"
+                                          >
+                                            Cancel
+                                          </button>
                                         </div>
                                       )}
                                     </div>
-                                    
-                                    {/* OR Divider */}
-                                    <div className="flex items-center gap-3 my-4">
-                                      <div className="flex-1 h-px bg-[#D97706]/30"></div>
-                                      <span className="text-sm font-medium text-[#92400E]">OR</span>
-                                      <div className="flex-1 h-px bg-[#D97706]/30"></div>
-                                    </div>
-                                    
-                                    {/* Clip via Extension */}
-                                    <Button
-                                      type="button"
-                                      onClick={() => {
-                                        if (extractedProduct?.productLink) {
-                                          const url = addAffiliateTag(extractedProduct.productLink)
-                                          window.open(url, '_blank')
-                                          setAltSelected(true)
-                                          setAltClippedImage(null)
-                                          setAltClippedTitle(null)
-                                          setAltStyle("")
-                                          setAltColor("")
-                                          setAltSize("")
-                                          setAltConfiguration("")
-                                          setAwaitingExtensionFor("alt")
-                                          setShowAltRetailerPopup(false)
-                                          toast({
-                                            title: "🐝 Extension Mode",
-                                            description: "Select options on the retailer page, then click the extension.",
-                                            variant: "warm",
-                                          })
-                                        }
-                                      }}
-                                      className="w-full h-10 bg-gradient-to-r from-[#D97706] to-[#F59E0B] text-white font-semibold rounded-lg hover:from-[#F59E0B] hover:to-[#D97706] transition-all"
-                                    >
-                                      <Scissors className="w-4 h-4 mr-2" /> Clip via Extension
-                                    </Button>
                                   </div>
+                                  {/* Footer - matches Choose Your Preferred Options */}
+                                  <div className="h-[48px] bg-gradient-to-r from-[#6B4423] via-[#8B5A3C] to-[#6B4423] border-t-2 border-[#4A2F1A]" />
                                 </div>
                               </div>
                             )}
@@ -4515,7 +4545,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
       {/* Alternative Price Too High Warning Dialog */}
       {showPriceWarning && (
         <div 
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]"
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110]"
           onClick={(e) => e.stopPropagation()}
         >
           <div 

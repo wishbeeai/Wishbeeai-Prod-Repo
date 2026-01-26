@@ -71,7 +71,7 @@ export async function PATCH(
     }
 
     // Update other fields stored in description JSON
-    const { giftName, storeName, rating, reviewCount, badges, originalPrice, currentPrice, specifications } = body
+    const { giftName, storeName, rating, reviewCount, badges, originalPrice, currentPrice, specifications, imageUrl } = body
     
     if (storeName !== undefined) descriptionData.storeName = storeName
     if (rating !== undefined) descriptionData.rating = rating
@@ -91,6 +91,10 @@ export async function PATCH(
     // Update list_price if currentPrice is provided (convert to cents)
     if (currentPrice !== undefined) {
       updateFields.list_price = Math.round(currentPrice * 100)
+    }
+
+    if (imageUrl !== undefined && imageUrl != null && typeof imageUrl === "string") {
+      updateFields.image_url = imageUrl
     }
 
     // Update the item

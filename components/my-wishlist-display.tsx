@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Sparkles, Share2, Trash2, ShoppingCart, AlertCircle, Plus, Pencil, X, Check, ExternalLink, Heart, Info, ChevronDown, ChevronUp, Loader2, Scissors } from "lucide-react"
+import { Sparkles, Share2, Trash2, ShoppingCart, AlertCircle, Plus, Pencil, X, Check, ExternalLink, Heart, Info, ChevronDown, ChevronUp, Loader2, Scissors, Link2 } from "lucide-react"
 import Image from "next/image"
 import { useToast } from "@/hooks/use-toast"
 import Link from "next/link"
@@ -131,11 +131,288 @@ export function MyWishlistDisplay() {
   const [showIWishChangePopup, setShowIWishChangePopup] = useState<string | null>(null)
   const [iWishChangeUrl, setIWishChangeUrl] = useState("")
   const [isExtractingIWish, setIsExtractingIWish] = useState(false)
+  const [iWishChangeMethod, setIWishChangeMethod] = useState<"url" | "extension">("url")
 
   // State for "Change Options" popup (Alternative)
   const [showAltChangePopup, setShowAltChangePopup] = useState<string | null>(null)
   const [altChangeUrl, setAltChangeUrl] = useState("")
   const [isExtractingAlt, setIsExtractingAlt] = useState(false)
+  const [altChangeMethod, setAltChangeMethod] = useState<"url" | "extension">("url")
+
+  // State for Alternative Price Too High warning
+  const [showAltPriceWarning, setShowAltPriceWarning] = useState(false)
+  const [altPriceWarningData, setAltPriceWarningData] = useState<{ altPrice: number; iWishPrice: number; itemId: string } | null>(null)
+
+  // When listening for extension clip (I Wish Change Options)
+  const [awaitingExtensionForItemId, setAwaitingExtensionForItemId] = useState<string | null>(null)
+  // When listening for extension clip (Alternative Change Options)
+  const [awaitingAltExtensionForItemId, setAwaitingAltExtensionForItemId] = useState<string | null>(null)
+
+  // Ensure method state is initialized when popup opens
+  useEffect(() => {
+    if (showIWishChangePopup !== null) {
+      setIWishChangeMethod("url")
+      setIWishChangeUrl("")
+    }
+  }, [showIWishChangePopup])
+
+  useEffect(() => {
+    if (showAltChangePopup !== null) {
+      setAltChangeMethod("url")
+      setAltChangeUrl("")
+    }
+  }, [showAltChangePopup])
+
+  // Poll for extension clip when listening (I Wish Change Options → Clip via Extension)
+  useEffect(() => {
+    if (!awaitingExtensionForItemId) return
+    let pollInterval: ReturnType<typeof setInterval> | null = null
+    let cancelled = false
+
+    const normalizeKey = (k: string) => {
+      const lower = k.toLowerCase().replace(/[_\s]+/g, "")
+      if (lower.includes("color") || lower.includes("colour")) return "Color"
+      if (lower.includes("size") || lower === "formfactor") return "Size"
+      if (lower.includes("style")) return "Style"
+      if (lower.includes("config") || lower.includes("pattern") || lower === "set") return "Configuration"
+      if (lower.includes("capacity")) return "Capacity"
+      return k.charAt(0).toUpperCase() + k.slice(1).replace(/_/g, " ")
+    }
+
+    const checkForClip = async () => {
+      if (cancelled) return
+      try {
+        const res = await fetch("/api/extension/save-variants", { method: "GET", credentials: "include" })
+        if (!res.ok || cancelled) return
+        const data = await res.json()
+        const hasVariants = data.variants && typeof data.variants === "object" && Object.keys(data.variants).length > 0
+        const hasImageOrTitle = data.image || data.title
+        if (!hasVariants && !hasImageOrTitle) return
+
+        // Stop polling immediately when clip is detected
+        if (pollInterval) {
+          clearInterval(pollInterval)
+          pollInterval = null
+        }
+        cancelled = true
+
+        const item = wishlistItems.find((i) => i.id === awaitingExtensionForItemId)
+        if (!item) {
+          setAwaitingExtensionForItemId(null)
+          setShowIWishChangePopup(null)
+          setIWishChangeMethod("url")
+          return
+        }
+
+        const variants = data.variants || {}
+        const specs = (data.specifications && typeof data.specifications === "object") ? data.specifications as Record<string, string> : {}
+        const excluded = ["color", "size", "style", "brand", "configuration", "set", "capacity"]
+        const norm: Record<string, string> = {}
+        for (const [key, value] of Object.entries(variants)) {
+          if (value && typeof value === "string") norm[normalizeKey(key)] = value
+        }
+        if (!norm["Style"] && specs["Style"]) norm["Style"] = String(specs["Style"]).trim()
+        if (!norm["Capacity"] && specs["Capacity"]) norm["Capacity"] = String(specs["Capacity"]).trim()
+
+        const priceNum = typeof data.price === "number" ? data.price : (data.price != null && data.price !== "") ? parseFloat(String(data.price)) : NaN
+        const currentPrice = !isNaN(priceNum) && priceNum >= 0 ? priceNum : item.currentPrice
+
+        const clipImage = data.image || (data as { imageUrl?: string }).imageUrl
+        const imageForItem = clipImage || item.productImageUrl
+        const iLikeImage = clipImage || item.preferenceOptions?.iLike?.image
+
+        const specObj: Record<string, string> = {}
+        for (const [k, v] of Object.entries(specs)) {
+          if (!excluded.includes(k.toLowerCase()) && v && String(v).trim()) specObj[k] = String(v).trim()
+        }
+
+        const updatedItem: WishlistItem = {
+          ...item,
+          webLink: data.url || item.webLink,
+          giftName: data.title || item.giftName,
+          productImageUrl: imageForItem,
+          currentPrice,
+          specifications: Object.keys(specObj).length > 0 ? specObj : item.specifications,
+          preferenceOptions: {
+            ...item.preferenceOptions,
+            iLike: {
+              ...item.preferenceOptions?.iLike,
+              image: iLikeImage,
+              title: data.title || item.preferenceOptions?.iLike?.title,
+              color: norm["Color"] ?? item.preferenceOptions?.iLike?.color ?? undefined,
+              size: norm["Size"] ?? item.preferenceOptions?.iLike?.size ?? undefined,
+              style: norm["Style"] ?? item.preferenceOptions?.iLike?.style ?? undefined,
+              configuration: norm["Configuration"] ?? norm["Set"] ?? item.preferenceOptions?.iLike?.configuration ?? undefined,
+            },
+          },
+        }
+
+        setWishlistItems((prev) => prev.map((i) => (i.id === awaitingExtensionForItemId ? updatedItem : i)))
+        await fetch(`/api/wishlist-items/${awaitingExtensionForItemId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            giftName: updatedItem.giftName,
+            storeName: updatedItem.storeName,
+            currentPrice: updatedItem.currentPrice,
+            originalPrice: updatedItem.originalPrice,
+            rating: updatedItem.rating,
+            reviewCount: updatedItem.reviewCount,
+            badges: updatedItem.badges,
+            specifications: updatedItem.specifications,
+            preferenceOptions: updatedItem.preferenceOptions,
+            imageUrl: imageForItem && imageForItem !== "/placeholder.svg" ? imageForItem : undefined,
+          }),
+        }).catch((e) => console.error("[Wishlist] PATCH error:", e))
+
+        // Close popup and reset state
+        setAwaitingExtensionForItemId(null)
+        setShowIWishChangePopup(null)
+        setIWishChangeMethod("url")
+        setIWishChangeUrl("")
+        toast({ title: "🐝 Product updated!", description: "I Wish options updated from extension clip.", variant: "default" })
+      } catch (e) {
+        /* ignore */
+      }
+    }
+
+    checkForClip()
+    pollInterval = setInterval(checkForClip, 2000)
+    return () => {
+      cancelled = true
+      if (pollInterval) clearInterval(pollInterval)
+    }
+  }, [awaitingExtensionForItemId, wishlistItems, toast])
+
+  // Poll for extension clip when listening (Alternative Change Options → Clip via Extension)
+  useEffect(() => {
+    if (!awaitingAltExtensionForItemId) return
+    let pollInterval: ReturnType<typeof setInterval> | null = null
+    let cancelled = false
+
+    const normalizeKey = (k: string) => {
+      const lower = k.toLowerCase().replace(/[_\s]+/g, "")
+      if (lower.includes("color") || lower.includes("colour")) return "Color"
+      if (lower.includes("size") || lower === "formfactor") return "Size"
+      if (lower.includes("style")) return "Style"
+      if (lower.includes("config") || lower.includes("pattern") || lower === "set") return "Configuration"
+      if (lower.includes("capacity")) return "Capacity"
+      return k.charAt(0).toUpperCase() + k.slice(1).replace(/_/g, " ")
+    }
+
+    const checkForClip = async () => {
+      if (cancelled) return
+      try {
+        const res = await fetch("/api/extension/save-variants", { method: "GET", credentials: "include" })
+        if (!res.ok || cancelled) return
+        const data = await res.json()
+        const hasVariants = data.variants && typeof data.variants === "object" && Object.keys(data.variants).length > 0
+        const hasImageOrTitle = data.image || data.title
+        if (!hasVariants && !hasImageOrTitle) return
+
+        // Stop polling immediately when clip is detected
+        if (pollInterval) {
+          clearInterval(pollInterval)
+          pollInterval = null
+        }
+        cancelled = true
+
+        const item = wishlistItems.find((i) => i.id === awaitingAltExtensionForItemId)
+        if (!item) {
+          setAwaitingAltExtensionForItemId(null)
+          setShowAltChangePopup(null)
+          setAltChangeMethod("url")
+          return
+        }
+
+        const variants = data.variants || {}
+        const specs = (data.specifications && typeof data.specifications === "object") ? data.specifications as Record<string, string> : {}
+        const excluded = ["color", "size", "style", "brand", "configuration", "set", "capacity"]
+        const norm: Record<string, string> = {}
+        for (const [key, value] of Object.entries(variants)) {
+          if (value && typeof value === "string") norm[normalizeKey(key)] = value
+        }
+        if (!norm["Style"] && specs["Style"]) norm["Style"] = String(specs["Style"]).trim()
+        if (!norm["Capacity"] && specs["Capacity"]) norm["Capacity"] = String(specs["Capacity"]).trim()
+
+        const priceNum = typeof data.price === "number" ? data.price : (data.price != null && data.price !== "") ? parseFloat(String(data.price)) : NaN
+        const altPrice = !isNaN(priceNum) && priceNum >= 0 ? priceNum : (item.preferenceOptions?.alternative as any)?.currentPrice || (item.preferenceOptions?.alternative as any)?.price || null
+
+        // Check if Alternative price is higher than I Wish price
+        if (altPrice && checkAltPriceAndWarn(altPrice, item.id, item)) {
+          // Price warning shown - don't update yet, wait for user to choose another
+          setAwaitingAltExtensionForItemId(null)
+          setShowAltChangePopup(null)
+          setAltChangeMethod("url")
+          return
+        }
+
+        const clipImage = data.image || (data as { imageUrl?: string }).imageUrl
+        const altImage = clipImage || (item.preferenceOptions?.alternative as any)?.image || ""
+
+        const specObj: Record<string, string> = {}
+        for (const [k, v] of Object.entries(specs)) {
+          if (!excluded.includes(k.toLowerCase()) && v && String(v).trim()) specObj[k] = String(v).trim()
+        }
+
+        const updatedItem: WishlistItem = {
+          ...item,
+          preferenceOptions: {
+            ...item.preferenceOptions,
+            alternative: {
+              ...(item.preferenceOptions?.alternative as any),
+              image: altImage,
+              title: data.title || (item.preferenceOptions?.alternative as any)?.title || "",
+              color: norm["Color"] ?? (item.preferenceOptions?.alternative as any)?.color ?? "",
+              size: norm["Size"] ?? (item.preferenceOptions?.alternative as any)?.size ?? "",
+              style: norm["Style"] ?? (item.preferenceOptions?.alternative as any)?.style ?? "",
+              configuration: norm["Configuration"] ?? norm["Set"] ?? (item.preferenceOptions?.alternative as any)?.configuration ?? "",
+              specifications: Object.keys(specObj).length > 0 ? specObj : (item.preferenceOptions?.alternative as any)?.specifications || {},
+              currentPrice: altPrice,
+            },
+          },
+        }
+
+        setWishlistItems((prev) => prev.map((i) => (i.id === awaitingAltExtensionForItemId ? updatedItem : i)))
+        await fetch(`/api/wishlist-items/${awaitingAltExtensionForItemId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            preferenceOptions: updatedItem.preferenceOptions,
+          }),
+        }).catch((e) => console.error("[Wishlist] PATCH error:", e))
+
+        // Close popup and reset state
+        setAwaitingAltExtensionForItemId(null)
+        setShowAltChangePopup(null)
+        setAltChangeMethod("url")
+        setAltChangeUrl("")
+        toast({ title: "🐝 Product updated!", description: "Alternative options updated from extension clip.", variant: "default" })
+      } catch (e) {
+        /* ignore */
+      }
+    }
+
+    checkForClip()
+    pollInterval = setInterval(checkForClip, 2000)
+    return () => {
+      cancelled = true
+      if (pollInterval) clearInterval(pollInterval)
+    }
+  }, [awaitingAltExtensionForItemId, wishlistItems, toast])
+
+  // Price validation: Check if Alternative price is higher than I Wish price
+  const checkAltPriceAndWarn = (altPriceValue: number | null | undefined, itemId: string, item: WishlistItem) => {
+    const iWishPriceNum = item.currentPrice || 0
+    const altPriceNum = altPriceValue || 0
+    
+    if (altPriceNum > 0 && iWishPriceNum > 0 && altPriceNum > iWishPriceNum) {
+      setAltPriceWarningData({ altPrice: altPriceNum, iWishPrice: iWishPriceNum, itemId })
+      setShowAltPriceWarning(true)
+      return true // Price is too high
+    }
+    return false // Price is ok
+  }
 
   // Toggle collapse for Alternative section
   const toggleAltCollapse = (itemId: string) => {
@@ -861,9 +1138,10 @@ export function MyWishlistDisplay() {
                               <button
                                 type="button"
                                 onClick={() => {
-                                  setShowIWishChangePopup(item.id)
-                                  setIWishChangeUrl("")
-                                }}
+                                    setShowIWishChangePopup(item.id)
+                                    setIWishChangeUrl("")
+                                    setIWishChangeMethod("url")
+                                  }}
                                 className="text-[10px] text-[#4A2F1A] font-medium hover:underline flex items-center gap-1"
                               >
                                 <ExternalLink className="w-2.5 h-2.5" />
@@ -880,162 +1158,277 @@ export function MyWishlistDisplay() {
                             </div>
                           </div>
                           
-                          {/* Change Product Popup for I Wish */}
+                          {/* Change Options Popup for I Wish */}
                           {showIWishChangePopup === item.id && (
-                            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]" onClick={(e) => { e.stopPropagation(); setShowIWishChangePopup(null) }}>
-                              <div className="bg-white rounded-2xl p-6 w-[400px] max-w-[90vw] shadow-2xl border-2 border-[#DAA520]/30" onClick={(e) => e.stopPropagation()}>
-                                <div className="flex items-center justify-between mb-4">
-                                  <h3 className="text-lg font-bold text-[#4A2F1A]">Change Product</h3>
-                                  <button type="button" onClick={() => setShowIWishChangePopup(null)} className="p-1 hover:bg-gray-100 rounded-full">
-                                    <X className="w-5 h-5 text-gray-500" />
+                            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]" onClick={(e) => { e.stopPropagation(); setShowIWishChangePopup(null); setIWishChangeMethod("url"); setAwaitingExtensionForItemId(null) }}>
+                              <div className="w-[400px] max-w-[90vw] rounded-2xl shadow-2xl border-2 border-[#4A2F1A] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                                {/* Header - matches Choose Your Preferred Options */}
+                                <div className="h-[64px] bg-gradient-to-r from-[#6B4423] via-[#8B5A3C] to-[#6B4423] px-4 border-b-2 border-[#4A2F1A] flex items-center justify-center relative">
+                                  <h3 className="text-base font-bold text-[#F5DEB3]">Change Options</h3>
+                                  <button type="button" onClick={() => { setShowIWishChangePopup(null); setIWishChangeMethod("url"); setAwaitingExtensionForItemId(null) }} className="absolute right-3 p-1.5 hover:bg-[#4A2F1A] rounded-full transition-colors">
+                                    <X className="w-5 h-5 text-[#F5DEB3]" />
                                   </button>
                                 </div>
-                                
-                                <div className="space-y-4">
-                                  {/* Select on Retailer Button */}
-                                  {item.webLink && (
+                                {/* Body - warm gradient, min-height so modal doesn't shrink when Clip via Extension */}
+                                <div className="p-4 bg-gradient-to-br from-[#FEF7ED] via-[#FFF7ED] to-[#FFFBEB] max-h-[60vh] min-h-[200px] overflow-y-auto">
+                                <div className="space-y-3">
+                                  {/* Method Toggle - Paste URL or Clip via Extension */}
+                                  <div className="flex items-center gap-2">
                                     <button
                                       type="button"
                                       onClick={() => {
-                                        window.open(item.webLink, '_blank')
+                                        setIWishChangeMethod("url")
+                                        // Always open the product URL when button is clicked
+                                        const productUrl = item.webLink || iWishChangeUrl || ""
+                                        if (productUrl) {
+                                          window.open(productUrl, '_blank')
+                                        }
                                       }}
-                                      className="w-full h-11 bg-gradient-to-r from-[#8B4513] to-[#A0522D] text-white font-semibold rounded-xl hover:from-[#A0522D] hover:to-[#8B4513] transition-all flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
+                                      className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+                                        (iWishChangeMethod === "url" || iWishChangeMethod === undefined)
+                                          ? "bg-gradient-to-r from-[#B8860B] to-[#DAA520] text-white shadow-md"
+                                          : "bg-white text-[#654321] border border-[#DAA520]/30 hover:border-[#DAA520]"
+                                      }`}
                                     >
-                                      <ExternalLink className="w-4 h-4" />
-                                      Select on Retailer
+                                      <Link2 className="w-4 h-4" />
+                                      Paste Product URL
                                     </button>
-                                  )}
-                                  
-                                  {/* Divider */}
-                                  <div className="flex items-center gap-3">
-                                    <div className="flex-1 h-px bg-[#DAA520]/30"></div>
-                                    <span className="text-xs font-medium text-[#8B6914]">OR</span>
-                                    <div className="flex-1 h-px bg-[#DAA520]/30"></div>
-                                  </div>
-                                  
-                                  {/* URL Input */}
-                                  <input
-                                    type="text"
-                                    value={iWishChangeUrl}
-                                    onChange={(e) => setIWishChangeUrl(e.target.value)}
-                                    placeholder="Paste product link to extract product details"
-                                    className="w-full px-3 py-2.5 text-sm border-2 border-[#DAA520]/30 rounded-lg focus:outline-none focus:border-[#DAA520] bg-[#FFF8DC]/30"
-                                  />
-                                  
-                                  {/* AI Extract Button */}
-                                  <button
-                                    type="button"
-                                    disabled={!iWishChangeUrl || isExtractingIWish}
-                                    onClick={async () => {
-                                      if (!iWishChangeUrl) return
-                                      setIsExtractingIWish(true)
-                                      try {
-                                        const response = await fetch('/api/ai/extract-product', {
-                                          method: 'POST',
-                                          headers: { 'Content-Type': 'application/json' },
-                                          body: JSON.stringify({ url: iWishChangeUrl }),
+                                    <span className="text-xs font-semibold text-[#8B6914]">OR</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setIWishChangeMethod("extension")
+                                        setAwaitingExtensionForItemId(item.id)
+                                        const productUrl = item.webLink || iWishChangeUrl || ""
+                                        if (productUrl) window.open(productUrl, "_blank")
+                                        toast({
+                                          title: "🐝 Extension Mode",
+                                          description: "Select options on the product page, then click the Wishbee extension to clip it.",
                                         })
-                                        if (response.ok) {
-                                          const data = await response.json()
-                                          console.log('[Wishlist] Extracted product data:', data)
-                                          
-                                          const updatedItem = {
-                                            ...item,
-                                            webLink: iWishChangeUrl,
-                                            giftName: data.name || data.title || data.productName || item.giftName,
-                                            productImageUrl: data.image || data.imageUrl || item.productImageUrl,
-                                            storeName: data.store || data.source || data.storeName || item.storeName,
-                                            currentPrice: data.price || item.currentPrice,
-                                            originalPrice: data.originalPrice || data.listPrice || item.originalPrice,
-                                            rating: data.rating || item.rating,
-                                            reviewCount: data.reviewCount || item.reviewCount,
-                                            badges: {
-                                              amazonChoice: data.amazonChoice || data.badges?.amazonChoice || item.badges?.amazonChoice,
-                                              bestSeller: data.bestSeller || data.badges?.bestSeller || item.badges?.bestSeller,
-                                            },
-                                            specifications: data.attributes || item.specifications,
-                                            preferenceOptions: {
-                                              ...item.preferenceOptions,
-                                              iLike: {
-                                                ...item.preferenceOptions?.iLike,
-                                                image: data.image || data.imageUrl,
-                                                title: data.name || data.title || data.productName,
-                                                color: data.color || data.attributes?.color || '',
-                                                size: data.size || data.attributes?.size || data.screenSize || data.attributes?.screenSize || data.attributes?.memoryStorageCapacity || '',
-                                                style: data.style || data.attributes?.style || '',
-                                                configuration: data.configuration || data.attributes?.configuration || data.attributes?.appleCarePlus || '',
+                                      }}
+                                      className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+                                        iWishChangeMethod === "extension"
+                                          ? "bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-white shadow-md"
+                                          : "bg-white text-[#654321] border border-[#DAA520]/30 hover:border-[#DAA520]"
+                                      }`}
+                                    >
+                                      <Scissors className="w-4 h-4" />
+                                      Clip via Extension
+                                    </button>
+                                  </div>
+
+                                  {/* Paste URL Option */}
+                                  {(iWishChangeMethod === "url" || iWishChangeMethod === undefined) && (
+                                    <div className="bg-white/80 rounded-lg p-3 border border-[#DAA520]/20">
+                                      <p className="text-[10px] text-[#6B4423] mb-2 italic">
+                                        Select your options on the product page, then copy &amp; paste the product URL here.
+                                      </p>
+                                      <div className="flex gap-2">
+                                        <input
+                                          type="url"
+                                          value={iWishChangeUrl}
+                                          onChange={(e) => setIWishChangeUrl(e.target.value)}
+                                          onPaste={async (e) => {
+                                            const pastedText = e.clipboardData.getData('text').trim()
+                                            if (!pastedText) return
+                                            setIWishChangeUrl(pastedText)
+                                            if (pastedText.startsWith('http://') || pastedText.startsWith('https://')) {
+                                              e.preventDefault()
+                                              setIsExtractingIWish(true)
+                                              try {
+                                                const response = await fetch('/api/ai/extract-product', {
+                                                  method: 'POST',
+                                                  headers: { 'Content-Type': 'application/json' },
+                                                  body: JSON.stringify({ url: pastedText }),
+                                                })
+                                                if (response.ok) {
+                                                  const data = await response.json()
+                                                  const extracted = data.productData || data
+                                                  const updatedItem = {
+                                                    ...item,
+                                                    webLink: pastedText,
+                                                    giftName: extracted.productName || data.name || data.title || item.giftName,
+                                                    productImageUrl: extracted.imageUrl || data.image || data.imageUrl || item.productImageUrl,
+                                                    storeName: extracted.storeName || data.store || data.source || data.storeName || item.storeName,
+                                                    currentPrice: extracted.price || data.price || item.currentPrice,
+                                                    originalPrice: extracted.originalPrice || data.originalPrice || data.listPrice || item.originalPrice,
+                                                    rating: extracted.rating || data.rating || item.rating,
+                                                    reviewCount: extracted.reviewCount || data.reviewCount || item.reviewCount,
+                                                    badges: {
+                                                      amazonChoice: extracted.amazonChoice || data.amazonChoice || data.badges?.amazonChoice || item.badges?.amazonChoice,
+                                                      bestSeller: extracted.bestSeller || data.bestSeller || data.badges?.bestSeller || item.badges?.bestSeller,
+                                                    },
+                                                    specifications: extracted.attributes || data.attributes || item.specifications,
+                                                    preferenceOptions: {
+                                                      ...item.preferenceOptions,
+                                                      iLike: {
+                                                        ...item.preferenceOptions?.iLike,
+                                                        image: extracted.imageUrl || data.image || data.imageUrl || item.preferenceOptions?.iLike?.image,
+                                                        title: extracted.productName || data.name || data.title || data.productName || item.preferenceOptions?.iLike?.title,
+                                                        color: extracted.attributes?.color || data.color || data.attributes?.color || item.preferenceOptions?.iLike?.color,
+                                                        size: extracted.attributes?.size || data.size || data.attributes?.size || item.preferenceOptions?.iLike?.size,
+                                                        style: extracted.attributes?.style || data.style || data.attributes?.style || item.preferenceOptions?.iLike?.style,
+                                                        configuration: extracted.attributes?.configuration || data.configuration || data.attributes?.configuration || item.preferenceOptions?.iLike?.configuration,
+                                                      }
+                                                    }
+                                                  }
+                                                  setWishlistItems(prev => prev.map(i => i.id === item.id ? updatedItem : i))
+                                                  await fetch(`/api/wishlist-items/${item.id}`, {
+                                                    method: 'PATCH',
+                                                    headers: { 'Content-Type': 'application/json' },
+                                                    body: JSON.stringify({
+                                                      giftName: updatedItem.giftName,
+                                                      storeName: updatedItem.storeName,
+                                                      currentPrice: updatedItem.currentPrice,
+                                                      originalPrice: updatedItem.originalPrice,
+                                                      rating: updatedItem.rating,
+                                                      reviewCount: updatedItem.reviewCount,
+                                                      badges: updatedItem.badges,
+                                                      specifications: updatedItem.specifications,
+                                                      preferenceOptions: updatedItem.preferenceOptions,
+                                                    }),
+                                                  })
+                                                  setShowIWishChangePopup(null)
+                                                  setIWishChangeUrl("")
+                                                  toast({
+                                                    title: "🐝 Product Extracted!",
+                                                    description: "I Wish product has been updated successfully.",
+                                                    variant: "default",
+                                                  })
+                                                }
+                                              } catch (error) {
+                                                console.error('[Wishlist] Auto-extract error:', error)
+                                              } finally {
+                                                setIsExtractingIWish(false)
                                               }
                                             }
-                                          }
-                                          
-                                          setWishlistItems(prev => prev.map(i => i.id === item.id ? updatedItem : i))
-                                          
-                                          await fetch(`/api/wishlist-items/${item.id}`, {
-                                            method: 'PATCH',
-                                            headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({
-                                              giftName: updatedItem.giftName,
-                                              storeName: updatedItem.storeName,
-                                              currentPrice: updatedItem.currentPrice,
-                                              originalPrice: updatedItem.originalPrice,
-                                              rating: updatedItem.rating,
-                                              reviewCount: updatedItem.reviewCount,
-                                              badges: updatedItem.badges,
-                                              specifications: updatedItem.specifications,
-                                              preferenceOptions: updatedItem.preferenceOptions,
-                                            }),
-                                          })
-                                          
+                                          }}
+                                          placeholder="Paste product link to extract product details"
+                                          className="w-full px-3 py-2 border-2 border-[#DAA520]/30 rounded-lg focus:border-[#DAA520] focus:ring-2 focus:ring-amber-200 text-xs flex-1 bg-white"
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={async () => {
+                                            if (!iWishChangeUrl.trim()) return
+                                            setIsExtractingIWish(true)
+                                            try {
+                                              const response = await fetch('/api/ai/extract-product', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ url: iWishChangeUrl }),
+                                              })
+                                              if (response.ok) {
+                                                const data = await response.json()
+                                                const extracted = data.productData || data
+                                                const updatedItem = {
+                                                  ...item,
+                                                  webLink: iWishChangeUrl,
+                                                  giftName: extracted.productName || data.name || data.title || item.giftName,
+                                                  productImageUrl: extracted.imageUrl || data.image || data.imageUrl || item.productImageUrl,
+                                                  storeName: extracted.storeName || data.store || data.source || data.storeName || item.storeName,
+                                                  currentPrice: extracted.price || data.price || item.currentPrice,
+                                                  originalPrice: extracted.originalPrice || data.originalPrice || data.listPrice || item.originalPrice,
+                                                  rating: extracted.rating || data.rating || item.rating,
+                                                  reviewCount: extracted.reviewCount || data.reviewCount || item.reviewCount,
+                                                  badges: {
+                                                    amazonChoice: extracted.amazonChoice || data.amazonChoice || data.badges?.amazonChoice || item.badges?.amazonChoice,
+                                                    bestSeller: extracted.bestSeller || data.bestSeller || data.badges?.bestSeller || item.badges?.bestSeller,
+                                                  },
+                                                  specifications: extracted.attributes || data.attributes || item.specifications,
+                                                  preferenceOptions: {
+                                                    ...item.preferenceOptions,
+                                                    iLike: {
+                                                      ...item.preferenceOptions?.iLike,
+                                                      image: extracted.imageUrl || data.image || data.imageUrl || item.preferenceOptions?.iLike?.image,
+                                                      title: extracted.productName || data.name || data.title || data.productName || item.preferenceOptions?.iLike?.title,
+                                                      color: extracted.attributes?.color || data.color || data.attributes?.color || item.preferenceOptions?.iLike?.color,
+                                                      size: extracted.attributes?.size || data.size || data.attributes?.size || item.preferenceOptions?.iLike?.size,
+                                                      style: extracted.attributes?.style || data.style || data.attributes?.style || item.preferenceOptions?.iLike?.style,
+                                                      configuration: extracted.attributes?.configuration || data.configuration || data.attributes?.configuration || item.preferenceOptions?.iLike?.configuration,
+                                                    }
+                                                  }
+                                                }
+                                                setWishlistItems(prev => prev.map(i => i.id === item.id ? updatedItem : i))
+                                                await fetch(`/api/wishlist-items/${item.id}`, {
+                                                  method: 'PATCH',
+                                                  headers: { 'Content-Type': 'application/json' },
+                                                  body: JSON.stringify({
+                                                    giftName: updatedItem.giftName,
+                                                    storeName: updatedItem.storeName,
+                                                    currentPrice: updatedItem.currentPrice,
+                                                    originalPrice: updatedItem.originalPrice,
+                                                    rating: updatedItem.rating,
+                                                    reviewCount: updatedItem.reviewCount,
+                                                    badges: updatedItem.badges,
+                                                    specifications: updatedItem.specifications,
+                                                    preferenceOptions: updatedItem.preferenceOptions,
+                                                  }),
+                                                })
+                                                setShowIWishChangePopup(null)
+                                                setIWishChangeUrl("")
+                                                toast({
+                                                  title: "🐝 Product Extracted!",
+                                                  description: "I Wish product has been updated successfully.",
+                                                  variant: "default",
+                                                })
+                                              }
+                                            } catch (error) {
+                                              console.error('[Wishlist] Error updating I Wish product:', error)
+                                              toast({
+                                                title: "Extraction Failed",
+                                                description: "Could not extract product details.",
+                                                variant: "destructive",
+                                              })
+                                            } finally {
+                                              setIsExtractingIWish(false)
+                                            }
+                                          }}
+                                          disabled={isExtractingIWish || !iWishChangeUrl.trim()}
+                                          className="bg-gradient-to-r from-[#B8860B] to-[#DAA520] text-white hover:from-[#DAA520] hover:to-[#B8860B] whitespace-nowrap px-3 py-2 rounded-lg font-semibold text-xs disabled:opacity-50"
+                                        >
+                                          {isExtractingIWish ? (
+                                            <><Loader2 className="w-3 h-3 animate-spin inline mr-1" />Extracting...</>
+                                          ) : (
+                                            <><Sparkles className="w-3 h-3 inline mr-1" />AI Extract</>
+                                          )}
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
+                                  {/* Clip via Extension - keep modal height consistent */}
+                                  {iWishChangeMethod === "extension" && (
+                                    <div className="bg-white/80 rounded-lg p-4 border border-[#DAA520]/20 flex flex-col items-center">
+                                      {/* Listening for clip... - pill badge with icon */}
+                                      <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-[#D97706] bg-[#FFF4E6] mb-3">
+                                        <Loader2 className="w-4 h-4 text-[#D97706] animate-spin" />
+                                        <span className="text-xs font-semibold text-[#6B4423]">Listening for clip...</span>
+                                      </div>
+                                      <p className="text-[10px] text-[#6B4423] mb-3 italic text-center">
+                                        Select your options on the product page, then click the Wishbee extension to clip it.
+                                      </p>
+                                      <p className="text-[10px] text-[#6B4423]/80 mb-4 text-center">
+                                        Don&apos;t have the extension?{' '}
+                                        <a href="https://wishbee.ai/extension" target="_blank" rel="noopener noreferrer" className="text-[#DAA520] font-semibold hover:underline">
+                                          Get it free →
+                                        </a>
+                                      </p>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
                                           setShowIWishChangePopup(null)
-                                          toast({
-                                            title: "🐝 Product Updated!",
-                                            description: "I Wish product details synced successfully",
-                                            variant: "warm",
-                                          })
-                                        }
-                                      } catch (err) {
-                                        console.error('[Wishlist] Extract error:', err)
-                                        toast({
-                                          title: "Extraction Failed",
-                                          description: "Could not extract product details.",
-                                          variant: "destructive",
-                                        })
-                                      } finally {
-                                        setIsExtractingIWish(false)
-                                      }
-                                    }}
-                                    className="w-full h-10 bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#4A2F1A] font-semibold rounded-lg hover:from-[#F4C430] hover:to-[#DAA520] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                                  >
-                                    {isExtractingIWish ? (
-                                      <><Loader2 className="w-4 h-4 animate-spin" /> Extracting...</>
-                                    ) : (
-                                      <><Sparkles className="w-4 h-4" /> AI Extract</>
-                                    )}
-                                  </button>
-                                  
-                                  {/* OR Divider */}
-                                  <div className="flex items-center gap-3">
-                                    <div className="flex-1 h-px bg-[#DAA520]/30"></div>
-                                    <span className="text-sm font-medium text-[#8B6914]">OR</span>
-                                    <div className="flex-1 h-px bg-[#DAA520]/30"></div>
-                                  </div>
-                                  
-                                  {/* Clip via Extension */}
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      window.open(item.webLink, '_blank')
-                                      setShowIWishChangePopup(null)
-                                      toast({
-                                        title: "🐝 Extension Mode",
-                                        description: "Select options on the retailer page, then click the extension.",
-                                      })
-                                    }}
-                                    className="w-full h-10 bg-gradient-to-r from-[#8B4513] to-[#A0522D] text-white font-semibold rounded-lg hover:from-[#A0522D] hover:to-[#8B4513] transition-all flex items-center justify-center gap-2"
-                                  >
-                                    <Scissors className="w-4 h-4" /> Clip via Extension
-                                  </button>
+                                          setIWishChangeMethod("url")
+                                          setAwaitingExtensionForItemId(null)
+                                        }}
+                                        className="text-xs text-red-500 hover:text-red-700 font-medium transition-colors"
+                                      >
+                                        Cancel
+                                      </button>
+                                    </div>
+                                  )}
                                 </div>
+                                </div>
+                                {/* Footer - matches Choose Your Preferred Options */}
+                                <div className="h-[48px] bg-gradient-to-r from-[#6B4423] via-[#8B5A3C] to-[#6B4423] border-t-2 border-[#4A2F1A]" />
                               </div>
                             </div>
                           )}
@@ -1224,10 +1617,17 @@ export function MyWishlistDisplay() {
                             </div>
                           ) : (
                             <>
-                              {/* Product Image - Display Mode (Large, Centered) */}
+                              {/* Product Image - Display Mode (Large, Centered). Prefer I Wish option image when set (e.g. from clip). */}
                               <div className="flex justify-center mb-4">
                                 <div className="w-40 h-40 sm:w-48 sm:h-48 bg-white rounded-2xl border-2 border-[#DAA520]/30 p-3 shadow-md">
-                                  <Image src={item.productImageUrl || "/placeholder.svg"} alt={item.giftName} width={180} height={180} className="w-full h-full object-contain" />
+                                  <Image
+                                    key={(item.preferenceOptions?.iLike?.image || item.productImageUrl) || item.id}
+                                    src={(item.preferenceOptions?.iLike?.image || item.productImageUrl) || "/placeholder.svg"}
+                                    alt={item.giftName}
+                                    width={180}
+                                    height={180}
+                                    className="w-full h-full object-contain"
+                                  />
                                 </div>
                               </div>
                               
@@ -1388,6 +1788,7 @@ export function MyWishlistDisplay() {
                                   onClick={() => {
                                     setShowAltChangePopup(item.id)
                                     setAltChangeUrl("")
+                                    setAltChangeMethod("url")
                                   }}
                                   className="text-[10px] text-[#4A2F1A] font-medium hover:underline flex items-center gap-1"
                                 >
@@ -1395,149 +1796,269 @@ export function MyWishlistDisplay() {
                                   Change Options
                                 </button>
                                 
-                                {/* Change Product Popup for Alternative */}
+                                {/* Change Options Popup for Alternative */}
                                 {showAltChangePopup === item.id && (
-                                  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]" onClick={(e) => { e.stopPropagation(); setShowAltChangePopup(null) }}>
-                                    <div className="bg-white rounded-2xl p-6 w-[400px] max-w-[90vw] shadow-2xl border-2 border-[#DAA520]/30" onClick={(e) => e.stopPropagation()}>
-                                      <div className="flex items-center justify-between mb-4">
-                                        <h3 className="text-lg font-bold text-[#4A2F1A]">Change Product</h3>
-                                        <button type="button" onClick={() => setShowAltChangePopup(null)} className="p-1 hover:bg-gray-100 rounded-full">
-                                          <X className="w-5 h-5 text-gray-500" />
+                                  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]" onClick={(e) => { e.stopPropagation(); setShowAltChangePopup(null); setAltChangeMethod("url") }}>
+                                    <div className="w-[400px] max-w-[90vw] rounded-2xl shadow-2xl border-2 border-[#4A2F1A] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                                      {/* Header - matches Choose Your Preferred Options */}
+                                      <div className="h-[64px] bg-gradient-to-r from-[#6B4423] via-[#8B5A3C] to-[#6B4423] px-4 border-b-2 border-[#4A2F1A] flex items-center justify-center relative">
+                                        <h3 className="text-base font-bold text-[#F5DEB3]">Change Options</h3>
+                                        <button type="button" onClick={() => { setShowAltChangePopup(null); setAltChangeMethod("url"); setAwaitingAltExtensionForItemId(null) }} className="absolute right-3 p-1.5 hover:bg-[#4A2F1A] rounded-full transition-colors">
+                                          <X className="w-5 h-5 text-[#F5DEB3]" />
                                         </button>
                                       </div>
-                                      
-                                      <div className="space-y-4">
-                                        {/* Select on Retailer Button */}
-                                        {item.webLink && (
+                                      {/* Body - warm gradient, min-height so modal doesn't shrink when Clip via Extension */}
+                                      <div className="p-4 bg-gradient-to-br from-[#FEF7ED] via-[#FFF7ED] to-[#FFFBEB] max-h-[60vh] min-h-[200px] overflow-y-auto">
+                                      <div className="space-y-3">
+                                        {/* Method Toggle - Paste URL or Clip via Extension */}
+                                        <div className="flex items-center gap-2">
                                           <button
                                             type="button"
                                             onClick={() => {
-                                              window.open(item.webLink, '_blank')
+                                              setAltChangeMethod("url")
+                                              // Always open the product URL when button is clicked
+                                              const productUrl = item.webLink || altChangeUrl || ""
+                                              if (productUrl) {
+                                                window.open(productUrl, '_blank')
+                                              }
                                             }}
-                                            className="w-full h-11 bg-gradient-to-r from-[#8B4513] to-[#A0522D] text-white font-semibold rounded-xl hover:from-[#A0522D] hover:to-[#8B4513] transition-all flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
+                                            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+                                              (altChangeMethod === "url" || altChangeMethod === undefined)
+                                                ? "bg-gradient-to-r from-[#B8860B] to-[#DAA520] text-white shadow-md"
+                                                : "bg-white text-[#654321] border border-[#DAA520]/30 hover:border-[#DAA520]"
+                                            }`}
                                           >
-                                            <ExternalLink className="w-4 h-4" />
-                                            Select on Retailer
+                                            <Link2 className="w-4 h-4" />
+                                            Paste Product URL
                                           </button>
-                                        )}
-                                        
-                                        {/* Divider */}
-                                        <div className="flex items-center gap-3">
-                                          <div className="flex-1 h-px bg-[#DAA520]/30"></div>
-                                          <span className="text-xs font-medium text-[#8B6914]">OR</span>
-                                          <div className="flex-1 h-px bg-[#DAA520]/30"></div>
-                                        </div>
-                                        
-                                        {/* URL Input */}
-                                        <input
-                                          type="text"
-                                          value={altChangeUrl}
-                                          onChange={(e) => setAltChangeUrl(e.target.value)}
-                                          placeholder="Paste product link to extract product details"
-                                          className="w-full px-3 py-2.5 text-sm border-2 border-[#DAA520]/30 rounded-lg focus:outline-none focus:border-[#DAA520] bg-[#FFF8DC]/30"
-                                        />
-                                        
-                                        {/* AI Extract Button */}
-                                        <button
-                                          type="button"
-                                          disabled={!altChangeUrl || isExtractingAlt}
-                                          onClick={async () => {
-                                            if (!altChangeUrl) return
-                                            setIsExtractingAlt(true)
-                                            try {
-                                              const response = await fetch('/api/ai/extract-product', {
-                                                method: 'POST',
-                                                headers: { 'Content-Type': 'application/json' },
-                                                body: JSON.stringify({ url: altChangeUrl }),
+                                          <span className="text-xs font-semibold text-[#8B6914]">OR</span>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setAltChangeMethod("extension")
+                                              setAwaitingAltExtensionForItemId(item.id)
+                                              const productUrl = item.webLink || altChangeUrl || ""
+                                              if (productUrl) window.open(productUrl, "_blank")
+                                              toast({
+                                                title: "🐝 Extension Mode",
+                                                description: "Select options on the product page, then click the Wishbee extension to clip it.",
                                               })
-                                              if (response.ok) {
-                                                const data = await response.json()
-                                                console.log('[Wishlist] Extracted alt product data:', data)
-                                                
-                                                const updatedItem = {
-                                                  ...item,
-                                                  preferenceOptions: {
-                                                    ...item.preferenceOptions,
-                                                    alternative: {
-                                                      image: data.image || data.imageUrl || '',
-                                                      title: data.name || data.title || data.productName || '',
-                                                      color: data.color || data.attributes?.color || '',
-                                                      size: data.size || data.attributes?.size || data.screenSize || data.attributes?.screenSize || data.attributes?.memoryStorageCapacity || '',
-                                                      style: data.style || data.attributes?.style || '',
-                                                      configuration: data.configuration || data.attributes?.configuration || data.attributes?.appleCarePlus || '',
-                                                      specifications: data.specifications || data.attributes || {},
-                                                      storeName: data.storeName || data.store || 'Amazon',
-                                                      rating: data.rating || data.stars || null,
-                                                      reviewCount: data.reviewCount || data.reviews || null,
-                                                      badges: {
-                                                        amazonChoice: data.amazonChoice || data.badges?.amazonChoice || false,
-                                                        bestSeller: data.bestSeller || data.badges?.bestSeller || false,
-                                                      },
-                                                      originalPrice: data.originalPrice || data.listPrice || null,
-                                                      currentPrice: data.currentPrice || data.price || data.salePrice || null,
+                                            }}
+                                            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+                                              altChangeMethod === "extension"
+                                                ? "bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-white shadow-md"
+                                                : "bg-white text-[#654321] border border-[#DAA520]/30 hover:border-[#DAA520]"
+                                            }`}
+                                          >
+                                            <Scissors className="w-4 h-4" />
+                                            Clip via Extension
+                                          </button>
+                                        </div>
+
+                                        {/* Paste URL Option */}
+                                        {(altChangeMethod === "url" || altChangeMethod === undefined) && (
+                                          <div className="bg-white/80 rounded-lg p-3 border border-[#DAA520]/20">
+                                            <p className="text-[10px] text-[#6B4423] mb-2 italic">
+                                              Select your options on the product page, then copy &amp; paste the product URL here.
+                                            </p>
+                                            <div className="flex gap-2">
+                                              <input
+                                                type="url"
+                                                value={altChangeUrl}
+                                                onChange={(e) => setAltChangeUrl(e.target.value)}
+                                                onPaste={async (e) => {
+                                                  const pastedText = e.clipboardData.getData('text').trim()
+                                                  if (!pastedText) return
+                                                  setAltChangeUrl(pastedText)
+                                                  if (pastedText.startsWith('http://') || pastedText.startsWith('https://')) {
+                                                    e.preventDefault()
+                                                    setIsExtractingAlt(true)
+                                                    try {
+                                                      const response = await fetch('/api/ai/extract-product', {
+                                                        method: 'POST',
+                                                        headers: { 'Content-Type': 'application/json' },
+                                                        body: JSON.stringify({ url: pastedText }),
+                                                      })
+                                                      if (response.ok) {
+                                                        const data = await response.json()
+                                                        const extracted = data.productData || data
+                                                        const extractedAltPrice = extracted.price || data.currentPrice || data.price || data.salePrice || 0
+                                                        
+                                                        // Check if Alternative price is higher than I Wish price
+                                                        if (checkAltPriceAndWarn(extractedAltPrice, item.id, item)) {
+                                                          // Price warning shown - don't update yet, wait for user to choose another
+                                                          setIsExtractingAlt(false)
+                                                          return
+                                                        }
+                                                        
+                                                        const updatedItem = {
+                                                          ...item,
+                                                          preferenceOptions: {
+                                                            ...item.preferenceOptions,
+                                                            alternative: {
+                                                              image: extracted.imageUrl || data.image || data.imageUrl || '',
+                                                              title: extracted.productName || data.name || data.title || data.productName || '',
+                                                              color: extracted.attributes?.color || data.color || data.attributes?.color || '',
+                                                              style: extracted.attributes?.style || data.style || data.attributes?.style || '',
+                                                              configuration: extracted.attributes?.configuration || data.configuration || data.attributes?.configuration || '',
+                                                              specifications: extracted.attributes || data.specifications || data.attributes || {},
+                                                              storeName: extracted.storeName || data.storeName || data.store || 'Amazon',
+                                                              rating: extracted.rating || data.rating || data.stars || null,
+                                                              reviewCount: extracted.reviewCount || data.reviewCount || data.reviews || null,
+                                                              badges: {
+                                                                amazonChoice: extracted.amazonChoice || data.amazonChoice || data.badges?.amazonChoice || false,
+                                                                bestSeller: extracted.bestSeller || data.bestSeller || data.badges?.bestSeller || false,
+                                                              },
+                                                              originalPrice: extracted.originalPrice || data.originalPrice || data.listPrice || null,
+                                                              currentPrice: extracted.price || data.currentPrice || data.price || data.salePrice || null,
+                                                            }
+                                                          }
+                                                        }
+                                                        setWishlistItems(prev => prev.map(i => i.id === item.id ? updatedItem : i))
+                                                        await fetch(`/api/wishlist-items/${item.id}`, {
+                                                          method: 'PATCH',
+                                                          headers: { 'Content-Type': 'application/json' },
+                                                          body: JSON.stringify({
+                                                            preferenceOptions: updatedItem.preferenceOptions,
+                                                          }),
+                                                        })
+                                                        setShowAltChangePopup(null)
+                                                        setAltChangeUrl("")
+                                                        toast({
+                                                          title: "🐝 Product Extracted!",
+                                                          description: "Alternative product has been updated successfully.",
+                                                          variant: "default",
+                                                        })
+                                                      }
+                                                    } catch (error) {
+                                                      console.error('[Wishlist] Auto-extract alt error:', error)
+                                                    } finally {
+                                                      setIsExtractingAlt(false)
                                                     }
                                                   }
-                                                }
-                                                
-                                                setWishlistItems(prev => prev.map(i => i.id === item.id ? updatedItem : i))
-                                                
-                                                await fetch(`/api/wishlist-items/${item.id}`, {
-                                                  method: 'PATCH',
-                                                  headers: { 'Content-Type': 'application/json' },
-                                                  body: JSON.stringify({
-                                                    preferenceOptions: updatedItem.preferenceOptions,
-                                                  }),
-                                                })
-                                                
+                                                }}
+                                                placeholder="Paste product link to extract product details"
+                                                className="w-full px-3 py-2 border-2 border-[#DAA520]/30 rounded-lg focus:border-[#DAA520] focus:ring-2 focus:ring-amber-200 text-xs flex-1 bg-white"
+                                              />
+                                              <button
+                                                type="button"
+                                                onClick={async () => {
+                                                  if (!altChangeUrl.trim()) return
+                                                  setIsExtractingAlt(true)
+                                                  try {
+                                                    const response = await fetch('/api/ai/extract-product', {
+                                                      method: 'POST',
+                                                      headers: { 'Content-Type': 'application/json' },
+                                                      body: JSON.stringify({ url: altChangeUrl }),
+                                                    })
+                                                    if (response.ok) {
+                                                      const data = await response.json()
+                                                      const extracted = data.productData || data
+                                                      const extractedAltPrice = extracted.price || data.currentPrice || data.price || data.salePrice || 0
+                                                      
+                                                      // Check if Alternative price is higher than I Wish price
+                                                      if (checkAltPriceAndWarn(extractedAltPrice, item.id, item)) {
+                                                        // Price warning shown - don't update yet, wait for user to choose another
+                                                        setIsExtractingAlt(false)
+                                                        return
+                                                      }
+                                                      
+                                                      const updatedItem = {
+                                                        ...item,
+                                                        preferenceOptions: {
+                                                          ...item.preferenceOptions,
+                                                          alternative: {
+                                                            image: extracted.imageUrl || data.image || data.imageUrl || '',
+                                                            title: extracted.productName || data.name || data.title || data.productName || '',
+                                                            color: extracted.attributes?.color || data.color || data.attributes?.color || '',
+                                                            style: extracted.attributes?.style || data.style || data.attributes?.style || '',
+                                                            configuration: extracted.attributes?.configuration || data.configuration || data.attributes?.configuration || '',
+                                                            specifications: extracted.attributes || data.specifications || data.attributes || {},
+                                                            storeName: extracted.storeName || data.storeName || data.store || 'Amazon',
+                                                            rating: extracted.rating || data.rating || data.stars || null,
+                                                            reviewCount: extracted.reviewCount || data.reviewCount || data.reviews || null,
+                                                            badges: {
+                                                              amazonChoice: extracted.amazonChoice || data.amazonChoice || data.badges?.amazonChoice || false,
+                                                              bestSeller: extracted.bestSeller || data.bestSeller || data.badges?.bestSeller || false,
+                                                            },
+                                                            originalPrice: extracted.originalPrice || data.originalPrice || data.listPrice || null,
+                                                            currentPrice: extracted.price || data.currentPrice || data.price || data.salePrice || null,
+                                                          }
+                                                        }
+                                                      }
+                                                      setWishlistItems(prev => prev.map(i => i.id === item.id ? updatedItem : i))
+                                                      await fetch(`/api/wishlist-items/${item.id}`, {
+                                                        method: 'PATCH',
+                                                        headers: { 'Content-Type': 'application/json' },
+                                                        body: JSON.stringify({
+                                                          preferenceOptions: updatedItem.preferenceOptions,
+                                                        }),
+                                                      })
+                                                      setShowAltChangePopup(null)
+                                                      setAltChangeUrl("")
+                                                      toast({
+                                                        title: "🐝 Product Extracted!",
+                                                        description: "Alternative product has been updated successfully.",
+                                                        variant: "default",
+                                                      })
+                                                    }
+                                                  } catch (error) {
+                                                    console.error('[Wishlist] Error updating Alternative product:', error)
+                                                    toast({
+                                                      title: "Extraction Failed",
+                                                      description: "Could not extract product details.",
+                                                      variant: "destructive",
+                                                    })
+                                                  } finally {
+                                                    setIsExtractingAlt(false)
+                                                  }
+                                                }}
+                                                disabled={isExtractingAlt || !altChangeUrl.trim()}
+                                                className="bg-gradient-to-r from-[#B8860B] to-[#DAA520] text-white hover:from-[#DAA520] hover:to-[#B8860B] whitespace-nowrap px-3 py-2 rounded-lg font-semibold text-xs disabled:opacity-50"
+                                              >
+                                                {isExtractingAlt ? (
+                                                  <><Loader2 className="w-3 h-3 animate-spin inline mr-1" />Extracting...</>
+                                                ) : (
+                                                  <><Sparkles className="w-3 h-3 inline mr-1" />AI Extract</>
+                                                )}
+                                              </button>
+                                            </div>
+                                          </div>
+                                        )}
+                                        {/* Clip via Extension - keep modal height consistent */}
+                                        {altChangeMethod === "extension" && (
+                                          <div className="bg-white/80 rounded-lg p-4 border border-[#DAA520]/20 flex flex-col items-center">
+                                            {/* Listening for clip... - pill badge with icon */}
+                                            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-[#D97706] bg-[#FFF4E6] mb-3">
+                                              <Loader2 className="w-4 h-4 text-[#D97706] animate-spin" />
+                                              <span className="text-xs font-semibold text-[#6B4423]">Listening for clip...</span>
+                                            </div>
+                                            <p className="text-[10px] text-[#6B4423] mb-3 italic text-center">
+                                              Select your options on the product page, then click the Wishbee extension to clip it.
+                                            </p>
+                                            <p className="text-[10px] text-[#6B4423]/80 mb-4 text-center">
+                                              Don&apos;t have the extension?{' '}
+                                              <a href="https://wishbee.ai/extension" target="_blank" rel="noopener noreferrer" className="text-[#DAA520] font-semibold hover:underline">
+                                                Get it free →
+                                              </a>
+                                            </p>
+                                            <button
+                                              type="button"
+                                              onClick={() => {
                                                 setShowAltChangePopup(null)
-                                                toast({
-                                                  title: "🐝 Alternative Updated!",
-                                                  description: "Alternative product has been replaced.",
-                                                })
-                                              }
-                                            } catch (err) {
-                                              console.error('[Wishlist] Extract alt error:', err)
-                                              toast({
-                                                title: "Extraction Failed",
-                                                description: "Could not extract product details.",
-                                                variant: "destructive",
-                                              })
-                                            } finally {
-                                              setIsExtractingAlt(false)
-                                            }
-                                          }}
-                                          className="w-full h-10 bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#4A2F1A] font-semibold rounded-lg hover:from-[#F4C430] hover:to-[#DAA520] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                                        >
-                                          {isExtractingAlt ? (
-                                            <><Loader2 className="w-4 h-4 animate-spin" /> Extracting...</>
-                                          ) : (
-                                            <><Sparkles className="w-4 h-4" /> AI Extract</>
-                                          )}
-                                        </button>
-                                        
-                                        {/* OR Divider */}
-                                        <div className="flex items-center gap-3">
-                                          <div className="flex-1 h-px bg-[#DAA520]/30"></div>
-                                          <span className="text-sm font-medium text-[#8B6914]">OR</span>
-                                          <div className="flex-1 h-px bg-[#DAA520]/30"></div>
-                                        </div>
-                                        
-                                        {/* Clip via Extension */}
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            window.open(item.webLink, '_blank')
-                                            setShowAltChangePopup(null)
-                                            toast({
-                                              title: "🐝 Extension Mode",
-                                              description: "Select options on the retailer page, then click the extension.",
-                                            })
-                                          }}
-                                          className="w-full h-10 bg-gradient-to-r from-[#8B4513] to-[#A0522D] text-white font-semibold rounded-lg hover:from-[#A0522D] hover:to-[#8B4513] transition-all flex items-center justify-center gap-2"
-                                        >
-                                          <Scissors className="w-4 h-4" /> Clip via Extension
-                                        </button>
+                                                setAltChangeMethod("url")
+                                                setAwaitingAltExtensionForItemId(null)
+                                              }}
+                                              className="text-xs text-red-500 hover:text-red-700 font-medium transition-colors"
+                                            >
+                                              Cancel
+                                            </button>
+                                          </div>
+                                        )}
                                       </div>
+                                      </div>
+                                      {/* Footer - matches Choose Your Preferred Options */}
+                                      <div className="h-[48px] bg-gradient-to-r from-[#6B4423] via-[#8B5A3C] to-[#6B4423] border-t-2 border-[#4A2F1A]" />
                                     </div>
                                   </div>
                                 )}
@@ -1650,7 +2171,14 @@ export function MyWishlistDisplay() {
                                   {item.preferenceOptions?.alternative?.image && (
                                     <div className="flex justify-center mb-4">
                                       <div className="w-40 h-40 sm:w-48 sm:h-48 bg-white rounded-2xl border-2 border-[#D97706]/30 p-3 shadow-md">
-                                        <Image src={item.preferenceOptions.alternative.image as string || "/placeholder.svg"} alt="Alternative" width={180} height={180} className="w-full h-full object-contain" />
+                                        <Image
+                                          key={(item.preferenceOptions?.alternative as any)?.image || item.id}
+                                          src={(item.preferenceOptions?.alternative as any)?.image as string || "/placeholder.svg"}
+                                          alt="Alternative"
+                                          width={180}
+                                          height={180}
+                                          className="w-full h-full object-contain"
+                                        />
                                       </div>
                                     </div>
                                   )}
@@ -1950,6 +2478,86 @@ export function MyWishlistDisplay() {
         productId={shareItem?.id}
         productName={shareItem?.giftName}
       />
+
+      {/* Alternative Price Too High Warning Dialog */}
+      {showAltPriceWarning && (
+        <div 
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110]"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div 
+            className="sm:max-w-md w-full mx-4 border-2 border-[#D97706] bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 rounded-lg p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-center mb-4">
+              <div className="w-16 h-16 rounded-full bg-gradient-to-r from-[#D97706] to-[#F59E0B] flex items-center justify-center shadow-lg">
+                <AlertCircle className="w-8 h-8 text-white" />
+              </div>
+            </div>
+            <h3 className="text-center text-xl font-bold text-[#92400E]">
+              Alternative Price Too High
+            </h3>
+            <div className="text-center text-base pt-3 text-[#78350F]">
+              {altPriceWarningData && (
+                <div className="space-y-3">
+                  <p>
+                    Alternative option{' '}
+                    <span className="font-bold text-[#DC2626] bg-red-100 px-2 py-0.5 rounded-full">
+                      ${altPriceWarningData.altPrice.toFixed(2)}
+                    </span>{' '}
+                    is priced higher than your I Wish selection{' '}
+                    <span className="font-bold text-[#B8860B] bg-amber-100 px-2 py-0.5 rounded-full">
+                      ${altPriceWarningData.iWishPrice.toFixed(2)}
+                    </span>
+                  </p>
+                  <p className="text-sm text-[#92400E] font-medium">
+                    Please choose a lower-priced alternative.
+                  </p>
+                </div>
+              )}
+            </div>
+            {/* Footer */}
+            <div className="mt-6">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setShowAltPriceWarning(false)
+                  setAltPriceWarningData(null)
+                  // Clear Alternative data for this item so user has to select a new product
+                  if (altPriceWarningData) {
+                    const item = wishlistItems.find(i => i.id === altPriceWarningData.itemId)
+                    if (item) {
+                      const updatedItem = {
+                        ...item,
+                        preferenceOptions: {
+                          ...item.preferenceOptions,
+                          alternative: null
+                        }
+                      }
+                      setWishlistItems(prev => prev.map(i => i.id === altPriceWarningData.itemId ? updatedItem : i))
+                      fetch(`/api/wishlist-items/${altPriceWarningData.itemId}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          preferenceOptions: updatedItem.preferenceOptions,
+                        }),
+                      }).catch(err => console.error('[Wishlist] Error clearing Alternative:', err))
+                    }
+                  }
+                  // Close Change Options popup if open
+                  setShowAltChangePopup(null)
+                  setAltChangeUrl("")
+                }}
+                className="w-full h-10 text-sm bg-gradient-to-r from-[#D97706] to-[#F59E0B] text-white font-semibold rounded-full hover:from-[#F59E0B] hover:to-[#D97706] hover:scale-105 transition-all shadow-md"
+              >
+                Got it, I'll choose another
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
