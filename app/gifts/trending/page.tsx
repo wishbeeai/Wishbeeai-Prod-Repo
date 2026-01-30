@@ -177,8 +177,9 @@ export default function TrendingGiftsPage() {
     }
   }
 
-  // Check if product has MULTIPLE selectable variant options
-  // Only show modal if the product has actual choices to make (multiple colors, sizes, etc.)
+  // Check if product has variant options (multiple OR single values)
+  // Show modal if product has variant attributes (color, size, capacity, style, configuration)
+  // This allows users to specify preferences even for products with single variant values
   const hasVariantOptions = (gift: Gift): boolean => {
     // Check 1: Amazon URL with variant indicator (th=1 means variant selection page)
     // This is the most reliable indicator that a product has selectable variants
@@ -206,7 +207,7 @@ export default function TrendingGiftsPage() {
       return true
     }
     
-    // Check 3: Stored variant arrays
+    // Check 3: Stored variant arrays (multiple options)
     if (gift.attributes) {
       // Check for colorVariants array with MULTIPLE options
       const colorVariants = gift.attributes?.colorVariants
@@ -235,6 +236,31 @@ export default function TrendingGiftsPage() {
         console.log('[hasVariantOptions] Multiple combined variants found - showing modal')
         return true
       }
+      
+      // Check 4: Single variant values (color, size, capacity, style, configuration)
+      // These indicate the product has variant options that users should be able to specify
+      const hasColor = gift.attributes?.color || gift.color
+      const hasSize = gift.attributes?.size || gift.size
+      const hasCapacity = gift.attributes?.capacity || gift.capacity
+      const hasStyle = gift.attributes?.style || gift.style
+      const hasConfiguration = gift.attributes?.configuration || gift.attributes?.set || gift.configuration
+      
+      if (hasColor || hasSize || hasCapacity || hasStyle || hasConfiguration) {
+        console.log('[hasVariantOptions] Product has variant attributes (color, size, capacity, style, or configuration) - showing modal', {
+          hasColor: !!hasColor,
+          hasSize: !!hasSize,
+          hasCapacity: !!hasCapacity,
+          hasStyle: !!hasStyle,
+          hasConfiguration: !!hasConfiguration
+        })
+        return true
+      }
+    }
+    
+    // Also check top-level variant properties (from gift object directly)
+    if (gift.color || gift.size || gift.capacity || gift.style || gift.configuration) {
+      console.log('[hasVariantOptions] Product has top-level variant properties - showing modal')
+      return true
     }
     
     // No variant indicators found - add directly without modal

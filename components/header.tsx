@@ -79,8 +79,8 @@ export function Header() {
       icon: Heart,
       submenu: [
         { title: "My Wishlist", href: "/wishlist", description: "Manage your personal wishlist" },
-        { title: "Shared Wishlists", href: "/wishlist/friends", description: "Browse Shared Wishlists" },
-        { title: "Add Wishlist", href: "/wishlist/add", description: "Add new Products to your Wishlist" },
+        { title: "Friends' Wishlists", href: "/wishlist/friends", description: "Browse friends' wish items" },
+        { title: "Add Wishlist", href: "/wishlist/add", description: "Add new items to your wishlist" },
       ],
     },
     // Admin-only menu item - only show if user is admin
@@ -116,9 +116,9 @@ export function Header() {
       />
       <SignUpModal isOpen={isSignUpModalOpen} onClose={() => setIsSignUpModalOpen(false)} />
 
-      <header className="sticky top-0 z-50 bg-gradient-to-r from-[#6B4423] via-[#8B5A3C] to-[#6B4423] shadow-xl border-b-2 md:border-b-4 border-[#4A2F1A]">
+      <header className="sticky top-0 z-50 bg-gradient-to-r from-[#6B4423] via-[#8B5A3C] to-[#6B4423] shadow-xl border-b-2 md:border-b-4 border-[#4A2F1A] overflow-visible">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-14 sm:h-16 md:h-20 lg:h-24 gap-2 sm:gap-4 md:gap-8">
+          <div className="flex items-center justify-between h-14 sm:h-16 md:h-20 lg:h-24 gap-2 sm:gap-4 md:gap-8 overflow-visible">
             <Link
               href="/"
               className="flex items-center gap-0 hover:opacity-100 transition-all duration-300 group flex-shrink-0"
@@ -177,8 +177,12 @@ export function Header() {
                         )}
 
                       {item.submenu && openDropdown === item.title && (
-                        <div className="absolute top-full left-0 pt-2 w-64">
-                          <div className="bg-[#F5DEB3] rounded-lg shadow-xl border-2 border-[#4A2F1A] py-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                        <div 
+                          className="absolute top-full left-0 pt-2 w-64 z-50"
+                          onMouseEnter={() => setOpenDropdown(item.title)}
+                          onMouseLeave={() => setOpenDropdown(null)}
+                        >
+                          <div className="bg-[#F5DEB3] rounded-lg shadow-xl border-2 border-[#4A2F1A] py-2 opacity-100 transition-opacity duration-200">
                           {item.submenu.map((subitem) => (
                             <button
                               key={subitem.title}
@@ -210,7 +214,11 @@ export function Header() {
                     </button>
 
                     {openDropdown === "profile" && (
-                      <div className="absolute top-full right-0 pt-2 w-52">
+                      <div 
+                        className="absolute top-full right-0 pt-2 w-52 z-50"
+                        onMouseEnter={() => setOpenDropdown("profile")}
+                        onMouseLeave={() => setOpenDropdown(null)}
+                      >
                         <div className="bg-[#F5DEB3] rounded-lg shadow-xl border-2 border-[#4A2F1A] py-2 animate-in fade-in slide-in-from-top-2 duration-200">
                           <button
                             onClick={() => {

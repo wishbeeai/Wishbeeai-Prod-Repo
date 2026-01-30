@@ -81,38 +81,129 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json()
     
+    // Log received data for debugging
+    console.log('[trending-gifts] Received request body:', {
+      productName: body.productName,
+      price: body.price,
+      image: body.image ? 'present' : 'missing',
+      productLink: body.productLink,
+      hasAttributes: !!body.attributes
+    })
+    
     // Validate required fields
     if (!body.productName || !body.price || !body.image || !body.productLink) {
+      const missingFields = []
+      if (!body.productName) missingFields.push('productName')
+      if (!body.price) missingFields.push('price')
+      if (!body.image) missingFields.push('image')
+      if (!body.productLink) missingFields.push('productLink')
+      
+      console.error('[trending-gifts] Missing required fields:', missingFields)
       return NextResponse.json(
-        { error: 'Product name, price, image, and product link are required' },
+        { 
+          error: 'Product name, price, image, and product link are required',
+          missingFields: missingFields
+        },
         { status: 400 }
       )
     }
 
-    // Check if product already exists in database (by product_link)
-    const { data: existing } = await supabase
+    // Normalize Amazon URLs for duplicate checking (extract base URL without query params)
+    const normalizeProductLink = (url: string): string => {
+      if (!url) return url
+      try {
+        const urlObj = new URL(url)
+        // For Amazon URLs, extract just the base path (e.g., /dp/B00007G309)
+        if (urlObj.hostname.includes('amazon.com') || urlObj.hostname.includes('amazon.')) {
+          // Extract ASIN from URL patterns: /dp/ASIN, /gp/product/ASIN, etc.
+          const asinMatch = url.match(/\/(?:dp|gp\/product|product)\/([A-Z0-9]{10})(?:\/|$|\?|&)/i)
+          if (asinMatch && asinMatch[1]) {
+            // Return normalized Amazon URL with just ASIN
+            return `https://${urlObj.hostname}/dp/${asinMatch[1].toUpperCase()}`
+          }
+          // If no ASIN found, return base URL without query params
+          return `${urlObj.protocol}//${urlObj.hostname}${urlObj.pathname}`
+        }
+        // For non-Amazon URLs, remove query params and fragments
+        return `${urlObj.protocol}//${urlObj.hostname}${urlObj.pathname}`
+      } catch {
+        // If URL parsing fails, return original
+        return url
+      }
+    }
+    
+    const normalizedLink = normalizeProductLink(body.productLink)
+    
+    // Check if product already exists in database (by normalized product_link or exact match)
+    // First try exact match
+    let { data: existing } = await supabase
       .from('trending_gifts')
-      .select('id, product_name')
+      .select('id, product_name, product_link')
       .eq('product_link', body.productLink)
       .single()
     
-    // If product already exists, return a friendly error message
+    // If not found, try normalized match
+    if (!existing && normalizedLink !== body.productLink) {
+      const { data: normalizedMatch } = await supabase
+        .from('trending_gifts')
+        .select('id, product_name, product_link')
+        .eq('product_link', normalizedLink)
+        .single()
+      
+      if (normalizedMatch) {
+        existing = normalizedMatch
+      } else {
+        // Also check if any existing product_link normalizes to the same URL
+        const { data: allProducts } = await supabase
+          .from('trending_gifts')
+          .select('id, product_name, product_link')
+        
+        if (allProducts) {
+          const matchingProduct = allProducts.find(p => {
+            if (!p.product_link) return false
+            const existingNormalized = normalizeProductLink(p.product_link)
+            return existingNormalized === normalizedLink
+          })
+          if (matchingProduct) {
+            existing = matchingProduct
+          }
+        }
+      }
+    }
+    
+    // If product already exists, return a friendly error message with product info
     if (existing) {
       console.log(`[trending-gifts] Product already exists: ${existing.product_name} (${existing.id})`)
+      const errorResponse = { 
+        error: 'This product is already in Trending Gifts',
+        message: `"${existing.product_name || 'This product'}" is already added to Trending Gifts.`,
+        existing: true,
+        existingId: existing.id,
+        existingProductLink: existing.product_link
+      }
+      console.log(`[trending-gifts] Returning 409 response:`, JSON.stringify(errorResponse))
       return NextResponse.json(
+        errorResponse,
         { 
-          error: 'This product is already in Trending Gifts',
-          message: `"${existing.product_name || 'This product'}" is already added to Trending Gifts.`,
-          existing: true,
-          existingId: existing.id
-        },
-        { status: 409 } // 409 Conflict - resource already exists
+          status: 409, // 409 Conflict - resource already exists
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
       )
     }
     
     let savedGift
     
     {
+      // Normalize product link before storing (for Amazon URLs, use normalized version)
+      const linkToStore = normalizedLink || body.productLink
+      
+      console.log(`[trending-gifts] Storing product with normalized link:`, {
+        original: body.productLink,
+        normalized: linkToStore
+      })
+      
       // Insert new gift
       const { data: inserted, error: insertError } = await supabase
         .from('trending_gifts')
@@ -125,7 +216,7 @@ export async function POST(req: NextRequest) {
           original_price: body.originalPrice ? parseFloat(body.originalPrice) : null,
           rating: body.rating ? parseFloat(body.rating) : 0,
           review_count: body.reviewCount ? parseInt(body.reviewCount.toString()) : 0,
-          product_link: body.productLink,
+          product_link: linkToStore, // Store normalized link
           description: body.description || `${body.productName} from ${body.source || body.storeName || 'Unknown'}`,
           amazon_choice: body.amazonChoice || false,
           best_seller: body.bestSeller || false,
@@ -183,8 +274,12 @@ export async function POST(req: NextRequest) {
     }, { status: 201 })
   } catch (error) {
     console.error('[trending-gifts] Error adding to trending gifts:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
     return NextResponse.json(
-      { error: 'Failed to add product to trending gifts' },
+      { 
+        error: 'Failed to add product to trending gifts',
+        details: errorMessage 
+      },
       { status: 500 }
     )
   }

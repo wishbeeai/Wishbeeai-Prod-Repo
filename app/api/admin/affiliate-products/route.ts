@@ -102,12 +102,13 @@ export async function POST(req: NextRequest) {
       console.log('[API POST] Saving attributes:', JSON.stringify(attributes, null, 2))
     }
     
-    // Add variant options from body directly (style, color, size, set, configuration)
+    // Add variant options from body directly (style, color, size, set, configuration, capacity)
     if (body.style) attributes.style = body.style
     if (body.color) attributes.color = body.color
     if (body.size) attributes.size = body.size
     if (body.set) attributes.set = body.set
     if (body.configuration) attributes.configuration = body.configuration
+    if (body.capacity) attributes.capacity = body.capacity
 
     // Use the full product name (no truncation)
     const fullProductName = body.productName ? body.productName.trim() : body.productName

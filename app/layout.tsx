@@ -11,35 +11,47 @@ const poppins = Poppins({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700", "800"],
   variable: "--font-poppins",
+  display: "swap",
+  preload: true,
 })
 
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
+  display: "swap",
+  preload: true,
 })
 
 const shadowsIntoLight = Shadows_Into_Light({
   subsets: ["latin"],
   weight: ["400"],
   variable: "--font-shadows",
+  display: "swap",
+  preload: false,
 })
 
 const kalam = Kalam({
   subsets: ["latin"],
   weight: ["400"],
   variable: "--font-kalam",
+  display: "swap",
+  preload: false,
 })
 
 const dancingScript = Dancing_Script({
   subsets: ["latin"],
   weight: ["700"],
   variable: "--font-dancing",
+  display: "swap",
+  preload: false,
 })
 
 const pacifico = Pacifico({
   subsets: ["latin"],
   weight: ["400"],
   variable: "--font-pacifico",
+  display: "swap",
+  preload: false,
 })
 
 export const metadata: Metadata = {

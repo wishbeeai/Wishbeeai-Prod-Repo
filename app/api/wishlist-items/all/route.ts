@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
     // Get all wishlists for the user
     const { data: wishlists, error: wishlistsError } = await supabase
       .from("wishlists")
-      .select("id")
+      .select("id, title")
       .eq("user_id", user.id)
 
     if (wishlistsError) {
@@ -36,13 +36,18 @@ export async function GET(req: NextRequest) {
       throw wishlistsError
     }
 
+    console.log(`[Wishlist Items All] User ${user.email} has ${wishlists?.length || 0} wishlists`)
+
     if (!wishlists || wishlists.length === 0) {
+      console.log(`[Wishlist Items All] No wishlists found for user ${user.email}`)
       return NextResponse.json({ items: [] })
     }
 
     const wishlistIds = wishlists.map((w) => w.id).filter((id) => id) // Filter out any null/undefined IDs
+    console.log(`[Wishlist Items All] Wishlist IDs:`, wishlistIds)
 
     if (wishlistIds.length === 0) {
+      console.log(`[Wishlist Items All] No valid wishlist IDs found`)
       return NextResponse.json({ items: [] })
     }
 
@@ -62,8 +67,19 @@ export async function GET(req: NextRequest) {
       throw itemsError
     }
 
-    // Return empty array if no items
-    return NextResponse.json({ items: items || [] })
+    console.log(`[Wishlist Items All] Found ${items?.length || 0} items for user ${user.email}`)
+
+    // Return items (or empty array)
+    return NextResponse.json(
+      { items: items || [] },
+      {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
+      }
+    )
   } catch (error) {
     console.error("[Wishlist Items All] Error:", error)
     const errorMessage = error instanceof Error ? error.message : "Failed to fetch wishlist items"

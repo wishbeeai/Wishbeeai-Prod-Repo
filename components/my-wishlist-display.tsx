@@ -645,11 +645,11 @@ export function MyWishlistDisplay() {
     setEditingItemId(item.id)
     const iLike = item.preferenceOptions?.iLike
     
-    // Convert specifications object to array
+    // Convert specifications object to array (exclude brand; shown above Category)
     const specsArray: Array<{ key: string; value: string }> = []
     if (item.specifications) {
       Object.entries(item.specifications).forEach(([key, value]) => {
-        if (value && !['color', 'size', 'style', 'configuration', 'set'].includes(key.toLowerCase())) {
+        if (value && !['color', 'size', 'style', 'configuration', 'set', 'brand'].includes(key.trim().toLowerCase())) {
           specsArray.push({ key, value: String(value) })
         }
       })
@@ -838,11 +838,11 @@ export function MyWishlistDisplay() {
     setEditingAltItemId(item.id)
     const alt = item.preferenceOptions?.alternative
     
-    // Convert alternative specifications to array
+    // Convert alternative specifications to array (exclude brand; shown above Category)
     const specsArray: Array<{ key: string; value: string }> = []
     if (alt?.specifications && typeof alt.specifications === 'object') {
       Object.entries(alt.specifications).forEach(([key, value]) => {
-        if (value && !['color', 'size', 'style', 'configuration', 'set'].includes(key.toLowerCase())) {
+        if (value && !['color', 'size', 'style', 'configuration', 'set', 'brand'].includes(key.trim().toLowerCase())) {
           specsArray.push({ key, value: String(value) })
         }
       })
@@ -1088,8 +1088,9 @@ export function MyWishlistDisplay() {
               <div className="flex flex-col h-full">
                 {/* Product Preferences Section */}
                 {item.preferenceOptions && (() => {
-                  // Keys to exclude from display (these are metadata, not variant options)
-                  const excludeKeys = ['image', 'title', 'customFields', 'notes']
+                  // Keys to exclude from display (these are metadata, not variant options). Brand shown above Category.
+                  const excludeKeys = ['image', 'title', 'customFields', 'notes', 'brand']
+                  const excludeKeysLower = excludeKeys.map((x) => x.toLowerCase())
                   
                   // Helper to check if a value is valid (not garbage data)
                   const isValidValue = (value: any): boolean => {
@@ -1108,13 +1109,13 @@ export function MyWishlistDisplay() {
                     return true
                   }
                   
-                  // Helper to get valid entries only (exclude metadata, keep variant options)
+                  // Helper to get valid entries only (exclude metadata + brand, keep variant options)
                   const getValidEntries = (opt: Record<string, any> | null | undefined) => {
                     if (!opt) return []
                     if (typeof opt === 'string') return []
                     if (Array.isArray(opt)) return []
                     return Object.entries(opt)
-                      .filter(([key, value]) => !excludeKeys.includes(key) && isValidValue(value) && typeof value === 'string')
+                      .filter(([key, value]) => !excludeKeysLower.includes(key.trim().toLowerCase()) && isValidValue(value) && typeof value === 'string')
                   }
                   
                   const iLikeEntries = getValidEntries(item.preferenceOptions.iLike)
@@ -1258,7 +1259,11 @@ export function MyWishlistDisplay() {
                                                       amazonChoice: extracted.amazonChoice || data.amazonChoice || data.badges?.amazonChoice || item.badges?.amazonChoice,
                                                       bestSeller: extracted.bestSeller || data.bestSeller || data.badges?.bestSeller || item.badges?.bestSeller,
                                                     },
-                                                    specifications: extracted.attributes || data.attributes || item.specifications,
+                                                    specifications: (() => {
+                                                      const raw = extracted.specifications || extracted.attributes || data.attributes || item.specifications
+                                                      if (typeof raw !== 'object' || !raw || Array.isArray(raw)) return raw
+                                                      return Object.fromEntries(Object.entries(raw).filter(([k]) => k.trim().toLowerCase() !== 'brand'))
+                                                    })(),
                                                     preferenceOptions: {
                                                       ...item.preferenceOptions,
                                                       iLike: {
@@ -1334,7 +1339,11 @@ export function MyWishlistDisplay() {
                                                     amazonChoice: extracted.amazonChoice || data.amazonChoice || data.badges?.amazonChoice || item.badges?.amazonChoice,
                                                     bestSeller: extracted.bestSeller || data.bestSeller || data.badges?.bestSeller || item.badges?.bestSeller,
                                                   },
-                                                  specifications: extracted.attributes || data.attributes || item.specifications,
+                                                  specifications: (() => {
+                                                    const raw = extracted.specifications || extracted.attributes || data.attributes || item.specifications
+                                                    if (typeof raw !== 'object' || !raw || Array.isArray(raw)) return raw
+                                                    return Object.fromEntries(Object.entries(raw).filter(([k]) => k.trim().toLowerCase() !== 'brand'))
+                                                  })(),
                                                   preferenceOptions: {
                                                     ...item.preferenceOptions,
                                                     iLike: {
@@ -1658,7 +1667,7 @@ export function MyWishlistDisplay() {
 
                               {/* Specifications - Display Mode */}
                               {item.specifications && Object.keys(item.specifications).length > 0 && (() => {
-                                const allSpecs = Object.entries(item.specifications).filter(([k,v]) => v && !['color','size','style','configuration','set'].includes(k.toLowerCase()))
+                                const allSpecs = Object.entries(item.specifications).filter(([k,v]) => v && !['color','size','style','configuration','set','brand'].includes(k.trim().toLowerCase()))
                                 const visibleSpecs = allSpecs.slice(0, 5)
                                 const hasMore = allSpecs.length > 5
                                 
@@ -1901,7 +1910,11 @@ export function MyWishlistDisplay() {
                                                               color: extracted.attributes?.color || data.color || data.attributes?.color || '',
                                                               style: extracted.attributes?.style || data.style || data.attributes?.style || '',
                                                               configuration: extracted.attributes?.configuration || data.configuration || data.attributes?.configuration || '',
-                                                              specifications: extracted.attributes || data.specifications || data.attributes || {},
+                                                              specifications: (() => {
+                                                                const raw = extracted.attributes || data.specifications || data.attributes || {}
+                                                                if (typeof raw !== 'object' || !raw || Array.isArray(raw)) return raw
+                                                                return Object.fromEntries(Object.entries(raw).filter(([k]) => k.trim().toLowerCase() !== 'brand'))
+                                                              })(),
                                                               storeName: extracted.storeName || data.storeName || data.store || 'Amazon',
                                                               rating: extracted.rating || data.rating || data.stars || null,
                                                               reviewCount: extracted.reviewCount || data.reviewCount || data.reviews || null,
@@ -1973,7 +1986,11 @@ export function MyWishlistDisplay() {
                                                             color: extracted.attributes?.color || data.color || data.attributes?.color || '',
                                                             style: extracted.attributes?.style || data.style || data.attributes?.style || '',
                                                             configuration: extracted.attributes?.configuration || data.configuration || data.attributes?.configuration || '',
-                                                            specifications: extracted.attributes || data.specifications || data.attributes || {},
+                                                            specifications: (() => {
+                                                              const raw = extracted.attributes || data.specifications || data.attributes || {}
+                                                              if (typeof raw !== 'object' || !raw || Array.isArray(raw)) return raw
+                                                              return Object.fromEntries(Object.entries(raw).filter(([k]) => k.trim().toLowerCase() !== 'brand'))
+                                                            })(),
                                                             storeName: extracted.storeName || data.storeName || data.store || 'Amazon',
                                                             rating: extracted.rating || data.rating || data.stars || null,
                                                             reviewCount: extracted.reviewCount || data.reviewCount || data.reviews || null,
@@ -2222,7 +2239,7 @@ export function MyWishlistDisplay() {
                                   {/* Specifications - Display Mode for Alternative */}
                                   {item.preferenceOptions?.alternative?.specifications && Object.keys(item.preferenceOptions.alternative.specifications).length > 0 && (() => {
                                     const altSpecs = item.preferenceOptions.alternative.specifications as Record<string, any>
-                                    const allAltSpecs = Object.entries(altSpecs).filter(([k,v]) => v && !['color','size','style','configuration','set'].includes(k.toLowerCase()))
+                                    const allAltSpecs = Object.entries(altSpecs).filter(([k,v]) => v && !['color','size','style','configuration','set','brand'].includes(k.trim().toLowerCase()))
                                     const visibleAltSpecs = allAltSpecs.slice(0, 5)
                                     const hasMoreAltSpecs = allAltSpecs.length > 5
                                     
@@ -2431,11 +2448,11 @@ export function MyWishlistDisplay() {
                     if (!value || value === 'null' || value === 'undefined') return false
                     const strValue = String(value).trim()
                     if (strValue.length === 0 || strValue.length > 200) return false
-                    const lowerKey = key.toLowerCase()
-                    // Exclude variant options (shown in Selected Options)
-                    if (['color', 'size', 'style', 'configuration', 'set'].includes(lowerKey)) return false
+                    const keyNorm = key.trim().toLowerCase()
+                    // Exclude variant options (shown in Selected Options) and Brand (shown above Category)
+                    if (['color', 'size', 'style', 'configuration', 'set', 'brand'].includes(keyNorm)) return false
                     const garbageKeys = ['asin', 'item model number', 'date first available', 'department', 'manufacturer']
-                    if (garbageKeys.some(g => lowerKey.includes(g))) return false
+                    if (garbageKeys.some(g => keyNorm.includes(g))) return false
                     return true
                   })
                   

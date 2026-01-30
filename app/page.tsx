@@ -1,12 +1,32 @@
 import { Header } from "@/components/header"
 import { Hero } from "@/components/hero"
 import { Steps } from "@/components/steps"
-import { AIGiftAssistant } from "@/components/ai-gift-assistant"
-import { QuickStartCards } from "@/components/quick-start-cards"
-import { TrendingGifts } from "@/components/trending-gifts"
-import { TrackManage } from "@/components/track-manage"
-import { ShareWidget } from "@/components/share-widget"
-import { Footer } from "@/components/footer"
+import dynamic from "next/dynamic"
+
+// Lazy load below-the-fold components for better initial load performance
+const AIGiftAssistant = dynamic(() => import("@/components/ai-gift-assistant").then(mod => ({ default: mod.AIGiftAssistant })), {
+  loading: () => <div className="min-h-[400px]" />,
+})
+
+const QuickStartCards = dynamic(() => import("@/components/quick-start-cards").then(mod => ({ default: mod.QuickStartCards })), {
+  loading: () => <div className="min-h-[300px]" />,
+})
+
+const TrendingGifts = dynamic(() => import("@/components/trending-gifts").then(mod => ({ default: mod.TrendingGifts })), {
+  loading: () => <div className="min-h-[500px]" />,
+})
+
+const TrackManage = dynamic(() => import("@/components/track-manage").then(mod => ({ default: mod.TrackManage })), {
+  loading: () => <div className="min-h-[400px]" />,
+})
+
+const ShareWidget = dynamic(() => import("@/components/share-widget").then(mod => ({ default: mod.ShareWidget })), {
+  loading: () => <div className="min-h-[300px]" />,
+})
+
+const Footer = dynamic(() => import("@/components/footer").then(mod => ({ default: mod.Footer })), {
+  loading: () => <div className="min-h-[200px]" />,
+})
 
 export const metadata = {
   title: "Wishbee.ai - Gift Together. Give Better.",
@@ -14,8 +34,6 @@ export const metadata = {
 }
 
 export default function Home() {
-  console.log("[v0] Home page is rendering")
-
   return (
     <main
       className="min-h-screen"

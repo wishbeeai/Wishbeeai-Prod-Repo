@@ -417,12 +417,109 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
     
     // PRIORITY 1: Check top-level properties first (from admin affiliate products page)
     // These are saved as: gift.color, gift.size, gift.style, gift.configuration, gift.capacity
-    const topLevelColor = (gift as any)?.color || extractedProduct?.color
-    const topLevelSize = (gift as any)?.size || (gift as any)?.screenSize || (gift as any)?.memoryStorageCapacity || extractedProduct?.size || (extractedProduct as any)?.screenSize || (extractedProduct as any)?.memoryStorageCapacity
+    let topLevelColor = (gift as any)?.color || extractedProduct?.color
+    // Size should be physical dimensions or screen size (for electronics), NOT memory/storage capacity
+    let topLevelSize = (gift as any)?.size || (gift as any)?.screenSize || extractedProduct?.size || (extractedProduct as any)?.screenSize
     const topLevelStyle = (gift as any)?.style || extractedProduct?.style
     const topLevelConfiguration = (gift as any)?.configuration || (gift as any)?.set || 
                                    extractedProduct?.configuration || extractedProduct?.set
-    const topLevelCapacity = (gift as any)?.capacity || gift?.attributes?.capacity || extractedProduct?.capacity || (extractedProduct as any)?.attributes?.capacity
+    // Capacity includes memory/storage capacity (for electronics) and volume capacity (for kitchen items)
+    let topLevelCapacity = (gift as any)?.capacity || gift?.attributes?.capacity || (gift as any)?.memoryStorageCapacity || extractedProduct?.capacity || (extractedProduct as any)?.attributes?.capacity || (extractedProduct as any)?.memoryStorageCapacity
+    
+    // Clean color to remove capacity numbers (e.g., "10QT BLACK" -> "BLACK")
+    if (topLevelColor && typeof topLevelColor === 'string') {
+      // Strip leading "number + QT/Quart" (e.g. "10QT BLACK" -> "BLACK")
+      let cleanedColor = topLevelColor.replace(/\d+\s*(?:-)?\s*(?:QT|Quarts?)(?:\s+)?/gi, '').trim()
+      if (/^\d+\s*QT/i.test(topLevelColor)) {
+        cleanedColor = topLevelColor.replace(/^\d+\s*QT\s*/i, '').trim() || cleanedColor
+      }
+      if (cleanedColor && cleanedColor !== topLevelColor) {
+        console.log('[Modal] Cleaned color:', topLevelColor, '->', cleanedColor)
+        topLevelColor = cleanedColor
+      }
+    }
+    
+    console.log('[Modal] Initial capacity from gift/extracted:', topLevelCapacity)
+    console.log('[Modal] Initial size from gift/extracted:', topLevelSize)
+    console.log('[Modal] Initial color (cleaned):', topLevelColor)
+    
+    // Prefer capacity from product name (e.g. "5 QT", "10 Quarts") over stored value when they conflict
+    // Also check product URL for capacity information
+    const productName = (gift?.productName || (gift as any)?.giftName || extractedProduct?.productName || '').replace(/\s+/g, ' ')
+    const productUrl = gift?.productLink || (gift as any)?.productUrl || extractedProduct?.productLink || ''
+    
+    console.log('[Modal] Product name:', productName)
+    console.log('[Modal] Product URL:', productUrl)
+    
+    // Match patterns like "10 Quarts", "10 QT", "10-Quart", "10QT", "10QT BLACK" in product name, URL, and variant strings (color/size/attrs)
+    // Use the LARGEST quart value found so variant options like "10QT BLACK" override stored "7 Quarts"
+    let quartFromName: { num: string, value: number } | null = null
+
+    const considerQuart = (num: number, numStr: string, source: string) => {
+      if (!quartFromName || num > quartFromName.value) {
+        quartFromName = { num: numStr, value: num }
+        console.log('[Modal] Found capacity from', source, ':', quartFromName.value, 'Quarts')
+      }
+    }
+
+    const scanForQuarts = (text: string, source: string) => {
+      if (!text || typeof text !== 'string') return
+      const s = String(text)
+      // Standard "10 Quarts", "10 QT", "10-Quart"
+      for (const m of s.matchAll(/(\d+)\s*(?:-)?\s*(?:QT|Quarts?)(?:\s|$|[^a-z])/gi)) {
+        if (m[1]) considerQuart(parseInt(m[1]), m[1], source)
+      }
+      // "10QT" followed by text (e.g. "10QT BLACK")
+      for (const m of s.matchAll(/(\d+)\s*QT(?:\s+[A-Z]+|[A-Z]+)/gi)) {
+        if (m[1]) considerQuart(parseInt(m[1]), m[1], source)
+      }
+      // Standalone "10QT"
+      for (const m of s.matchAll(/(\d+)\s*QT(?!\s*[a-z])/gi)) {
+        if (m[1]) considerQuart(parseInt(m[1]), m[1], source)
+      }
+    }
+
+    scanForQuarts(productName, 'product name')
+    if (productUrl) scanForQuarts(productUrl, 'URL')
+    // Variant strings often contain the real capacity (e.g. "10QT BLACK") — prefer over stored "7 Quarts"
+    scanForQuarts(topLevelColor ?? '', 'color/variant')
+    scanForQuarts(topLevelSize ?? '', 'size/variant')
+    if (typeof topLevelCapacity === 'string') scanForQuarts(topLevelCapacity, 'stored capacity')
+    const attrsForScan = gift?.attributes || extractedProduct?.attributes || {}
+    for (const v of Object.values(attrsForScan)) {
+      if (v != null && typeof v === 'string') scanForQuarts(v, 'attributes')
+    }
+    
+    // Quart-based values (e.g. 4 QT, 10 Quarts) go in SIZE only, not Capacity. Capacity is for electronics (e.g. storage).
+    if (quartFromName) {
+      const n = quartFromName.num
+      const preferred = `${n} Quarts`
+      const currentSizeIsQuarts = topLevelSize && /^\d+\s*Quarts?$/i.test(String(topLevelSize).trim())
+      // Put quart value in Size only; do not set Capacity for quart-based products
+      if (!topLevelSize || currentSizeIsQuarts) {
+        topLevelSize = preferred
+        console.log('[Modal] ✅ Set Size (quart) from product/variant:', preferred, '— Capacity not shown for quarts')
+      }
+      // Do not set topLevelCapacity for quarts so we don't show a separate Capacity row
+      topLevelCapacity = ''
+    } else {
+      console.log('[Modal] ⚠️ No quart found in product/URL/variants, using stored size/capacity:', topLevelSize, topLevelCapacity)
+    }
+    
+    // If we have a non-quart capacity (e.g. electronics storage), keep it for the Capacity field only
+    const capacityStr = topLevelCapacity ? String(topLevelCapacity).trim() : ''
+    const capacityIsQuarts = /^\d+\s*Quarts?$/i.test(capacityStr) || /^\d+\s*QT$/i.test(capacityStr)
+    if (capacityStr && capacityIsQuarts) {
+      // Stored capacity is quart-based — show in Size only, clear Capacity
+      topLevelCapacity = ''
+      if (!topLevelSize) {
+        const quartMatch = capacityStr.match(/(\d+)\s*(?:Quarts?|QT)/i)
+        if (quartMatch?.[1]) {
+          topLevelSize = `${quartMatch[1]} Quarts`
+          console.log('[Modal] ✅ Set Size from stored quart capacity (Capacity field omitted):', topLevelSize)
+        }
+      }
+    }
     
     console.log('[Modal] Pre-filling from top-level:', { 
       color: topLevelColor, 
@@ -432,14 +529,14 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
       capacity: topLevelCapacity
     })
     
-    // Set from top-level properties
+    // Set from top-level properties (use final cleaned/overridden values)
     if (topLevelColor && isValidVariantValue(topLevelColor)) {
       setLikeColor(topLevelColor)
-      console.log('[Modal] Set likeColor from top-level:', topLevelColor)
+      console.log('[Modal] ✅ Set likeColor from top-level:', topLevelColor)
     }
     if (topLevelSize && isValidVariantValue(topLevelSize)) {
       setLikeSize(topLevelSize)
-      console.log('[Modal] Set likeSize from top-level:', topLevelSize)
+      console.log('[Modal] ✅ Set likeSize from top-level:', topLevelSize)
     }
     if (topLevelStyle && isValidVariantValue(topLevelStyle)) {
       setLikeStyle(topLevelStyle)
@@ -455,10 +552,15 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
     }
     
     // PRIORITY 2: Also check attributes object for any fields not found at top level
+    // BUT: Capacity from product name/URL takes precedence over attributes
     const attrs = gift?.attributes || extractedProduct?.attributes || {}
+    
+    // Track if we found capacity from product name (so we don't override it from attributes)
+    const hasCapacityFromProductName = quartFromName !== null
     
     if (Object.keys(attrs).length > 0) {
       console.log('[Modal] Pre-filling from attributes:', attrs)
+      console.log('[Modal] Has capacity from product name:', hasCapacityFromProductName, 'Value:', quartFromName ? `${quartFromName.num} Quarts` : 'none')
       
       // Known standard variant fields (case-insensitive matching)
       // Only these are shown - product specs like Material, Item Weight, etc. are excluded
@@ -475,17 +577,55 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
           setLikeStyle(value as string)
           console.log('[Modal] Set likeStyle from attrs:', value)
         } else if (lowerKey === 'color' && !topLevelColor) {
-          setLikeColor(value as string)
-          console.log('[Modal] Set likeColor from attrs:', value)
-        } else if ((lowerKey === 'size' || lowerKey === 'screensize' || lowerKey === 'screen size' || lowerKey === 'displaysize' || lowerKey === 'display size' || lowerKey === 'memorystoragecapacity' || lowerKey === 'storagecapacity' || lowerKey === 'storage') && !topLevelSize && !likeSize) {
-          setLikeSize(value as string)
-          console.log('[Modal] Set likeSize from attrs:', value)
+          // Clean color to remove capacity prefix (e.g. "10QT BLACK" -> "BLACK")
+          let cleanedColor = String(value).trim()
+          cleanedColor = cleanedColor.replace(/\d+\s*(?:-)?\s*(?:QT|Quarts?)(?:\s+)?/gi, '').trim()
+          if (/^\d+\s*QT/i.test(String(value))) {
+            cleanedColor = String(value).trim().replace(/^\d+\s*QT\s*/i, '').trim() || cleanedColor
+          }
+          if (cleanedColor !== String(value).trim()) {
+            console.log('[Modal] Cleaned color from attrs:', value, '->', cleanedColor)
+          }
+          setLikeColor(cleanedColor)
+          console.log('[Modal] Set likeColor from attrs:', cleanedColor)
+        } else if ((lowerKey === 'size' || lowerKey === 'screensize' || lowerKey === 'screen size' || lowerKey === 'displaysize' || lowerKey === 'display size') && !topLevelSize && !likeSize) {
+          // Don't set size from attributes if we already set it from capacity (for kitchen appliances)
+          // topLevelSize would be set if capacity was in quarts format
+          if (!topLevelSize) {
+            setLikeSize(value as string)
+            console.log('[Modal] Set likeSize from attrs:', value)
+          } else {
+            console.log('[Modal] Skipping size from attrs - already set from capacity:', topLevelSize)
+          }
         } else if ((lowerKey === 'set' || lowerKey === 'configuration') && !topLevelConfiguration) {
           setLikeConfiguration(value as string)
           console.log('[Modal] Set likeConfiguration from attrs:', value)
-        } else if (lowerKey === 'capacity' && !topLevelCapacity) {
-          setLikeCapacity(value as string)
-          console.log('[Modal] Set likeCapacity from attrs:', value)
+        } else if ((lowerKey === 'capacity' || lowerKey === 'memorystoragecapacity' || lowerKey === 'storagecapacity' || lowerKey === 'storage') && !hasCapacityFromProductName) {
+          const attrCapacity = String(value).trim()
+          const isQuartCapacity = /^\d+\s*Quarts?$/i.test(attrCapacity) || /^\d+\s*QT$/i.test(attrCapacity)
+          const productNameCapacity = quartFromName ? `${quartFromName.num} Quarts` : null
+          
+          if (productNameCapacity && attrCapacity !== productNameCapacity && !isQuartCapacity) {
+            console.log('[Modal] ⚠️ Skipping capacity from attrs (', attrCapacity, ') - using product name/URL value (', productNameCapacity, ')')
+          } else if (isQuartCapacity) {
+            // Quart-based capacity goes in Size only, not Capacity (e.g. air fryer 4 QT)
+            if (!topLevelSize) {
+              const quartMatch = attrCapacity.match(/(\d+)\s*(?:Quarts?|QT)/i)
+              if (quartMatch?.[1]) {
+                const sizeValue = `${quartMatch[1]} Quarts`
+                setLikeSize(sizeValue)
+                console.log('[Modal] Set Size from attrs (quart — Capacity omitted):', sizeValue)
+              }
+            }
+          } else if (!topLevelCapacity) {
+            // Non-quart capacity (e.g. electronics storage) — set Capacity only
+            setLikeCapacity(value as string)
+            console.log('[Modal] Set likeCapacity from attrs:', value)
+          } else {
+            console.log('[Modal] ⚠️ Skipping capacity from attrs - already set from top-level:', topLevelCapacity)
+          }
+        } else if ((lowerKey === 'capacity' || lowerKey === 'memorystoragecapacity' || lowerKey === 'storagecapacity' || lowerKey === 'storage') && hasCapacityFromProductName) {
+          console.log('[Modal] ⚠️ Skipping capacity from attrs (', value, ') - quart shown as Size only')
         }
         // NOTE: We intentionally do NOT auto-populate custom fields from product specs
         // like Material, Item Weight, Operating System, etc.
@@ -582,7 +722,13 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
       if (iLike.color) setLikeColor(iLike.color)
       if (iLike.style) setLikeStyle(iLike.style)
       if (iLike.configuration) setLikeConfiguration(iLike.configuration)
-      if (iLike.capacity) setLikeCapacity(iLike.capacity)
+      // Quart-based capacity is shown as Size only; load into size and skip capacity
+      if (iLike.capacity) {
+        const cap = String(iLike.capacity).trim()
+        const isQuart = /^\d+\s*Quarts?$/i.test(cap) || /^\d+\s*QT$/i.test(cap)
+        if (isQuart && !iLike.size) setLikeSize(cap)
+        else if (!isQuart) setLikeCapacity(cap)
+      }
       if (iLike.customFields) setLikeCustomFields(iLike.customFields.map((f: any) => ({ ...f, id: Date.now().toString() + Math.random() })))
       if (iLike.notes) setLikeNotes(iLike.notes)
       if (iLike.specifications && typeof iLike.specifications === 'object' && Object.keys(iLike.specifications).length > 0) {
@@ -601,7 +747,12 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
       if (alt.color) setAltColor(alt.color)
       if (alt.style) setAltStyle(alt.style)
       if (alt.configuration) setAltConfiguration(alt.configuration)
-      if (alt.capacity) setAltCapacity(alt.capacity)
+      // Quart-based capacity shown as Size only; Alternative has no Size field so only set non-quart capacity
+      if (alt.capacity) {
+        const cap = String(alt.capacity).trim()
+        const isQuart = /^\d+\s*Quarts?$/i.test(cap) || /^\d+\s*QT$/i.test(cap)
+        if (!isQuart) setAltCapacity(cap)
+      }
       if (alt.customFields) setAltCustomFields(alt.customFields.map((f: any) => ({ ...f, id: Date.now().toString() + Math.random() })))
       if (alt.notes) setAltNotes(alt.notes)
       if (alt.specifications && typeof alt.specifications === 'object' && Object.keys(alt.specifications).length > 0) {
@@ -618,6 +769,12 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
       if (ok.image) setOkClippedImage(ok.image)
       if (ok.title) setOkClippedTitle(ok.title)
       if (ok.size) setOkSize(ok.size)
+      // Quart capacity goes in Size only
+      if (ok.capacity && !ok.size) {
+        const cap = String(ok.capacity).trim()
+        const isQuart = /^\d+\s*Quarts?$/i.test(cap) || /^\d+\s*QT$/i.test(cap)
+        if (isQuart) setOkSize(cap)
+      }
       if (ok.color) setOkColor(ok.color)
       if (ok.style) setOkStyle(ok.style)
       if (ok.configuration) setOkConfiguration(ok.configuration)
@@ -1203,7 +1360,16 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
       if (gift.attributes?.size && isValidVariantValue(gift.attributes.size)) setLikeSize(gift.attributes.size)
       if (gift.attributes?.style && isValidVariantValue(gift.attributes.style)) setLikeStyle(gift.attributes.style)
       if ((gift.attributes?.configuration || gift.attributes?.set) && isValidVariantValue(gift.attributes.configuration || gift.attributes.set)) setLikeConfiguration(gift.attributes.configuration || gift.attributes.set)
-      if (gift.attributes?.capacity && isValidVariantValue(gift.attributes.capacity)) setLikeCapacity(gift.attributes.capacity)
+      let cap = gift.attributes?.capacity
+      const pn = ((gift as any)?.productName || (gift as any)?.giftName || '').replace(/\s+/g, ' ')
+      const qm = pn.match(/(?:^|[^0-9])(\d+)\s*(?:QT|Quarts?)(?:[^a-z]|$)/i)
+      if (qm && qm[1]) {
+        const preferred = `${qm[1]} Quarts`
+        const cur = (cap && String(cap).trim()) || ''
+        if (cur && /^\d+\s*Quarts?$/i.test(cur) && cur.replace(/\D/g, '') !== qm[1]) cap = preferred
+        else if (!cur || cur.length < 3) cap = preferred
+      }
+      if (cap && isValidVariantValue(cap)) setLikeCapacity(cap)
       setLikeSelected(true)
       
       // Pre-fill editable I Wish fields
@@ -1397,6 +1563,21 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
         if (garbagePatterns.some(p => lowerStr.includes(p))) return null
         return str
       }
+      // Strip capacity from color when saving (e.g. "10QT BLACK" -> "BLACK")
+      const cleanColorForSave = (value: string | null | undefined): string | null => {
+        const raw = cleanOptionValue(value)
+        if (!raw) return null
+        let s = raw.replace(/\d+\s*(?:-)?\s*(?:QT|Quarts?)(?:\s+)?/gi, '').trim()
+        if (/^\d+\s*QT/i.test(raw)) s = raw.replace(/^\d+\s*QT\s*/i, '').trim() || s
+        return (s && s.length <= 100) ? s : raw
+      }
+      // Quart-based capacity is shown as Size only; do not save capacity when it's quarts
+      const capacityForSave = (value: string | null | undefined): string | null => {
+        const v = cleanOptionValue(value)
+        if (!v) return null
+        const isQuart = /^\d+\s*Quarts?$/i.test(v) || /^\d+\s*QT$/i.test(v)
+        return isQuart ? null : v
+      }
 
       // Build preference options object with cleaned values
       // IMPORTANT: Include image and title for each preference section
@@ -1405,10 +1586,10 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
           image: likeClippedImage || extractedProduct?.imageUrl || null,
           title: likeClippedTitle || extractedProduct?.productName || null,
           size: cleanOptionValue(likeSize),
-          color: cleanOptionValue(likeColor),
+          color: cleanColorForSave(likeColor),
           style: cleanOptionValue(likeStyle),
           configuration: cleanOptionValue(likeConfiguration),
-          capacity: cleanOptionValue(likeCapacity),
+          capacity: capacityForSave(likeCapacity),
           customFields: likeCustomFields.filter(f => f.key && f.value).map(f => ({ key: f.key, value: f.value })),
           notes: likeNotes.trim() || null,
           specifications: Object.keys(iWishSpecs).length > 0 ? iWishSpecs : null,
@@ -1416,10 +1597,10 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
         alternative: altSelected ? {
           image: altClippedImage || null,
           title: altClippedTitle || null,
-          color: cleanOptionValue(altColor),
+          color: cleanColorForSave(altColor),
           style: cleanOptionValue(altStyle),
           configuration: cleanOptionValue(altConfiguration),
-          capacity: cleanOptionValue(altCapacity),
+          capacity: capacityForSave(altCapacity),
           customFields: altCustomFields.filter(f => f.key && f.value).map(f => ({ key: f.key, value: f.value })),
           notes: altNotes.trim() || null,
           specifications: Object.keys(altSpecs).length > 0 ? altSpecs : null,
@@ -1428,7 +1609,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
           image: okClippedImage || null,
           title: okClippedTitle || null,
           size: cleanOptionValue(okSize),
-          color: cleanOptionValue(okColor),
+          color: cleanColorForSave(okColor),
           style: cleanOptionValue(okStyle),
           configuration: cleanOptionValue(okConfiguration),
         } : null,
@@ -1563,13 +1744,26 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
       if (garbagePatterns.some(p => lowerStr.includes(p))) return null
       return str
     }
+    const cleanColorForSave = (v: string | null | undefined): string | null => {
+      const raw = cleanOptionValue(v)
+      if (!raw) return null
+      let s = raw.replace(/\d+\s*(?:-)?\s*(?:QT|Quarts?)(?:\s+)?/gi, '').trim()
+      if (/^\d+\s*QT/i.test(raw)) s = raw.replace(/^\d+\s*QT\s*/i, '').trim() || s
+      return (s && s.length <= 100) ? s : raw
+    }
+    const capacityForSave = (v: string | null | undefined): string | null => {
+      const val = cleanOptionValue(v)
+      if (!val) return null
+      const isQuart = /^\d+\s*Quarts?$/i.test(val) || /^\d+\s*QT$/i.test(val)
+      return isQuart ? null : val
+    }
 
     const prefs = {
       iLike: likeSelected ? {
         image: likeClippedImage || extractedProduct?.imageUrl || null,
         title: likeClippedTitle || extractedProduct?.productName || null,
         size: cleanOptionValue(likeSize),
-        color: cleanOptionValue(likeColor),
+        color: cleanColorForSave(likeColor),
         style: cleanOptionValue(likeStyle),
         configuration: cleanOptionValue(likeConfiguration),
         customFields: likeCustomFields.filter(f => f.key && f.value).map(f => ({ key: f.key, value: f.value })),
@@ -1579,10 +1773,10 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
       alternative: altSelected ? {
         image: altClippedImage || null,
         title: altClippedTitle || null,
-        color: cleanOptionValue(altColor),
+        color: cleanColorForSave(altColor),
         style: cleanOptionValue(altStyle),
         configuration: cleanOptionValue(altConfiguration),
-        capacity: cleanOptionValue(altCapacity),
+        capacity: capacityForSave(altCapacity),
         customFields: altCustomFields.filter(f => f.key && f.value).map(f => ({ key: f.key, value: f.value })),
         notes: altNotes.trim() || null,
         specifications: Object.keys(altSpecs).length > 0 ? altSpecs : null,
@@ -1591,7 +1785,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
         image: okClippedImage || null,
         title: okClippedTitle || null,
         size: cleanOptionValue(okSize),
-        color: cleanOptionValue(okColor),
+        color: cleanColorForSave(okColor),
         style: cleanOptionValue(okStyle),
         configuration: cleanOptionValue(okConfiguration),
       } : null,

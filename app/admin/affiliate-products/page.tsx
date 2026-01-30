@@ -651,7 +651,19 @@ export default function AdminAffiliateProductsPage() {
         if (isValidVariantValue(sizeVal)) extractedVariants.size = sizeVal!.trim()
         if (isValidStyleValue(styleVal)) extractedVariants.style = styleVal!.trim()
         if (isValidVariantValue(configVal)) extractedVariants.configuration = configVal!.trim()
-        if (isValidVariantValue(capacityVal)) extractedVariants.capacity = capacityVal!.trim()
+        // Quart-based capacity (e.g. "4 Quarts", "4 QT") goes in size only, not capacity
+        const capacityStr = capacityVal ? String(capacityVal).trim() : ''
+        const isQuartCapacity = /^\d+\s*Quarts?$/i.test(capacityStr) || /^\d+\s*QT$/i.test(capacityStr)
+        if (isValidVariantValue(capacityVal)) {
+          if (isQuartCapacity) {
+            if (!extractedVariants.size) {
+              extractedVariants.size = capacityStr
+              console.log('[Admin] Quart capacity mapped to size (not capacity):', capacityStr)
+            }
+          } else {
+            extractedVariants.capacity = capacityStr
+          }
+        }
         
         setVariantOptions(extractedVariants)
         console.log('[Admin] Final extracted variant options for I Wish display:', extractedVariants)
@@ -975,31 +987,56 @@ export default function AdminAffiliateProductsPage() {
       return
     }
 
+    // Validate required fields before making the request
+    if (!product.productName || !product.price || !product.image || !product.productLink) {
+      const missingFields = []
+      if (!product.productName) missingFields.push('Product Name')
+      if (!product.price) missingFields.push('Price')
+      if (!product.image) missingFields.push('Image')
+      if (!product.productLink) missingFields.push('Product Link')
+      
+      toast.error("Missing Required Fields", {
+        description: `Please fill in: ${missingFields.join(', ')}`,
+        duration: 4000,
+      })
+      return
+    }
+
     setAddingToWishlist(product.id)
     try {
       const description = `${product.productName} from ${product.source}`
+
+      const requestBody = {
+        productName: product.productName,
+        price: product.price,
+        originalPrice: product.originalPrice,
+        image: product.image,
+        source: product.source,
+        productLink: product.productLink,
+        category: product.category,
+        rating: product.rating,
+        reviewCount: product.reviewCount,
+        amazonChoice: product.amazonChoice || false,
+        bestSeller: product.bestSeller || false,
+        description: description,
+        // Include all product attributes/specifications
+        attributes: product.attributes || undefined,
+      }
+
+      console.log('[handleAddToWishlist] Sending request:', {
+        productName: requestBody.productName,
+        price: requestBody.price,
+        hasImage: !!requestBody.image,
+        hasProductLink: !!requestBody.productLink,
+        category: requestBody.category
+      })
 
       const response = await fetch("/api/trending-gifts", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          productName: product.productName,
-          price: product.price,
-          originalPrice: product.originalPrice,
-          image: product.image,
-          source: product.source,
-          productLink: product.productLink,
-          category: product.category,
-          rating: product.rating,
-          reviewCount: product.reviewCount,
-          amazonChoice: product.amazonChoice || false,
-          bestSeller: product.bestSeller || false,
-          description: description,
-          // Include all product attributes/specifications
-          attributes: product.attributes || undefined,
-        }),
+        body: JSON.stringify(requestBody),
       })
 
       if (response.ok) {
@@ -1029,18 +1066,67 @@ export default function AdminAffiliateProductsPage() {
           duration: 5000,
         })
       } else {
-        const error = await response.json().catch(() => ({ error: `HTTP ${response.status}: ${response.statusText}` }))
-        console.error(`[handleAddToWishlist] Error response:`, error)
+        // Default messages for common status codes
+        const defaultMessages: Record<number, string> = {
+          409: "This product is already in Trending Gifts.",
+          401: "Please log in to add products to Trending Gifts.",
+          400: "Please check that all required fields are filled.",
+          500: "Server error. Please try again later."
+        }
         
-        // Handle duplicate product (409 Conflict)
+        // Get error message from response (silently handle expected errors)
+        let errorMessage = defaultMessages[response.status] || response.statusText || 'Unknown error'
+        let existingProductLink: string | null = null
+        const isExpectedError = response.status === 409 // Duplicate is expected, not an error
+        
+        try {
+          const contentType = response.headers.get('content-type') || ''
+          if (contentType.includes('application/json')) {
+            const jsonText = await response.text()
+            if (jsonText && jsonText.trim()) {
+              try {
+                const error = JSON.parse(jsonText)
+                if (error && typeof error === 'object' && Object.keys(error).length > 0) {
+                  errorMessage = error.message || error.error || error.details || errorMessage
+                  existingProductLink = error.existingProductLink || null
+                }
+              } catch {
+                // Not valid JSON, use default message
+              }
+            }
+          }
+        } catch {
+          // Silently use default message
+        }
+        
+        // Only log unexpected errors (not 409 duplicates)
+        if (!isExpectedError) {
+          console.error(`[handleAddToWishlist] Error (status ${response.status}):`, errorMessage)
+        }
+        
+        // Handle duplicate product (409 Conflict) - show friendly message with link to view
         if (response.status === 409) {
           toast.warning("🐝 Already Added", {
-            description: error.message || error.error || "This product is already in Trending Gifts.",
+            description: errorMessage,
+            duration: 5000,
+            action: {
+              label: "View Trending Gifts",
+              onClick: () => router.push("/gifts/trending"),
+            },
+          })
+        } else if (response.status === 401) {
+          toast.error("Authentication Required", {
+            description: errorMessage,
+            duration: 4000,
+          })
+        } else if (response.status === 400) {
+          toast.error("Invalid Request", {
+            description: errorMessage,
             duration: 4000,
           })
         } else {
           toast.error("Failed to add product", {
-            description: error.error || "Something went wrong. Please try again.",
+            description: errorMessage,
             duration: 4000,
           })
         }
@@ -2358,21 +2444,6 @@ export default function AdminAffiliateProductsPage() {
                         onChange={(e) => setExtractedProduct({ ...extractedProduct, image: e.target.value, imageUrl: e.target.value })}
                         placeholder="Image URL"
                         className="text-xs border-2 border-gray-300 focus:border-[#DAA520] focus:ring-2 focus:ring-amber-200 rounded-lg"
-                      />
-                    </div>
-                    
-                    {/* Product Brand */}
-                    <div className="bg-white rounded-xl p-4 shadow-md border border-amber-200">
-                      <label className="block text-sm font-bold text-[#654321] mb-2">Product Brand <span className="text-red-500">*</span></label>
-                      <Input
-                        required
-                        value={(extractedProduct.brand && extractedProduct.brand.toLowerCase() !== 'unknown') ? extractedProduct.brand : ""}
-                        onChange={(e) => {
-                          const newValue = e.target.value.trim()
-                          setExtractedProduct({ ...extractedProduct, brand: newValue || null })
-                        }}
-                        placeholder="Brand"
-                        className="text-sm border-2 border-gray-300 focus:border-[#DAA520] focus:ring-2 focus:ring-amber-200 rounded-lg"
                       />
                     </div>
                     
