@@ -24,17 +24,17 @@ export async function GET(req: NextRequest) {
       )
     }
     
-    // Convert database format to TrendingGift interface format
+    // Convert database format to TrendingGift interface format (guard against null price/rating)
     const gifts = (trendingGifts || []).map((gift) => ({
       id: gift.id,
       productName: gift.product_name,
       image: gift.image,
       category: gift.category,
       source: gift.source,
-      price: parseFloat(gift.price.toString()),
-      originalPrice: gift.original_price ? parseFloat(gift.original_price.toString()) : undefined,
-      rating: parseFloat(gift.rating.toString()),
-      reviewCount: gift.review_count,
+      price: gift.price != null ? parseFloat(String(gift.price)) : 0,
+      originalPrice: gift.original_price != null ? parseFloat(String(gift.original_price)) : undefined,
+      rating: gift.rating != null ? parseFloat(String(gift.rating)) : 0,
+      reviewCount: gift.review_count ?? 0,
       productLink: gift.product_link,
       description: gift.description,
       amazonChoice: gift.amazon_choice,
@@ -58,8 +58,9 @@ export async function GET(req: NextRequest) {
     })
   } catch (error) {
     console.error('[trending-gifts] Error fetching trending gifts:', error)
+    const details = error instanceof Error ? error.message : String(error)
     return NextResponse.json(
-      { error: 'Failed to fetch trending gifts' },
+      { error: 'Failed to fetch trending gifts', details },
       { status: 500 }
     )
   }

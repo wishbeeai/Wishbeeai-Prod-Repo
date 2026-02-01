@@ -31,6 +31,12 @@ CREATE INDEX IF NOT EXISTS idx_trending_gifts_created_at ON trending_gifts(creat
 -- Enable RLS
 ALTER TABLE trending_gifts ENABLE ROW LEVEL SECURITY;
 
+-- Drop policies if they exist (so migration can be re-run)
+DROP POLICY IF EXISTS "trending_gifts_public_read" ON trending_gifts;
+DROP POLICY IF EXISTS "trending_gifts_admin_insert" ON trending_gifts;
+DROP POLICY IF EXISTS "trending_gifts_admin_update" ON trending_gifts;
+DROP POLICY IF EXISTS "trending_gifts_admin_delete" ON trending_gifts;
+
 -- Policy: Allow public read access (trending gifts are shown to all users)
 CREATE POLICY "trending_gifts_public_read" ON trending_gifts
   FOR SELECT

@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -51,10 +51,16 @@ import {
   Scissors,
   Copy,
   MessageCircle,
+  Search,
+  SlidersHorizontal,
+  Grid3x3,
+  List,
 } from "lucide-react"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { EviteWizard } from "@/components/evite-wizard"
+import { AddToWishlistModal, type PreferenceOptions } from "@/components/add-to-wishlist-modal"
 
 // Step configuration
 const STEPS = [
@@ -141,6 +147,21 @@ export function CreateGiftFormClient() {
   // Trending Gifts
   const [trendingGifts, setTrendingGifts] = useState<any[]>([])
   const [isLoadingTrending, setIsLoadingTrending] = useState(false)
+  // Trending Gifts filters (same as /gifts/trending)
+  const [searchQueryTrending, setSearchQueryTrending] = useState("")
+  const [selectedCategoryTrending, setSelectedCategoryTrending] = useState("all")
+  const [selectedSourceTrending, setSelectedSourceTrending] = useState("all")
+  const [selectedRatingTrending, setSelectedRatingTrending] = useState("all")
+  const [selectedBadgeTrending, setSelectedBadgeTrending] = useState("all")
+  const [priceRangeTrending, setPriceRangeTrending] = useState({ min: "", max: "" })
+  const [sortByTrending, setSortByTrending] = useState<"popularity" | "rating" | "price-low" | "price-high" | "name" | "newest">("popularity")
+  const [showFiltersTrending, setShowFiltersTrending] = useState(false)
+  const [viewModeTrending, setViewModeTrending] = useState<"grid" | "list">("grid")
+  const [expandedSpecsTrending, setExpandedSpecsTrending] = useState<Record<string, boolean>>({})
+  const [showPreviewProduct, setShowPreviewProduct] = useState(false)
+  const [previewProduct, setPreviewProduct] = useState<any>(null)
+  const [selectedGiftForDifferentOptions, setSelectedGiftForDifferentOptions] = useState<any>(null)
+  const [showSelectDifferentOptionsModal, setShowSelectDifferentOptionsModal] = useState(false)
   
   // I Wish preferences (auto-extracted from URL)
   const [iWishVariants, setIWishVariants] = useState<Record<string, string>>({})
@@ -916,6 +937,161 @@ export function CreateGiftFormClient() {
     ? sharedItems 
     : sharedItems.filter(item => item.wishlist_id === selectedSharedWishlist)
 
+  // Trending Gifts: extract filter options and filter/sort (same as /gifts/trending)
+  const categoriesTrending = useMemo(() => {
+    return ["all", ...Array.from(new Set(trendingGifts.map((g) => g.category).filter(Boolean)))]
+  }, [trendingGifts])
+
+  const sourcesTrending = useMemo(() => {
+    return ["all", ...Array.from(new Set(trendingGifts.map((g) => g.source).filter(Boolean)))]
+  }, [trendingGifts])
+
+  const filteredAndSortedTrendingGifts = useMemo(() => {
+    const name = (g: any) => (g.productName || g.giftName || "").toLowerCase()
+    const price = (g: any) => g.price ?? g.targetAmount ?? 0
+    let filtered = trendingGifts.filter((gift) => {
+      const matchesSearch =
+        !searchQueryTrending ||
+        name(gift).includes(searchQueryTrending.toLowerCase()) ||
+        (gift.description || "").toLowerCase().includes(searchQueryTrending.toLowerCase()) ||
+        (gift.category || "").toLowerCase().includes(searchQueryTrending.toLowerCase())
+      const matchesCategory = selectedCategoryTrending === "all" || gift.category === selectedCategoryTrending
+      const matchesSource = selectedSourceTrending === "all" || gift.source === selectedSourceTrending
+      const matchesRating =
+        selectedRatingTrending === "all" ||
+        (gift.rating != null &&
+          ((selectedRatingTrending === "4+" && gift.rating >= 4) ||
+            (selectedRatingTrending === "3+" && gift.rating >= 3) ||
+            (selectedRatingTrending === "2+" && gift.rating >= 2) ||
+            (selectedRatingTrending === "1+" && gift.rating >= 1)))
+      const matchesBadge =
+        selectedBadgeTrending === "all" ||
+        (selectedBadgeTrending === "amazon-choice" && gift.amazonChoice) ||
+        (selectedBadgeTrending === "best-seller" && gift.bestSeller) ||
+        (selectedBadgeTrending === "overall-pick" && gift.overallPick) ||
+        (selectedBadgeTrending === "on-sale" && gift.originalPrice != null && gift.originalPrice > price(gift))
+      const p = price(gift)
+      const matchesPriceRange =
+        (!priceRangeTrending.min || p >= parseFloat(priceRangeTrending.min)) &&
+        (!priceRangeTrending.max || p <= parseFloat(priceRangeTrending.max))
+      return matchesSearch && matchesCategory && matchesSource && matchesRating && matchesBadge && matchesPriceRange
+    })
+    filtered.sort((a, b) => {
+      switch (sortByTrending) {
+        case "rating":
+          return (b.rating ?? 0) - (a.rating ?? 0)
+        case "price-low":
+          return price(a) - price(b)
+        case "price-high":
+          return price(b) - price(a)
+        case "name":
+          return (a.productName || a.giftName || "").localeCompare(b.productName || b.giftName || "")
+        case "newest":
+          const da = a.createdDate ? new Date(a.createdDate).getTime() : 0
+          const db = b.createdDate ? new Date(b.createdDate).getTime() : 0
+          return db - da
+        case "popularity":
+        default:
+          return (b.reviewCount ?? 0) - (a.reviewCount ?? 0)
+      }
+    })
+    return filtered
+  }, [
+    trendingGifts,
+    searchQueryTrending,
+    selectedCategoryTrending,
+    selectedSourceTrending,
+    selectedRatingTrending,
+    selectedBadgeTrending,
+    priceRangeTrending,
+    sortByTrending,
+  ])
+
+  const activeFiltersCountTrending = useMemo(() => {
+    let count = 0
+    if (selectedCategoryTrending !== "all") count++
+    if (selectedSourceTrending !== "all") count++
+    if (selectedRatingTrending !== "all") count++
+    if (selectedBadgeTrending !== "all") count++
+    if (priceRangeTrending.min || priceRangeTrending.max) count++
+    return count
+  }, [selectedCategoryTrending, selectedSourceTrending, selectedRatingTrending, selectedBadgeTrending, priceRangeTrending])
+
+  const clearAllTrendingFilters = () => {
+    setSearchQueryTrending("")
+    setSelectedCategoryTrending("all")
+    setSelectedSourceTrending("all")
+    setSelectedRatingTrending("all")
+    setSelectedBadgeTrending("all")
+    setPriceRangeTrending({ min: "", max: "" })
+    setSortByTrending("popularity")
+  }
+
+  const getCategoryColorTrending = (category: string): { bg: string; text: string; border: string } => {
+    const categoryColors: Record<string, { bg: string; text: string; border: string }> = {
+      Electronics: { bg: "from-rose-100 to-pink-100", text: "text-rose-700", border: "border-rose-200" },
+      "Home & Kitchen": { bg: "from-amber-100 to-yellow-100", text: "text-amber-700", border: "border-amber-200" },
+      Clothing: { bg: "from-violet-100 to-purple-100", text: "text-violet-700", border: "border-violet-200" },
+      Beauty: { bg: "from-pink-100 to-rose-100", text: "text-pink-700", border: "border-pink-200" },
+      Sports: { bg: "from-emerald-100 to-teal-100", text: "text-emerald-700", border: "border-emerald-200" },
+      Toys: { bg: "from-orange-100 to-amber-100", text: "text-orange-700", border: "border-orange-200" },
+      Books: { bg: "from-indigo-100 to-blue-100", text: "text-indigo-700", border: "border-indigo-200" },
+      Jewelry: { bg: "from-fuchsia-100 to-pink-100", text: "text-fuchsia-700", border: "border-fuchsia-200" },
+    }
+    if (categoryColors[category]) return categoryColors[category]
+    const hash = category.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0)
+    const opts = [
+      { bg: "from-coral-100 to-red-100", text: "text-red-700", border: "border-red-200" },
+      { bg: "from-amber-100 to-orange-100", text: "text-amber-700", border: "border-amber-200" },
+      { bg: "from-rose-100 to-pink-100", text: "text-rose-700", border: "border-rose-200" },
+    ]
+    return opts[hash % opts.length]
+  }
+
+  const addAffiliateTagTrending = (url: string): string => {
+    if (!url) return url
+    try {
+      const u = new URL(url)
+      if (u.hostname.includes("amazon.")) {
+        u.searchParams.delete("tag")
+        u.searchParams.set("tag", "wishbeeai-20")
+        return u.toString()
+      }
+      return url
+    } catch {
+      return url
+    }
+  }
+
+  const getFilteredAttributesTrending = (gift: any) => {
+    if (!gift?.attributes) return []
+    const exclude = ["color", "size", "style", "brand", "sizeOptions", "colorVariants", "combinedVariants", "styleOptions", "styleName", "patternName"]
+    return Object.entries(gift.attributes).filter(
+      ([key, value]) => !exclude.includes(key) && value != null && value !== ""
+    )
+  }
+
+  // Map trending gift to shape expected by AddToWishlistModal (Choose Your Preferred Options / Change Options UI)
+  const trendingGiftToModalGift = (gift: any) => {
+    if (!gift) return null
+    return {
+      id: gift.id,
+      giftName: gift.productName || gift.giftName || "Product",
+      productLink: gift.productLink,
+      image: gift.image,
+      targetAmount: gift.price ?? gift.targetAmount ?? 0,
+      source: gift.source,
+      category: gift.category,
+      rating: gift.rating,
+      reviewCount: gift.reviewCount,
+      amazonChoice: gift.amazonChoice,
+      bestSeller: gift.bestSeller,
+      overallPick: gift.overallPick,
+      originalPrice: gift.originalPrice,
+      attributes: gift.attributes,
+    }
+  }
+
   const handleGenerateBanner = async () => {
     if (!collectionTitle) {
       toast({ title: "Title required", description: "Please enter a collection title first.", variant: "destructive" })
@@ -1025,9 +1201,18 @@ export function CreateGiftFormClient() {
         }
         return true
       case 2:
-        // Product step - at least need I Wish preferences or extracted product
-        if (!extractedProduct && Object.keys(iWishVariants).length === 0) {
-          toast({ title: "Required", description: "Please extract a product or enter preferences.", variant: "destructive" })
+        // Product step - require a product from Trending Gifts, Shared Wishlists, or Add Your Own
+        const hasProduct = !!(
+          extractedProduct ||
+          (Object.keys(iWishVariants).length > 0) ||
+          (iWishImage && (giftName?.trim() || productUrl?.trim()))
+        )
+        if (!hasProduct) {
+          toast({
+            title: "Select a product",
+            description: "Please choose a product from Trending Gifts, Shared Wishlists, or Add Your Own before continuing.",
+            variant: "destructive",
+          })
           return false
         }
         return true
@@ -1139,8 +1324,39 @@ export function CreateGiftFormClient() {
         }),
       })
 
-      if (!response.ok) throw new Error("Failed to create gift")
-      const data = await response.json()
+      const rawText = await response.text()
+      let data: Record<string, unknown> = {}
+      try {
+        if (rawText && rawText.trim()) data = JSON.parse(rawText) as Record<string, unknown>
+      } catch {
+        console.error("[Gift Create] POST /api/gifts failed: response was not JSON. Status:", response.status, "Body (first 500 chars):", rawText.slice(0, 500))
+        throw new Error("Server returned an error page. Check the browser console for the response body and the terminal where 'npm run dev' is running.")
+      }
+      if (!response.ok) {
+        // Always derive message from raw body for 500s so we show the real server error
+        let message = "Failed to create gift"
+        if (rawText?.trim()) {
+          try {
+            const parsed = JSON.parse(rawText) as Record<string, unknown>
+            const details = parsed?.details && typeof parsed.details === "string" ? parsed.details : null
+            const errMsg = parsed?.error && typeof parsed.error === "string" ? parsed.error : null
+            message = details || errMsg || message
+            // When Supabase schema is wrong (PGRST204), tell user exactly how to fix
+            const code = parsed?.code as string | undefined
+            if ((code === "PGRST204" || (details && details.includes("schema cache"))) && message) {
+              message = `${message} Fix: Copy RUN-GIFTS-MIGRATION.sql (project root) into Supabase SQL Editor → Run. Then Settings → API → Reload schema cache.`
+            }
+          } catch {
+            message = response.status === 500
+              ? "Server error. Check the terminal where 'npm run dev' is running."
+              : message
+          }
+        } else if (response.status === 500) {
+          message = "Server error (no response body). Check the terminal where 'npm run dev' is running."
+        }
+        console.error("[Gift Create] POST /api/gifts failed:", response.status, "rawBody:", rawText?.slice(0, 500))
+        throw new Error(message)
+      }
       
       // Generate magic link if evite settings are enabled
       if (eviteSettings?.enableMagicLink) {
@@ -1159,11 +1375,8 @@ export function CreateGiftFormClient() {
           
           if (magicLinkData.success) {
             console.log('[Gift Create] Magic link generated:', magicLinkData.magicLink.url)
-            // Store magic link URL in session storage for sharing
             sessionStorage.setItem(`gift_${data.id}_magicLink`, magicLinkData.magicLink.url)
-            // Set the magic link and move to Share step
-            setCreatedGiftMagicLink(magicLinkData.magicLink.url)
-            setCurrentStep(7)
+            router.push('/gifts/active')
             return
           }
         } catch (magicLinkError) {
@@ -1171,12 +1384,13 @@ export function CreateGiftFormClient() {
         }
       }
       
-      // If no magic link or evite settings, use default link and move to Share step
+      // No magic link or evite: store default link for share modal on Active page, then go to Active Gifts
       const defaultLink = `${window.location.origin}/gifts/contribute/${data.id}`
-      setCreatedGiftMagicLink(defaultLink)
-      setCurrentStep(7)
+      sessionStorage.setItem(`gift_${data.id}_magicLink`, defaultLink)
+      router.push('/gifts/active')
     } catch (error) {
-      toast({ title: "Error", description: "Could not create gift collection.", variant: "destructive" })
+      const message = error instanceof Error ? error.message : "Could not create gift collection."
+      toast({ title: "Error", description: message, variant: "destructive" })
     } finally {
       setIsSubmitting(false)
     }
@@ -1547,64 +1761,243 @@ export function CreateGiftFormClient() {
 
                 {/* Trending Gifts Browser - SECOND */}
                 {productSource === "trending" && (
-                  <div className="bg-gradient-to-br from-amber-50/50 to-orange-50/30 rounded-xl border border-[#F59E0B]/20 overflow-hidden mb-4">
-                    <div className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-[#F59E0B] to-[#FBBF24]">
-                      <TrendingUp className="w-4 h-4 text-white" />
-                      <span className="text-sm font-semibold text-white">Trending Gifts</span>
-                      <span className="ml-auto text-xs text-white/80">{trendingGifts.length} items</span>
+                  <div className="bg-gradient-to-br from-amber-50/60 to-orange-50/40 rounded-xl border-2 border-[#F59E0B]/25 overflow-hidden mb-4 shadow-sm">
+                    <div className="flex items-center gap-2 px-4 py-3.5 bg-gradient-to-r from-[#F59E0B] to-[#FBBF24]">
+                      <TrendingUp className="w-5 h-5 text-white" />
+                      <span className="text-base font-semibold text-white">Trending Gifts</span>
+                      <span className="ml-auto text-sm text-white/90">{trendingGifts.length} items</span>
                     </div>
-                    <div className="max-h-[280px] overflow-y-auto">
+                    {/* Search and filters (same as /gifts/trending) */}
+                    {trendingGifts.length > 0 && (
+                      <div className="px-4 pt-3 pb-2 border-b border-[#F59E0B]/10 bg-white/50">
+                        <div className="flex flex-col sm:flex-row gap-3">
+                          <div className="flex-1 relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#F59E0B] w-4 h-4" />
+                            <input
+                              type="text"
+                              placeholder="Search trending gifts..."
+                              value={searchQueryTrending}
+                              onChange={(e) => setSearchQueryTrending(e.target.value)}
+                              className="w-full pl-9 pr-3 py-2 rounded-lg border-2 border-[#F59E0B]/20 focus:border-[#F59E0B] focus:outline-none bg-white text-[#654321] text-sm"
+                            />
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Button
+                              type="button"
+                              onClick={() => setShowFiltersTrending(!showFiltersTrending)}
+                              className={`h-9 px-3 rounded-lg border-2 text-sm transition-all ${
+                                showFiltersTrending || activeFiltersCountTrending > 0
+                                  ? "bg-[#F59E0B] text-white border-[#F59E0B]"
+                                  : "bg-white text-[#654321] border-[#F59E0B]/20 hover:border-[#F59E0B]"
+                              }`}
+                            >
+                              <SlidersHorizontal className="w-4 h-4 mr-1.5" />
+                              Filters
+                              {activeFiltersCountTrending > 0 && (
+                                <span className="ml-1.5 bg-white/20 text-white rounded-full px-1.5 py-0.5 text-xs font-bold">
+                                  {activeFiltersCountTrending}
+                                </span>
+                              )}
+                            </Button>
+                            <div className="flex gap-0.5 border-2 border-[#F59E0B]/20 rounded-lg bg-white p-0.5">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setViewModeTrending("grid")}
+                                className={`h-8 px-2.5 ${viewModeTrending === "grid" ? "bg-[#F59E0B] text-white" : "text-[#654321]"}`}
+                              >
+                                <Grid3x3 className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setViewModeTrending("list")}
+                                className={`h-8 px-2.5 ${viewModeTrending === "list" ? "bg-[#F59E0B] text-white" : "text-[#654321]"}`}
+                              >
+                                <List className="w-4 h-4" />
+                              </Button>
+                            </div>
+                            <select
+                              value={sortByTrending}
+                              onChange={(e) => setSortByTrending(e.target.value as typeof sortByTrending)}
+                              className="h-9 px-3 rounded-lg border-2 border-[#F59E0B]/20 focus:border-[#F59E0B] focus:outline-none bg-white text-[#654321] text-sm font-medium cursor-pointer"
+                            >
+                              <option value="popularity">Sort: Popularity</option>
+                              <option value="rating">Sort: Rating</option>
+                              <option value="price-low">Sort: Price Low to High</option>
+                              <option value="price-high">Sort: Price High to Low</option>
+                              <option value="name">Sort: Name A–Z</option>
+                              <option value="newest">Sort: Newest</option>
+                            </select>
+                          </div>
+                        </div>
+                        {/* Advanced filters panel */}
+                        {showFiltersTrending && (
+                          <div className="mt-3 pt-3 border-t border-[#F59E0B]/10">
+                            <div className="flex items-center justify-between mb-3">
+                              <span className="text-sm font-semibold text-[#654321]">Filter options</span>
+                              <div className="flex gap-2">
+                                {activeFiltersCountTrending > 0 && (
+                                  <Button type="button" variant="outline" size="sm" onClick={clearAllTrendingFilters} className="text-xs h-8 border-[#F59E0B] text-[#654321] hover:bg-[#F59E0B] hover:text-white">
+                                    <X className="w-3 h-3 mr-1" /> Clear all
+                                  </Button>
+                                )}
+                                <Button type="button" variant="ghost" size="sm" onClick={() => setShowFiltersTrending(false)} className="h-8 w-8 p-0">
+                                  <X className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                              <div>
+                                <label className="block text-xs font-semibold text-[#654321] mb-1">Category</label>
+                                <select value={selectedCategoryTrending} onChange={(e) => setSelectedCategoryTrending(e.target.value)} className="w-full px-2 py-1.5 rounded-lg border border-[#F59E0B]/20 text-[#654321] text-sm focus:outline-none focus:border-[#F59E0B] bg-white">
+                                  {categoriesTrending.map((c) => (
+                                    <option key={c} value={c}>{c === "all" ? "All categories" : c}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div>
+                                <label className="block text-xs font-semibold text-[#654321] mb-1">Store</label>
+                                <select value={selectedSourceTrending} onChange={(e) => setSelectedSourceTrending(e.target.value)} className="w-full px-2 py-1.5 rounded-lg border border-[#F59E0B]/20 text-[#654321] text-sm focus:outline-none focus:border-[#F59E0B] bg-white">
+                                  {sourcesTrending.map((s) => (
+                                    <option key={s} value={s}>{s === "all" ? "All stores" : s}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div>
+                                <label className="block text-xs font-semibold text-[#654321] mb-1">Min. rating</label>
+                                <select value={selectedRatingTrending} onChange={(e) => setSelectedRatingTrending(e.target.value)} className="w-full px-2 py-1.5 rounded-lg border border-[#F59E0B]/20 text-[#654321] text-sm focus:outline-none focus:border-[#F59E0B] bg-white">
+                                  <option value="all">All</option>
+                                  <option value="4+">4+ Stars</option>
+                                  <option value="3+">3+ Stars</option>
+                                  <option value="2+">2+ Stars</option>
+                                  <option value="1+">1+ Stars</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label className="block text-xs font-semibold text-[#654321] mb-1">Badge</label>
+                                <select value={selectedBadgeTrending} onChange={(e) => setSelectedBadgeTrending(e.target.value)} className="w-full px-2 py-1.5 rounded-lg border border-[#F59E0B]/20 text-[#654321] text-sm focus:outline-none focus:border-[#F59E0B] bg-white">
+                                  <option value="all">All</option>
+                                  <option value="amazon-choice">Amazon's Choice</option>
+                                  <option value="best-seller">Best Seller</option>
+                                  <option value="overall-pick">Overall Pick</option>
+                                  <option value="on-sale">On Sale</option>
+                                </select>
+                              </div>
+                              <div className="sm:col-span-2">
+                                <label className="block text-xs font-semibold text-[#654321] mb-1">Price range</label>
+                                <div className="flex gap-2">
+                                  <input type="number" placeholder="Min" value={priceRangeTrending.min} onChange={(e) => setPriceRangeTrending((p) => ({ ...p, min: e.target.value }))} className="flex-1 px-2 py-1.5 rounded-lg border border-[#F59E0B]/20 text-[#654321] text-sm focus:outline-none focus:border-[#F59E0B] bg-white" />
+                                  <input type="number" placeholder="Max" value={priceRangeTrending.max} onChange={(e) => setPriceRangeTrending((p) => ({ ...p, max: e.target.value }))} className="flex-1 px-2 py-1.5 rounded-lg border border-[#F59E0B]/20 text-[#654321] text-sm focus:outline-none focus:border-[#F59E0B] bg-white" />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        <p className="text-xs text-[#78350F]/80 mt-2">
+                          {filteredAndSortedTrendingGifts.length} {filteredAndSortedTrendingGifts.length === 1 ? "gift" : "gifts"} found
+                          {activeFiltersCountTrending > 0 && (
+                            <button type="button" onClick={clearAllTrendingFilters} className="ml-2 underline font-medium hover:no-underline">
+                              Clear filters
+                            </button>
+                          )}
+                        </p>
+                      </div>
+                    )}
+                    <div className="max-h-[520px] overflow-y-auto p-4">
                       {isLoadingTrending ? (
-                        <div className="flex items-center justify-center py-12">
-                          <Loader2 className="w-6 h-6 animate-spin text-[#F59E0B]" />
-                          <span className="ml-2 text-sm text-[#78350F]">Loading...</span>
+                        <div className="flex items-center justify-center py-16">
+                          <Loader2 className="w-8 h-8 animate-spin text-[#F59E0B]" />
+                          <span className="ml-3 text-base text-[#78350F]">Loading...</span>
                         </div>
                       ) : trendingGifts.length === 0 ? (
-                        <div className="text-center py-12 px-4">
-                          <TrendingUp className="w-12 h-12 mx-auto text-[#F59E0B]/30 mb-3" />
-                          <p className="text-sm text-[#78350F]/70 font-medium">No trending gifts yet</p>
-                          <p className="text-xs text-[#78350F]/50 mt-1">Check back later for popular gift ideas</p>
+                        <div className="text-center py-16 px-4">
+                          <TrendingUp className="w-14 h-14 mx-auto text-[#F59E0B]/30 mb-4" />
+                          <p className="text-base text-[#78350F]/70 font-medium">No trending gifts yet</p>
+                          <p className="text-sm text-[#78350F]/50 mt-2">Check back later for popular gift ideas</p>
                         </div>
-                      ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3">
-                          {trendingGifts.map((gift) => (
-                            <button
-                              key={gift.id}
-                              type="button"
-                              onClick={() => selectTrendingGift(gift)}
-                              className="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-100 hover:border-[#F59E0B] hover:shadow-md transition-all text-left"
-                            >
-                              {gift.image ? (
-                                <img src={gift.image} alt={gift.productName} className="w-14 h-14 object-contain rounded-lg bg-gray-50" />
-                              ) : (
-                                <div className="w-14 h-14 bg-gray-100 rounded-lg flex items-center justify-center">
-                                  <Gift className="w-6 h-6 text-gray-400" />
+                      ) : filteredAndSortedTrendingGifts.length === 0 ? (
+                        <div className="text-center py-12 px-4">
+                          <p className="text-sm text-[#78350F]/70 font-medium">No gifts match your filters</p>
+                          <Button type="button" onClick={clearAllTrendingFilters} className="mt-3 bg-[#F59E0B] hover:bg-[#D97706] text-white text-sm">
+                            Clear filters
+                          </Button>
+                        </div>
+                      ) : viewModeTrending === "grid" ? (
+                        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {filteredAndSortedTrendingGifts.map((gift) => {
+                            const name = gift.productName || gift.giftName || "Trending Gift"
+                            const priceVal = gift.price ?? gift.targetAmount ?? 0
+                            const attrs = getFilteredAttributesTrending(gift)
+                            return (
+                              <div key={gift.id} className="bg-gradient-to-br from-white to-amber-50/30 rounded-2xl shadow-lg border border-[#DAA520]/30 overflow-hidden hover:shadow-2xl hover:border-[#DAA520]/60 transition-all duration-300 group flex flex-col h-full">
+                                <div className="relative overflow-hidden">
+                                  <img src={gift.image || "/placeholder.svg"} alt={name} className="w-full h-40 object-contain bg-white group-hover:scale-105 transition-transform duration-500" />
+                                  {gift.category && (() => { const c = getCategoryColorTrending(gift.category); return <div className={`absolute top-2 left-2 bg-gradient-to-r ${c.bg} ${c.text} px-2.5 py-0.5 rounded-full text-xs font-bold border ${c.border}`}>{gift.category}</div> })()}
+                                  {gift.originalPrice != null && gift.originalPrice > priceVal && <div className="absolute top-2 right-2 bg-gradient-to-r from-red-500 to-rose-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">SALE</div>}
                                 </div>
-                              )}
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-semibold text-[#654321] line-clamp-2">{gift.productName}</p>
-                                <div className="flex items-center gap-2 mt-1">
-                                  <span className="text-sm font-bold text-[#F59E0B]">${gift.price?.toFixed(2)}</span>
+                                <div className="p-3 flex-grow flex flex-col">
+                                  <Tooltip><TooltipTrigger asChild><h3 className="text-sm font-semibold text-[#654321] mb-1 line-clamp-2 min-h-[2.5rem] cursor-pointer">{name}</h3></TooltipTrigger><TooltipContent className="max-w-[280px] bg-[#4A2F1A] text-white text-xs p-2 rounded-lg"><p>{name}</p></TooltipContent></Tooltip>
+                                  {gift.source && <p className="text-xs text-[#8B4513]/60 mb-1 flex items-center gap-1"><span className="w-1 h-1 bg-[#DAA520] rounded-full" /> From {gift.source}</p>}
                                   {gift.rating > 0 && (
-                                    <span className="flex items-center gap-0.5 text-[10px] text-amber-600">
-                                      <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                                      {gift.rating.toFixed(1)}
-                                    </span>
+                                    <div className="flex items-center gap-1.5 mb-1">
+                                      <div className="flex items-center gap-0.5">{[1,2,3,4,5].map((i) => { const fill = Math.max(0, Math.min(1, (gift.rating ?? 0) - (i - 1))); const pct = Math.round(fill * 100); const id = `star-cg-${gift.id}-${i}`; return <svg key={i} className="w-3 h-3" viewBox="0 0 24 24" fill="none"><defs><linearGradient id={id} x1="0%" y1="0%" x2="100%" y2="0%"><stop offset={`${pct}%`} stopColor="#F4C430" /><stop offset={`${pct}%`} stopColor="#E5E7EB" /></linearGradient></defs><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill={`url(#${id})`} stroke="#F4C430" strokeWidth="1" /></svg> })})</div>
+                                      <span className="text-xs font-bold text-[#654321]">{gift.rating?.toFixed(1)}</span>{gift.reviewCount > 0 && <span className="text-xs text-gray-500">({gift.reviewCount})</span>}
+                                    </div>
+                                  )}
+                                  {(gift.amazonChoice || gift.bestSeller || gift.overallPick) && (
+                                    <div className="min-h-[22px] flex flex-wrap gap-1 mb-1">
+                                      {gift.amazonChoice && <span className="text-[10px] px-2 py-0.5 bg-gray-900 text-white rounded-full font-medium">Amazon&apos;s Choice</span>}
+                                      {gift.bestSeller && <span className="text-[10px] px-2 py-0.5 text-white rounded-full font-medium" style={{ backgroundColor: "#D14900" }}>Best Seller</span>}
+                                      {gift.overallPick && <span className="text-[10px] px-2 py-0.5 bg-emerald-600 text-white rounded-full font-medium">Overall Pick</span>}
+                                    </div>
+                                  )}
+                                  <div className="mb-2">{gift.originalPrice != null && gift.originalPrice > priceVal ? (<><span className="font-bold text-sm text-[#654321]">${priceVal.toFixed(2)}</span><span className="text-gray-400 line-through text-xs ml-1">${gift.originalPrice.toFixed(2)}</span></>) : <span className="font-bold text-sm text-[#654321]">${priceVal.toFixed(2)}</span>}</div>
+                                  {attrs.length > 0 && (
+                                    <div className="bg-[#6B4423]/5 rounded-lg p-2 border border-[#8B5A3C]/10 text-[10px]">
+                                      <p className="font-bold text-[#6B4423] uppercase tracking-wider mb-1">Specs</p>
+                                      {attrs.slice(0, expandedSpecsTrending[gift.id] ? undefined : 4).map(([key, value]) => <div key={key} className="flex gap-1 truncate"><span className="font-semibold text-[#6B4423] capitalize flex-shrink-0">{key.replace(/([A-Z])/g, " $1").trim()}:</span><span className="text-[#654321] truncate">{String(value)}</span></div>)}
+                                      {attrs.length > 4 && <button type="button" onClick={(e) => { e.stopPropagation(); setExpandedSpecsTrending((p) => ({ ...p, [gift.id]: !p[gift.id] })) }} className="text-[8px] font-bold text-[#DAA520] mt-0.5 hover:underline">{expandedSpecsTrending[gift.id] ? "Show less" : `+${attrs.length - 4} more`}</button>}
+                                    </div>
                                   )}
                                 </div>
-                                {(gift.amazonChoice || gift.bestSeller) && (
-                                  <div className="flex gap-1 mt-1">
-                                    {gift.amazonChoice && (
-                                      <span className="text-[8px] px-1.5 py-0.5 bg-gray-900 text-white rounded-full">Choice</span>
-                                    )}
-                                    {gift.bestSeller && (
-                                      <span className="text-[8px] px-1.5 py-0.5 bg-orange-600 text-white rounded-full">Best Seller</span>
-                                    )}
-                                  </div>
-                                )}
+                                <div className="px-3 pb-3 pt-1 flex flex-col gap-1.5 border-t border-[#DAA520]/10">
+                                  <button type="button" className="w-full px-3 py-1.5 bg-gradient-to-r from-[#DAA520] to-[#F4C430] hover:from-[#F4C430] hover:to-[#DAA520] text-[#8B4513] rounded-lg text-xs font-semibold flex items-center justify-center gap-1" onClick={(e) => { e.stopPropagation(); setPreviewProduct(gift); setShowPreviewProduct(true) }}><Gift className="w-3 h-3" /> Select for gift</button>
+                                  <button type="button" className="w-full px-3 py-1.5 bg-gradient-to-r from-[#EA580C] to-[#FB923C] hover:from-[#FB923C] hover:to-[#EA580C] text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1" onClick={(e) => { e.stopPropagation(); setSelectedGiftForDifferentOptions(trendingGiftToModalGift(gift)); setShowSelectDifferentOptionsModal(true) }}><ExternalLink className="w-3 h-3" /> Select different Options</button>
+                                </div>
                               </div>
-                            </button>
-                          ))}
+                            )
+                          })}
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {filteredAndSortedTrendingGifts.map((gift) => {
+                            const name = gift.productName || gift.giftName || "Trending Gift"
+                            const priceVal = gift.price ?? gift.targetAmount ?? 0
+                            const attrs = getFilteredAttributesTrending(gift)
+                            return (
+                              <div key={gift.id} className="bg-white rounded-xl shadow-lg border-2 border-[#DAA520]/20 p-4 hover:shadow-xl transition-all flex gap-4 items-start">
+                                <div className="relative flex-shrink-0"><img src={gift.image || "/placeholder.svg"} alt={name} className="w-24 h-24 object-contain bg-white rounded-lg border-2 border-[#DAA520]" />{gift.originalPrice != null && gift.originalPrice > priceVal && <div className="absolute top-0 left-0 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">SALE</div>}</div>
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="text-base font-bold text-[#654321] line-clamp-2 mb-1">{name}</h3>
+                                  {gift.source && <p className="text-xs text-[#8B4513]/70 mb-1">From {gift.source}</p>}
+                                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                                    {gift.category && (() => { const c = getCategoryColorTrending(gift.category); return <span className={`text-xs px-2 py-0.5 rounded-full font-medium bg-gradient-to-r ${c.bg} ${c.text} border ${c.border}`}>{gift.category}</span> })()}
+                                    {gift.rating > 0 && <span className="flex items-center gap-0.5 text-xs"><Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />{gift.rating.toFixed(1)}{gift.reviewCount > 0 ? ` (${gift.reviewCount})` : ""}</span>}
+                                    {(gift.amazonChoice || gift.bestSeller || gift.overallPick) && <div className="flex gap-1">{gift.amazonChoice && <span className="text-[10px] px-1.5 py-0.5 bg-gray-900 text-white rounded">Amazon&apos;s Choice</span>}{gift.bestSeller && <span className="text-[10px] px-1.5 py-0.5 text-white rounded" style={{ backgroundColor: "#D14900" }}>Best Seller</span>}{gift.overallPick && <span className="text-[10px] px-1.5 py-0.5 bg-emerald-600 text-white rounded">Overall Pick</span>}</div>}
+                                    <span className="font-bold text-[#654321]">${priceVal.toFixed(2)}{gift.originalPrice != null && gift.originalPrice > priceVal && <span className="text-gray-400 line-through text-xs ml-1">${gift.originalPrice.toFixed(2)}</span>}</span>
+                                  </div>
+                                  {attrs.length > 0 && <div className="text-[10px] text-[#8B5A3C]/80">{attrs.slice(0, expandedSpecsTrending[gift.id] ? undefined : 3).map(([key, value]) => <span key={key} className="mr-2"><span className="font-semibold">{key.replace(/([A-Z])/g, " $1").trim()}:</span> {String(value)}</span>)}{attrs.length > 3 && <button type="button" onClick={() => setExpandedSpecsTrending((p) => ({ ...p, [gift.id]: !p[gift.id] }))} className="text-[#DAA520] font-bold ml-1">{expandedSpecsTrending[gift.id] ? "Less" : `+${attrs.length - 3} more`}</button>}</div>}
+                                </div>
+                                <div className="flex flex-col gap-1.5 flex-shrink-0">
+                                  <button type="button" className="px-3 py-1.5 bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#8B4513] rounded-lg text-xs font-semibold flex items-center gap-1" onClick={(e) => { e.stopPropagation(); setPreviewProduct(gift); setShowPreviewProduct(true) }}><Gift className="w-3 h-3" /> Select for gift</button>
+                                  <button type="button" className="px-3 py-1.5 bg-gradient-to-r from-[#EA580C] to-[#FB923C] text-white rounded-lg text-xs font-semibold flex items-center gap-1" onClick={(e) => { e.stopPropagation(); setSelectedGiftForDifferentOptions(trendingGiftToModalGift(gift)); setShowSelectDifferentOptionsModal(true) }}><ExternalLink className="w-3 h-3" /> Select different Options</button>
+                                </div>
+                              </div>
+                            )
+                          })}
                         </div>
                       )}
                     </div>
@@ -3536,7 +3929,7 @@ export function CreateGiftFormClient() {
                       )}
 
                       {/* Alternative Card - Full Details */}
-                      {(altImage || Object.keys(altVariants).length > 0) && (
+                      {(altImage || Object.keys(altVariants).length > 0 || Object.keys(altEditableSpecs).length > 0 || altNotes) && (
                         <div className="rounded-lg border-2 border-[#D97706]/30 bg-gradient-to-r from-[#D97706]/10 to-[#F59E0B]/10 p-3">
                           <div className="flex items-center justify-between mb-2">
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-gradient-to-r from-[#D97706] to-[#F59E0B] text-white shadow-sm">
@@ -4182,6 +4575,159 @@ export function CreateGiftFormClient() {
         </DialogContent>
       </Dialog>
       
+      {/* Preview Product (Trending Gift) Dialog */}
+      <Dialog open={showPreviewProduct} onOpenChange={setShowPreviewProduct}>
+        <DialogContent className="sm:max-w-lg border-2 border-[#F59E0B] bg-white">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-[#654321] flex items-center gap-2">
+              <Eye className="w-5 h-5 text-[#F59E0B]" />
+              Preview Product
+            </DialogTitle>
+          </DialogHeader>
+          {previewProduct && (
+            <div className="space-y-4">
+              <div className="flex gap-4">
+                {previewProduct.image ? (
+                  <img src={previewProduct.image} alt={previewProduct.productName} className="w-28 h-28 sm:w-32 sm:h-32 flex-shrink-0 object-contain rounded-xl bg-gray-50 border border-[#F59E0B]/20" />
+                ) : (
+                  <div className="w-28 h-28 sm:w-32 sm:h-32 flex-shrink-0 bg-gray-100 rounded-xl flex items-center justify-center border border-[#F59E0B]/20">
+                    <Gift className="w-12 h-12 text-gray-400" />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-base font-semibold text-[#654321] line-clamp-2 leading-snug">{previewProduct.productName}</p>
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-xl font-bold text-[#F59E0B]">${(previewProduct.price ?? 0).toFixed(2)}</span>
+                    {previewProduct.originalPrice != null && Number(previewProduct.originalPrice) > (previewProduct.price ?? 0) && (
+                      <span className="text-sm text-gray-500 line-through">${Number(previewProduct.originalPrice).toFixed(2)}</span>
+                    )}
+                  </div>
+                  {previewProduct.rating > 0 && (
+                    <span className="flex items-center gap-1 text-sm text-amber-600 mt-1">
+                      <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                      {previewProduct.rating?.toFixed(1)} {previewProduct.reviewCount ? `(${previewProduct.reviewCount} reviews)` : ""}
+                    </span>
+                  )}
+                  {(previewProduct.amazonChoice || previewProduct.bestSeller || previewProduct.overallPick) && (
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {previewProduct.amazonChoice && (
+                        <span className="text-xs px-2 py-0.5 bg-gray-900 text-white rounded-full font-medium">Amazon Choice</span>
+                      )}
+                      {previewProduct.bestSeller && (
+                        <span className="text-xs px-2 py-0.5 bg-orange-600 text-white rounded-full font-medium">Best Seller</span>
+                      )}
+                      {previewProduct.overallPick && (
+                        <span className="text-xs px-2 py-0.5 bg-[#F59E0B] text-white rounded-full font-medium">Overall Pick</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+              {previewProduct.description && (
+                <p className="text-sm text-[#8B4513]/80 line-clamp-3">{previewProduct.description}</p>
+              )}
+              {previewProduct.category && (
+                <p className="text-xs text-[#8B4513]/60">Category: {previewProduct.category}</p>
+              )}
+            </div>
+          )}
+          <DialogFooter className="mt-4 gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowPreviewProduct(false)}
+              className="border-[#F59E0B] text-[#654321] hover:bg-[#F59E0B]/10"
+            >
+              Close
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                if (previewProduct) {
+                  selectTrendingGift(previewProduct)
+                  setShowPreviewProduct(false)
+                  setPreviewProduct(null)
+                }
+              }}
+              className="bg-gradient-to-r from-[#F59E0B] to-[#D97706] hover:from-[#D97706] hover:to-[#B45309] text-white font-semibold"
+            >
+              Use this product
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Select different Options - same UI as /gifts/trending Add to Wishlist → Choose Your Preferred Options */}
+      <AddToWishlistModal
+        gift={selectedGiftForDifferentOptions}
+        isOpen={showSelectDifferentOptionsModal}
+        onClose={() => {
+          setShowSelectDifferentOptionsModal(false)
+          setSelectedGiftForDifferentOptions(null)
+        }}
+        primaryButtonText="Add as gift"
+        modalTitle="Select different options"
+        onAddAsGift={({ gift, preferences }) => {
+          const product = {
+            productName: gift.giftName || "Product",
+            price: gift.targetAmount ?? 0,
+            originalPrice: gift.originalPrice,
+            imageUrl: preferences.iLike?.image || gift.image || "",
+            productLink: gift.productLink || "",
+            storeName: gift.source || "Store",
+            rating: gift.rating || 0,
+            reviewCount: gift.reviewCount || 0,
+            description: (gift as any).description || "",
+            amazonChoice: gift.amazonChoice,
+            bestSeller: gift.bestSeller,
+            overallPick: gift.overallPick,
+            attributes: gift.attributes || {},
+          }
+          setExtractedProduct(product)
+          setIWishImage(preferences.iLike?.image || gift.image || "")
+          const iLikeVariants: Record<string, string> = {}
+          if (preferences.iLike) {
+            const il = preferences.iLike
+            if (il.color) iLikeVariants["Color"] = il.color
+            if (il.size) iLikeVariants["Size"] = il.size
+            if (il.style) iLikeVariants["Style"] = il.style
+            if (il.configuration) iLikeVariants["Configuration"] = il.configuration
+            if (il.capacity) iLikeVariants["Capacity"] = il.capacity
+            if (il.customFields) il.customFields.forEach((f) => { if (f.key && f.value) iLikeVariants[f.key] = f.value })
+          }
+          setIWishVariants(iLikeVariants)
+          const specs = (preferences.iLike as any)?.specifications || gift.attributes
+          if (specs && typeof specs === "object") {
+            const specRecord: Record<string, string> = {}
+            Object.entries(specs).forEach(([k, v]) => { if (v != null && String(v).trim()) specRecord[k] = String(v) })
+            setEditableSpecs(specRecord)
+          }
+          if (gift.targetAmount != null) setTargetAmount(String(gift.targetAmount))
+          if (gift.giftName && !giftName) setGiftName(gift.giftName)
+          if (preferences.alternative) {
+            const alt = preferences.alternative as any
+            setAltImage(alt.image || "")
+            setAltNotes(alt.notes || "")
+            const altVariants: Record<string, string> = {}
+            if (alt.color) altVariants["Color"] = alt.color
+            if (alt.size) altVariants["Size"] = alt.size
+            if (alt.style) altVariants["Style"] = alt.style
+            if (alt.configuration) altVariants["Configuration"] = alt.configuration
+            if (alt.capacity) altVariants["Capacity"] = alt.capacity
+            if (alt.customFields) alt.customFields.forEach((f: { key: string; value: string }) => { if (f.key && f.value) altVariants[f.key] = f.value })
+            setAltVariants(altVariants)
+            if (alt.specifications && typeof alt.specifications === "object" && Object.keys(alt.specifications).length > 0) {
+              const specRecord: Record<string, string> = {}
+              Object.entries(alt.specifications).forEach(([k, v]) => { if (v != null && String(v).trim()) specRecord[k] = String(v).trim() })
+              setAltEditableSpecs(specRecord)
+            }
+          }
+          setShowSelectDifferentOptionsModal(false)
+          setSelectedGiftForDifferentOptions(null)
+          toast({ title: "🐝 Added as gift!", description: "Product added to Include Gift for this collection.", variant: "warm" })
+        }}
+      />
+
       {/* Gift Created Share Modal */}
       {showGiftCreatedModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">

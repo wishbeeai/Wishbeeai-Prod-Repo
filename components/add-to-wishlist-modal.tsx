@@ -32,6 +32,7 @@ import {
   Sparkles,
   AlertCircle,
 } from "lucide-react"
+import { amazonImageUrlToLarge } from "@/lib/utils"
 
 interface Gift {
   id: string
@@ -119,6 +120,12 @@ interface AddToWishlistModalProps {
   onClose: () => void
   wishlistItemId?: string // If provided, this is an existing item that can be updated
   onSavePreferences?: (preferences: PreferenceOptions) => void // Callback when preferences are saved
+  /** Primary button label (e.g. "Add as gift" on create page, "Add to My Wishlist" on trending) */
+  primaryButtonText?: string
+  /** Modal header title (e.g. "Select different options" on create page, "Choose Your Preferred Options" on trending) */
+  modalTitle?: string
+  /** When provided, primary button adds product as gift (e.g. to Include Gift on create page) instead of adding to wishlist */
+  onAddAsGift?: (data: { gift: Gift; preferences: PreferenceOptions }) => void
 }
 
 interface ExtractedProduct {
@@ -259,7 +266,7 @@ function getCleanVariantDisplay(value: string): string {
   return cleanVariantValue(value)
 }
 
-export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSavePreferences }: AddToWishlistModalProps) {
+export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSavePreferences, primaryButtonText = "Add to My Wishlist", modalTitle = "Choose Your Preferred Options", onAddAsGift }: AddToWishlistModalProps) {
   const { toast } = useToast()
   const router = useRouter()
   const [step, setStep] = useState<1 | 2>(1)
@@ -716,7 +723,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
     // Load I Wish preferences
     if (prefs.iLike) {
       const iLike = prefs.iLike
-      if (iLike.image) setLikeClippedImage(iLike.image)
+              if (iLike.image) setLikeClippedImage(amazonImageUrlToLarge(iLike.image) || iLike.image)
       if (iLike.title) setLikeClippedTitle(iLike.title)
       if (iLike.size) setLikeSize(iLike.size)
       if (iLike.color) setLikeColor(iLike.color)
@@ -766,7 +773,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
     // Load Ok to Buy preferences
     if (prefs.okToBuy) {
       const ok = prefs.okToBuy
-      if (ok.image) setOkClippedImage(ok.image)
+      if (ok.image) setOkClippedImage(amazonImageUrlToLarge(ok.image) || ok.image)
       if (ok.title) setOkClippedTitle(ok.title)
       if (ok.size) setOkSize(ok.size)
       // Quart capacity goes in Size only
@@ -1004,7 +1011,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
               // Update clipped image and title for I wish
               if (data.image) {
                 console.log('[Modal] ✅ Setting likeClippedImage:', data.image)
-                setLikeClippedImage(data.image)
+                setLikeClippedImage(amazonImageUrlToLarge(data.image) || data.image)
               }
               if (data.title) {
                 console.log('[Modal] Setting likeClippedTitle:', data.title.substring(0, 50))
@@ -1175,7 +1182,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                 if (!excl.includes(k.toLowerCase()) && v && String(v).trim()) specsFallback[k] = String(v).trim()
               })
               if (awaitingExtensionFor === "like") {
-                if (data.image) setLikeClippedImage(data.image)
+                if (data.image) setLikeClippedImage(amazonImageUrlToLarge(data.image) || data.image)
                 if (data.title) setLikeClippedTitle(data.title)
                 if (Object.keys(specsFallback).length > 0) setIWishSpecs(specsFallback)
                 setLikeSelected(true)
@@ -1195,7 +1202,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                 setShowAltRetailerPopup(false)
                 setAltRetailerMethod("url")
               } else if (awaitingExtensionFor === "ok") {
-                if (data.image) setOkClippedImage(data.image)
+                if (data.image) setOkClippedImage(amazonImageUrlToLarge(data.image) || data.image)
                 if (data.title) setOkClippedTitle(data.title)
                 setOkSelected(true)
               }
@@ -1583,7 +1590,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
       // IMPORTANT: Include image and title for each preference section
       const preferenceOptions = {
         iLike: likeSelected ? {
-          image: likeClippedImage || extractedProduct?.imageUrl || null,
+          image: amazonImageUrlToLarge(likeClippedImage || extractedProduct?.imageUrl) || likeClippedImage || extractedProduct?.imageUrl || null,
           title: likeClippedTitle || extractedProduct?.productName || null,
           size: cleanOptionValue(likeSize),
           color: cleanColorForSave(likeColor),
@@ -1606,7 +1613,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
           specifications: Object.keys(altSpecs).length > 0 ? altSpecs : null,
         } : null,
         okToBuy: okSelected ? {
-          image: okClippedImage || null,
+          image: amazonImageUrlToLarge(okClippedImage) || okClippedImage || null,
           title: okClippedTitle || null,
           size: cleanOptionValue(okSize),
           color: cleanColorForSave(okColor),
@@ -2088,7 +2095,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
     const url = prompt("Enter the product image URL:", defaultUrl)
     if (url !== null && url.trim()) {
       if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:image')) {
-        setAltClippedImage(url.trim())
+        setAltClippedImage(amazonImageUrlToLarge(url.trim()) || url.trim())
         toast({
           title: "Image updated",
           description: "Product image URL has been set for Alternative section",
@@ -2158,8 +2165,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
         // Check if it's a valid image URL
         if (trimmedText.startsWith('http://') || trimmedText.startsWith('https://')) {
           console.log('[Paste] Alt - Valid URL detected, setting image...')
-          // Accept any URL - let the browser try to load it
-          setAltClippedImage(trimmedText)
+          setAltClippedImage(amazonImageUrlToLarge(trimmedText) || trimmedText)
           toast({
             title: "🐝 Image Pasted!",
             description: "Alternative product image updated from clipboard",
@@ -2210,7 +2216,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
   const handleAltImageUrlSubmit = () => {
     const url = altImageUrlInput.trim()
     if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
-      setAltClippedImage(url)
+      setAltClippedImage(amazonImageUrlToLarge(url) || url)
       setAltImageUrlInput("")
       setShowAltImageInput(false)
       toast({
@@ -2241,7 +2247,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
         <div className="w-[750px] h-[80px] bg-gradient-to-r from-[#6B4423] via-[#8B5A3C] to-[#6B4423] px-4 border-b-2 border-[#4A2F1A] flex items-center justify-center relative">
           <h3 className="text-[18px] font-bold text-[#F5DEB3] flex items-center gap-2">
             <Heart className="w-[18px] h-[18px] text-[#F5DEB3]" />
-            Choose Your Preferred Options
+            {modalTitle}
           </h3>
           <button
             onClick={handleClose}
@@ -2446,7 +2452,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                                                       for (const [k, v] of Object.entries(data.attributes)) { if (v && typeof v === "string" && !["color", "size", "style", "configuration"].includes(k.toLowerCase())) specs[k] = v }
                                                       if (Object.keys(specs).length > 0) setIWishSpecs(specs)
                                                     }
-                                                    setLikeClippedImage(imageUrl)
+                                                    setLikeClippedImage(amazonImageUrlToLarge(imageUrl) || imageUrl)
                                                     setLikeClippedTitle(productTitle)
                                                     setLikeColor("")
                                                     setLikeSize("")
@@ -2701,7 +2707,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                                             setIWishPrice(extracted.price?.toString() || "")
                                             setIWishAmazonChoice(extracted.amazonChoice || false)
                                             setIWishBestSeller(extracted.bestSeller || false)
-                                            setLikeClippedImage(extracted.imageUrl || null)
+                                            setLikeClippedImage(amazonImageUrlToLarge(extracted.imageUrl) || extracted.imageUrl || null)
                                             setLikeClippedTitle(extracted.productName || null)
                                             // Populate specs
                                             if (extracted.attributes) {
@@ -2757,7 +2763,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                                           setIWishPrice(extracted.price?.toString() || "")
                                           setIWishAmazonChoice(extracted.amazonChoice || false)
                                           setIWishBestSeller(extracted.bestSeller || false)
-                                          setLikeClippedImage(extracted.imageUrl || null)
+                                          setLikeClippedImage(amazonImageUrlToLarge(extracted.imageUrl) || extracted.imageUrl || null)
                                           setLikeClippedTitle(extracted.productName || null)
                                           // Populate specs
                                           if (extracted.attributes) {
@@ -3710,7 +3716,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                                               addToSpecs(attrs)
                                               addToSpecs(specData)
                                               if (Object.keys(specs).length > 0) setAltSpecs(specs)
-                                              setAltClippedImage(imageUrl)
+                                              setAltClippedImage(amazonImageUrlToLarge(imageUrl) || imageUrl)
                                               setAltClippedTitle(productTitle)
                                               setAltColor("")
                                               setAltSize("")
@@ -4040,7 +4046,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                                           setAltPrice(extracted.price?.toString() || "")
                                           setAltAmazonChoice(extracted.amazonChoice || false)
                                           setAltBestSeller(extracted.bestSeller || false)
-                                          setAltClippedImage(extracted.imageUrl || null)
+                                          setAltClippedImage(amazonImageUrlToLarge(extracted.imageUrl) || extracted.imageUrl || null)
                                           setAltClippedTitle(extracted.productName || null)
                                           // Populate specs from attributes and/or specifications
                                           const excludedKeysAltBtn = ['color', 'size', 'style', 'brand', 'sizeOptions', 'colorVariants', 'combinedVariants', 'styleOptions', 'styleName', 'patternName', 'configuration', 'set', 'capacity']
@@ -4157,7 +4163,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                             ) : (
                               <div className="relative group">
                                 {altClippedImage ? (
-                                  <img src={altClippedImage} alt={altClippedTitle || 'Alternative product'} className="w-20 h-20 object-contain rounded-lg bg-white border border-[#D97706]/20" />
+                                  <img src={amazonImageUrlToLarge(altClippedImage) || altClippedImage} alt={altClippedTitle || 'Alternative product'} className="w-20 h-20 object-contain rounded-lg bg-white border border-[#D97706]/20" />
                                 ) : (
                                   <div className="w-20 h-20 rounded-lg bg-gradient-to-br from-amber-50 to-orange-50 border border-[#D97706]/20 flex items-center justify-center cursor-pointer hover:border-[#D97706]" onClick={() => setShowAltImageInput(true)}>
                                     <span className="text-[#D97706] text-[9px] text-center px-1">Click to add</span>
@@ -4711,17 +4717,25 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                       Cancel
                     </button>
                     <button
-                      onClick={handleAddToWishlist}
-                      disabled={isSaving}
+                      onClick={onAddAsGift
+                        ? () => {
+                            if (!gift) return
+                            const preferences = buildCurrentPreferences()
+                            onAddAsGift({ gift, preferences })
+                            onClose()
+                          }
+                        : handleAddToWishlist
+                      }
+                      disabled={isSaving && !onAddAsGift}
                       className="flex-1 h-8 text-xs bg-gradient-to-r from-[#DAA520] to-[#F4C430] hover:from-[#F4C430] hover:to-[#DAA520] text-[#654321] rounded-lg font-semibold transition-all shadow-sm hover:shadow-md disabled:opacity-50"
                     >
-                      {isSaving ? (
+                      {isSaving && !onAddAsGift ? (
                         <span className="flex items-center justify-center gap-1">
                           <Loader2 className="w-3 h-3 animate-spin" />
                           Adding...
                         </span>
                       ) : (
-                        "Add to My Wishlist"
+                        primaryButtonText
                       )}
                     </button>
                   </div>

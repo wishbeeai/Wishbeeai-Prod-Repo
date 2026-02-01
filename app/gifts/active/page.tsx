@@ -22,12 +22,35 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { useState, useEffect } from "react"
 
+type ActiveGift = {
+  id: string | number
+  name: string
+  image: string
+  targetAmount: number
+  currentAmount: number
+  contributors: number
+  daysLeft: number
+  urgency: "high" | "medium" | "low"
+}
+
+// Demo/sample collections shown when user has none (or not signed in)
+const DEMO_ACTIVE_GIFTS: ActiveGift[] = [
+  { id: 1, name: "Sarah's Birthday Gift", image: "/images/espresso-machine.webp", targetAmount: 500, currentAmount: 350, contributors: 8, daysLeft: 5, urgency: "high" },
+  { id: 2, name: "Team Appreciation Gift", image: "/colorful-gift-box.png", targetAmount: 300, currentAmount: 180, contributors: 12, daysLeft: 10, urgency: "medium" },
+  { id: 3, name: "Dad's Retirement Celebration", image: "/images/retirement-celebration.jpg", targetAmount: 800, currentAmount: 620, contributors: 15, daysLeft: 3, urgency: "high" },
+  { id: 4, name: "Baby Shower for Emma", image: "/colorful-gift-box.png", targetAmount: 400, currentAmount: 250, contributors: 10, daysLeft: 12, urgency: "low" },
+  { id: 5, name: "Office Holiday Party Fund", image: "/images/espresso-machine.webp", targetAmount: 1000, currentAmount: 450, contributors: 25, daysLeft: 7, urgency: "medium" },
+  { id: 6, name: "Wedding Gift for Alex & Jamie", image: "/images/wedding-gift.jpg", targetAmount: 600, currentAmount: 540, contributors: 18, daysLeft: 4, urgency: "high" },
+]
+
 export default function ActiveGiftsPage() {
   const router = useRouter()
-  const [loadingAI, setLoadingAI] = useState<number | null>(null)
-  const [aiInsights, setAiInsights] = useState<{ [key: number]: any }>({})
-  const [sharingGift, setSharingGift] = useState<number | null>(null)
-  const [remindingGift, setRemindingGift] = useState<number | null>(null)
+  const [activeGifts, setActiveGifts] = useState<ActiveGift[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadingAI, setLoadingAI] = useState<string | null>(null)
+  const [aiInsights, setAiInsights] = useState<{ [key: string]: any }>({})
+  const [sharingGift, setSharingGift] = useState<string | null>(null)
+  const [remindingGift, setRemindingGift] = useState<string | null>(null)
   
   // New gift share modal state
   const [showShareModal, setShowShareModal] = useState(false)
@@ -35,9 +58,53 @@ export default function ActiveGiftsPage() {
   const [newGiftId, setNewGiftId] = useState<string | null>(null)
   const [linkCopied, setLinkCopied] = useState(false)
   
+  // Fetch current user's gift collections; fall back to demo when empty
+  useEffect(() => {
+    async function fetchCollections() {
+      try {
+        const res = await fetch("/api/gifts/collections?status=active")
+        if (res.status === 401) {
+          setActiveGifts(DEMO_ACTIVE_GIFTS)
+          setLoading(false)
+          return
+        }
+        if (!res.ok) throw new Error("Failed to load")
+        const data = await res.json()
+        const list = (data.collections || []).map((g: {
+          id: string
+          name: string
+          image: string
+          targetAmount: number
+          currentAmount: number
+          contributors: number
+          deadline: string
+        }) => {
+          const deadline = g.deadline ? new Date(g.deadline).getTime() : 0
+          const daysLeft = Math.max(0, Math.ceil((deadline - Date.now()) / (24 * 60 * 60 * 1000)))
+          const urgency: "high" | "medium" | "low" = daysLeft <= 3 ? "high" : daysLeft <= 7 ? "medium" : "low"
+          return {
+            id: g.id,
+            name: g.name,
+            image: g.image || "/placeholder.svg",
+            targetAmount: g.targetAmount,
+            currentAmount: g.currentAmount,
+            contributors: g.contributors,
+            daysLeft,
+            urgency,
+          }
+        })
+        setActiveGifts(list.length > 0 ? list : DEMO_ACTIVE_GIFTS)
+      } catch {
+        setActiveGifts(DEMO_ACTIVE_GIFTS)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchCollections()
+  }, [])
+  
   // Check for newly created gift magic link on mount
   useEffect(() => {
-    // Check all session storage keys for magic links
     for (let i = 0; i < sessionStorage.length; i++) {
       const key = sessionStorage.key(i)
       if (key && key.startsWith('gift_') && key.endsWith('_magicLink')) {
@@ -47,7 +114,6 @@ export default function ActiveGiftsPage() {
           setNewGiftLink(magicLink)
           setNewGiftId(giftId)
           setShowShareModal(true)
-          // Remove from session storage after showing
           sessionStorage.removeItem(key)
           break
         }
@@ -81,69 +147,6 @@ export default function ActiveGiftsPage() {
     const message = encodeURIComponent(`I've created a gift collection and would love for you to contribute!\n\nClick here to view and contribute: ${newGiftLink}`)
     window.open(`https://wa.me/?text=${message}`, '_blank')
   }
-
-  const activeGifts = [
-    {
-      id: 1,
-      name: "Sarah's Birthday Gift",
-      image: "/images/espresso-machine.webp",
-      targetAmount: 500,
-      currentAmount: 350,
-      contributors: 8,
-      daysLeft: 5,
-      urgency: "high",
-    },
-    {
-      id: 2,
-      name: "Team Appreciation Gift",
-      image: "/colorful-gift-box.png",
-      targetAmount: 300,
-      currentAmount: 180,
-      contributors: 12,
-      daysLeft: 10,
-      urgency: "medium",
-    },
-    {
-      id: 3,
-      name: "Dad's Retirement Celebration",
-      image: "/images/retirement-celebration.jpg",
-      targetAmount: 800,
-      currentAmount: 620,
-      contributors: 15,
-      daysLeft: 3,
-      urgency: "high",
-    },
-    {
-      id: 4,
-      name: "Baby Shower for Emma",
-      image: "/colorful-gift-box.png",
-      targetAmount: 400,
-      currentAmount: 250,
-      contributors: 10,
-      daysLeft: 12,
-      urgency: "low",
-    },
-    {
-      id: 5,
-      name: "Office Holiday Party Fund",
-      image: "/images/espresso-machine.webp",
-      targetAmount: 1000,
-      currentAmount: 450,
-      contributors: 25,
-      daysLeft: 7,
-      urgency: "medium",
-    },
-    {
-      id: 6,
-      name: "Wedding Gift for Alex & Jamie",
-      image: "/images/wedding-gift.jpg",
-      targetAmount: 600,
-      currentAmount: 540,
-      contributors: 18,
-      daysLeft: 4,
-      urgency: "high",
-    },
-  ]
 
   const giftProducts = [
     {
@@ -286,7 +289,7 @@ export default function ActiveGiftsPage() {
     }
   }
 
-  const getAIInsights = async (giftId: number, gift: any) => {
+  const getAIInsights = async (giftId: string | number, gift: ActiveGift) => {
     setLoadingAI(giftId)
 
     await new Promise((resolve) => setTimeout(resolve, 2000))
@@ -318,7 +321,7 @@ export default function ActiveGiftsPage() {
     toast.success("AI insights generated!")
   }
 
-  const sendReminder = async (giftId: number, giftName: string, contributors: number) => {
+  const sendReminder = async (giftId: string | number, giftName: string, contributors: number) => {
     setRemindingGift(giftId)
 
     try {
@@ -398,6 +401,12 @@ export default function ActiveGiftsPage() {
           </div>
         </div>
 
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <div className="animate-spin w-10 h-10 border-2 border-[#DAA520] border-t-transparent rounded-full" />
+          </div>
+        ) : (
+          <>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           <div className="bg-white rounded-xl p-4 border-2 border-[#DAA520]/20">
             <div className="flex items-center gap-3">
@@ -545,6 +554,8 @@ export default function ActiveGiftsPage() {
             </div>
           ))}
         </div>
+        </>
+        )}
 
       </div>
       

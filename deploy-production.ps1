@@ -19,6 +19,7 @@ if (Test-Path ".git\index.lock") {
 Write-Host "Staging deployment files..." -ForegroundColor Cyan
 git add app/
 git add components/
+git add lib/
 git add next.config.mjs
 git add package.json
 git add package-lock.json
@@ -52,7 +53,7 @@ if (-not $gitEmail -or -not $gitName) {
 # Commit
 Write-Host ""
 Write-Host "Committing changes..." -ForegroundColor Cyan
-$commitMessage = "Deploy: Size-only for quarts (no Capacity), admin variant mapping, add-to-wishlist and trending fixes"
+$commitMessage = "Deploy: Magic link persistence (DB), guest contribution progress in DB for Active page"
 git commit -m $commitMessage
 
 if ($LASTEXITCODE -ne 0) {

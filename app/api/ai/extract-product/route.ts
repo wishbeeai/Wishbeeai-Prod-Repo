@@ -110,6 +110,46 @@ function isMarketingImage(imageUrl: string | null | undefined): boolean {
   )
 }
 
+/** Build canonical Amazon product URL (e.g. https://www.amazon.com/dp/B00007IT2P) for fetching.
+ * Variant URLs with th=1, ref=twister, etc. often return captcha or "Continue shopping" and lack the main product image. */
+function getCanonicalAmazonProductUrl(url: string): string | null {
+  try {
+    const u = new URL(url)
+    if (!u.hostname.toLowerCase().includes('amazon')) return null
+    // ASIN: 10 chars, alphanumeric; common paths: /dp/ASIN, /gp/product/ASIN, /exec/obidos/ASIN
+    const dpMatch = u.pathname.match(/\/dp\/([A-Z0-9]{10})(?:\/|$)/i)
+    if (dpMatch) {
+      const asin = dpMatch[1]
+      const base = u.hostname.toLowerCase().startsWith('www.') ? u.origin : `https://www.${u.hostname}`
+      return `${base}/dp/${asin}`
+    }
+    const gpMatch = u.pathname.match(/\/gp\/product\/([A-Z0-9]{10})(?:\/|$)/i)
+    if (gpMatch) {
+      const asin = gpMatch[1]
+      const base = u.hostname.toLowerCase().startsWith('www.') ? u.origin : `https://www.${u.hostname}`
+      return `${base}/dp/${asin}`
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+/** For Amazon, always use canonical /dp/ASIN URL for fetching so we get the main product page (and correct image). */
+function getFetchUrlForProductPage(originalUrl: string): string {
+  const canonical = getCanonicalAmazonProductUrl(originalUrl)
+  if (!canonical) return originalUrl
+  log(`[v0] Using canonical Amazon URL for fetch: ${canonical}`)
+  return canonical
+}
+
+/** If url is an Amazon product image with a small size (e.g. _AC_SS115_), return URL with larger size (_AC_SL1500_) for display. */
+function amazonImageUrlToLarge(url: string | null | undefined): string | null {
+  if (!url || typeof url !== 'string') return url ?? null
+  if (!url.includes('media-amazon.com/images/')) return url
+  return url.replace(/\._AC_[A-Z]{2}\d+_\./g, '._AC_SL1500_.').split('?')[0]
+}
+
 function extractStructuredData(html: string) {
   const structuredData: any = {}
 
@@ -554,10 +594,7 @@ async function extractWithoutAI(
         log(`[v0] ✅ Set price from structuredData: ${productData.price} (preserved decimals)`)
       }
     }
-    if (structuredData.brand) {
-      const b = decodeHtmlEntities(structuredData.brand).trim()
-      if (b && b.toLowerCase() !== 'unknown') productData.attributes.brand = b
-    }
+    if (structuredData.brand) productData.attributes.brand = decodeHtmlEntities(structuredData.brand)
     if (structuredData.color && structuredData.color.trim() !== "") {
       const colorValue = decodeHtmlEntities(structuredData.color.trim()).toLowerCase()
       // Reject placeholder/generic color values
@@ -2240,7 +2277,6 @@ async function extractWithoutAI(
   if (hostname.includes('amazon.com') && htmlContent) {
     log("[v0] 🔍 Amazon detected - extracting ALL selected variants from accessibility text")
     
-    const invalidColors = ['base', 'default', 'standard', 'normal', 'regular', 'basic', 'none', 'n/a']
     const selectedTextPatterns = [
       { pattern: /Selected Color is ([^.]+?)(?:\.|Tap to collapse)/i, field: 'color' },
       { pattern: /Selected Size is ([^.]+?)(?:\.|Tap to collapse)/i, field: 'size' },
@@ -2256,10 +2292,6 @@ async function extractWithoutAI(
           const value = decodeHtmlEntities(match[1].trim())
           
           if (value && value.length > 1 && value.length < 100) {
-            if (field === 'color' && invalidColors.includes(value.toLowerCase())) {
-              log(`[v0] ⚠️ Rejected "Selected Color is" value (placeholder): ${value}`)
-              continue
-            }
             (productData.attributes as any)[field] = value
             if (field === 'color') colorExtracted = true
             log(`[v0] ✅ Extracted ${field} from "Selected ${field} is" text: ${value}`)
@@ -2293,17 +2325,14 @@ async function extractWithoutAI(
         /data-current-color=["']([^"']+)["']/i,
       ]
       
-      const invalidColorsHtml = ['base', 'default', 'standard', 'normal', 'regular', 'basic', 'none', 'n/a']
       for (const pattern of selectedColorPatterns) {
         const match = htmlContent.match(pattern)
         if (match && match[1]) {
           let color = decodeHtmlEntities(match[1].trim())
-          const colorLower = color.toLowerCase()
-          // Clean up and validate; reject placeholder colors like "base"
+          // Clean up and validate
           if (color && color.length > 2 && color.length < 50 && 
-              !colorLower.includes('select') &&
-              !colorLower.includes('color') &&
-              !invalidColorsHtml.includes(colorLower)) {
+              !color.toLowerCase().includes('select') &&
+              !color.toLowerCase().includes('color')) {
             color = color.split(' ').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')
             productData.attributes.color = color
             colorExtracted = true
@@ -2317,13 +2346,11 @@ async function extractWithoutAI(
     // PRIORITY 2: Extract from product title/name (often contains the selected color)
     if (!colorExtracted && productData.productName) {
       const productName = decodeHtmlEntities(productData.productName)
-      // Look for color at the end after dash (e.g., "...– Raspberry") or comma (e.g. "...Plate, Grey, AF141")
+      // Look for color at the end after dash (e.g., "...– Raspberry")
       const endColorPatterns = [
         /[–—\-]\s*([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)?)\s*\+/i, // Before "+" (e.g., "– Raspberry + 3 Months")
         /[–—\-]\s*([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)?)\s*$/i, // At the end
         /[–—\-]\s*([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)?)\s*[–—\-]/i, // Between dashes
-        /,\s*(Gray|Grey)\s*(?:,|\s|$)/i, // ", Grey, AF141" or ", Gray" (e.g. Ninja air fryer)
-        /\b(Gray|Grey)\b(?:\s*,|\s*$)/i, // "Grey, AF141" or "Grey" as standalone word
       ]
       
       const knownColorWords = [
@@ -2342,7 +2369,7 @@ async function extractWithoutAI(
           
           const isKnownColor = knownColorWords.some(kc => colorLower === kc.toLowerCase() || colorLower.includes(kc.toLowerCase()))
           const looksLikeColor = /^[A-Z][a-z]+$/.test(color) || /^[A-Z][a-z]+\s+[A-Z][a-z]+$/.test(color)
-          const rejectWords = ['newest', 'model', 'faster', 'display', 'battery', 'life', 'glare', 'free', 'weeks', 'capacity', 'quarts', 'inches', 'pounds', 'lbs', 'months', 'kindle', 'unlimited', 'lockscreen', 'ads', 'without', 'with', 'base', 'default', 'standard', 'normal', 'regular', 'basic']
+          const rejectWords = ['newest', 'model', 'faster', 'display', 'battery', 'life', 'glare', 'free', 'weeks', 'capacity', 'quarts', 'inches', 'pounds', 'lbs', 'months', 'kindle', 'unlimited', 'lockscreen', 'ads', 'without', 'with']
           const isRejected = rejectWords.some(word => colorLower.includes(word))
           
           if (color && color.length >= 3 && color.length < 30 && 
@@ -2554,12 +2581,8 @@ async function extractWithoutAI(
   if (!colorExtracted && !hostname.includes('tommy.com')) {
     const colorFromUrl = extractColorFromUrl(finalUrl)
     if (colorFromUrl) {
-      const urlColorLower = colorFromUrl.trim().toLowerCase()
-      const invalidUrlColors = ['base', 'default', 'standard', 'normal', 'regular', 'basic', 'none', 'n/a']
-      if (!invalidUrlColors.includes(urlColorLower)) {
-        productData.attributes.color = colorFromUrl
-        console.log("[v0] Extracted color from URL (fallback):", productData.attributes.color)
-      }
+      productData.attributes.color = colorFromUrl
+      console.log("[v0] Extracted color from URL (fallback):", productData.attributes.color)
     }
   }
   
@@ -2823,8 +2846,6 @@ async function extractWithoutAI(
     // Extract brand from product name - but be smarter about it
     if (productData.productName) {
       const brand = extractBrandFromName(productData.productName)
-      const currentBrand = productData.attributes.brand
-      const hasValidBrand = currentBrand && String(currentBrand).trim().toLowerCase() !== 'unknown'
     // For Tommy.com, the brand should ALWAYS be "Tommy Hilfiger" not "Classic" or anything else
     if (hostname.includes('tommy.com') || hostname.includes('hilfiger')) {
       // ALWAYS set to "Tommy Hilfiger" for Tommy.com URLs, regardless of product name
@@ -2844,10 +2865,8 @@ async function extractWithoutAI(
       } else if (brand) {
         productData.attributes.brand = brand
       }
-    } else if (!hasValidBrand && brand) {
-      // Overwrite "unknown" or missing brand with brand from product name (e.g. "Ninja" from "Ninja Air Fryer...")
+    } else if (brand) {
       productData.attributes.brand = brand
-      console.log("[v0] Extracted brand from product name:", productData.attributes.brand)
     }
   }
   
@@ -2863,12 +2882,9 @@ async function extractWithoutAI(
     for (const pattern of brandPatterns) {
       const match = htmlContent.match(pattern)
       if (match && match[1]) {
-        const b = match[1].trim()
-        if (b && b.toLowerCase() !== 'unknown') {
-          productData.attributes.brand = b
-          console.log("[v0] Extracted brand from HTML pattern:", productData.attributes.brand)
-          break
-        }
+        productData.attributes.brand = match[1].trim()
+        console.log("[v0] Extracted brand from HTML pattern:", productData.attributes.brand)
+        break
       }
     }
   }
@@ -5744,20 +5760,11 @@ async function extractWithoutAI(
     }
   }
 
-  // Clean up empty strings and placeholder colors - convert to null
+  // Clean up empty strings - convert to null
   if (productData.attributes.color === "") productData.attributes.color = null
-  const invalidColorPlaceholders = ['base', 'default', 'standard', 'normal', 'regular', 'basic', 'none', 'n/a']
-  if (productData.attributes.color && invalidColorPlaceholders.includes(String(productData.attributes.color).trim().toLowerCase())) {
-    productData.attributes.color = null
-    log("[v0] Cleared placeholder color (base/default/etc.)")
-  }
   if (productData.attributes.size === "") productData.attributes.size = null
   if (productData.attributes.material === "") productData.attributes.material = null
   if (productData.attributes.brand === "") productData.attributes.brand = null
-  if (productData.attributes.brand && String(productData.attributes.brand).trim().toLowerCase() === 'unknown') {
-    productData.attributes.brand = null
-    log("[v0] Cleared placeholder brand (unknown)")
-  }
   if (productData.description === "") productData.description = null
   
   // Deduplicate attributes - remove duplicates and ensure each attribute appears only once
@@ -7364,7 +7371,6 @@ async function extractWithoutAI(
         'power source': 'powerSource',
         'control method': 'controlMethod',
         'control type': 'controlMethod',
-        'controls type': 'controlMethod',
         'special features': 'specialFeatures',
         'special feature': 'specialFeatures',
         // Kitchen/Appliances - Amazon Product Overview
@@ -7403,11 +7409,9 @@ async function extractWithoutAI(
             if (valueMatch && valueMatch[1]) {
               const value = decodeHtmlEntities(valueMatch[1].trim())
               if (value && value.length > 0 && value.length < 200) {
-                if (attrName === 'brand' && value.toLowerCase() === 'unknown') { /* skip */ } else {
-                  productData.attributes[attrName] = value
-                  log(`[v0] ✅ Extracted ${attrName} from th/td: ${value}`)
-                  continue
-                }
+                productData.attributes[attrName] = value
+                log(`[v0] ✅ Extracted ${attrName} from th/td: ${value}`)
+                continue
               }
             }
           }
@@ -7424,11 +7428,9 @@ async function extractWithoutAI(
             if (valueMatch && valueMatch[1]) {
               const value = decodeHtmlEntities(valueMatch[1].trim())
               if (value && value.length > 0 && value.length < 200) {
-                if (attrName === 'brand' && value.toLowerCase() === 'unknown') { /* skip */ } else {
-                  productData.attributes[attrName] = value
-                  log(`[v0] ✅ Extracted ${attrName} from span: ${value}`)
-                  continue
-                }
+                productData.attributes[attrName] = value
+                log(`[v0] ✅ Extracted ${attrName} from span: ${value}`)
+                continue
               }
             }
           }
@@ -7444,11 +7446,9 @@ async function extractWithoutAI(
             if (valueMatch && valueMatch[1]) {
               const value = decodeHtmlEntities(valueMatch[1].trim())
               if (value && value.length > 0 && value.length < 200) {
-                if (attrName === 'brand' && value.toLowerCase() === 'unknown') { /* skip */ } else {
-                  productData.attributes[attrName] = value
-                  log(`[v0] ✅ Extracted ${attrName} from dt/dd: ${value}`)
-                  continue
-                }
+                productData.attributes[attrName] = value
+                log(`[v0] ✅ Extracted ${attrName} from dt/dd: ${value}`)
+                continue
               }
             }
           }
@@ -7464,10 +7464,8 @@ async function extractWithoutAI(
             if (valueMatch && valueMatch[1]) {
               const value = decodeHtmlEntities(valueMatch[1].trim())
               if (value && value.length > 0 && value.length < 200) {
-                if (attrName === 'brand' && value.toLowerCase() === 'unknown') { /* skip */ } else {
-                  productData.attributes[attrName] = value
-                  log(`[v0] ✅ Extracted ${attrName} from tr: ${value}`)
-                }
+                productData.attributes[attrName] = value
+                log(`[v0] ✅ Extracted ${attrName} from tr: ${value}`)
               }
             }
           }
@@ -7490,9 +7488,8 @@ async function extractWithoutAI(
           } else if ((label.includes('memory storage') || label.includes('storage capacity')) && !productData.attributes.memoryStorageCapacity) {
             productData.attributes.memoryStorageCapacity = value
             log(`[v0] ✅ Table extracted memoryStorageCapacity: ${value}`)
-          } else if (label === 'capacity' || (label.includes('capacity') && !label.includes('battery') && !label.includes('seating') && !label.includes('water') && !label.includes('basket') && !label.includes('crisper') && !label.includes('food') && !label.includes('cooking') && !label.includes('interior'))) {
-            // Extract Capacity as variant option (e.g., "16GB Unified Memory, 1TB SSD Storage" or "5 Quarts")
-            // Skip sub-feature capacity (basket, crisper, etc.) so we use main product capacity
+          } else if (label === 'capacity' || (label.includes('capacity') && !label.includes('battery') && !label.includes('seating') && !label.includes('water'))) {
+            // Extract Capacity as variant option (e.g., "16GB Unified Memory, 1TB SSD Storage")
             if (!productData.attributes.capacity && value && value.length < 200) {
               productData.attributes.capacity = value
               log(`[v0] ✅ Table extracted capacity: ${value}`)
@@ -7524,24 +7521,6 @@ async function extractWithoutAI(
           } else if (label.includes('special feature') && !productData.attributes.specialFeatures) {
             productData.attributes.specialFeatures = value
             log(`[v0] ✅ Table extracted specialFeatures: ${value}`)
-          } else if ((label.includes('product dimensions') || label.includes('item dimensions')) && !productData.attributes.productDimensions) {
-            productData.attributes.productDimensions = value
-            log(`[v0] ✅ Table extracted productDimensions: ${value}`)
-          } else if (label === 'material' && !productData.attributes.material) {
-            productData.attributes.material = value
-            log(`[v0] ✅ Table extracted material: ${value}`)
-          } else if (label.includes('item weight') && !productData.attributes.itemWeight) {
-            productData.attributes.itemWeight = value
-            log(`[v0] ✅ Table extracted itemWeight: ${value}`)
-          } else if (label === 'voltage' && !productData.attributes.voltage) {
-            productData.attributes.voltage = value
-            log(`[v0] ✅ Table extracted voltage: ${value}`)
-          } else if (label === 'wattage' && !productData.attributes.wattage) {
-            productData.attributes.wattage = value
-            log(`[v0] ✅ Table extracted wattage: ${value}`)
-          } else if ((label.includes('controls type') || label.includes('control type') || label.includes('control method')) && !productData.attributes.controlMethod) {
-            productData.attributes.controlMethod = value
-            log(`[v0] ✅ Table extracted controlMethod: ${value}`)
           }
         }
       }
@@ -7593,17 +7572,6 @@ async function extractWithoutAI(
         'wireless type': 'wirelessType',
         'color': 'color',
         'size': 'size',
-        'product dimensions': 'productDimensions',
-        'item dimensions': 'productDimensions',
-        'material': 'material',
-        'special feature': 'specialFeatures',
-        'special features': 'specialFeatures',
-        'voltage': 'voltage',
-        'wattage': 'wattage',
-        'controls type': 'controlMethod',
-        'control type': 'controlMethod',
-        'control method': 'controlMethod',
-        'item weight': 'itemWeight',
       }
       
       // Pattern 1: Simple table row with two cells
@@ -7615,8 +7583,6 @@ async function extractWithoutAI(
         
         for (const [key, attrName] of Object.entries(productOverviewLabels)) {
           if (label.includes(key) && !productData.attributes[attrName] && value && value.length < 300) {
-            if (attrName === 'brand' && value.trim().toLowerCase() === 'unknown') continue
-            if (attrName === 'capacity' && (label.includes('basket') || label.includes('crisper') || label.includes('food') || label.includes('cooking') || label.includes('interior'))) continue
             productData.attributes[attrName] = value
             log(`[v0] ✅ Simple TR extracted ${attrName}: ${value}`)
           }
@@ -7633,8 +7599,6 @@ async function extractWithoutAI(
         
         for (const [key, attrName] of Object.entries(productOverviewLabels)) {
           if (label.includes(key) && !productData.attributes[attrName] && value && value.length < 300) {
-            if (attrName === 'brand' && value.trim().toLowerCase() === 'unknown') continue
-            if (attrName === 'capacity' && (label.includes('basket') || label.includes('crisper') || label.includes('food') || label.includes('cooking') || label.includes('interior'))) continue
             productData.attributes[attrName] = value
             log(`[v0] ✅ PO Feature extracted ${attrName}: ${value}`)
           }
@@ -7650,8 +7614,6 @@ async function extractWithoutAI(
         
         for (const [key, attrName] of Object.entries(productOverviewLabels)) {
           if (label.includes(key) && !productData.attributes[attrName] && value && value.length < 300) {
-            if (attrName === 'brand' && value.trim().toLowerCase() === 'unknown') continue
-            if (attrName === 'capacity' && (label.includes('basket') || label.includes('crisper') || label.includes('food') || label.includes('cooking') || label.includes('interior'))) continue
             productData.attributes[attrName] = value
             log(`[v0] ✅ Span pair extracted ${attrName}: ${value}`)
           }
@@ -7986,50 +7948,6 @@ async function extractWithoutAI(
   if (productData.attributes?.configuration && !productData.configuration) {
     productData.configuration = productData.attributes.configuration
   }
-
-  // Prefer capacity from product name (e.g. "5 QT", "5 Quarts") over table/specs when they conflict
-  // Fixes kitchen appliances showing "4 Quarts" (e.g. basket) instead of "5 Quarts" (main capacity)
-  const name = (productData.productName || '').replace(/\s+/g, ' ')
-  const quartMatch = name.match(/(?:^|[^0-9])(\d+)\s*(?:QT|Quarts?)(?:[^a-z]|$)/i)
-  if (quartMatch && quartMatch[1]) {
-    const n = quartMatch[1]
-    const preferred = `${n} Quarts`
-    const current = (productData.attributes?.capacity && String(productData.attributes.capacity).trim()) || ''
-    if (current && /^\d+\s*Quarts?$/i.test(current)) {
-      const currentNum = current.replace(/\D/g, '')
-      if (currentNum !== n) {
-        productData.attributes!.capacity = preferred
-        log(`[v0] ✅ Capacity overridden from product name: "${current}" -> "${preferred}"`)
-      }
-    } else if (!current || current.length < 3) {
-      productData.attributes = productData.attributes || {}
-      ;(productData.attributes as any).capacity = preferred
-      log(`[v0] ✅ Capacity from product name: ${preferred}`)
-    }
-  }
-
-  // Build ordered specifications for Amazon (Product Dimensions, Material, etc.) in exact display order
-  if (hostname.includes('amazon.com') && productData.attributes) {
-    const ordered: Record<string, string> = {}
-    const specOrder: { displayKey: string; attrKey: keyof typeof productData.attributes }[] = [
-      { displayKey: 'Product Dimensions', attrKey: 'productDimensions' },
-      { displayKey: 'Material', attrKey: 'material' },
-      { displayKey: 'Special Feature', attrKey: 'specialFeatures' },
-      { displayKey: 'Capacity', attrKey: 'capacity' },
-      { displayKey: 'Voltage', attrKey: 'voltage' },
-      { displayKey: 'Wattage', attrKey: 'wattage' },
-      { displayKey: 'Controls Type', attrKey: 'controlMethod' },
-      { displayKey: 'Item Weight', attrKey: 'itemWeight' },
-    ]
-    for (const { displayKey, attrKey } of specOrder) {
-      const v = productData.attributes[attrKey]
-      if (v != null && String(v).trim()) ordered[displayKey] = String(v).trim()
-    }
-    if (Object.keys(ordered).length > 0) {
-      productData.specifications = ordered
-      log(`[v0] 📋 Ordered specifications (${Object.keys(ordered).length}): ${Object.keys(ordered).join(', ')}`)
-    }
-  }
   
   console.log("[v0] 🎯 FINAL VARIANT OPTIONS in response:", {
     color: productData.color || productData.attributes?.color || 'not set',
@@ -8037,7 +7955,12 @@ async function extractWithoutAI(
     set: productData.set || productData.attributes?.set || 'not set',
     configuration: productData.configuration || productData.attributes?.configuration || 'not set'
   })
-  
+
+  if (productData.imageUrl) {
+    const largeUrl = amazonImageUrlToLarge(productData.imageUrl)
+    if (largeUrl) productData.imageUrl = largeUrl
+  }
+
   return NextResponse.json(productData);
 }
 
@@ -8058,16 +7981,6 @@ function extractBrandFromName(productName: string): string | null {
   const match = productName.match(/^([A-Z][a-z\s&]+?)\s+(Sweater|Dress|Shirt|Pants|Shoes|Jacket|Coat)/i)
   if (match && match[1]) {
     return match[1].trim()
-  }
-
-  // Fallback: first word as brand (e.g. "Ninja 4-in-1 Air Fryer" -> "Ninja")
-  const firstWordMatch = productName.match(/^([A-Z][a-z]+)\s+/)
-  if (firstWordMatch && firstWordMatch[1]) {
-    const w = firstWordMatch[1].toLowerCase()
-    const notBrands = ['the', 'with', 'by', 'and', 'for', 'new', 'best', 'top', 'buy', 'see', 'get', 'how', 'all', 'our']
-    if (!notBrands.includes(w) && firstWordMatch[1].length >= 2) {
-      return firstWordMatch[1].trim()
-    }
   }
 
   return null
@@ -8306,7 +8219,9 @@ Return ONLY valid JSON, no markdown, no explanation.`
     }
 
     let hostname = urlObj.hostname.replace("www.", "")
-    
+    // For Amazon variant URLs (th=1, ref=twister), fetch canonical /dp/ASIN so we get main product page and image
+    const fetchUrl = getFetchUrlForProductPage(finalUrl)
+
     // Determine store name - handle subdomains properly
     let storeNameCapitalized: string
     if (hostname.includes('tommy.com') || hostname.includes('hilfiger')) {
@@ -8362,10 +8277,10 @@ Return ONLY valid JSON, no markdown, no explanation.`
           hostname.includes("nordstrom") ||
           hostname.includes("macys")
 
-        // Build ScraperAPI URL
+        // Build ScraperAPI URL (use fetchUrl so Amazon variant URLs get main product page and image)
         const scraperApiUrl = new URL("https://api.scraperapi.com")
         scraperApiUrl.searchParams.set("api_key", process.env.SCRAPERAPI_KEY)
-        scraperApiUrl.searchParams.set("url", finalUrl)
+        scraperApiUrl.searchParams.set("url", fetchUrl)
         
         if (needsJavaScriptRendering) {
           scraperApiUrl.searchParams.set("render", "true")
@@ -8446,10 +8361,7 @@ Return ONLY valid JSON, no markdown, no explanation.`
           if (structuredData.description) productData.description = decodeHtmlEntities(structuredData.description)
           if (structuredData.image) productData.imageUrl = structuredData.image
           if (structuredData.price) productData.price = Number.parseFloat(String(structuredData.price))
-          if (structuredData.brand) {
-            const b = String(structuredData.brand).trim()
-            if (b && b.toLowerCase() !== 'unknown') productData.attributes.brand = b
-          }
+          if (structuredData.brand) productData.attributes.brand = structuredData.brand
           if (structuredData.color) {
             const colorValue = String(structuredData.color).toLowerCase().trim()
             const invalidColors = ['base', 'default', 'standard', 'normal', 'regular', 'basic', 'none', 'n/a']
@@ -8513,11 +8425,8 @@ Return ONLY valid JSON, no markdown, no explanation.`
           if (!productData.attributes.brand && productData.productName) {
             const brandMatch = productData.productName.match(/^([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+/i)
             if (brandMatch) {
-              const b = brandMatch[1].trim()
-              if (b && b.toLowerCase() !== 'unknown') {
-                productData.attributes.brand = b
-                console.log("[v0] Extracted brand from title:", productData.attributes.brand)
-              }
+              productData.attributes.brand = brandMatch[1].trim()
+              console.log("[v0] Extracted brand from title:", productData.attributes.brand)
             }
           }
 
@@ -8776,11 +8685,8 @@ Return ONLY valid JSON, no markdown, no explanation.`
                 console.log("[v0] ScraperAPI path: Filled product name from post-processing")
               }
               if (!productData.attributes.brand && postProcessedData.attributes?.brand) {
-                const b = String(postProcessedData.attributes.brand).trim()
-                if (b && b.toLowerCase() !== 'unknown') {
-                  productData.attributes.brand = b
-                  console.log("[v0] ScraperAPI path: Filled brand from post-processing")
-                }
+                productData.attributes.brand = postProcessedData.attributes.brand
+                console.log("[v0] ScraperAPI path: Filled brand from post-processing")
               }
               if (!productData.attributes.material && postProcessedData.attributes?.material) {
                 productData.attributes.material = postProcessedData.attributes.material
@@ -9010,7 +8916,6 @@ Return ONLY valid JSON, no markdown, no explanation.`
               
               for (const [key, attrName] of Object.entries(productOverviewLabels)) {
                 if (label.includes(key) && !(productData.attributes as any)[attrName] && value && value.length < 300) {
-                  if (attrName === 'brand' && value.trim().toLowerCase() === 'unknown') continue
                   (productData.attributes as any)[attrName] = value
                   console.log(`[v0] ✅ ScraperAPI Simple TR extracted ${attrName}: ${value}`)
                 }
@@ -9026,7 +8931,6 @@ Return ONLY valid JSON, no markdown, no explanation.`
               
               for (const [key, attrName] of Object.entries(productOverviewLabels)) {
                 if (label.includes(key) && !(productData.attributes as any)[attrName] && value && value.length < 300) {
-                  if (attrName === 'brand' && value.trim().toLowerCase() === 'unknown') continue
                   (productData.attributes as any)[attrName] = value
                   console.log(`[v0] ✅ ScraperAPI PO Feature extracted ${attrName}: ${value}`)
                 }
@@ -9042,7 +8946,6 @@ Return ONLY valid JSON, no markdown, no explanation.`
               
               for (const [key, attrName] of Object.entries(productOverviewLabels)) {
                 if (label.includes(key) && !(productData.attributes as any)[attrName] && value && value.length < 300) {
-                  if (attrName === 'brand' && value.trim().toLowerCase() === 'unknown') continue
                   (productData.attributes as any)[attrName] = value
                   console.log(`[v0] ✅ ScraperAPI TD pair extracted ${attrName}: ${value}`)
                 }
@@ -9114,7 +9017,7 @@ Return ONLY valid JSON, no markdown, no explanation.`
       timeoutId = setTimeout(() => controller.abort(), timeoutMs)
 
       const fetchPromise = new Promise<Response | null>((resolve) => {
-        fetch(finalUrl, {
+        fetch(fetchUrl, {
           signal: controller.signal,
           headers: {
             "User-Agent":
@@ -10366,7 +10269,6 @@ Return ONLY valid JSON, no markdown, no explanation.`
         
         for (const [key, attrName] of Object.entries(productOverviewLabels)) {
           if (label.includes(key) && !productData.attributes[attrName] && value && value.length < 500) {
-            if (attrName === 'brand' && value.trim().toLowerCase() === 'unknown') continue
             productData.attributes[attrName] = value
             console.log(`[v0] ✅ AI Path PO extracted ${attrName}: ${value}`)
           }
@@ -10382,7 +10284,6 @@ Return ONLY valid JSON, no markdown, no explanation.`
         
         for (const [key, attrName] of Object.entries(productOverviewLabels)) {
           if (label.includes(key) && !productData.attributes[attrName] && value && value.length < 500 && value.length > 1) {
-            if (attrName === 'brand' && value.trim().toLowerCase() === 'unknown') continue
             productData.attributes[attrName] = value
             console.log(`[v0] ✅ AI Path Simple TR extracted ${attrName}: ${value}`)
           }
@@ -10403,7 +10304,6 @@ Return ONLY valid JSON, no markdown, no explanation.`
           
           for (const [key, attrName] of Object.entries(productOverviewLabels)) {
             if (label.includes(key) && !productData.attributes[attrName] && value && value.length < 500 && value.length > 1) {
-              if (attrName === 'brand' && value.trim().toLowerCase() === 'unknown') continue
               productData.attributes[attrName] = value
               console.log(`[v0] ✅ AI Path ProductOverview extracted ${attrName}: ${value}`)
             }

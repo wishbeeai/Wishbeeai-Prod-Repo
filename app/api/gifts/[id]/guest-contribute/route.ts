@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { createClient, createPublicClient } from "@/lib/supabase/server"
 
-// In-memory store for contributions (in production, use database)
+// In-memory store for contribution list (optional; gift progress is persisted in DB)
 const contributionsStore = new Map<string, Array<{
   id: string
   giftId: string
@@ -19,20 +20,20 @@ export async function POST(
   try {
     const { id: giftId } = await params
     const body = await request.json()
-    const { 
-      amount, 
-      contributorName, 
-      contributorEmail, 
+    const {
+      amount,
+      contributorName,
+      contributorEmail,
       message,
-      token // Magic link token for validation
+      token, // Magic link token for validation
     } = body
 
-    // Validate required fields
     if (!giftId) {
       return NextResponse.json({ error: "Gift ID is required" }, { status: 400 })
     }
 
-    if (!amount || amount <= 0) {
+    const contributionAmount = parseFloat(amount)
+    if (!amount || isNaN(contributionAmount) || contributionAmount <= 0) {
       return NextResponse.json({ error: "Valid contribution amount is required" }, { status: 400 })
     }
 
@@ -40,17 +41,47 @@ export async function POST(
       return NextResponse.json({ error: "Email is required for guest contributions" }, { status: 400 })
     }
 
-    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(contributorEmail)) {
       return NextResponse.json({ error: "Invalid email format" }, { status: 400 })
     }
 
-    // Create contribution record
+    // Update gift progress in database so Active page shows correct total.
+    // Use public client so guest (unauthenticated) can update; RLS would block owner-only update.
+    const supabase = await createPublicClient()
+    const { data: gift, error: fetchError } = await supabase
+      .from("gifts")
+      .select("id, current_amount, contributors")
+      .eq("id", giftId)
+      .single()
+
+    if (fetchError || !gift) {
+      console.error("[Guest Contribution] Gift not found:", fetchError)
+      return NextResponse.json({ error: "Gift not found" }, { status: 404 })
+    }
+
+    const currentAmount = Number(gift.current_amount) || 0
+    const contributorCount = (gift.contributors ?? 0) + 1
+    const newTotal = currentAmount + contributionAmount
+
+    const { error: updateError } = await supabase
+      .from("gifts")
+      .update({
+        current_amount: newTotal,
+        contributors: contributorCount,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", giftId)
+
+    if (updateError) {
+      console.error("[Guest Contribution] Failed to update gift progress:", updateError)
+      return NextResponse.json({ error: "Failed to record contribution" }, { status: 500 })
+    }
+
     const contribution = {
       id: `guest_contrib_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       giftId,
-      amount: parseFloat(amount),
+      amount: contributionAmount,
       contributorName: contributorName || "Anonymous",
       contributorEmail,
       message: message || undefined,
@@ -58,23 +89,11 @@ export async function POST(
       createdAt: new Date(),
     }
 
-    // Store contribution
     const existing = contributionsStore.get(giftId) || []
     existing.push(contribution)
     contributionsStore.set(giftId, existing)
 
-    // Calculate total contributions for this gift
-    const totalContributions = existing.reduce((sum, c) => sum + c.amount, 0)
-    const contributorCount = existing.length
-
-    console.log(`[Guest Contribution] ${contributorName || 'Anonymous'} contributed $${amount} to gift ${giftId}`)
-
-    // In production, you would:
-    // 1. Process payment via Stripe
-    // 2. Store in database
-    // 3. Send confirmation email to contributor
-    // 4. Send notification to gift creator
-    // 5. Update gift progress
+    console.log(`[Guest Contribution] ${contributorName || "Anonymous"} contributed $${contributionAmount} to gift ${giftId}`)
 
     return NextResponse.json({
       success: true,
@@ -85,7 +104,7 @@ export async function POST(
         createdAt: contribution.createdAt.toISOString(),
       },
       giftProgress: {
-        totalContributions,
+        totalContributions: newTotal,
         contributorCount,
       },
       message: "Thank you for your contribution! A confirmation has been sent to your email.",

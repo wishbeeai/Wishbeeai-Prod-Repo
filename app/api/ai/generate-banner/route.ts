@@ -66,15 +66,13 @@ export async function POST(request: Request) {
     console.log("[v0] FAL_KEY configured:", !!process.env.FAL_KEY)
 
     const body = await request.json()
-    const { title, colorTheme, imageStyle, customImageWords, category, useCustomKeywordsOnly, guestAge } = body
+    const { title, colorTheme, imageStyle, customImageWords, category, useCustomKeywordsOnly, guestAge, eventVibe } = body
 
     console.log("[v0] Generating banner for title:", title)
-    console.log("[v0] Color theme:", colorTheme)
-    console.log("[v0] Image style:", imageStyle)
+    console.log("[v0] Occasion/category:", category)
+    console.log("[v0] Event Vibe:", eventVibe)
     console.log("[v0] Custom image words:", customImageWords)
-    console.log("[v0] Category:", category)
     console.log("[v0] Use custom keywords only:", useCustomKeywordsOnly)
-    console.log("[v0] Guest age:", guestAge)
 
     if (!title) {
       return NextResponse.json({ error: "Title is required" }, { status: 400 })
@@ -101,80 +99,88 @@ export async function POST(request: Request) {
     let contextualTheme = ''
     let customElementsPrompt = ''
     let categoryPrompt = ''
-    
-    // If using custom keywords only, prioritize them as the main image content
-    if (useCustomKeywordsOnly && customImageWords && customImageWords.trim()) {
-      const customWords = customImageWords.trim()
-      const wordsList = customWords.split(',').map((w: string) => w.trim()).filter((w: string) => w)
-      
-      // Build the theme entirely around custom keywords with explicit descriptions
-      contextualTheme = `beautiful celebration scene featuring EXACTLY these specific items: ${wordsList.join(', ')}`
-      customElementsPrompt = `
-ABSOLUTELY CRITICAL - USE THESE EXACT SPECIFIC ITEMS (NOT SUBSTITUTES):
-${wordsList.map((word: string) => {
-  // Add explicit descriptions for commonly confused items
-  const lowerWord = word.toLowerCase()
-  if (lowerWord.includes('lacrosse')) {
-    if (lowerWord.includes('bat') || lowerWord.includes('stick')) {
-      return `- LACROSSE STICK (NOT baseball bat): a long stick with a netted pocket/head at the end used for catching and throwing the lacrosse ball, must show the distinctive net/mesh pocket`
-    } else if (lowerWord.includes('ball')) {
-      return `- LACROSSE BALL (NOT baseball): small solid rubber ball, typically white or yellow, about 2.5 inches diameter, smooth surface`
-    }
-    return `- ${word}: LACROSSE equipment specifically (sport with sticks that have net pockets), NOT baseball or other sports`
-  }
-  return `- ${word}: prominently visible, detailed, EXACTLY as specified (not a similar substitute)`
-}).join('\n')}
 
-STRICT REQUIREMENTS:
-- Use the EXACT items listed above - DO NOT substitute with similar items
-- If "lacrosse" is mentioned, show LACROSSE equipment (sticks with net pockets, rubber balls) - NOT baseball
-- If a specific sport is named, show ONLY that sport's equipment
-- The image should feature ONLY these specific elements as the main focus
-- DO NOT add generic party elements like baby toys, balloons, or cakes unless specifically requested above
-- Be accurate to the specific sport/activity mentioned`
-      
-      console.log("[v0] Using ONLY custom keywords for image:", contextualTheme)
+    // Step 2: EVENT VIBE – resolved first so we know if Boho (affects category use)
+    const vibeDescriptions: Record<string, string> = {
+      Minimalist: 'minimalist aesthetic: clean lines, simple composition, neutral tones, uncluttered, elegant simplicity',
+      Boho: 'boho aesthetic: natural textures, woven macramé, rattan, terracotta, pampas grass, dried flowers, earthy neutrals, plants, relaxed bohemian vibe',
+      Cyberpunk: 'cyberpunk aesthetic: neon lights, futuristic, tech, urban night, high contrast',
+      Retro: 'retro aesthetic: vintage, 70s or 80s style, warm nostalgic tones',
+      Elegant: 'elegant aesthetic: sophisticated, luxurious, refined, soft lighting',
+      Tropical: 'tropical aesthetic: palm leaves, lush greenery, bright florals, vacation vibe',
+    }
+    const vibeKey = (eventVibe || '').trim()
+    const isBohoVibe = vibeKey === 'Boho'
+
+    // Step 1: PRODUCT/EVENT first – what is this celebration for? (always include before vibe and keywords)
+    // When Boho: do NOT include long category text (balloons, cake, confetti) – it makes the model add balls/party items
+    const safeCategory = isBohoVibe ? '' : (category && category.trim() ? category : '')
+    const productDescription = title
+      ? `Celebration/event: "${title}". ${safeCategory ? `Occasion: ${safeCategory}.` : ''} The image must reflect this event/occasion first.`
+      : safeCategory
+        ? `Occasion: ${safeCategory}. The image must reflect this occasion.`
+        : 'Celebration banner. The image must reflect the event.'
+    contextualTheme = productDescription
+    console.log("[v0] Product/event first:", productDescription.substring(0, 100))
+
+    if (vibeKey && vibeDescriptions[vibeKey]) {
+      contextualTheme = `${contextualTheme} Style the image in ${vibeDescriptions[vibeKey]}.`
+      if (isBohoVibe) {
+        contextualTheme = `${contextualTheme} BOHO ONLY: no ball, no balls, no spheres, no sports, no sports equipment, no party balloons, no cakes, no confetti – only natural textures, plants, macramé, rattan, dried flowers, earthy tones.`
+      }
+      console.log("[v0] Event Vibe applied:", vibeKey)
+    }
+
+    // Step 3: CUSTOM IMAGE KEYWORDS (optional) – refine style; never add balls/sports unless user typed a sport
+    const customWords = (customImageWords || '').trim()
+    const wordsList = customWords ? customWords.split(/[\s,]+/).map((w: string) => w.trim()).filter((w: string) => w.length > 0) : []
+    const hasExplicitSport = wordsList.some((w: string) => /^lacrosse$|^baseball$|^soccer$|^football$|^basketball$|^hockey$|^tennis$|^golf$|sport\b/i.test(w))
+
+    if (wordsList.length > 0) {
+      const phrase = wordsList.join(' ').toLowerCase()
+      const isBoho = phrase.includes('boho')
+      const isEyeCatcher = phrase.includes('eye') && (phrase.includes('catcher') || phrase.includes('eye catcher') || phrase.includes('eyecatcher'))
+      let styleExtra = wordsList.join(' ')
+      if (isBoho) {
+        styleExtra = 'boho aesthetic: natural textures, macramé, rattan, plants, earthy tones, relaxed bohemian vibe'
+        if (isEyeCatcher) styleExtra += '. Eye-catching, striking, visually compelling composition'
+      } else if (isEyeCatcher) {
+        styleExtra = 'eye-catching, striking, visually compelling. ' + wordsList.join(' ')
+      }
+      contextualTheme = `${contextualTheme} Additionally: ${styleExtra}.`
+      customElementsPrompt = `
+STYLE RULES:
+- Reflect the custom style above. Do NOT add balls, spheres, sports equipment, party balloons, cakes, or unrelated objects unless the user's keywords explicitly request a sport or party item.
+- If Event Vibe is Boho (or boho in keywords), use ONLY boho/natural/earthy elements – no ball, no balls, no spheres, no sports, no party decor.`
+      if (hasExplicitSport) {
+        customElementsPrompt += `
+- User requested a sport: include only that sport's equipment (e.g. lacrosse stick with net pocket if "lacrosse").`
+      }
+      console.log("[v0] Custom keywords applied (product → vibe → keywords):", contextualTheme.substring(0, 120))
     } else {
-      // Use category/image style as base, with optional custom words enhancement
-      contextualTheme = imageStyle || getContextualImagePrompt(title)
-      
-      // Incorporate category into the theme if provided
-      if (category && category.trim()) {
-        categoryPrompt = `
+      customElementsPrompt = `
+STYLE RULES:
+- Style the image according to the Event Vibe and occasion above.
+- Do NOT add sports equipment, party balloons, cakes, or generic party objects unless they match the occasion and vibe.`
+      if (isBohoVibe) {
+        customElementsPrompt = `
+STYLE RULES:
+- BOHO STYLE ONLY. Use only natural textures, plants, macramé, rattan, dried flowers, earthy tones. Do NOT add any ball, balls, spheres, sports items, party balloons, cakes, or confetti.`
+      }
+    }
+
+    // When custom-only mode was requested, still keep product → vibe → keywords order (already built above)
+    if (useCustomKeywordsOnly && customWords) {
+      // Ensure product is still first; we already have product + vibe + custom in contextualTheme
+      console.log("[v0] Using product-first then vibe then custom keywords:", contextualTheme.substring(0, 150))
+    }
+
+    // Category prompt for non-custom path (invitation category style). When Boho, skip – long category text mentions balloons/cake and causes balls/party items in image
+    if (category && category.trim() && !useCustomKeywordsOnly && !isBohoVibe) {
+      categoryPrompt = `
 INVITATION CATEGORY STYLE:
 ${category}
-This category style should strongly influence the overall aesthetic, elements, and mood of the image.
 `
-        contextualTheme = `${category}, ${contextualTheme}`
-        console.log("[v0] Enhanced theme with category:", contextualTheme)
-      }
-      
-      // Incorporate custom words into the theme if provided
-      if (customImageWords && customImageWords.trim()) {
-        const customWords = customImageWords.trim()
-        const wordsList = customWords.split(',').map((w: string) => w.trim()).filter((w: string) => w)
-        customElementsPrompt = `
-
-IMPORTANT - MUST INCLUDE THESE EXACT SPECIFIC ELEMENTS (NOT SUBSTITUTES):
-${wordsList.map((word: string) => {
-  const lowerWord = word.toLowerCase()
-  if (lowerWord.includes('lacrosse')) {
-    if (lowerWord.includes('bat') || lowerWord.includes('stick')) {
-      return `- LACROSSE STICK: long stick with netted pocket/mesh head (NOT a baseball bat)`
-    } else if (lowerWord.includes('ball')) {
-      return `- LACROSSE BALL: small solid rubber ball, white or yellow (NOT a baseball)`
-    }
-    return `- ${word}: LACROSSE equipment with net pockets (NOT baseball)`
-  }
-  return `- ${word}: prominently visible, exactly as specified (not a substitute)`
-}).join('\n')}
-
-Use the EXACT items specified - do not substitute with similar items from other sports/activities.`
-        
-        contextualTheme = `${contextualTheme}, prominently featuring EXACTLY: ${wordsList.join(', ')}`
-        console.log("[v0] Enhanced theme with custom words:", contextualTheme)
-        console.log("[v0] Custom elements prompt:", customElementsPrompt)
-      }
     }
     
     // Add age-appropriate styling to the theme

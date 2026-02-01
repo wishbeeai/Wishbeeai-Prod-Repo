@@ -283,12 +283,12 @@ export function EviteWizard({
           occasion,
           style: 'warm',
           colorTheme: colorTheme,
-          // If custom keywords provided, use them as primary image style
           imageStyle: hasCustomKeywords ? customInvitationText : categoryDescriptions[selectedCategory] || categoryDescriptions.birthday,
           customImageWords: customInvitationText,
           category: hasCustomKeywords ? '' : categoryDescriptions[selectedCategory] || categoryDescriptions.birthday,
           useCustomKeywordsOnly: hasCustomKeywords,
           guestAge: guestAge,
+          eventVibe: eventDetails.eventVibe || '',
         }),
       })
 

@@ -2,9 +2,42 @@
 import { getTrendingGifts } from '../trending-gifts/store'
 import { createClient } from '@/lib/supabase/server'
 
-export async function POST(req: Request) {
+const JSON_500_HEADERS = { "Content-Type": "application/json" } as const
+
+function send500(details: string, code?: string): Response {
+  const body = JSON.stringify({
+    error: "Failed to create gift collection",
+    details: details || "Unknown error",
+    ...(code && { code }),
+  })
+  return new Response(body, { status: 500, headers: JSON_500_HEADERS })
+}
+
+export async function POST(req: Request): Promise<Response> {
   try {
-    const giftData = await req.json()
+    let supabase: Awaited<ReturnType<typeof createClient>>
+    try {
+      supabase = await createClient()
+    } catch (supabaseErr) {
+      const msg = supabaseErr instanceof Error ? supabaseErr.message : String(supabaseErr)
+      console.error("[v0] Supabase createClient failed:", msg)
+      return send500(msg)
+    }
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return Response.json({ error: "You must be signed in to create a gift collection" }, { status: 401 })
+    }
+
+    let giftData: Record<string, unknown>
+    try {
+      giftData = await req.json()
+    } catch (parseErr) {
+      console.error("[v0] Invalid JSON body:", parseErr)
+      return Response.json({ error: "Invalid request body", details: "Expected valid JSON" }, { status: 400 })
+    }
+    if (!giftData || typeof giftData !== "object") {
+      return Response.json({ error: "Invalid request body", details: "Body must be a JSON object" }, { status: 400 })
+    }
 
     console.log("[v0] Creating gift collection:", giftData)
 
@@ -16,27 +49,100 @@ export async function POST(req: Request) {
       )
     }
 
-    // In production, this would be stored in a database
-    // For now, we'll simulate a successful save
-    const savedGift = {
-      id: Date.now().toString(),
-      ...giftData,
-      createdDate: new Date().toISOString(),
-      currentAmount: 0,
-      contributors: 0,
-      status: "active",
+    const targetAmount = Number(giftData.targetAmount)
+    if (isNaN(targetAmount) || targetAmount <= 0) {
+      return Response.json({ error: "Target amount must be a positive number" }, { status: 400 })
+    }
+
+    // Normalize deadline to ISO string for TIMESTAMPTZ (YYYY-MM-DD → full day in UTC)
+    let deadlineValue: string = String(giftData.deadline).trim()
+    if (/^\d{4}-\d{2}-\d{2}$/.test(deadlineValue)) {
+      deadlineValue = `${deadlineValue}T23:59:59.000Z`
+    } else if (deadlineValue && isNaN(Date.parse(deadlineValue))) {
+      return Response.json({ error: "Invalid deadline date format" }, { status: 400 })
+    }
+
+    const { data: savedGift, error } = await supabase
+      .from('gifts')
+      .insert({
+        user_id: user.id,
+        collection_title: giftData.collectionTitle,
+        gift_name: giftData.giftName,
+        description: giftData.description || null,
+        target_amount: targetAmount,
+        current_amount: 0,
+        contributors: 0,
+        deadline: deadlineValue,
+        status: 'active',
+        banner_image: giftData.bannerImage || null,
+        product_image: giftData.productImage || null,
+        product_link: giftData.productLink || null,
+        product_name: giftData.giftName,
+        category: giftData.category || null,
+        brand: giftData.brand || null,
+        store_name: giftData.storeName || null,
+        price: giftData.price != null ? Number(giftData.price) : null,
+        rating: giftData.rating != null ? Number(giftData.rating) : null,
+        review_count: giftData.reviewCount != null ? Number(giftData.reviewCount) : null,
+        specifications: giftData.specifications || null,
+        preference_options: giftData.preferenceOptions || null,
+        recipient_name: giftData.recipientName || null,
+        occasion: giftData.occasion || null,
+        evite_settings: giftData.eviteSettings || null,
+      })
+      .select()
+      .single()
+
+    if (error) {
+      const err = error as { message?: string; code?: string; details?: string }
+      console.error("[v0] Error inserting gift collection:", err?.code, err?.message, err?.details)
+      const message = err?.message || (error as Error)?.message || "Unknown database error"
+      return send500(message, err?.code)
     }
 
     console.log("[v0] Gift collection created successfully:", savedGift.id)
 
+    // Return shape expected by create form (id, gift with camelCase for client).
+    // Do not spread giftData - it may contain circular refs or non-JSON-serializable values
+    // and cause Response.json() to throw, resulting in 500 with empty body.
+    const giftForClient = {
+      id: savedGift.id,
+      collectionTitle: savedGift.collection_title,
+      giftName: savedGift.gift_name,
+      description: savedGift.description,
+      targetAmount: Number(savedGift.target_amount),
+      currentAmount: Number(savedGift.current_amount),
+      contributors: savedGift.contributors,
+      deadline: savedGift.deadline,
+      status: savedGift.status,
+      bannerImage: savedGift.banner_image,
+      productImage: savedGift.product_image,
+      productLink: savedGift.product_link,
+      createdDate: savedGift.created_at,
+      category: savedGift.category ?? giftData.category ?? null,
+      brand: savedGift.brand ?? giftData.brand ?? null,
+      storeName: savedGift.store_name ?? giftData.storeName ?? null,
+      price: savedGift.price != null ? Number(savedGift.price) : giftData.price ?? null,
+      rating: savedGift.rating != null ? Number(savedGift.rating) : giftData.rating ?? null,
+      reviewCount: savedGift.review_count ?? giftData.reviewCount ?? null,
+      specifications: savedGift.specifications ?? giftData.specifications ?? null,
+      preferenceOptions: savedGift.preference_options ?? giftData.preferenceOptions ?? null,
+      recipientName: savedGift.recipient_name ?? giftData.recipientName ?? null,
+      occasion: savedGift.occasion ?? giftData.occasion ?? null,
+      eviteSettings: savedGift.evite_settings ?? giftData.eviteSettings ?? null,
+    }
+
     return Response.json({
       success: true,
       id: savedGift.id,
-      gift: savedGift,
+      gift: giftForClient,
     })
   } catch (error) {
     console.error("[v0] Error creating gift collection:", error)
-    return Response.json({ error: "Failed to create gift collection" }, { status: 500 })
+    const message = error instanceof Error ? error.message : String(error)
+    const stack = error instanceof Error ? error.stack : undefined
+    if (stack) console.error("[v0] Stack:", stack)
+    return send500(message)
   }
 }
 
