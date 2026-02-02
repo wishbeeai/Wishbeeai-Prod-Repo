@@ -18,8 +18,9 @@ export async function GET(req: NextRequest) {
     
     if (error) {
       console.error('[trending-gifts] Database error:', error)
+      const err = error as { message?: string; code?: string }
       return NextResponse.json(
-        { error: 'Failed to fetch trending gifts from database' },
+        { error: 'Failed to fetch trending gifts from database', details: err?.message, ...(err?.code && { code: err.code }) },
         { status: 500 }
       )
     }

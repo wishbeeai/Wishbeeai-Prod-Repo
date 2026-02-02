@@ -2846,7 +2846,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                               className="hidden"
                             />
                             {showLikeImageInput ? (
-                              <div className="w-32 space-y-1">
+                              <div className="w-40 space-y-1">
                                 <p className="text-[8px] text-[#654321] leading-tight">
                                   💡 Right-click image → Open in new tab → Copy URL from address bar
                                 </p>
@@ -2869,13 +2869,17 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                                 <img
                                   src={likeClippedImage || extractedProduct?.imageUrl || gift?.image || "/placeholder.svg"}
                                   alt={likeClippedTitle || extractedProduct?.productName || 'Selected product'}
-                                  className="w-20 h-20 object-contain rounded-lg bg-white border border-[#DAA520]/20"
+                                  className="w-32 h-32 object-contain rounded-lg bg-white border border-[#DAA520]/20"
                                 />
-                                <div className="absolute inset-0 bg-black/50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                                {/* Product image edit: always visible when editing I Wish, else on hover (same as /gifts/create) */}
+                                <div className={`absolute inset-0 bg-black/50 rounded-lg transition-opacity flex items-center justify-center gap-1 ${isEditingIWish ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
                                   <button onClick={() => setShowLikeImageInput(true)} className="p-1.5 bg-white/90 rounded-full hover:bg-white transition-colors" title="Paste image URL"><Pencil className="w-3.5 h-3.5 text-blue-600" /></button>
                                   <button onClick={() => likeImageInputRef.current?.click()} className="p-1.5 bg-white/90 rounded-full hover:bg-white transition-colors" title="Upload image"><Upload className="w-3.5 h-3.5 text-amber-600" /></button>
-                                  {likeClippedImage && <button onClick={handleLikeImageDelete} className="p-1.5 bg-white/90 rounded-full hover:bg-white transition-colors" title="Remove image"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>}
+                                  {(likeClippedImage || extractedProduct?.imageUrl || gift?.image) && <button onClick={handleLikeImageDelete} className="p-1.5 bg-white/90 rounded-full hover:bg-white transition-colors" title="Remove image"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>}
                                 </div>
+                                {isEditingIWish && (
+                                  <p className="text-[8px] text-[#654321] mt-0.5 text-center font-medium">Edit image</p>
+                                )}
                               </div>
                             )}
                           </div>
@@ -4144,7 +4148,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                               className="hidden"
                             />
                             {showAltImageInput ? (
-                              <div className="w-28 space-y-1">
+                              <div className="w-40 space-y-1">
                                 <p className="text-[7px] text-[#6B4423] leading-tight">💡 Right-click image → Open in new tab → Copy URL</p>
                                 <input
                                   type="text"
@@ -4163,18 +4167,20 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                             ) : (
                               <div className="relative group">
                                 {altClippedImage ? (
-                                  <img src={amazonImageUrlToLarge(altClippedImage) || altClippedImage} alt={altClippedTitle || 'Alternative product'} className="w-20 h-20 object-contain rounded-lg bg-white border border-[#D97706]/20" />
+                                  <img src={amazonImageUrlToLarge(altClippedImage) || altClippedImage} alt={altClippedTitle || 'Alternative product'} className="w-32 h-32 object-contain rounded-lg bg-white border border-[#D97706]/20" />
                                 ) : (
-                                  <div className="w-20 h-20 rounded-lg bg-gradient-to-br from-amber-50 to-orange-50 border border-[#D97706]/20 flex items-center justify-center cursor-pointer hover:border-[#D97706]" onClick={() => setShowAltImageInput(true)}>
+                                  <div className="w-32 h-32 rounded-lg bg-gradient-to-br from-amber-50 to-orange-50 border border-[#D97706]/20 flex items-center justify-center cursor-pointer hover:border-[#D97706]" onClick={() => setShowAltImageInput(true)}>
                                     <span className="text-[#D97706] text-[9px] text-center px-1">Click to add</span>
                                   </div>
                                 )}
-                                {altClippedImage && (
-                                  <div className="absolute inset-0 bg-black/50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
-                                    <button onClick={() => setShowAltImageInput(true)} className="p-1.5 bg-white/90 rounded-full hover:bg-white transition-colors" title="Paste image URL"><Pencil className="w-3.5 h-3.5 text-blue-600" /></button>
-                                    <button onClick={() => altImageInputRef.current?.click()} className="p-1.5 bg-white/90 rounded-full hover:bg-white transition-colors" title="Upload image"><Upload className="w-3.5 h-3.5 text-amber-600" /></button>
-                                    <button onClick={handleAltImageDelete} className="p-1.5 bg-white/90 rounded-full hover:bg-white transition-colors" title="Remove image"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>
-                                  </div>
+                                {/* Product image edit: always visible when editing Alternative, else on hover (same as /gifts/create) */}
+                                <div className={`absolute inset-0 bg-black/50 rounded-lg transition-opacity flex items-center justify-center gap-1 ${isEditingAlt ? "opacity-100" : "opacity-0 group-hover:opacity-100"} ${!altClippedImage ? "bg-black/40" : ""}`}>
+                                  <button onClick={() => setShowAltImageInput(true)} className="p-1.5 bg-white/90 rounded-full hover:bg-white transition-colors" title="Paste image URL"><Pencil className="w-3.5 h-3.5 text-blue-600" /></button>
+                                  <button onClick={() => altImageInputRef.current?.click()} className="p-1.5 bg-white/90 rounded-full hover:bg-white transition-colors" title="Upload image"><Upload className="w-3.5 h-3.5 text-amber-600" /></button>
+                                  {altClippedImage && <button onClick={handleAltImageDelete} className="p-1.5 bg-white/90 rounded-full hover:bg-white transition-colors" title="Remove image"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>}
+                                </div>
+                                {isEditingAlt && (
+                                  <p className="text-[8px] text-[#92400E] mt-0.5 text-center font-medium">Edit image</p>
                                 )}
                               </div>
                             )}

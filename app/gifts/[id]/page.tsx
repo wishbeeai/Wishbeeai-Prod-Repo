@@ -20,6 +20,7 @@ import {
   MessageCircle,
   Check,
   ExternalLink,
+  Loader2,
 } from "lucide-react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
@@ -134,6 +135,23 @@ export default function GiftDetailPage() {
   const [magicLink, setMagicLink] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [showShareModal, setShowShareModal] = useState(false)
+  const [fetchedGift, setFetchedGift] = useState<{
+    name: string
+    description: string
+    image: string
+    targetAmount: number
+    currentAmount: number
+    contributors: number
+    daysLeft: number
+    createdDate: string
+    endDate: string
+    organizer: string
+    recentContributions: { name: string; amount: number; time: string }[]
+    contributeUrl?: string
+  } | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailNotFound, setDetailNotFound] = useState(false)
+  const [contributing, setContributing] = useState(false)
 
   useEffect(() => {
     console.log("[v0] Gift detail page - giftId:", giftId)
@@ -161,6 +179,97 @@ export default function GiftDetailPage() {
     if (giftId === "browse") {
       fetchBrowseGifts()
     }
+  }, [giftId])
+
+  const mockIds = ["1", "2"]
+  const isRealGiftId =
+    giftId &&
+    giftId !== "browse" &&
+    giftId !== "create" &&
+    !mockIds.includes(giftId as string)
+
+  const refetchGift = () => {
+    if (!isRealGiftId || typeof giftId !== "string") return
+    fetch(`/api/gifts/${giftId}`, { cache: "no-store" })
+      .then((res) => {
+        if (!res.ok || res.status === 404) return null
+        return res.json()
+      })
+      .then((data) => {
+        if (!data?.gift) return
+        const g = data.gift
+        setFetchedGift({
+          name: g.name || g.collectionTitle || g.giftName,
+          description: g.description || "Help make this gift possible!",
+          image: g.image || "/placeholder.svg",
+          targetAmount: g.targetAmount ?? 0,
+          currentAmount: g.currentAmount ?? 0,
+          contributors: g.contributors ?? 0,
+          daysLeft: g.daysLeft ?? 0,
+          createdDate: g.created_at ? new Date(g.created_at).toLocaleDateString() : "",
+          endDate: g.deadline ? new Date(g.deadline).toLocaleDateString() : "",
+          organizer: "Gift organizer",
+          recentContributions: [],
+          contributeUrl: g.contributeUrl,
+        })
+      })
+      .catch(() => {})
+  }
+
+  // Fetch single gift by ID when coming from Active (real UUID, not mock "1" or "2")
+  useEffect(() => {
+    if (!isRealGiftId) return
+    let cancelled = false
+    setDetailNotFound(false)
+    setDetailLoading(true)
+    fetch(`/api/gifts/${giftId}`, { cache: "no-store" })
+      .then((res) => {
+        if (cancelled) return
+        if (res.ok) return res.json()
+        if (res.status === 404) {
+          setDetailNotFound(true)
+          setFetchedGift(null)
+          return
+        }
+        throw new Error("Failed to load gift")
+      })
+      .then((data) => {
+        if (cancelled || !data?.gift) return
+        const g = data.gift
+        setFetchedGift({
+          name: g.name || g.collectionTitle || g.giftName,
+          description: g.description || "Help make this gift possible!",
+          image: g.image || "/placeholder.svg",
+          targetAmount: g.targetAmount ?? 0,
+          currentAmount: g.currentAmount ?? 0,
+          contributors: g.contributors ?? 0,
+          daysLeft: g.daysLeft ?? 0,
+          createdDate: g.created_at ? new Date(g.created_at).toLocaleDateString() : "",
+          endDate: g.deadline ? new Date(g.deadline).toLocaleDateString() : "",
+          organizer: "Gift organizer",
+          recentContributions: [],
+          contributeUrl: g.contributeUrl,
+        })
+      })
+      .catch(() => {
+        if (!cancelled) setDetailNotFound(true)
+      })
+      .finally(() => {
+        if (!cancelled) setDetailLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [giftId])
+
+  // Refetch gift when tab becomes visible (e.g. after contributing in another tab) so amounts stay in sync
+  useEffect(() => {
+    if (!isRealGiftId) return
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") refetchGift()
+    }
+    document.addEventListener("visibilitychange", onVisibility)
+    return () => document.removeEventListener("visibilitychange", onVisibility)
   }, [giftId])
 
   const fetchBrowseGifts = async () => {
@@ -600,9 +709,22 @@ export default function GiftDetailPage() {
     },
   }
 
-  const gift = giftDetails[giftId as keyof typeof giftDetails]
+  // Use fetched gift (from API) when coming from Active, else mock giftDetails for ids "1" and "2"
+  const gift = fetchedGift ?? giftDetails[giftId as keyof typeof giftDetails]
 
-  if (!gift && giftId !== "create") {
+  // Loading state when fetching a real gift by ID
+  if (detailLoading && !gift && giftId !== "browse" && giftId !== "create") {
+    return (
+      <div className="min-h-screen bg-[#F5F1E8] flex items-center justify-center px-4">
+        <div className="text-center">
+          <div className="w-10 h-10 border-2 border-[#DAA520] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-[#654321] font-medium">Loading gift...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!gift && giftId !== "create" && !detailLoading) {
     return (
       <div className="min-h-screen bg-[#F5F1E8] flex items-center justify-center px-4">
         <div className="text-center max-w-md">
@@ -640,8 +762,35 @@ export default function GiftDetailPage() {
 
   const progressPercentage = (gift.currentAmount / gift.targetAmount) * 100
 
-  const handleContribute = () => {
-    toast.success("Opening contribution form...")
+  const handleContribute = async () => {
+    if (!isRealGiftId || typeof giftId !== "string") {
+      toast.success("Opening contribution form...")
+      return
+    }
+    if (fetchedGift?.contributeUrl) {
+      window.location.href = fetchedGift.contributeUrl
+      return
+    }
+    setContributing(true)
+    try {
+      const res = await fetch(`/api/gifts/${giftId}/magic-link`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enableReminders: true, colorTheme: "gold", invitationMessage: "", expiresInDays: 30 }),
+      })
+      const data = await res.json()
+      const url = data?.magicLink?.url
+      if (url) {
+        setFetchedGift((prev) => (prev ? { ...prev, contributeUrl: url } : null))
+        window.location.href = url
+      } else {
+        toast.error("Could not open contribution form. Please try again.")
+      }
+    } catch {
+      toast.error("Could not open contribution form. Please try again.")
+    } finally {
+      setContributing(false)
+    }
   }
 
   const copyMagicLink = async () => {
@@ -828,9 +977,17 @@ export default function GiftDetailPage() {
 
               <button
                 onClick={handleContribute}
-                className="w-full px-3 py-2 bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#3B2F0F] rounded-md font-semibold text-sm hover:shadow-md transition-all"
+                disabled={contributing}
+                className="w-full px-3 py-2 bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#3B2F0F] rounded-md font-semibold text-sm hover:shadow-md transition-all disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                Contribute Now
+                {contributing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Opening...
+                  </>
+                ) : (
+                  "Contribute Now"
+                )}
               </button>
             </div>
           </div>

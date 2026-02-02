@@ -31,9 +31,10 @@ export async function GET(req: NextRequest) {
 
     if (error) {
       console.error("[gifts/collections] Error fetching:", error)
-      const details = error?.message || (error as Error)?.message
+      const err = error as { message?: string; code?: string }
+      const details = err?.message || (error as Error)?.message
       return NextResponse.json(
-        { error: "Failed to load gift collections", details: details || undefined },
+        { error: "Failed to load gift collections", details: details || undefined, ...(err?.code && { code: err.code }) },
         { status: 500 }
       )
     }

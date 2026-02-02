@@ -656,16 +656,15 @@ export function CreateGiftFormClient() {
 
       const text = await response.text()
       if (!response.ok) {
-        let data
+        let data: { error?: string; message?: string; suggestion?: string }
         try {
-          data = JSON.parse(text)
+          data = JSON.parse(text) || {}
         } catch (e) {
           toast({ title: "Extraction Error", description: "Failed to extract product details.", variant: "destructive" })
           return
         }
-        if (data.error) {
-          toast({ title: "Extraction Error", description: data.error, variant: "destructive" })
-        }
+        const description = data.suggestion || data.message || data.error || "Failed to extract product details."
+        toast({ title: "Extraction Error", description, variant: "destructive" })
         return
       }
 
@@ -703,9 +702,10 @@ export function CreateGiftFormClient() {
       console.log('[Gift Create] Raw API response - attributes:', data.attributes)
       
       // Product specification keys - WHITELIST approach (only these will be included in specs)
-      // These are the relevant specs users actually want to see (minimum 10 for electronics)
+      // Include Color, Material, Brand, Item Weight, Capacity for Product details display
       const specificationKeys = [
-        'brand', 'operatingsystem', 'os', 'memorystoragecapacity', 'storagecapacity',
+        'brand', 'color', 'material', 'capacity', 'itemweight',
+        'operatingsystem', 'os', 'memorystoragecapacity', 'storagecapacity',
         'specialfeature', 'connectivitytechnology', 'wirelesscommunicationstandard',
         'batterycellcomposition', 'batterylife', 'batterycapacity', 'gps',
         'shape', 'screensize', 'displaysize', 'displayresolution', 'resolution',
@@ -715,10 +715,10 @@ export function CreateGiftFormClient() {
         'waterdepthrating', 'waterresistant', 'compatible', 'sensor', 'display'
       ]
       
-      // Keys to EXCLUDE from specs (irrelevant/internal data)
+      // Keys to EXCLUDE from specs (irrelevant/internal data) - do NOT exclude itemweight so Item Weight shows
       const excludeFromSpecs = [
         'sizeOptions', 'colorVariants', 'combinedVariants', 'styleOptions', 'stockStatus', 'features',
-        'caratweight', 'carat', 'itemweight', 'weight', 'productdimensions', 'dimensions',
+        'caratweight', 'carat', 'productdimensions', 'dimensions',
         'model', 'modelname', 'modelnumber', 'asin', 'upc', 'ean', 'isbn',
         'packagedimensions', 'shippingweight', 'itemmodelnumber', 'manufacturerpartnumber'
       ]
@@ -765,6 +765,10 @@ export function CreateGiftFormClient() {
                 return
               }
               variants[formattedKey] = value
+              // Also show Color in specifications (user expects Color, Material, Brand, Item Weight, Capacity in specs)
+              if (keyLower === 'color') {
+                specs['Color'] = value
+              }
               return // Don't also add to specs for other variants
             }
             
@@ -3014,8 +3018,10 @@ export function CreateGiftFormClient() {
                                               const altVars: Record<string, string> = {}
                                               const altSpecs: Record<string, string> = {}
                                               const variantKeys = ['color', 'style', 'configuration', 'pattern', 'edition', 'size', 'connectivity']
+                                              // Include Color, Material, Brand, Item Weight, Capacity for Alternative specs
                                               const specificationKeys = [
-                                                'brand', 'operatingsystem', 'os', 'memorystoragecapacity', 'storagecapacity',
+                                                'brand', 'color', 'material', 'capacity', 'itemweight',
+                                                'operatingsystem', 'os', 'memorystoragecapacity', 'storagecapacity',
                                                 'specialfeature', 'connectivitytechnology', 'wirelesscommunicationstandard',
                                                 'batterycellcomposition', 'batterylife', 'batterycapacity', 'gps',
                                                 'shape', 'screensize', 'displaysize', 'displayresolution', 'resolution',
@@ -3025,7 +3031,7 @@ export function CreateGiftFormClient() {
                                                 'waterdepthrating', 'waterresistant', 'compatible', 'sensor', 'display'
                                               ]
                                               const excludeFromSpecs = [
-                                                'caratweight', 'carat', 'itemweight', 'weight', 'productdimensions', 'dimensions',
+                                                'caratweight', 'carat', 'productdimensions', 'dimensions',
                                                 'model', 'modelname', 'modelnumber', 'asin', 'upc', 'ean', 'isbn',
                                                 'packagedimensions', 'shippingweight', 'itemmodelnumber'
                                               ]
@@ -3042,7 +3048,6 @@ export function CreateGiftFormClient() {
                                                     }
                                                     
                                                     // CHECK VARIANTS FIRST (before specs)
-                                                    // Use exact match for most keys, avoid 'screensize' matching 'size'
                                                     const isVariantKey = variantKeys.some(vk => {
                                                       if (vk === 'size') return keyLower === 'size'
                                                       if (vk === 'connectivity') return keyLower.includes('connectivity')
@@ -3053,7 +3058,6 @@ export function CreateGiftFormClient() {
                                                       if (keyLower.includes('color') && invalidColors.includes(value.trim().toLowerCase())) {
                                                         return
                                                       }
-                                                      // Map "Connectivity Technology" to "Style" for watches - but ALSO keep in specs
                                                       let formattedKey = key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1').trim()
                                                       if (keyLower.includes('connectivity') && (value.toLowerCase().includes('gps') || value.toLowerCase().includes('cellular'))) {
                                                         altVars['Style'] = value.trim()
@@ -3061,6 +3065,10 @@ export function CreateGiftFormClient() {
                                                         return
                                                       }
                                                       altVars[formattedKey] = value.trim()
+                                                      // Also show Color, Material, Capacity in Alternative specifications
+                                                      if (formattedKey === 'Color' || formattedKey === 'Material' || formattedKey === 'Capacity') {
+                                                        altSpecs[formattedKey] = value.trim()
+                                                      }
                                                       return
                                                     }
                                                     
@@ -3077,19 +3085,20 @@ export function CreateGiftFormClient() {
                                               variantKeys.forEach(vk => {
                                                 const val = data[vk]
                                                 if (val && typeof val === 'string' && val.trim()) {
-                                                  // Filter out invalid color values
                                                   if (vk === 'color' && invalidColors.includes(val.trim().toLowerCase())) {
                                                     return
                                                   }
                                                   const normalizedKey = vk.charAt(0).toUpperCase() + vk.slice(1)
-                                                  // For color, prefer longer/more descriptive values (e.g., "Space Gray Aluminum Case w/ Black Sport Band")
                                                   if (vk === 'color' && altVars['Color']) {
-                                                    // Only overwrite if new value is longer (more descriptive)
                                                     if (val.trim().length > altVars['Color'].length) {
                                                       altVars[normalizedKey] = val.trim()
+                                                      altSpecs['Color'] = val.trim()
                                                     }
                                                   } else {
                                                     altVars[normalizedKey] = val.trim()
+                                                    if (normalizedKey === 'Color' || normalizedKey === 'Material' || normalizedKey === 'Capacity') {
+                                                      altSpecs[normalizedKey] = val.trim()
+                                                    }
                                                   }
                                                 }
                                               })
@@ -3159,8 +3168,10 @@ export function CreateGiftFormClient() {
                                             const altVars: Record<string, string> = {}
                                             const altSpecs: Record<string, string> = {}
                                             const variantKeys = ['color', 'style', 'configuration', 'pattern', 'edition', 'size', 'connectivity']
+                                            // Include Color, Material, Brand, Item Weight, Capacity for Alternative specs
                                             const specificationKeys = [
-                                              'brand', 'operatingsystem', 'os', 'memorystoragecapacity', 'storagecapacity',
+                                              'brand', 'color', 'material', 'capacity', 'itemweight',
+                                              'operatingsystem', 'os', 'memorystoragecapacity', 'storagecapacity',
                                               'specialfeature', 'connectivitytechnology', 'wirelesscommunicationstandard',
                                               'batterycellcomposition', 'batterylife', 'batterycapacity', 'gps',
                                               'shape', 'screensize', 'displaysize', 'displayresolution', 'resolution',
@@ -3170,7 +3181,7 @@ export function CreateGiftFormClient() {
                                               'waterdepthrating', 'waterresistant', 'compatible', 'sensor', 'display'
                                             ]
                                             const excludeFromSpecs = [
-                                              'caratweight', 'carat', 'itemweight', 'weight', 'productdimensions', 'dimensions',
+                                              'caratweight', 'carat', 'productdimensions', 'dimensions',
                                               'model', 'modelname', 'modelnumber', 'asin', 'upc', 'ean', 'isbn',
                                               'packagedimensions', 'shippingweight', 'itemmodelnumber'
                                             ]
@@ -3181,13 +3192,10 @@ export function CreateGiftFormClient() {
                                                 if (value && typeof value === 'string' && value.trim()) {
                                                   const keyLower = key.toLowerCase().replace(/[\s_-]/g, '')
                                                   
-                                                  // Skip if in exclusion list
                                                   if (excludeFromSpecs.some(ek => keyLower === ek || keyLower.includes(ek))) {
                                                     return
                                                   }
                                                   
-                                                  // CHECK VARIANTS FIRST (before specs)
-                                                  // Use exact match for most keys, avoid 'screensize' matching 'size'
                                                   const isVariantKey = variantKeys.some(vk => {
                                                     if (vk === 'size') return keyLower === 'size'
                                                     if (vk === 'connectivity') return keyLower.includes('connectivity')
@@ -3198,7 +3206,6 @@ export function CreateGiftFormClient() {
                                                     if (keyLower.includes('color') && invalidColors.includes(value.trim().toLowerCase())) {
                                                       return
                                                     }
-                                                    // Map "Connectivity Technology" to "Style" for watches - but ALSO keep in specs
                                                     let formattedKey = key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1').trim()
                                                     if (keyLower.includes('connectivity') && (value.toLowerCase().includes('gps') || value.toLowerCase().includes('cellular'))) {
                                                       altVars['Style'] = value.trim()
@@ -3206,10 +3213,13 @@ export function CreateGiftFormClient() {
                                                       return
                                                     }
                                                     altVars[formattedKey] = value.trim()
+                                                    // Also show Color, Material, Capacity in Alternative specifications
+                                                    if (formattedKey === 'Color' || formattedKey === 'Material' || formattedKey === 'Capacity') {
+                                                      altSpecs[formattedKey] = value.trim()
+                                                    }
                                                     return
                                                   }
                                                   
-                                                  // Check if it's a specification (whitelist)
                                                   if (specificationKeys.some(sk => keyLower === sk || keyLower.includes(sk))) {
                                                     const formattedKey = key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1').trim()
                                                     altSpecs[formattedKey] = value.trim()
@@ -3218,28 +3228,27 @@ export function CreateGiftFormClient() {
                                               })
                                             }
                                             
-                                            // Also check top-level variant fields
                                             variantKeys.forEach(vk => {
                                               const val = data[vk]
                                               if (val && typeof val === 'string' && val.trim()) {
-                                                // Filter out invalid color values
                                                 if (vk === 'color' && invalidColors.includes(val.trim().toLowerCase())) {
                                                   return
                                                 }
                                                 const normalizedKey = vk.charAt(0).toUpperCase() + vk.slice(1)
-                                                // For color, prefer longer/more descriptive values (e.g., "Space Gray Aluminum Case w/ Black Sport Band")
                                                 if (vk === 'color' && altVars['Color']) {
-                                                  // Only overwrite if new value is longer (more descriptive)
                                                   if (val.trim().length > altVars['Color'].length) {
                                                     altVars[normalizedKey] = val.trim()
+                                                    altSpecs['Color'] = val.trim()
                                                   }
                                                 } else {
                                                   altVars[normalizedKey] = val.trim()
+                                                  if (normalizedKey === 'Color' || normalizedKey === 'Material' || normalizedKey === 'Capacity') {
+                                                    altSpecs[normalizedKey] = val.trim()
+                                                  }
                                                 }
                                               }
                                             })
                                             
-                                            // Add brand if available at top level
                                             if (data.brand && !altSpecs['Brand']) {
                                               altSpecs['Brand'] = data.brand
                                             }
@@ -3247,7 +3256,6 @@ export function CreateGiftFormClient() {
                                             setAltVariants(altVars)
                                             setAltEditableSpecs(altSpecs)
                                             
-                                            // Capture alternative price for validation
                                             if (data.price) {
                                               setAltPrice(data.price)
                                             }

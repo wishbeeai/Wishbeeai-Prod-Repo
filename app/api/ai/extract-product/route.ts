@@ -150,8 +150,9 @@ function amazonImageUrlToLarge(url: string | null | undefined): string | null {
   return url.replace(/\._AC_[A-Z]{2}\d+_\./g, '._AC_SL1500_.').split('?')[0]
 }
 
-function extractStructuredData(html: string) {
+function extractStructuredData(html: string | null | undefined) {
   const structuredData: any = {}
+  if (!html || typeof html !== "string") return structuredData
 
   // Extract JSON-LD structured data (common in modern e-commerce)
   const jsonLdMatch = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i)
@@ -5414,7 +5415,8 @@ async function extractWithoutAI(
       // If size was incorrectly set to a clothing size, override it here
       if (productData.attributes.size) {
         const clothingSizes = ['xs', 'small', 'medium', 'large', 'xl', 'xxl', 'xxxl', 's', 'm', 'l']
-        const sizeLower = productData.attributes.size.toLowerCase()
+        const sizeStr = typeof productData.attributes.size === 'string' ? productData.attributes.size : String(productData.attributes.size)
+        const sizeLower = sizeStr.toLowerCase()
         const isClothingSize = clothingSizes.some(cs => sizeLower === cs || sizeLower.includes(cs + ' '))
         
         if (isClothingSize) {
@@ -7327,12 +7329,15 @@ async function extractWithoutAI(
       
       // Define the specifications we want to extract (label -> attribute name mapping)
       const specMappings: Record<string, keyof typeof productData.attributes> = {
-        // General
+        // General (including Product details: Color, Material, Brand, Item Weight, Capacity)
+        'color': 'color',
+        'material': 'material',
         'brand': 'brand',
         'model': 'model',
         'model name': 'model',
         'item model number': 'model',
         'manufacturer': 'brand',
+        'item weight': 'itemWeight',
         // Audio/Headphones
         'ear placement': 'earPlacement',
         'form factor': 'formFactor',
@@ -7375,8 +7380,6 @@ async function extractWithoutAI(
         'special feature': 'specialFeatures',
         // Kitchen/Appliances - Amazon Product Overview
         'capacity': 'capacity',
-        'material': 'material',
-        'item weight': 'itemWeight',
         'product dimensions': 'productDimensions',
         'item dimensions': 'productDimensions',
         'coffee maker type': 'coffeeMakerType',
@@ -7481,8 +7484,20 @@ async function extractWithoutAI(
         const value = decodeHtmlEntities(tableMatch[2].trim())
         
         if (value && value.length > 0 && value.length < 300) {
-          // Map to our attribute names
-          if (label.includes('operating system') && !productData.attributes.operatingSystem) {
+          // Map to our attribute names (Product details: Color, Material, Brand, Item Weight, Capacity first)
+          if ((label === 'color' || label.includes('color')) && label.length < 15 && !productData.attributes.color) {
+            productData.attributes.color = value
+            log(`[v0] ✅ Table extracted color: ${value}`)
+          } else if ((label === 'material' || label.includes('material')) && !label.includes('battery') && !productData.attributes.material) {
+            productData.attributes.material = value
+            log(`[v0] ✅ Table extracted material: ${value}`)
+          } else if ((label === 'brand' || label.includes('brand')) && label.length < 10 && !productData.attributes.brand) {
+            productData.attributes.brand = value
+            log(`[v0] ✅ Table extracted brand: ${value}`)
+          } else if ((label === 'item weight' || label.includes('item weight')) && !productData.attributes.itemWeight) {
+            productData.attributes.itemWeight = value
+            log(`[v0] ✅ Table extracted itemWeight: ${value}`)
+          } else if (label.includes('operating system') && !productData.attributes.operatingSystem) {
             productData.attributes.operatingSystem = value
             log(`[v0] ✅ Table extracted operatingSystem: ${value}`)
           } else if ((label.includes('memory storage') || label.includes('storage capacity')) && !productData.attributes.memoryStorageCapacity) {
@@ -7557,6 +7572,9 @@ async function extractWithoutAI(
       // Format: <tr><td>Label</td><td>Value</td></tr> with various class patterns
       const productOverviewLabels: Record<string, keyof typeof productData.attributes> = {
         'brand': 'brand',
+        'color': 'color',
+        'material': 'material',
+        'item weight': 'itemWeight',
         'model name': 'model',
         'model': 'model',
         'memory storage capacity': 'memoryStorageCapacity',
@@ -7570,7 +7588,6 @@ async function extractWithoutAI(
         'operating system': 'operatingSystem',
         'connectivity technology': 'connectivityTechnology',
         'wireless type': 'wirelessType',
-        'color': 'color',
         'size': 'size',
       }
       
@@ -7623,6 +7640,8 @@ async function extractWithoutAI(
       // Log what specifications were extracted
       const extractedSpecs = Object.entries(productData.attributes)
         .filter(([key, value]) => value && [
+          // Product details (Color, Material, Brand, Item Weight, Capacity)
+          'color', 'material', 'brand', 'itemWeight', 'capacity',
           // Audio/Headphones
           'earPlacement', 'formFactor', 'impedance', 'noiseControl', 'connectivity', 'wirelessType', 'batteryLife',
           // Watch/Wearables
@@ -7630,7 +7649,7 @@ async function extractWithoutAI(
           'wirelessCommunicationStandard', 'batteryCellComposition', 'gps', 'shape', 'screenSize', 
           'displayType', 'displayResolutionMaximum', 'waterResistance',
           // General tech specs
-          'wattage', 'powerSource', 'controlMethod', 'specialFeatures', 'brand', 'model'
+          'wattage', 'powerSource', 'controlMethod', 'specialFeatures', 'model'
         ].includes(key))
         .map(([key, value]) => `${key}: ${value}`)
       
@@ -8010,7 +8029,8 @@ function convertMacysImageUrl(imageUrl: string): string {
   return imageUrl
 }
 
-function extractPriceFromHTML(html: string): number | null {
+function extractPriceFromHTML(html: string | null | undefined): number | null {
+  if (!html || typeof html !== "string") return null
   // Pattern 1: Look for price in meta tags - preserve decimals
   const metaPriceMatch = html.match(/<meta[^>]*property=["']og:price:amount["'][^>]*content=["']([0-9]+(?:\.[0-9]{1,2})?)["']/i)
   if (metaPriceMatch) {
@@ -8070,6 +8090,21 @@ function extractPriceFromHTML(html: string): number | null {
   }
 
   return null
+}
+
+/** Build a safe JSON 500 response (only primitives so serialization never throws). */
+function safe500Response(error: unknown): NextResponse {
+  const message = error instanceof Error ? error.message : String(error)
+  const suggestion =
+    message.toLowerCase().includes("api key") || message.toLowerCase().includes("openai")
+      ? "Check that OPENAI_API_KEY is set in .env.local"
+      : message.toLowerCase().includes("fetch") || message.toLowerCase().includes("timeout") || message.toLowerCase().includes("abort")
+        ? "Network or timeout error. Check connection or try again."
+        : "An unexpected error occurred. Check server logs or try a different URL."
+  return NextResponse.json(
+    { error: "Failed to extract product information", message, suggestion },
+    { status: 500 }
+  )
 }
 
 export async function POST(request: Request) {
@@ -10634,7 +10669,20 @@ Return ONLY valid JSON, no markdown, no explanation.`
       log(`[v0] ⚠️ FINAL RESULT: Capacity NOT extracted. Features: ${productData.attributes.features?.substring(0, 100)}`)
     }
 
-    return NextResponse.json(productData)
+    try {
+      return NextResponse.json(productData)
+    } catch (serializeError) {
+      console.error("[v0] Failed to serialize product response (e.g. circular ref):", serializeError)
+      const msg = serializeError instanceof Error ? serializeError.message : String(serializeError)
+      return NextResponse.json(
+        {
+          error: "Failed to extract product information",
+          message: msg,
+          suggestion: "The product data could not be serialized. Try a different URL or check server logs.",
+        },
+        { status: 500 }
+      )
+    }
   } catch (error) {
     console.error("[v0] === TOP LEVEL ERROR IN PRODUCT EXTRACTION API ===")
     console.error("[v0] Error type:", typeof error)
@@ -10642,50 +10690,39 @@ Return ONLY valid JSON, no markdown, no explanation.`
     console.error("[v0] Error message:", error instanceof Error ? error.message : String(error))
     console.error("[v0] Error stack:", error instanceof Error ? error.stack : "No stack trace")
     
-    // Enhanced error details for debugging
-    const errorDetails: any = {
-      error: "Failed to extract product information",
-      message: error instanceof Error ? error.message : String(error),
-    }
-    
-    // Add stack trace in development
-    if (process.env.NODE_ENV === 'development' && error instanceof Error) {
-      errorDetails.stack = error.stack
-    }
-    
-    // Add common error context and suggestions
-    if (error instanceof Error) {
-      const errorMsg = error.message.toLowerCase()
-      
-      if (errorMsg.includes('api key') || errorMsg.includes('openai') || errorMsg.includes('authentication')) {
-        errorDetails.suggestion = "Check that OPENAI_API_KEY is set in .env.local"
-        errorDetails.statusCode = 401
-      } else if (errorMsg.includes('fetch') || errorMsg.includes('network') || errorMsg.includes('timeout') || errorMsg.includes('econnrefused')) {
-        errorDetails.suggestion = "Network error - check internet connection or API service status. The product URL may be unreachable."
-        errorDetails.statusCode = 503
-      } else if (errorMsg.includes('json') || errorMsg.includes('parse') || errorMsg.includes('syntax')) {
-        errorDetails.suggestion = "JSON parsing error - the API response may be malformed. Try a different product URL."
-        errorDetails.statusCode = 502
-      } else if (errorMsg.includes('url') || errorMsg.includes('invalid')) {
-        errorDetails.suggestion = "Invalid URL format. Please provide a valid product URL starting with http:// or https://"
-        errorDetails.statusCode = 400
-      } else if (errorMsg.includes('rate limit') || errorMsg.includes('too many requests')) {
-        errorDetails.suggestion = "Rate limit exceeded. Please wait a moment and try again."
-        errorDetails.statusCode = 429
-      } else {
-        errorDetails.suggestion = "An unexpected error occurred. Please check the server logs for more details."
-        errorDetails.statusCode = 500
-      }
+    // Build suggestion from message (primitives only so JSON never throws)
+    const message = error instanceof Error ? error.message : String(error)
+    const errorMsg = message.toLowerCase()
+    let suggestion: string
+    let statusCode: number
+    if (errorMsg.includes('api key') || errorMsg.includes('openai') || errorMsg.includes('authentication')) {
+      suggestion = "Check that OPENAI_API_KEY is set in .env.local"
+      statusCode = 401
+    } else if (errorMsg.includes('fetch') || errorMsg.includes('network') || errorMsg.includes('timeout') || errorMsg.includes('econnrefused') || errorMsg.includes('abort') || errorMsg.includes('operation was aborted')) {
+      suggestion = "Network error or request timeout - check internet connection or try again. The product URL may be unreachable or the site may be slow."
+      statusCode = 503
+    } else if (errorMsg.includes('json') || errorMsg.includes('parse') || errorMsg.includes('syntax')) {
+      suggestion = "JSON parsing error - the API response may be malformed. Try a different product URL."
+      statusCode = 502
+    } else if (errorMsg.includes('url') || errorMsg.includes('invalid')) {
+      suggestion = "Invalid URL format. Please provide a valid product URL starting with http:// or https://"
+      statusCode = 400
+    } else if (errorMsg.includes('rate limit') || errorMsg.includes('too many requests')) {
+      suggestion = "Rate limit exceeded. Please wait a moment and try again."
+      statusCode = 429
     } else {
-      errorDetails.suggestion = "An unexpected error occurred. Please check the server logs for more details."
-      errorDetails.statusCode = 500
+      suggestion = "An unexpected error occurred. Check the server terminal for the exact error message, or try a different URL."
+      statusCode = 500
     }
 
-    // Use appropriate status code if available, otherwise default to 500
-    const statusCode = errorDetails.statusCode || 500
-    delete errorDetails.statusCode // Remove from response body
-
-    return NextResponse.json(errorDetails, { status: statusCode })
+    try {
+      return NextResponse.json(
+        { error: "Failed to extract product information", message, suggestion },
+        { status: statusCode }
+      )
+    } catch (jsonError) {
+      return safe500Response(error)
+    }
   }
 }
 

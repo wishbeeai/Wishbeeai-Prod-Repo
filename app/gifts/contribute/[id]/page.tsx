@@ -213,15 +213,27 @@ export default function GuestContributePage() {
 
       const data = await response.json()
 
-      if (data.success) {
+      if (response.ok && data.success) {
+        // Update local gift details so progress bar and totals reflect the contribution
+        if (data.giftProgress) {
+          setGiftDetails((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  currentAmount: data.giftProgress.totalContributions ?? prev.currentAmount + parseFloat(amount),
+                  contributors: data.giftProgress.contributorCount ?? prev.contributors + 1,
+                }
+              : prev
+          )
+        }
         setIsSuccess(true)
-        toast({ 
-          title: "🎉 Thank You!", 
+        toast({
+          title: "🎉 Thank You!",
           description: "Your contribution has been received!",
-          variant: "warm" 
+          variant: "warm",
         })
       } else {
-        throw new Error(data.error)
+        throw new Error(data.error || "Failed to record contribution")
       }
     } catch (error) {
       toast({ 

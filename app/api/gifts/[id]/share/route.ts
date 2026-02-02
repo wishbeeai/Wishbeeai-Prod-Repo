@@ -1,27 +1,30 @@
 import { type NextRequest, NextResponse } from "next/server"
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
-    const { giftId, giftName, sharedBy } = await request.json()
+    let body: { giftId?: string; giftName?: string; sharedBy?: string }
+    try {
+      body = await request.json()
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid request body", details: "Expected JSON" },
+        { status: 400 }
+      )
+    }
+    const { giftId, giftName, sharedBy } = body ?? {}
 
-    // Validate input
     if (!giftId || !giftName) {
       return NextResponse.json({ error: "Gift ID and name are required" }, { status: 400 })
     }
 
-    // Generate shareable link
-    const shareUrl = `${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/gifts/share/${giftName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${giftId}`
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3001"
+    const slug = String(giftName).toLowerCase().replace(/[^a-z0-9]+/g, "-")
+    const shareUrl = `${baseUrl}/gifts/share/${slug}-${giftId}`
 
-    // In a real app, you would:
-    // 1. Log the share event to database
-    // 2. Track analytics
-    // 3. Generate unique tracking links
-    // 4. Store share metadata
-
-    console.log(`[v0] Gift shared: ${giftName} by ${sharedBy || "Anonymous"}`)
-
-    // Simulate database operation
-    await new Promise((resolve) => setTimeout(resolve, 300))
+    console.log(`[Share] Gift shared: ${giftName} by ${sharedBy || "Anonymous"}`)
 
     return NextResponse.json({
       success: true,
@@ -36,7 +39,16 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       },
     })
   } catch (error) {
-    console.error("[v0] Error sharing gift:", error)
-    return NextResponse.json({ error: "Failed to generate share link" }, { status: 500 })
+    const message = error instanceof Error ? error.message : String(error)
+    const details = error instanceof Error ? (error.stack ?? undefined) : undefined
+    console.error("[Share] Error:", error)
+    return NextResponse.json(
+      {
+        error: "Failed to generate share link",
+        details: process.env.NODE_ENV === "development" ? message : undefined,
+        ...(details && process.env.NODE_ENV === "development" ? { stack: details } : {}),
+      },
+      { status: 500 }
+    )
   }
 }

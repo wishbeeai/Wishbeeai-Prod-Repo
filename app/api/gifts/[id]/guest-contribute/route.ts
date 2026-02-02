@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient, createPublicClient } from "@/lib/supabase/server"
+import { createAdminClient, createPublicClient } from "@/lib/supabase/server"
 
 // In-memory store for contribution list (optional; gift progress is persisted in DB)
 const contributionsStore = new Map<string, Array<{
@@ -46,9 +46,13 @@ export async function POST(
       return NextResponse.json({ error: "Invalid email format" }, { status: 400 })
     }
 
-    // Update gift progress in database so Active page shows correct total.
-    // Use public client so guest (unauthenticated) can update; RLS would block owner-only update.
-    const supabase = await createPublicClient()
+    // Update gift progress in database. Prefer admin client so unauthenticated guests can update (RLS blocks anon).
+    let supabase = createAdminClient()
+    const usingAdmin = !!supabase
+    if (!supabase) {
+      supabase = await createPublicClient()
+    }
+    console.log(`[Guest Contribution] gift ${giftId} using ${usingAdmin ? "admin" : "public"} client`)
     const { data: gift, error: fetchError } = await supabase
       .from("gifts")
       .select("id, current_amount, contributors")
@@ -74,8 +78,12 @@ export async function POST(
       .eq("id", giftId)
 
     if (updateError) {
-      console.error("[Guest Contribution] Failed to update gift progress:", updateError)
-      return NextResponse.json({ error: "Failed to record contribution" }, { status: 500 })
+      console.error("[Guest Contribution] Failed to update gift progress:", updateError?.message ?? updateError, "code:", (updateError as { code?: string })?.code)
+      const msg =
+        (updateError as { code?: string }).code === "PGRST301" || String(updateError).includes("policy")
+          ? "Contributions are not available. The server needs SUPABASE_SERVICE_ROLE_KEY set for guest contributions."
+          : "Failed to record contribution"
+      return NextResponse.json({ error: msg }, { status: 500 })
     }
 
     const contribution = {
@@ -93,7 +101,22 @@ export async function POST(
     existing.push(contribution)
     contributionsStore.set(giftId, existing)
 
-    console.log(`[Guest Contribution] ${contributorName || "Anonymous"} contributed $${contributionAmount} to gift ${giftId}`)
+    // Persist contributor email for reminder emails (gift_contributor_emails table)
+    try {
+      await supabase.from("gift_contributor_emails").upsert(
+        {
+          gift_id: giftId,
+          email: contributorEmail.trim().toLowerCase(),
+          contributor_name: contributorName || null,
+          amount: contributionAmount,
+        },
+        { onConflict: "gift_id,email" }
+      )
+    } catch (tableErr) {
+      console.warn("[Guest Contribution] Could not save contributor email for reminders (table may not exist):", tableErr)
+    }
+
+    console.log(`[Guest Contribution] ${contributorName || "Anonymous"} contributed $${contributionAmount} to gift ${giftId} → new total $${newTotal}, ${contributorCount} contributors`)
 
     return NextResponse.json({
       success: true,

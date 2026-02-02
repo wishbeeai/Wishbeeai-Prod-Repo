@@ -15,25 +15,26 @@ if (Test-Path ".git\index.lock") {
     Start-Sleep -Seconds 1
 }
 
-# Stage deployment files (app, components, config; exclude logs and .DS_Store)
+# Stage deployment files (app, components, lib, config, migrations)
 Write-Host "Staging deployment files..." -ForegroundColor Cyan
 git add app/
 git add components/
 git add lib/
+git add hooks/
+git add types/
+git add middleware.ts
 git add next.config.mjs
 git add package.json
 git add package-lock.json
-git add scripts/verify-setup.ts
+git add scripts/
 git add deploy-production.ps1
 git add deploy-production.bat
-git add app/wishlist/loading.tsx
 git add supabase/migrations/
-# Remove postcss.config.js from index if deleted
-git add -u postcss.config.js 2>$null
-
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Failed to stage files. Please check Git status." -ForegroundColor Red
-    exit 1
+# Ignore errors from optional paths; check if we have anything staged
+git diff --cached --quiet 2>$null
+if ($LASTEXITCODE -eq 0) {
+    Write-Host "No changes to commit (working tree clean or nothing staged). Run: git status" -ForegroundColor Yellow
+    exit 0
 }
 
 # Check what's staged
@@ -53,7 +54,7 @@ if (-not $gitEmail -or -not $gitName) {
 # Commit
 Write-Host ""
 Write-Host "Committing changes..." -ForegroundColor Cyan
-$commitMessage = "Deploy: Magic link persistence (DB), guest contribution progress in DB for Active page"
+$commitMessage = "Deploy: latest to production (remind emails, specs, extract-product, gifts)"
 git commit -m $commitMessage
 
 if ($LASTEXITCODE -ne 0) {

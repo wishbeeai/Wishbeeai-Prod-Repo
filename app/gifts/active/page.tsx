@@ -57,50 +57,64 @@ export default function ActiveGiftsPage() {
   const [newGiftLink, setNewGiftLink] = useState<string | null>(null)
   const [newGiftId, setNewGiftId] = useState<string | null>(null)
   const [linkCopied, setLinkCopied] = useState(false)
+  // Share options modal (Copy / Email / WhatsApp) when user clicks Share on a gift
+  const [shareOptionsUrl, setShareOptionsUrl] = useState<string | null>(null)
+  const [shareOptionsGiftName, setShareOptionsGiftName] = useState<string | null>(null)
+  const [shareOptionsLinkCopied, setShareOptionsLinkCopied] = useState(false)
   
+  const fetchCollections = async () => {
+    try {
+      const res = await fetch("/api/gifts/collections?status=active")
+      if (res.status === 401) {
+        setActiveGifts(DEMO_ACTIVE_GIFTS)
+        setLoading(false)
+        return
+      }
+      if (!res.ok) throw new Error("Failed to load")
+      const data = await res.json()
+      const list = (data.collections || []).map((g: {
+        id: string
+        name: string
+        image: string
+        targetAmount: number
+        currentAmount: number
+        contributors: number
+        deadline: string
+      }) => {
+        const deadline = g.deadline ? new Date(g.deadline).getTime() : 0
+        const daysLeft = Math.max(0, Math.ceil((deadline - Date.now()) / (24 * 60 * 60 * 1000)))
+        const urgency: "high" | "medium" | "low" = daysLeft <= 3 ? "high" : daysLeft <= 7 ? "medium" : "low"
+        return {
+          id: g.id,
+          name: g.name,
+          image: g.image || "/placeholder.svg",
+          targetAmount: g.targetAmount,
+          currentAmount: g.currentAmount,
+          contributors: g.contributors,
+          daysLeft,
+          urgency,
+        }
+      })
+      setActiveGifts(list.length > 0 ? list : DEMO_ACTIVE_GIFTS)
+    } catch {
+      setActiveGifts(DEMO_ACTIVE_GIFTS)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   // Fetch current user's gift collections; fall back to demo when empty
   useEffect(() => {
-    async function fetchCollections() {
-      try {
-        const res = await fetch("/api/gifts/collections?status=active")
-        if (res.status === 401) {
-          setActiveGifts(DEMO_ACTIVE_GIFTS)
-          setLoading(false)
-          return
-        }
-        if (!res.ok) throw new Error("Failed to load")
-        const data = await res.json()
-        const list = (data.collections || []).map((g: {
-          id: string
-          name: string
-          image: string
-          targetAmount: number
-          currentAmount: number
-          contributors: number
-          deadline: string
-        }) => {
-          const deadline = g.deadline ? new Date(g.deadline).getTime() : 0
-          const daysLeft = Math.max(0, Math.ceil((deadline - Date.now()) / (24 * 60 * 60 * 1000)))
-          const urgency: "high" | "medium" | "low" = daysLeft <= 3 ? "high" : daysLeft <= 7 ? "medium" : "low"
-          return {
-            id: g.id,
-            name: g.name,
-            image: g.image || "/placeholder.svg",
-            targetAmount: g.targetAmount,
-            currentAmount: g.currentAmount,
-            contributors: g.contributors,
-            daysLeft,
-            urgency,
-          }
-        })
-        setActiveGifts(list.length > 0 ? list : DEMO_ACTIVE_GIFTS)
-      } catch {
-        setActiveGifts(DEMO_ACTIVE_GIFTS)
-      } finally {
-        setLoading(false)
-      }
-    }
     fetchCollections()
+  }, [])
+
+  // Refetch when tab becomes visible so progress updates after contributing in another tab
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") fetchCollections()
+    }
+    document.addEventListener("visibilitychange", onVisibility)
+    return () => document.removeEventListener("visibilitychange", onVisibility)
   }, [])
   
   // Check for newly created gift magic link on mount
@@ -234,7 +248,6 @@ export default function ActiveGiftsPage() {
 
   const handleShare = async (giftId: number, giftName: string) => {
     setSharingGift(giftId)
-
     try {
       const response = await fetch(`/api/gifts/${giftId}/share`, {
         method: "POST",
@@ -245,37 +258,60 @@ export default function ActiveGiftsPage() {
           sharedBy: "Current User",
         }),
       })
-
       const data = await response.json()
-
       if (!response.ok) {
         throw new Error(data.error || "Failed to generate share link")
       }
-
       const shareUrl = data.shareUrl
-
-      if (navigator.share) {
-        try {
-          await navigator.share({
-            title: `Contribute to ${giftName}`,
-            text: `Join us in contributing to ${giftName}! Every contribution counts.`,
-            url: shareUrl,
-          })
-          toast.success("Share successful!")
-        } catch (error) {
-          if ((error as Error).name !== "AbortError") {
-            await copyToClipboard(shareUrl, giftName)
-          }
-        }
-      } else {
-        await copyToClipboard(shareUrl, giftName)
-      }
+      setShareOptionsUrl(shareUrl)
+      setShareOptionsGiftName(giftName)
+      setShareOptionsLinkCopied(false)
+      // Open our share modal so user can pick Copy / Email (mailto) / WhatsApp — mailto opens Gmail reliably
     } catch (error) {
       console.error("[v0] Share error:", error)
       toast.error("Failed to share gift. Please try again.")
     } finally {
       setSharingGift(null)
     }
+  }
+
+  const closeShareOptions = () => {
+    setShareOptionsUrl(null)
+    setShareOptionsGiftName(null)
+    setShareOptionsLinkCopied(false)
+  }
+
+  const handleShareCopy = async () => {
+    if (!shareOptionsUrl) return
+    try {
+      await navigator.clipboard.writeText(shareOptionsUrl)
+      setShareOptionsLinkCopied(true)
+      toast.success(`🐝 Link for "${shareOptionsGiftName}" copied!`, {
+        style: { background: "linear-gradient(to right, #FEF3C7, #FDE68A, #F4C430)", color: "#654321", border: "2px solid #DAA520" },
+      })
+      setTimeout(() => setShareOptionsLinkCopied(false), 2000)
+    } catch {
+      toast.error("Failed to copy link")
+    }
+  }
+
+  const handleShareEmail = () => {
+    if (!shareOptionsUrl || !shareOptionsGiftName) return
+    const subject = encodeURIComponent(`You're invited to contribute to ${shareOptionsGiftName}`)
+    const body = encodeURIComponent(
+      `I'd love for you to contribute to this gift!\n\n${shareOptionsGiftName}\n\nContribute here: ${shareOptionsUrl}`
+    )
+    window.location.href = `mailto:?subject=${subject}&body=${body}`
+    toast.success("Opening your email app…")
+    closeShareOptions()
+  }
+
+  const handleShareWhatsApp = () => {
+    if (!shareOptionsUrl || !shareOptionsGiftName) return
+    const text = encodeURIComponent(`🎁 You're invited to contribute to ${shareOptionsGiftName}!\n\n${shareOptionsUrl}`)
+    window.open(`https://wa.me/?text=${text}`, "_blank", "noopener,noreferrer")
+    toast.success("Opening WhatsApp…")
+    closeShareOptions()
   }
 
   const copyToClipboard = async (url: string, giftName: string) => {
@@ -339,13 +375,16 @@ export default function ActiveGiftsPage() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to send reminders")
+        const message = data.error || "Failed to send reminders"
+        toast.error(message)
+        return
       }
 
       toast.success(data.message)
     } catch (error) {
       console.error("[v0] Reminder error:", error)
-      toast.error("Failed to send reminders. Please try again.")
+      const message = error instanceof Error ? error.message : "Failed to send reminders. Please try again."
+      toast.error(message)
     } finally {
       setRemindingGift(null)
     }
@@ -624,6 +663,59 @@ export default function ActiveGiftsPage() {
               >
                 Done
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Share options modal (Copy / Email / WhatsApp) — Email uses mailto so Gmail opens */}
+      {shareOptionsUrl && shareOptionsGiftName && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
+            <div className="bg-gradient-to-r from-[#DAA520] to-[#F4C430] p-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Share2 className="w-5 h-5 text-white" />
+                <div>
+                  <h3 className="text-lg font-bold text-white">Share contribution link</h3>
+                  <p className="text-xs text-white/90">{shareOptionsGiftName}</p>
+                </div>
+              </div>
+              <button
+                onClick={closeShareOptions}
+                className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition-colors"
+                aria-label="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="bg-[#F5F1E8] rounded-lg p-3">
+                <p className="text-[10px] text-[#8B4513]/60 uppercase tracking-wide mb-1">Link</p>
+                <p className="text-xs text-[#654321] font-mono break-all">{shareOptionsUrl}</p>
+              </div>
+              <div className="flex flex-wrap justify-center gap-3">
+                <button
+                  onClick={handleShareCopy}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-white shadow-sm hover:shadow-md hover:scale-105 transition-all"
+                >
+                  {shareOptionsLinkCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  <span className="text-sm font-medium">{shareOptionsLinkCopied ? "Copied!" : "Copy link"}</span>
+                </button>
+                <button
+                  onClick={handleShareEmail}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-gradient-to-r from-[#EA580C] to-[#FB923C] text-white shadow-sm hover:shadow-md hover:scale-105 transition-all"
+                >
+                  <Mail className="w-4 h-4" />
+                  <span className="text-sm font-medium">Gmail / Email</span>
+                </button>
+                <button
+                  onClick={handleShareWhatsApp}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-gradient-to-r from-[#25D366] to-[#128C7E] text-white shadow-sm hover:shadow-md hover:scale-105 transition-all"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  <span className="text-sm font-medium">WhatsApp</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
