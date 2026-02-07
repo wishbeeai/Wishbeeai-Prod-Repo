@@ -21,6 +21,9 @@ import {
   Check,
   ExternalLink,
   Loader2,
+  User,
+  Gift as GiftIcon,
+  PartyPopper,
 } from "lucide-react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
@@ -146,12 +149,13 @@ export default function GiftDetailPage() {
     createdDate: string
     endDate: string
     organizer: string
-    recentContributions: { name: string; amount: number; time: string }[]
+    recentContributions: { name: string; email?: string; amount: number; time: string }[]
     contributeUrl?: string
   } | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailNotFound, setDetailNotFound] = useState(false)
   const [contributing, setContributing] = useState(false)
+  const [backfillLoading, setBackfillLoading] = useState(false)
 
   useEffect(() => {
     console.log("[v0] Gift detail page - giftId:", giftId)
@@ -208,8 +212,8 @@ export default function GiftDetailPage() {
           daysLeft: g.daysLeft ?? 0,
           createdDate: g.created_at ? new Date(g.created_at).toLocaleDateString() : "",
           endDate: g.deadline ? new Date(g.deadline).toLocaleDateString() : "",
-          organizer: "Gift organizer",
-          recentContributions: [],
+          organizer: g.organizerDisplayName ?? "Gift organizer",
+          recentContributions: g.recentContributions ?? [],
           contributeUrl: g.contributeUrl,
         })
       })
@@ -246,8 +250,8 @@ export default function GiftDetailPage() {
           daysLeft: g.daysLeft ?? 0,
           createdDate: g.created_at ? new Date(g.created_at).toLocaleDateString() : "",
           endDate: g.deadline ? new Date(g.deadline).toLocaleDateString() : "",
-          organizer: "Gift organizer",
-          recentContributions: [],
+          organizer: g.organizerDisplayName ?? "Gift organizer",
+          recentContributions: g.recentContributions ?? [],
           contributeUrl: g.contributeUrl,
         })
       })
@@ -760,12 +764,19 @@ export default function GiftDetailPage() {
     return null
   }
 
-  const progressPercentage = (gift.currentAmount / gift.targetAmount) * 100
+  const progressPercentage = gift.targetAmount > 0 ? (gift.currentAmount / gift.targetAmount) * 100 : 0
+  const goalReached = progressPercentage >= 100
 
   const handleContribute = async () => {
     if (!isRealGiftId || typeof giftId !== "string") {
       toast.success("Opening contribution form...")
       return
+    }
+    if (goalReached) {
+      toast.info("The main gift is fully funded! Your contribution will be added to an Amazon eGift Card bonus for the recipient.", {
+        duration: 6000,
+        style: { background: "linear-gradient(to right, #FEF3C7, #FDE68A)", color: "#654321", border: "2px solid #DAA520" },
+      })
     }
     if (fetchedGift?.contributeUrl) {
       window.location.href = fetchedGift.contributeUrl
@@ -930,9 +941,17 @@ export default function GiftDetailPage() {
                 alt={gift.name}
                 className="w-full h-64 md:h-80 object-cover rounded-lg border-2 border-[#DAA520]"
               />
-              <div className="mt-4 p-4 bg-[#F5DEB3] rounded-lg">
-                <h3 className="font-bold text-[#654321] mb-2">Organized by</h3>
-                <p className="text-[#8B4513]">{gift.organizer}</p>
+              <div className="mt-4 p-4 bg-gradient-to-br from-[#F5DEB3] to-[#EDD9A3] rounded-xl border border-[#DAA520]/30 shadow-sm">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-[#8B6914] mb-3">Organized by</h3>
+                <div className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#DAA520]/40 text-[#654321] font-bold text-lg">
+                    {gift.organizer?.charAt(0)?.toUpperCase() || <User className="h-5 w-5" />}
+                  </div>
+                  <div>
+                    <p className="font-semibold text-[#654321]">{gift.organizer}</p>
+                    <p className="text-xs text-[#8B4513]/80">Organizing this collection</p>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -963,14 +982,22 @@ export default function GiftDetailPage() {
               </div>
 
               <div className="mb-6">
-                <div className="flex justify-between text-sm mb-2">
+                <div className="flex justify-between items-center text-sm mb-2">
                   <span className="text-[#8B4513]/70">Progress</span>
-                  <span className="font-bold text-[#654321]">{progressPercentage.toFixed(0)}%</span>
+                  <span className="flex items-center gap-2">
+                    {goalReached && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#DAA520]/20 text-[#654321] font-semibold text-xs">
+                        <PartyPopper className="w-3.5 h-3.5 text-[#DAA520]" />
+                        Goal Reached!
+                      </span>
+                    )}
+                    <span className="font-bold text-[#654321]">{Math.round(progressPercentage)}%</span>
+                  </span>
                 </div>
                 <div className="w-full bg-[#F5DEB3] rounded-full h-4 overflow-hidden">
                   <div
                     className="bg-gradient-to-r from-[#DAA520] to-[#F4C430] h-full rounded-full transition-all duration-500"
-                    style={{ width: `${progressPercentage}%` }}
+                    style={{ width: `${Math.min(100, progressPercentage)}%` }}
                   />
                 </div>
               </div>
@@ -985,25 +1012,106 @@ export default function GiftDetailPage() {
                     <Loader2 className="w-4 h-4 animate-spin" />
                     Opening...
                   </>
+                ) : goalReached ? (
+                  "Add to the Bonus"
                 ) : (
                   "Contribute Now"
                 )}
               </button>
+              {goalReached && (
+                <p className="text-xs text-[#8B4513]/80 mt-2 text-center">
+                  Extra contributions go to an Amazon eGift Card bonus for the recipient. The organizer can settle the balance from Active Gifts.
+                </p>
+              )}
             </div>
           </div>
 
-          <div className="border-t-2 border-[#DAA520]/20 p-6 md:p-8">
-            <h2 className="text-[18px] font-bold text-[#654321] mb-4">Recent Contributions</h2>
+          <div className="border-t-2 border-[#DAA520]/20 p-6 md:p-8 bg-gradient-to-b from-white/50 to-transparent">
+            <div className="flex flex-wrap items-baseline justify-between gap-2 mb-4">
+              <div>
+                <h2 className="text-lg font-bold text-[#654321]">Recent Contributions</h2>
+                {(gift.contributors ?? 0) > 0 || gift.recentContributions.length > 0 ? (
+                  <p className="text-sm text-[#8B4513]/80 mt-0.5">
+                    {(gift.contributors ?? 0) > 0
+                      ? `${gift.contributors} ${gift.contributors === 1 ? "person has" : "people have"} contributed — thank you!`
+                      : `${gift.recentContributions.length} ${gift.recentContributions.length === 1 ? "person has" : "people have"} contributed — thank you!`}
+                  </p>
+                ) : (
+                  <p className="text-sm text-[#8B4513]/70 mt-0.5">Thank you to everyone who contributes</p>
+                )}
+              </div>
+              {((gift.contributors ?? 0) > 0 || gift.recentContributions.length > 0) && (
+                <p className="text-xs text-[#8B4513]/60">
+                  ${((gift.currentAmount ?? 0) > 0 ? Number(gift.currentAmount).toFixed(2) : gift.recentContributions.reduce((sum, c) => sum + Number(c.amount), 0).toFixed(2))} from donors
+                </p>
+              )}
+            </div>
             <div className="space-y-3">
-              {gift.recentContributions.map((contribution, index) => (
-                <div key={index} className="flex items-center justify-between p-4 bg-[#F5F1E8] rounded-lg">
-                  <div>
-                    <p className="font-semibold text-[#654321]">{contribution.name}</p>
-                    <p className="text-sm text-[#8B4513]/70">{contribution.time}</p>
+              {gift.recentContributions.length === 0 ? (
+                (gift.contributors ?? 0) > 0 ? (
+                  <div className="flex flex-col items-center justify-center py-8 px-6 bg-[#F5F1E8]/70 rounded-xl border-2 border-dashed border-[#DAA520]/30">
+                    <p className="font-semibold text-[#654321]">{gift.contributors} {gift.contributors === 1 ? "person" : "people"} contributed — thank you!</p>
+                    <p className="text-sm text-[#8B4513]/80 mt-1 text-center max-w-sm">
+                      Past contributions weren’t stored by name/email. From now on, every new contribution will show name, email, and amount here.
+                    </p>
+                    {isRealGiftId && giftId && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setBackfillLoading(true)
+                          try {
+                            const res = await fetch(`/api/gifts/${giftId}/backfill-contributions`, { method: "POST" })
+                            const data = await res.json().catch(() => ({}))
+                            if (res.ok && data?.success && data?.count > 0) {
+                              refetchGift()
+                              toast.success(`Loaded ${data.count} contribution details.`)
+                            } else if (res.ok && data?.success) {
+                              toast.info("No stored details to load. New contributions will appear here.")
+                            } else {
+                              toast.error(data?.error || "Could not load contribution details.")
+                            }
+                          } finally {
+                            setBackfillLoading(false)
+                          }
+                        }}
+                        disabled={backfillLoading}
+                        className="mt-4 px-4 py-2 rounded-lg bg-[#DAA520]/20 text-[#654321] font-medium hover:bg-[#DAA520]/30 disabled:opacity-60 transition-colors text-sm"
+                      >
+                        {backfillLoading ? "Loading…" : "Try loading stored details"}
+                      </button>
+                    )}
                   </div>
-                  <span className="font-semibold text-[#DAA520] text-sm">${contribution.amount}</span>
-                </div>
-              ))}
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-10 px-6 bg-[#F5F1E8]/70 rounded-xl border-2 border-dashed border-[#DAA520]/30">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#DAA520]/20 mb-3">
+                      <GiftIcon className="h-7 w-7 text-[#DAA520]" />
+                    </div>
+                    <p className="font-semibold text-[#654321]">No contributions yet</p>
+                    <p className="text-sm text-[#8B4513]/80 mt-1">Be the first to contribute and help reach the goal!</p>
+                  </div>
+                )
+              ) : (
+                gift.recentContributions.map((contribution, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-4 bg-[#F5F1E8] rounded-xl border border-[#DAA520]/20 hover:border-[#DAA520]/40 hover:bg-[#F0EBE0] transition-all shadow-sm"
+                  >
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#DAA520]/30 text-[#654321] font-bold text-sm ring-2 ring-[#DAA520]/20">
+                        {contribution.name?.charAt(0)?.toUpperCase() || "?"}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-[#654321] truncate">{contribution.name}</p>
+                        {contribution.email && (
+                          <p className="text-xs text-[#8B4513]/70 truncate" title={contribution.email}>{contribution.email}</p>
+                        )}
+                        <p className="text-xs text-[#8B4513]/60">{contribution.time}</p>
+                      </div>
+                    </div>
+                    <span className="font-bold text-[#B8860B] text-base shrink-0 ml-2">${Number(contribution.amount).toFixed(2)}</span>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>

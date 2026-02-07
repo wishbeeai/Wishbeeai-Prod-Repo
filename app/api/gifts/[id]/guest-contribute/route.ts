@@ -1,17 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createAdminClient, createPublicClient } from "@/lib/supabase/server"
-
-// In-memory store for contribution list (optional; gift progress is persisted in DB)
-const contributionsStore = new Map<string, Array<{
-  id: string
-  giftId: string
-  amount: number
-  contributorName: string
-  contributorEmail: string
-  message?: string
-  isGuest: boolean
-  createdAt: Date
-}>>()
+import { getContributionsForGift, addContribution } from "@/lib/gift-contributions-store"
 
 export async function POST(
   request: NextRequest,
@@ -55,7 +44,7 @@ export async function POST(
     console.log(`[Guest Contribution] gift ${giftId} using ${usingAdmin ? "admin" : "public"} client`)
     const { data: gift, error: fetchError } = await supabase
       .from("gifts")
-      .select("id, current_amount, contributors")
+      .select("id, current_amount, contributors, evite_settings")
       .eq("id", giftId)
       .single()
 
@@ -68,11 +57,23 @@ export async function POST(
     const contributorCount = (gift.contributors ?? 0) + 1
     const newTotal = currentAmount + contributionAmount
 
+    // Append to contribution list stored on the gift (no separate tables required).
+    const evite = (gift.evite_settings as Record<string, unknown>) || {}
+    const list = Array.isArray(evite.contributionList) ? [...(evite.contributionList as { name?: string; email?: string; amount?: number; time?: string }[])] : []
+    list.unshift({
+      name: contributorName || "Anonymous",
+      email: contributorEmail.trim(),
+      amount: contributionAmount,
+      time: new Date().toISOString(),
+    })
+    const eviteUpdated = { ...evite, contributionList: list.slice(0, 50) }
+
     const { error: updateError } = await supabase
       .from("gifts")
       .update({
         current_amount: newTotal,
         contributors: contributorCount,
+        evite_settings: eviteUpdated,
         updated_at: new Date().toISOString(),
       })
       .eq("id", giftId)
@@ -97,13 +98,25 @@ export async function POST(
       createdAt: new Date(),
     }
 
-    const existing = contributionsStore.get(giftId) || []
-    existing.push(contribution)
-    contributionsStore.set(giftId, existing)
+    addContribution(giftId, contribution)
 
-    // Persist contributor email for reminder emails (gift_contributor_emails table)
+    const dbForWrites = createAdminClient() || supabase
+
+    // Store each contribution for "Recent Contributions" display. Base columns (014); run 015 to add contributor_email.
     try {
-      await supabase.from("gift_contributor_emails").upsert(
+      const { error: insertErr } = await dbForWrites.from("gift_contributions").insert({
+        gift_id: giftId,
+        contributor_name: contributorName || null,
+        amount: contributionAmount,
+      })
+      if (insertErr) console.warn("[Guest Contribution] gift_contributions insert error:", insertErr.message)
+    } catch (tableErr) {
+      console.warn("[Guest Contribution] Could not save to gift_contributions (table may not exist):", tableErr)
+    }
+
+    // Persist contributor email for reminder emails (gift_contributor_emails).
+    try {
+      const { error: upsertErr } = await dbForWrites.from("gift_contributor_emails").upsert(
         {
           gift_id: giftId,
           email: contributorEmail.trim().toLowerCase(),
@@ -112,8 +125,9 @@ export async function POST(
         },
         { onConflict: "gift_id,email" }
       )
+      if (upsertErr) console.warn("[Guest Contribution] gift_contributor_emails upsert error:", upsertErr.message)
     } catch (tableErr) {
-      console.warn("[Guest Contribution] Could not save contributor email for reminders (table may not exist):", tableErr)
+      console.warn("[Guest Contribution] Could not save contributor email (table may not exist):", tableErr)
     }
 
     console.log(`[Guest Contribution] ${contributorName || "Anonymous"} contributed $${contributionAmount} to gift ${giftId} → new total $${newTotal}, ${contributorCount} contributors`)
@@ -150,7 +164,7 @@ export async function GET(
       return NextResponse.json({ error: "Gift ID is required" }, { status: 400 })
     }
 
-    const contributions = contributionsStore.get(giftId) || []
+    const contributions = getContributionsForGift(giftId)
     const totalAmount = contributions.reduce((sum, c) => sum + c.amount, 0)
 
     // Return sanitized contribution data (hide emails for privacy)

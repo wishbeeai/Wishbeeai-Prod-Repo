@@ -15,14 +15,21 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 
-export default function PastGiftsPage() {
-  const [loadingAI, setLoadingAI] = useState<number | null>(null)
-  const [aiInsights, setAiInsights] = useState<{ [key: number]: any }>({})
-  const [sharingGift, setSharingGift] = useState<number | null>(null)
+type PastGift = {
+  id: string | number
+  name: string
+  image: string
+  totalAmount: number
+  contributors: number
+  completedDate: string
+  description: string
+  category: string
+  successRate: number
+}
 
-  const pastGifts = [
+const FALLBACK_PAST_GIFTS: PastGift[] = [
     {
       id: 1,
       name: "Mom's Anniversary Gift",
@@ -69,7 +76,56 @@ export default function PastGiftsPage() {
     },
   ]
 
-  const handleShare = async (gift: (typeof pastGifts)[0]) => {
+export default function PastGiftsPage() {
+  const [loadingAI, setLoadingAI] = useState<string | number | null>(null)
+  const [aiInsights, setAiInsights] = useState<{ [key: string | number]: unknown }>({})
+  const [sharingGift, setSharingGift] = useState<string | number | null>(null)
+  const [pastGifts, setPastGifts] = useState<PastGift[]>(FALLBACK_PAST_GIFTS)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    async function fetchPast() {
+      try {
+        const res = await fetch("/api/gifts/collections?status=past")
+        if (res.status === 401 || !res.ok) return
+        const data = await res.json()
+        const list = (data.collections || []) as Array<{
+          id: string
+          name: string
+          image: string
+          targetAmount: number
+          currentAmount: number
+          contributors: number
+          deadline?: string
+          created_at?: string
+        }>
+        if (!cancelled && list.length > 0) {
+          setPastGifts(
+            list.map((g) => ({
+              id: g.id,
+              name: g.name,
+              image: g.image || "/placeholder.svg",
+              totalAmount: g.currentAmount ?? g.targetAmount,
+              contributors: g.contributors ?? 0,
+              completedDate: g.deadline || g.created_at || new Date().toISOString(),
+              description: g.name,
+              category: "",
+              successRate: 100,
+            }))
+          )
+        }
+      } catch {
+        // keep fallback
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    fetchPast()
+    return () => { cancelled = true }
+  }, [])
+
+  const handleShare = async (gift: PastGift) => {
     setSharingGift(gift.id)
     const shareUrl = `${window.location.origin}/gifts/past/${gift.id}`
     const shareText = `Check out the ${gift.name} we completed together! Total: $${gift.totalAmount} from ${gift.contributors} contributors.`

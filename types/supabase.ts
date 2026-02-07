@@ -21,6 +21,11 @@ export interface Database {
           id: string
           email: string
           name: string | null
+          phone: string | null
+          location: string | null
+          bio: string | null
+          birthday: string | null
+          profile_image: string | null
           created_at: string
           updated_at: string | null
         }
@@ -28,6 +33,11 @@ export interface Database {
           id: string
           email: string
           name?: string | null
+          phone?: string | null
+          location?: string | null
+          bio?: string | null
+          birthday?: string | null
+          profile_image?: string | null
           created_at?: string
           updated_at?: string | null
         }
@@ -35,6 +45,11 @@ export interface Database {
           id?: string
           email?: string
           name?: string | null
+          phone?: string | null
+          location?: string | null
+          bio?: string | null
+          birthday?: string | null
+          profile_image?: string | null
           created_at?: string
           updated_at?: string | null
         }

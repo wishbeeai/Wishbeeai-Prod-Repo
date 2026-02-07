@@ -160,8 +160,41 @@ export default function ProfilePage() {
   }
 
   const handleSave = async () => {
-    setIsEditing(false)
-    toast.success("Profile updated successfully!")
+    if (!user) return
+    try {
+      const res = await fetch("/api/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: profileData.name || null,
+          email: profileData.email || user.email,
+          phone: profileData.phone || null,
+          location: profileData.location || null,
+          bio: profileData.bio || null,
+          birthday: profileData.birthday || null,
+          profile_image: profileImage !== "/images/first-person.png" ? profileImage : null,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        const msg = typeof data?.error === "string" ? data.error : res.statusText || "Failed to save profile"
+        toast.error(
+          data?.code === "42501" || msg.toLowerCase().includes("row level security")
+            ? "You don't have permission to update profile. Run the database migration for profiles RLS."
+            : msg
+        )
+        return
+      }
+      setIsEditing(false)
+      if (data?.warning) {
+        toast.success("Profile updated (name saved).", { description: data.warning })
+      } else {
+        toast.success("Profile updated successfully!")
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      toast.error(`Failed to save profile: ${message}`)
+    }
   }
 
   const generateAIRecommendations = async () => {

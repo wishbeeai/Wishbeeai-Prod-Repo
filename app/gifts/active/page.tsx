@@ -6,21 +6,37 @@ import {
   Users,
   Share2,
   Sparkles,
-  TrendingUp,
   Target,
-  ShoppingCart,
-  Package,
   Gift,
   Copy,
   Mail,
   MessageCircle,
   X,
   Check,
+  Heart,
+  DollarSign,
+  Award,
+  ShoppingCart,
+  PartyPopper,
+  Eye,
+  Bell,
+  Globe,
+  Leaf,
+  Cross,
+  Wallet,
+  ChevronRight,
 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { useState, useEffect } from "react"
+
+/** Avoid SSR running the full page (sessionStorage, etc.) which can cause 500 on some setups. */
+function useClientOnly() {
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+  return mounted
+}
 
 type ActiveGift = {
   id: string | number
@@ -31,6 +47,8 @@ type ActiveGift = {
   contributors: number
   daysLeft: number
   urgency: "high" | "medium" | "low"
+  /** When 'purchased', show Settle Balance and balance actions; otherwise 'Preview' */
+  fundingStatus?: "active" | "purchased"
 }
 
 // Demo/sample collections shown when user has none (or not signed in)
@@ -43,7 +61,14 @@ const DEMO_ACTIVE_GIFTS: ActiveGift[] = [
   { id: 6, name: "Wedding Gift for Alex & Jamie", image: "/images/wedding-gift.jpg", targetAmount: 600, currentAmount: 540, contributors: 18, daysLeft: 4, urgency: "high" },
 ]
 
-export default function ActiveGiftsPage() {
+const DONATION_CHARITIES = [
+  { id: "feeding-america", name: "Feeding America", description: "Help provide meals to families in need", icon: "heart" as const, logo: "/images/charity-logos/FeedingAmerica.png" },
+  { id: "unicef", name: "UNICEF", description: "Support children's health & education globally.", icon: "globe" as const, logo: "/images/charity-logos/Unicef.png" },
+  { id: "edf", name: "Environmental Defense Fund", description: "Protect the planet & stabilize the climate.", icon: "leaf" as const, logo: "/images/charity-logos/Environmental%20Defense%20Fund.png" },
+  { id: "red-cross", name: "American Red Cross", description: "Provide disaster relief & emergency assistance.", icon: "cross" as const, logo: "/images/charity-logos/American%20Red%20Cross.jpg" },
+]
+
+function ActiveGiftsPageContent() {
   const router = useRouter()
   const [activeGifts, setActiveGifts] = useState<ActiveGift[]>([])
   const [loading, setLoading] = useState(true)
@@ -61,6 +86,48 @@ export default function ActiveGiftsPage() {
   const [shareOptionsUrl, setShareOptionsUrl] = useState<string | null>(null)
   const [shareOptionsGiftName, setShareOptionsGiftName] = useState<string | null>(null)
   const [shareOptionsLinkCopied, setShareOptionsLinkCopied] = useState(false)
+
+  // Post-purchase modals (from design: Gift Purchased Successfully, Small Balance donation, Donation confirmation)
+  const [purchaseModal, setPurchaseModal] = useState<{
+    gift: ActiveGift
+    productTotal: number
+    remaining: number
+    recipientName: string
+  } | null>(null)
+  const [donationCharity, setDonationCharity] = useState<string | null>(null)
+  const [donationConfirmed, setDonationConfirmed] = useState<{
+    amount: number
+    charityName: string
+    disposition: "charity"
+    dedication: string
+    viewGiftDetailsUrl: string
+    receiptUrl?: string
+    recipientName: string
+    totalFundsCollected: number
+    finalGiftPrice: number
+  } | null>(null)
+  /** Shown when user chooses Support Wishbee (tip) — includes receiptUrl for immediate receipt (no pooling) */
+  const [tipThankYouGift, setTipThankYouGift] = useState<{ gift: ActiveGift; remaining: number; recipientName: string; receiptUrl?: string } | null>(null)
+  /** Modal for Settle Balance: choose Bonus Gift Card, Donate to Charity, or Support Wishbee; when remaining < $1, only Support Wishbee is enabled */
+  const [settleBalanceModal, setSettleBalanceModal] = useState<{
+    gift: ActiveGift
+    remaining: number
+    recipientName: string
+  } | null>(null)
+  /** Selected option in Remaining Balance modal (left nav): gift-card | charity | support-wishbee */
+  const [remainingBalanceView, setRemainingBalanceView] = useState<"gift-card" | "charity" | "support-wishbee">("gift-card")
+  /** Donate-to-charity flow for Settle Balance (amount >= $1); includes event context for dedication and transparency email */
+  const [donateFromSettle, setDonateFromSettle] = useState<{
+    amount: number
+    recipientName: string
+    giftId: string
+    giftName: string
+    totalFundsCollected: number
+    finalGiftPrice: number
+  } | null>(null)
+  const [selectedCharityId, setSelectedCharityId] = useState<string>("feeding-america")
+  /** Modal shown before opening Amazon: displays instructions and "Open Amazon" button so message is visible in front */
+  const [amazonGiftCardModal, setAmazonGiftCardModal] = useState<{ amount: number } | null>(null)
   
   const fetchCollections = async () => {
     try {
@@ -80,10 +147,12 @@ export default function ActiveGiftsPage() {
         currentAmount: number
         contributors: number
         deadline: string
+        status?: string
       }) => {
         const deadline = g.deadline ? new Date(g.deadline).getTime() : 0
         const daysLeft = Math.max(0, Math.ceil((deadline - Date.now()) / (24 * 60 * 60 * 1000)))
         const urgency: "high" | "medium" | "low" = daysLeft <= 3 ? "high" : daysLeft <= 7 ? "medium" : "low"
+        const fundingStatus: "active" | "purchased" = g.status === "completed" ? "purchased" : "active"
         return {
           id: g.id,
           name: g.name,
@@ -93,11 +162,15 @@ export default function ActiveGiftsPage() {
           contributors: g.contributors,
           daysLeft,
           urgency,
+          fundingStatus,
         }
       })
-      setActiveGifts(list.length > 0 ? list : DEMO_ACTIVE_GIFTS)
+      // Only show gifts whose deadline has not passed (deadline-passed appear on /gifts/past)
+      const activeOnly = list.filter((g: { daysLeft: number }) => g.daysLeft > 0)
+      const toShow = activeOnly.length > 0 ? activeOnly : (list.length > 0 ? [] : DEMO_ACTIVE_GIFTS.filter((g) => g.daysLeft > 0).map((g) => ({ ...g, fundingStatus: "active" as const })))
+      setActiveGifts(toShow)
     } catch {
-      setActiveGifts(DEMO_ACTIVE_GIFTS)
+      setActiveGifts(DEMO_ACTIVE_GIFTS.filter((g) => g.daysLeft > 0).map((g) => ({ ...g, fundingStatus: "active" as const })))
     } finally {
       setLoading(false)
     }
@@ -241,12 +314,115 @@ export default function ActiveGiftsPage() {
     },
   ]
 
-  const handleViewDetails = (giftId: number, giftName: string) => {
+  const handleViewDetails = (giftId: string | number, giftName: string) => {
     toast.success(`Opening details for "${giftName}"`)
     router.push(`/gifts/${giftId}`)
   }
 
-  const handleShare = async (giftId: number, giftName: string) => {
+  /** Values for "Gift Purchased Successfully" modal. When overfunded, use real amounts; otherwise demo. */
+  const getPreviewAmounts = (gift: ActiveGift) => {
+    const target = gift.targetAmount
+    const collected = gift.currentAmount
+    const overfunded = collected >= target
+    if (overfunded) {
+      const remaining = Math.max(0, Math.round((collected - target) * 100) / 100)
+      return { productTotal: target, remaining }
+    }
+    const remaining = Math.min(15, Math.max(6, Math.round(target * 0.03 * 100) / 100))
+    const productTotal = Math.round((target - remaining) * 100) / 100
+    return {
+      productTotal: productTotal >= 0 ? productTotal : 0,
+      remaining: productTotal >= 0 ? remaining : target,
+    }
+  }
+
+  // General Amazon Gift Cards page (neutral — not occasion-specific)
+  const AMAZON_GIFT_CARDS_URL = "https://www.amazon.com/Amazon-eGift-Card-Logo-Animated/dp/B07PCMWTSG?pf_rd_p=9e067638-7091-4c9f-8439-c1fb89e0df0d&pf_rd_r=XPT30XFPXB3QA4JJTYPC&ref_=US_GC_Top_P1_25_STND_B07PCMWTSG&th=1"
+
+  const handleSendAmazonGiftCard = (amount: number) => {
+    setAmazonGiftCardModal({ amount })
+  }
+
+  const handleOpenAmazonAndCloseModal = () => {
+    if (amazonGiftCardModal) {
+      window.open(AMAZON_GIFT_CARDS_URL, "_blank", "noopener,noreferrer")
+      setAmazonGiftCardModal(null)
+    }
+  }
+
+  /** Save donation settlement to backend and return receipt URL if successful */
+  const saveDonationSettlement = async (payload: {
+    giftId: string | number
+    amount: number
+    charityId: string
+    charityName: string
+    dedication: string
+    recipientName: string
+    giftName: string
+    totalFundsCollected: number
+    finalGiftPrice: number
+  }): Promise<string | null> => {
+    try {
+      const res = await fetch(`/api/gifts/${payload.giftId}/settlement`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: payload.amount,
+          disposition: "charity",
+          charityId: payload.charityId,
+          charityName: payload.charityName,
+          dedication: payload.dedication,
+          recipientName: payload.recipientName,
+          giftName: payload.giftName,
+          totalFundsCollected: payload.totalFundsCollected,
+          finalGiftPrice: payload.finalGiftPrice,
+        }),
+      })
+      if (!res.ok) return null
+      const data = await res.json()
+      const settlementId = data?.settlement?.id
+      if (!settlementId) return null
+      const base = typeof window !== "undefined" ? window.location.origin : ""
+      return `${base}/gifts/${payload.giftId}/receipt/${settlementId}`
+    } catch {
+      return null
+    }
+  }
+
+  /** Save tip settlement (Support Wishbee) and return receipt URL. Sends receipt immediately. */
+  const saveTipSettlement = async (payload: {
+    giftId: string | number
+    amount: number
+    recipientName: string
+    giftName: string
+    totalFundsCollected: number
+    finalGiftPrice: number
+  }): Promise<string | null> => {
+    try {
+      const res = await fetch(`/api/gifts/${payload.giftId}/settlement`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: payload.amount,
+          disposition: "tip",
+          recipientName: payload.recipientName,
+          giftName: payload.giftName,
+          totalFundsCollected: payload.totalFundsCollected,
+          finalGiftPrice: payload.finalGiftPrice,
+        }),
+      })
+      if (!res.ok) return null
+      const data = await res.json()
+      const settlementId = data?.settlement?.id
+      if (!settlementId) return null
+      const base = typeof window !== "undefined" ? window.location.origin : ""
+      return `${base}/gifts/${payload.giftId}/receipt/${settlementId}`
+    } catch {
+      return null
+    }
+  }
+
+  const handleShare = async (giftId: string | number, giftName: string) => {
     setSharingGift(giftId)
     try {
       const response = await fetch(`/api/gifts/${giftId}/share`, {
@@ -401,13 +577,13 @@ export default function ActiveGiftsPage() {
 
   const getUrgencyBadge = (urgency: string) => {
     const styles = {
-      high: "bg-gradient-to-r from-rose-500 to-red-500 text-white",
-      medium: "bg-gradient-to-r from-amber-500 to-orange-500 text-white",
-      low: "bg-gradient-to-r from-emerald-500 to-green-500 text-white",
+      high: "bg-red-500 text-white",
+      medium: "bg-amber-500 text-white",
+      low: "bg-emerald-500 text-white",
     }
     return (
       <span
-        className={`px-1.5 py-0.5 rounded-md text-[9px] font-medium ${styles[urgency as keyof typeof styles]}`}
+        className={`absolute top-2 right-2 px-2 py-0.5 rounded-full text-[10px] font-medium flex items-center gap-0.5 shadow-sm ${styles[urgency as keyof typeof styles]}`}
       >
         {urgency === "high" ? "🔥 Urgent" : urgency === "medium" ? "⚡ Active" : "✅ On Track"}
       </span>
@@ -419,14 +595,14 @@ export default function ActiveGiftsPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Link
           href="/"
-          className="inline-flex items-center gap-2 text-[#8B5A3C] hover:text-[#6B4423] mb-6 transition-colors text-xs sm:text-sm md:text-base"
+          className="inline-flex items-center gap-2 text-[#8B5A3C] hover:text-[#6B4423] mb-6 transition-colors"
         >
-          <ArrowLeft className="w-3 h-3 sm:w-4 sm:h-4" />
+          <ArrowLeft className="w-4 h-4" />
           Back to Home
         </Link>
 
+        {/* Header — same as past */}
         <div className="mb-8">
-          {/* Header */}
           <div className="bg-card border border-border rounded-lg p-6 mb-8">
             <div className="flex flex-row items-center justify-center gap-2">
               <Gift className="w-5 h-5 sm:w-8 sm:h-8 md:w-10 md:h-10 text-[#DAA520] flex-shrink-0" />
@@ -446,7 +622,19 @@ export default function ActiveGiftsPage() {
           </div>
         ) : (
           <>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        {/* Stats Overview — same 4-column layout as past */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          <div className="bg-white rounded-xl p-4 border-2 border-[#DAA520]/20">
+            <div className="flex items-center gap-3">
+              <div className="w-7 h-7 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-[#DAA520] to-[#F4C430] flex items-center justify-center">
+                <Award className="w-3 h-3 sm:w-5 sm:h-5 text-white" />
+              </div>
+              <div>
+                <p className="text-[10px] sm:text-sm text-[#8B4513]/70">Active Collections</p>
+                <p className="text-base sm:text-2xl font-bold text-[#654321]">{activeGifts.length}</p>
+              </div>
+            </div>
+          </div>
           <div className="bg-white rounded-xl p-4 border-2 border-[#DAA520]/20">
             <div className="flex items-center gap-3">
               <div className="w-7 h-7 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-[#DAA520] to-[#F4C430] flex items-center justify-center">
@@ -460,10 +648,10 @@ export default function ActiveGiftsPage() {
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-xl p-4 border-2 border-emerald-500/20">
+          <div className="bg-white rounded-xl p-4 border-2 border-orange-500/20">
             <div className="flex items-center gap-3">
-              <div className="w-7 h-7 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center">
-                <TrendingUp className="w-3 h-3 sm:w-5 sm:h-5 text-white" />
+              <div className="w-7 h-7 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-orange-300 via-coral-400 to-rose-300 flex items-center justify-center">
+                <DollarSign className="w-3 h-3 sm:w-5 sm:h-5 text-white" />
               </div>
               <div>
                 <p className="text-[10px] sm:text-sm text-[#8B4513]/70">Total Raised</p>
@@ -473,9 +661,9 @@ export default function ActiveGiftsPage() {
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-xl p-4 border-2 border-orange-500/20">
+          <div className="bg-white rounded-xl p-4 border-2 border-amber-500/20">
             <div className="flex items-center gap-3">
-              <div className="w-7 h-7 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center">
+              <div className="w-7 h-7 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-amber-400 via-yellow-400 to-amber-500 flex items-center justify-center">
                 <Users className="w-3 h-3 sm:w-5 sm:h-5 text-white" />
               </div>
               <div>
@@ -488,110 +676,171 @@ export default function ActiveGiftsPage() {
           </div>
         </div>
 
+        {/* Gift Cards Grid — same as past */}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {activeGifts.map((gift) => (
-            <div
-              key={gift.id}
-              className="bg-white rounded-xl shadow-lg border-2 border-[#DAA520]/20 p-6 hover:shadow-xl transition-shadow"
-            >
-              <div className="flex justify-between items-start mb-4">
-                <img
-                  src={gift.image || "/placeholder.svg"}
-                  alt={gift.name}
-                  className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-lg border-2 border-[#DAA520]"
-                />
-                {getUrgencyBadge(gift.urgency)}
-              </div>
-
-              <h3 className="text-base sm:text-lg font-bold text-black mb-3">{gift.name}</h3>
-
-              <div className="flex items-center gap-4 text-xs sm:text-sm text-[#8B4513]/70 mb-4">
-                <span className="flex items-center gap-1">
-                  <Users className="w-3 h-3 sm:w-4 sm:h-4 text-orange-500" />
-                  {gift.contributors}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Clock className="w-3 h-3 sm:w-4 sm:h-4 text-amber-600" />
-                  {gift.daysLeft}d left
-                </span>
-              </div>
-
-              <div className="mb-4">
-                <div className="flex justify-between text-xs sm:text-sm mb-2">
-                  <span className="text-[#8B4513]/70">Progress</span>
-                  <span className="font-bold text-[#654321]">
-                    ${gift.currentAmount} / ${gift.targetAmount}
-                  </span>
-                </div>
-                <div className="w-full bg-[#F5DEB3] rounded-full h-3 overflow-hidden">
-                  <div
-                    className="bg-gradient-to-r from-[#DAA520] to-[#F4C430] h-full rounded-full transition-all duration-500"
-                    style={{ width: `${(gift.currentAmount / gift.targetAmount) * 100}%` }}
+          {activeGifts.map((gift) => {
+            const recipientName = gift.name.replace(/'s.*| for .*/i, "").trim() || "the recipient"
+            const pct = gift.targetAmount > 0 ? Math.round((gift.currentAmount / gift.targetAmount) * 100) : 0
+            const isFullyFunded = pct >= 100
+            const daysLeftLabel = gift.daysLeft === 0 ? "Deadline passed" : gift.daysLeft === 1 ? "1 day left" : `${gift.daysLeft} days left`
+            return (
+              <div
+                key={gift.id}
+                className="bg-white rounded-xl shadow-lg border-2 border-[#DAA520]/20 p-6 hover:shadow-xl transition-shadow"
+              >
+                <div className="relative mb-4">
+                  <img
+                    src={gift.image || "/placeholder.svg"}
+                    alt={gift.name}
+                    className="w-full h-48 object-cover rounded-lg border-2 border-[#DAA520]"
                   />
+                  {getUrgencyBadge(gift.urgency)}
                 </div>
-                <p className="text-[10px] sm:text-xs text-[#8B4513]/60 mt-1">
-                  {Math.round((gift.currentAmount / gift.targetAmount) * 100)}% funded
+
+                <h3 className="text-base sm:text-lg font-bold text-[#654321] mb-2">{gift.name}</h3>
+                <p className="text-xs text-[#8B4513]/70 mb-3 line-clamp-2">
+                  {isFullyFunded ? "Goal reached! Ready to purchase the gift." : "Contributions are being collected for this gift."}
                 </p>
-              </div>
 
-              {aiInsights[gift.id] && (
-                <div className="bg-gradient-to-r from-amber-50 via-orange-50 to-rose-50 rounded-lg p-3 mb-4 border border-amber-200">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Sparkles className="w-3 h-3 sm:w-4 sm:h-4 text-amber-500" />
-                    <span className="text-[10px] sm:text-xs font-semibold text-[#654321]">AI Insights</span>
+                <div className="space-y-2 text-xs sm:text-sm text-[#8B4513]/70 mb-4">
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1">
+                      <DollarSign className="w-3 h-3 sm:w-4 sm:h-4 text-[#DAA520]" />
+                      Progress
+                    </span>
+                    <span className="font-bold text-[#654321]">${gift.currentAmount} / ${gift.targetAmount}</span>
                   </div>
-                  <div className="space-y-1 text-[10px] sm:text-xs text-[#8B4513]">
-                    <p>
-                      <span className="font-semibold">Success Likelihood:</span> {aiInsights[gift.id].likelihood}
-                    </p>
-                    <p>
-                      <span className="font-semibold">Recommendation:</span> {aiInsights[gift.id].recommendation}
-                    </p>
-                    <p>
-                      <span className="font-semibold">Prediction:</span> {aiInsights[gift.id].predictedCompletion}
-                    </p>
+                  <div className="w-full bg-[#F5DEB3] rounded-full h-2 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-[#DAA520] to-[#F4C430] transition-all duration-500"
+                      style={{ width: `${Math.min(100, pct)}%` }}
+                    />
+                  </div>
+                  <p className={`text-[10px] ${isFullyFunded ? "font-semibold text-[#DAA520]" : "text-[#8B4513]/60"}`}>
+                    {isFullyFunded ? "Goal reached!" : `${pct}% funded`}
+                  </p>
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1">
+                      <Users className="w-3 h-3 sm:w-4 sm:h-4 text-[#DAA520]" />
+                      Contributors
+                    </span>
+                    <span className="font-bold text-[#654321]">{gift.contributors}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-3 h-3 sm:w-4 sm:h-4 text-[#F4C430]" />
+                    <span>{daysLeftLabel}</span>
                   </div>
                 </div>
-              )}
 
-              <div className="space-y-1.5">
-                <div className="flex gap-1.5">
+                {/* Leftover area — reserved gap so all cards align; show Settle balance widget when overfunded/purchased */}
+                <div className="min-h-[108px] mb-3">
+                  {(gift.currentAmount > gift.targetAmount || gift.fundingStatus === "purchased") && (
+                    <div className="rounded-lg border border-[#DAA520]/30 bg-gradient-to-br from-amber-50 via-orange-50/80 to-rose-50/60 p-3 shadow-sm">
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex items-center justify-center gap-2 w-full">
+                          <div className="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center ring-2 ring-red-200 flex-shrink-0">
+                            <Heart className="w-4 h-4 text-red-500 fill-red-500" />
+                          </div>
+                          <p className="text-sm font-semibold text-[#654321] tabular-nums">
+                            {(() => {
+                              const rem = Math.max(0, Math.round((gift.currentAmount - gift.targetAmount) * 100) / 100)
+                              return rem >= 1 ? `$${rem.toFixed(2)} leftover` : rem > 0 ? "Small change" : "Settle balance"
+                            })()}
+                          </p>
+                        </div>
+                        <div className="space-y-0.5 w-full min-w-0">
+                          <p className="text-[11px] text-[#8B4513]/90 leading-tight">
+                            {(() => {
+                              const r = Math.max(0, Math.round((gift.currentAmount - gift.targetAmount) * 100) / 100)
+                              return r >= 1 ? "Send as a gift card, donate to a cause, or support Wishbee." : r > 0 ? "Support Wishbee — tip to keep our AI free and ad-free." : "Choose how to use leftover funds when ready."
+                            })()}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const remaining = Math.max(0, Math.round((gift.currentAmount - gift.targetAmount) * 100) / 100)
+                              if (remaining > 0) {
+                                setSettleBalanceModal({ gift, remaining, recipientName })
+                                setRemainingBalanceView(remaining < 1 ? "support-wishbee" : "gift-card")
+                                if (remaining >= 1) setSelectedCharityId("feeding-america")
+                              } else toast.info("No remaining balance yet. Once the goal is reached or exceeded, you can donate the extra.")
+                            }}
+                            className="mt-1 w-full min-h-[32px] px-2 py-1.5 rounded-md bg-gradient-to-r from-rose-500 to-orange-500 text-white text-[11px] font-semibold hover:shadow-md hover:brightness-110 transition-all flex items-center justify-center gap-1 border border-rose-400/30"
+                          >
+                            <Gift className="w-3 h-3 flex-shrink-0" />
+                            Settle balance
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {aiInsights[gift.id] && (
+                  <div className="bg-gradient-to-r from-amber-50 via-orange-50 to-rose-50 rounded-lg p-3 mb-4 border border-amber-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Sparkles className="w-3 h-3 sm:w-4 sm:h-4 text-amber-500" />
+                      <span className="text-[10px] sm:text-xs font-semibold text-[#654321]">AI Insights</span>
+                    </div>
+                    <div className="space-y-1 text-[10px] sm:text-xs text-[#8B4513]">
+                      <p>
+                        <span className="font-semibold">Recommendation:</span> {aiInsights[gift.id].recommendation}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-1.5">
                   <button
                     onClick={() => handleViewDetails(gift.id, gift.name)}
-                    className="flex-1 px-2 py-1.5 bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#3B2F0F] rounded-md text-[10px] font-semibold hover:shadow-md transition-all hover:scale-105"
+                    className="block w-full min-h-[32px] px-2 py-1.5 bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#3B2F0F] rounded-md text-[11px] font-semibold hover:shadow-md transition-all text-center flex items-center justify-center"
                   >
                     View Details
                   </button>
-                  <button
-                    onClick={() => handleShare(gift.id, gift.name)}
-                    disabled={sharingGift === gift.id}
-                    className="px-2 py-1.5 border border-[#DAA520] text-[#8B5A3C] rounded-md text-[10px] font-semibold hover:bg-[#DAA520]/10 transition-all flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Share2 className="w-3 h-3" />
-                    {sharingGift === gift.id ? "..." : "Share"}
-                  </button>
-                </div>
 
-                <div className="flex gap-1.5">
+                  <div className={`grid gap-1 ${(gift.fundingStatus === "purchased" || gift.currentAmount > gift.targetAmount) ? "grid-cols-2" : "grid-cols-3"}`}>
+                    <button
+                      onClick={() => handleShare(gift.id, gift.name)}
+                      disabled={sharingGift === gift.id}
+                      className="w-full min-h-[32px] min-w-0 px-2 py-1.5 bg-gradient-to-r from-orange-400 via-rose-400 to-pink-500 text-white rounded-md text-[11px] font-semibold hover:shadow-md transition-all flex items-center justify-center gap-0.5 disabled:opacity-50"
+                    >
+                      <Share2 className="w-2.5 h-2.5 shrink-0" />
+                      <span className="truncate">{sharingGift === gift.id ? "..." : "Share"}</span>
+                    </button>
+                    <button
+                      onClick={() => sendReminder(gift.id, gift.name, gift.contributors)}
+                      disabled={remindingGift === gift.id}
+                      className="w-full min-h-[32px] min-w-0 px-2 py-1.5 bg-amber-100 border border-amber-400/60 text-amber-900 rounded-md text-[11px] font-semibold hover:bg-amber-200 hover:border-amber-500 transition-all flex items-center justify-center gap-0.5 disabled:opacity-50"
+                    >
+                      <Bell className="w-2.5 h-2.5 shrink-0" />
+                      <span className="truncate">{remindingGift === gift.id ? "..." : "Remind"}</span>
+                    </button>
+                    {!(gift.fundingStatus === "purchased" || gift.currentAmount > gift.targetAmount) && (
+                      <button
+                        onClick={() => {
+                          const { productTotal, remaining } = getPreviewAmounts(gift)
+                          setPurchaseModal({ gift, productTotal, remaining, recipientName })
+                        }}
+                        className="w-full min-h-[32px] min-w-0 px-2 py-1.5 rounded-md text-[11px] font-semibold text-[#654321] border border-[#DAA520] bg-[#FEF3C7] hover:bg-[#FDE68A] hover:border-[#EAB308] transition-all flex items-center justify-center gap-0.5"
+                      >
+                        <Eye className="w-2.5 h-2.5 shrink-0" />
+                        <span className="truncate">Preview</span>
+                      </button>
+                    )}
+                  </div>
+
                   <button
                     onClick={() => getAIInsights(gift.id, gift)}
                     disabled={loadingAI === gift.id}
-                    className="flex-1 px-2 py-1.5 bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 text-white rounded-md text-[10px] font-semibold hover:shadow-md transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1 whitespace-nowrap"
+                    className="w-full min-h-[32px] px-2 py-1.5 bg-gradient-to-r from-rose-500 via-orange-500 to-amber-500 text-white rounded-md text-[11px] font-semibold hover:shadow-md transition-all disabled:opacity-50 flex items-center justify-center gap-1"
                   >
-                    <Sparkles className="w-3 h-3" />
-                    {loadingAI === gift.id ? "Analyzing..." : aiInsights[gift.id] ? "Refresh" : "AI Insights"}
-                  </button>
-                  <button
-                    onClick={() => sendReminder(gift.id, gift.name, gift.contributors)}
-                    disabled={remindingGift === gift.id}
-                    className="px-2 py-1.5 border border-amber-500 text-[#8B5A3C] rounded-md text-[10px] font-semibold hover:bg-amber-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {remindingGift === gift.id ? "..." : "Remind"}
+                    <Sparkles className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                    {loadingAI === gift.id ? "Analyzing..." : aiInsights[gift.id] ? "Refresh AI" : "AI Insights"}
                   </button>
                 </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
         </>
         )}
@@ -720,6 +969,745 @@ export default function ActiveGiftsPage() {
           </div>
         </div>
       )}
+
+      {/* Remaining Balance modal — left nav + right content (like /gifts/create) */}
+      {settleBalanceModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            {/* Header — Remaining Balance + amount (centered) */}
+            <div className="flex-shrink-0 w-full min-h-[4rem] bg-gradient-to-r from-[#6B4423] via-[#8B5A3C] to-[#6B4423] px-4 py-3 border-b-2 border-[#4A2F1A] flex items-center justify-center relative">
+              <div className="flex flex-col sm:flex-row items-center gap-1.5 sm:gap-2">
+                <div className="flex items-center gap-2">
+                  <Wallet className="w-5 h-5 text-[#F5DEB3] shrink-0" />
+                  <h2 className="text-lg font-bold text-[#F5DEB3]">Remaining Balance</h2>
+                </div>
+                <div className="inline-flex items-baseline gap-1 rounded-full bg-white/20 px-3 py-1">
+                  <span className="text-lg font-bold tabular-nums text-white">${settleBalanceModal.remaining.toFixed(2)}</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSettleBalanceModal(null)}
+                className="absolute right-4 p-1.5 hover:bg-[#4A2F1A] rounded-full transition-colors"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5 text-[#F5DEB3]" />
+              </button>
+            </div>
+
+            {/* Two columns: Left nav + Right content */}
+            <div className="flex flex-1 min-h-0 flex-col md:flex-row">
+              {/* Left navigation — like /gifts/create (no Cancel) */}
+              <div className="flex-shrink-0 md:w-56 lg:w-60 bg-[#F5F1E8] border-b md:border-b-0 md:border-r border-[#DAA520]/20 p-3 md:p-4 flex flex-col">
+                <div className="flex flex-row md:flex-col gap-2 md:gap-3 overflow-x-auto md:overflow-x-visible md:flex-1">
+                  {(() => {
+                    const rem = settleBalanceModal.remaining
+                    const micro = rem < 1
+                    const navItems: { id: "gift-card" | "charity" | "support-wishbee"; label: string; icon: typeof Gift; desc: string; disabled: boolean }[] = [
+                      { id: "gift-card", label: "Send Bonus Gift Card", icon: Gift, desc: "Amazon eGift Card", disabled: micro },
+                      { id: "charity", label: "Donate to Charity", icon: Heart, desc: "Choose a cause", disabled: micro },
+                      { id: "support-wishbee", label: "Support Wishbee", icon: Sparkles, desc: "Tip the platform", disabled: false },
+                    ]
+                    return navItems.map((item) => {
+                      const isCurrent = remainingBalanceView === item.id
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          disabled={item.disabled}
+                          onClick={() => !item.disabled && setRemainingBalanceView(item.id)}
+                          className={`flex items-center gap-3 px-3 py-3.5 rounded-xl transition-all w-full min-w-[140px] md:min-w-0 text-left ${
+                            item.disabled
+                              ? "opacity-50 cursor-not-allowed bg-gray-100/80 text-gray-500"
+                              : isCurrent
+                              ? "bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-white shadow-md"
+                              : "bg-white text-[#654321] border-2 border-[#DAA520]/30 hover:border-[#DAA520] hover:bg-[#FFFBEB]/80"
+                          }`}
+                        >
+                          <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${
+                            item.disabled ? "bg-gray-200" : isCurrent ? "bg-white/20" : "bg-[#DAA520]/10"
+                          }`}>
+                            <item.icon className="w-4 h-4" />
+                          </div>
+                          <div className="flex-1 min-w-0 text-left">
+                            <p className="text-xs font-bold leading-tight">{item.label}</p>
+                            <p className={`text-[10px] leading-tight mt-0.5 ${isCurrent ? "text-white/90" : "text-[#8B5A3C]/80"}`}>{item.desc}</p>
+                          </div>
+                          {isCurrent && <ChevronRight className="w-4 h-4 shrink-0 hidden md:block" />}
+                        </button>
+                      )
+                    })
+                  })()}
+                </div>
+              </div>
+
+              {/* Right content — form/actions for selected option */}
+              <div className="flex-1 min-h-0 overflow-y-auto p-4 md:p-5 bg-gradient-to-br from-[#FEF7ED] via-[#FFF7ED] to-[#FFFBEB]">
+                {remainingBalanceView === "gift-card" && (
+                  <div className="max-w-md mx-auto space-y-3">
+                    <h3 className="text-sm font-bold text-[#654321]">Send as Bonus Gift Card</h3>
+                    <p className="text-xs text-[#8B5A3C]/90">
+                      Send ${settleBalanceModal.remaining.toFixed(2)} as an Amazon eGift Card so {settleBalanceModal.recipientName} can pick one more treat.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleSendAmazonGiftCard(settleBalanceModal.remaining)
+                        setSettleBalanceModal(null)
+                      }}
+                      className="w-full py-2 px-3 rounded-lg text-xs font-semibold text-[#422006] bg-gradient-to-r from-[#DAA520] to-[#F4C430] shadow-sm hover:brightness-105 flex items-center justify-center gap-1.5"
+                    >
+                      <Gift className="w-4 h-4" />
+                      Open Amazon to send ${settleBalanceModal.remaining.toFixed(2)} gift card
+                    </button>
+                  </div>
+                )}
+
+                {remainingBalanceView === "charity" && (
+                  <div className="max-w-md mx-auto space-y-3">
+                    <h3 className="text-sm font-bold text-[#654321]">Donate to a cause</h3>
+                    <p className="text-xs text-[#8B5A3C]/90">
+                      Select a charity. These funds will be sent as a collective donation on behalf of the group gift.
+                    </p>
+                    <div className="space-y-1.5">
+                      {DONATION_CHARITIES.map((c) => {
+                        const CharityIcon = c.icon === "heart" ? Heart : c.icon === "globe" ? Globe : c.icon === "leaf" ? Leaf : Cross
+                        const iconColor = c.icon === "heart" ? "text-red-500 fill-red-500" : c.icon === "globe" ? "text-blue-600" : c.icon === "leaf" ? "text-emerald-600" : "text-red-600"
+                        const isSelected = selectedCharityId === c.id
+                        const logo = (c as { logo?: string }).logo
+                        return (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => setSelectedCharityId(c.id)}
+                            className={`w-full flex items-center gap-1.5 py-2 px-2.5 rounded-lg text-left transition-all border-2 ${isSelected ? "border-[#B8860B] bg-[#FFFBEB]" : "border-[#DAA520]/20 bg-white hover:border-[#DAA520]/50"}`}
+                          >
+                            <div className="w-6 h-6 rounded-full bg-white flex items-center justify-center flex-shrink-0 ring-1 ring-[#DAA520]/25 overflow-hidden">
+                              {logo ? <img src={logo} alt="" className="w-full h-full object-contain" /> : <CharityIcon className={`w-3.5 h-3.5 ${iconColor}`} />}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-semibold text-[#654321]">{c.name}</p>
+                              <p className="text-[10px] text-[#8B4513]/80">{c.description}</p>
+                            </div>
+                            {isSelected && <Check className="w-4 h-4 text-[#B8860B] shrink-0" />}
+                          </button>
+                        )
+                      })}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const charity = DONATION_CHARITIES.find((ch) => ch.id === selectedCharityId)
+                        if (!charity) return
+                        const gift = settleBalanceModal.gift
+                        const dedication = `On behalf of the ${gift.name} group via Wishbee.ai`
+                        const viewGiftDetailsUrl = typeof window !== "undefined" ? `${window.location.origin}/gifts/${gift.id}` : `/gifts/${gift.id}`
+                        const receiptUrl = await saveDonationSettlement({
+                          giftId: gift.id,
+                          amount: settleBalanceModal.remaining,
+                          charityId: charity.id,
+                          charityName: charity.name,
+                          dedication,
+                          recipientName: settleBalanceModal.recipientName,
+                          giftName: gift.name,
+                          totalFundsCollected: gift.currentAmount,
+                          finalGiftPrice: Math.round((gift.currentAmount - settleBalanceModal.remaining) * 100) / 100,
+                        })
+                        setDonationConfirmed({
+                          amount: settleBalanceModal.remaining,
+                          charityName: charity.name,
+                          disposition: "charity",
+                          dedication,
+                          viewGiftDetailsUrl,
+                          receiptUrl: receiptUrl ?? undefined,
+                          recipientName: settleBalanceModal.recipientName,
+                          totalFundsCollected: gift.currentAmount,
+                          finalGiftPrice: Math.round((gift.currentAmount - settleBalanceModal.remaining) * 100) / 100,
+                        })
+                        setSettleBalanceModal(null)
+                      }}
+                      className="w-full py-2 px-3 rounded-lg text-xs font-semibold bg-gradient-to-r from-[#EAB308] to-[#F4C430] text-[#3B2F0F] shadow-sm hover:brightness-105 transition-all"
+                    >
+                      Confirm Scheduled Donation
+                    </button>
+                  </div>
+                )}
+
+                {remainingBalanceView === "support-wishbee" && (
+                  <div className="max-w-md mx-auto space-y-3">
+                    <h3 className="text-sm font-bold text-[#654321]">Support Wishbee</h3>
+                    <p className="text-xs text-[#8B5A3C]/90">
+                      Did we do a good job? Tip Wishbee to help us keep our AI tools free and the platform ad-free for everyone.
+                    </p>
+                    <p className="text-xs text-[#654321]">
+                      Your ${settleBalanceModal.remaining.toFixed(2)} will be added as a platform tip.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const gift = settleBalanceModal.gift
+                        const receiptUrl = await saveTipSettlement({
+                          giftId: gift.id,
+                          amount: settleBalanceModal.remaining,
+                          recipientName: settleBalanceModal.recipientName,
+                          giftName: gift.name,
+                          totalFundsCollected: gift.currentAmount,
+                          finalGiftPrice: Math.round((gift.currentAmount - settleBalanceModal.remaining) * 100) / 100,
+                        })
+                        setTipThankYouGift({
+                          gift,
+                          remaining: settleBalanceModal.remaining,
+                          recipientName: settleBalanceModal.recipientName,
+                          receiptUrl: receiptUrl ?? undefined,
+                        })
+                        setSettleBalanceModal(null)
+                        if (receiptUrl) {
+                          try {
+                            const sessionRes = await fetch("/api/auth/session").catch(() => null)
+                            const session = sessionRes?.ok ? await sessionRes.json() : null
+                            const to = session?.user?.email ? [{ email: session.user.email, name: session.user.name }] : []
+                            if (to.length > 0) {
+                              const res = await fetch("/api/gifts/transparency-email", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                  eventData: {
+                                    recipientName: settleBalanceModal.recipientName,
+                                    totalFundsCollected: gift.currentAmount,
+                                    finalGiftPrice: Math.round((gift.currentAmount - settleBalanceModal.remaining) * 100) / 100,
+                                    remainingBalance: settleBalanceModal.remaining,
+                                    disposition: "tip" as const,
+                                    viewGiftDetailsUrl: typeof window !== "undefined" ? `${window.location.origin}/gifts/${gift.id}` : `/gifts/${gift.id}`,
+                                  },
+                                  to,
+                                }),
+                              })
+                              if (res.ok) toast.success("Tip receipt sent to your email")
+                            }
+                          } catch {
+                            // non-blocking
+                          }
+                        }
+                      }}
+                      className="w-full py-2 px-3 rounded-lg text-xs font-semibold bg-gradient-to-r from-[#EAB308] to-[#F4C430] text-[#3B2F0F] shadow-sm hover:brightness-105 flex items-center justify-center gap-1.5"
+                    >
+                      <span className="text-base" aria-hidden>🐝</span>
+                      Tip Wishbee ${settleBalanceModal.remaining.toFixed(2)}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex-shrink-0 w-full h-10 bg-gradient-to-r from-[#6B4423] via-[#8B5A3C] to-[#6B4423] border-t-2 border-[#4A2F1A]" />
+          </div>
+        </div>
+      )}
+
+      {/* Amazon Gift Card instructions modal — shown in front before opening Amazon (Home header/footer, Wishbee button) */}
+      {amazonGiftCardModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col">
+            {/* Header — same as Home page header */}
+            <div className="flex-shrink-0 w-full min-h-[4rem] bg-gradient-to-r from-[#6B4423] via-[#8B5A3C] to-[#6B4423] px-4 py-3 border-b-2 border-[#4A2F1A] flex items-center justify-center relative">
+              <div className="flex items-center gap-2">
+                <Gift className="w-5 h-5 text-[#F5DEB3] shrink-0" />
+                <h2 className="text-base font-bold text-[#F5DEB3]">Amazon eGift Card</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAmazonGiftCardModal(null)}
+                className="absolute right-4 p-1.5 hover:bg-[#4A2F1A] rounded-full transition-colors"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5 text-[#F5DEB3]" />
+              </button>
+            </div>
+            {/* Body — warm gradient */}
+            <div className="p-5 space-y-4 bg-gradient-to-br from-[#FEF7ED] via-[#FFF7ED] to-[#FFFBEB]">
+              <p className="text-sm text-[#654321] leading-relaxed">
+                Click the <strong>custom amount</strong> field on the Amazon page and enter{" "}
+                <span className="inline-flex items-baseline gap-0.5 rounded-md bg-[#FFFBEB] px-2 py-0.5 font-bold tabular-nums text-[#8B6914] ring-1 ring-[#DAA520]/40">
+                  ${amazonGiftCardModal.amount.toFixed(2)}
+                </span>
+              </p>
+              <button
+                type="button"
+                onClick={handleOpenAmazonAndCloseModal}
+                className="w-fit min-w-[120px] mx-auto py-2 px-4 rounded-lg text-xs font-semibold bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#3B2F0F] shadow-md hover:brightness-105 flex items-center justify-center gap-1.5"
+              >
+                <Gift className="w-3.5 h-3.5" />
+                Open Amazon
+              </button>
+            </div>
+            {/* Footer — same as Home page footer */}
+            <div className="flex-shrink-0 w-full h-10 bg-gradient-to-r from-[#6B4423] via-[#8B5A3C] to-[#6B4423] border-t-2 border-[#4A2F1A]" />
+          </div>
+        </div>
+      )}
+
+      {/* Donate to Charity (from Settle Balance) — charity picker — Home header/footer */}
+      {donateFromSettle && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-hidden flex flex-col">
+            {/* Header — H1: modal title, increased height */}
+            <div className="flex-shrink-0 w-full min-h-[5rem] bg-gradient-to-r from-[#6B4423] via-[#8B5A3C] to-[#6B4423] px-4 py-4 border-b-2 border-[#4A2F1A] flex items-center justify-center relative">
+              <h1 className="text-xl font-bold tracking-tight text-[#F5DEB3] flex items-center gap-2">
+                <Wallet className="w-5 h-5 shrink-0" />
+                Remaining Balance
+              </h1>
+              <button
+                type="button"
+                onClick={() => setDonateFromSettle(null)}
+                className="absolute right-4 p-1.5 hover:bg-[#4A2F1A] rounded-full transition-colors"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5 text-[#F5DEB3]" />
+              </button>
+            </div>
+            {/* Body — warm gradient, no outer scroll; only charity list scrolls */}
+            <div className="flex-1 min-h-0 flex flex-col overflow-hidden p-5 bg-gradient-to-br from-[#FEF7ED] via-[#FFF7ED] to-[#FFFBEB]">
+              <div className="flex-shrink-0 text-center mb-4">
+                <div className="inline-flex items-baseline gap-2 rounded-full bg-white/90 px-4 py-2 shadow-sm ring-1 ring-[#DAA520]/25">
+                  <h3 className="text-sm font-semibold tracking-tight text-[#8B5A3C]">Amount to donate</h3>
+                  <span className="text-base font-bold tabular-nums tracking-tight text-[#654321]">${donateFromSettle.amount.toFixed(2)}</span>
+                </div>
+              </div>
+              <p className="text-center text-sm text-[#8B5A3C]/80 leading-relaxed mb-4 flex-shrink-0">
+                Select a charity to donate your remaining balance. These funds will be sent as a collective monthly donation to maximize impact.
+              </p>
+              {/* Charity list — compact layout */}
+              <div className="flex-1 min-h-0 space-y-1.5 overflow-y-auto">
+                {DONATION_CHARITIES.map((c) => {
+                  const CharityIcon = c.icon === "heart" ? Heart : c.icon === "globe" ? Globe : c.icon === "leaf" ? Leaf : Cross
+                  const iconColor = c.icon === "heart" ? "text-red-500 fill-red-500" : c.icon === "globe" ? "text-blue-600" : c.icon === "leaf" ? "text-emerald-600" : "text-red-600"
+                  const isSelected = selectedCharityId === c.id
+                  const logo = (c as { logo?: string }).logo
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => setSelectedCharityId(c.id)}
+                      className={`w-full flex items-center gap-2 py-2 px-2.5 rounded-lg text-left transition-all duration-200 border-2 shadow-sm active:scale-[0.99] ${isSelected ? "border-[#B8860B] bg-[#FFFBEB] shadow-[0_0_0_1px_rgba(184,134,11,0.3)]" : "border-[#DAA520]/20 bg-white hover:border-[#DAA520]/50 hover:bg-[#FFFBEB]/60"}`}
+                    >
+                      <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center flex-shrink-0 ring-1 ring-[#DAA520]/25 overflow-hidden">
+                        {logo ? (
+                          <img src={logo} alt="" className="w-full h-full object-contain" />
+                        ) : (
+                          <CharityIcon className={`w-4 h-4 shrink-0 ${iconColor}`} />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-xs font-semibold tracking-tight text-[#654321] leading-tight">{c.name}</h3>
+                        <p className="text-[11px] text-[#8B4513]/80 mt-0.5 leading-snug line-clamp-2">{c.description}</p>
+                      </div>
+                      <div className="flex-shrink-0 w-4 h-4 rounded-full border-2 border-[#654321]/50 flex items-center justify-center">
+                        {isSelected && <div className="w-2 h-2 rounded-full bg-[#654321]" />}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+              <div className="mt-4 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const charity = DONATION_CHARITIES.find((ch) => ch.id === selectedCharityId)
+                    if (charity) {
+                      const dedication = `On behalf of the ${donateFromSettle.giftName} group via Wishbee.ai`
+                      const viewGiftDetailsUrl = typeof window !== "undefined" ? `${window.location.origin}/gifts/${donateFromSettle.giftId}` : `/gifts/${donateFromSettle.giftId}`
+                      const receiptUrl = await saveDonationSettlement({
+                        giftId: donateFromSettle.giftId,
+                        amount: donateFromSettle.amount,
+                        charityId: charity.id,
+                        charityName: charity.name,
+                        dedication,
+                        recipientName: donateFromSettle.recipientName,
+                        giftName: donateFromSettle.giftName,
+                        totalFundsCollected: donateFromSettle.totalFundsCollected,
+                        finalGiftPrice: donateFromSettle.finalGiftPrice,
+                      })
+                      setDonationConfirmed({
+                        amount: donateFromSettle.amount,
+                        charityName: charity.name,
+                        disposition: "charity",
+                        dedication,
+                        viewGiftDetailsUrl,
+                        receiptUrl: receiptUrl ?? undefined,
+                        recipientName: donateFromSettle.recipientName,
+                        totalFundsCollected: donateFromSettle.totalFundsCollected,
+                        finalGiftPrice: donateFromSettle.finalGiftPrice,
+                      })
+                      setDonateFromSettle(null)
+                    }
+                  }}
+                  className="w-full py-2 px-3 rounded-lg text-xs font-semibold tracking-tight text-[#422006] bg-[#FDE68A] border-2 border-[#654321]/60 hover:bg-[#FCD34D] hover:border-[#654321]/80 hover:shadow-md active:scale-[0.99] transition-all"
+                >
+                  Confirm Scheduled Donation
+                </button>
+              </div>
+            </div>
+            {/* Footer — same as Home page footer (brown gradient) */}
+            <div className="flex-shrink-0 w-full h-10 bg-gradient-to-r from-[#6B4423] via-[#8B5A3C] to-[#6B4423] border-t-2 border-[#4A2F1A]" />
+          </div>
+        </div>
+      )}
+
+      {/* Thank You for Support Wishbee (tip) — includes Done → sendTransparencyEmail + View Tip Receipt */}
+      {tipThankYouGift && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden border border-[#EAB308]/30 p-6 text-center">
+            <p className="text-2xl mb-2" aria-hidden>🐝</p>
+            <h3 className="text-lg font-bold text-[#654321]">Thank you for supporting Wishbee!</h3>
+            <p className="text-sm text-[#8B4513]/80 mt-2">
+              Thank you! Your tip of <span className="font-bold text-[#654321]">${tipThankYouGift.remaining.toFixed(2)}</span> has been added to the Wishbee development fund to help keep our AI free.
+            </p>
+            <div className="mt-4 space-y-3">
+              <a
+                href={tipThankYouGift.receiptUrl || (typeof window !== "undefined" ? `${window.location.origin}/gifts/${tipThankYouGift.gift.id}` : `/gifts/${tipThankYouGift.gift.id}`)}
+                target={tipThankYouGift.receiptUrl ? "_blank" : undefined}
+                rel={tipThankYouGift.receiptUrl ? "noopener noreferrer" : undefined}
+                className="text-sm font-semibold text-[#B8860B] hover:text-[#8B5A3C] underline underline-offset-2 transition-colors inline-block"
+              >
+                View Tip Receipt
+              </a>
+              <button
+                type="button"
+                onClick={async () => {
+                  const viewGiftDetailsUrl = typeof window !== "undefined" ? `${window.location.origin}/gifts/${tipThankYouGift!.gift.id}` : `/gifts/${tipThankYouGift!.gift.id}`
+                  const eventData = {
+                    recipientName: tipThankYouGift!.recipientName,
+                    totalFundsCollected: tipThankYouGift!.gift.currentAmount,
+                    finalGiftPrice: Math.round((tipThankYouGift!.gift.currentAmount - tipThankYouGift!.remaining) * 100) / 100,
+                    remainingBalance: tipThankYouGift!.remaining,
+                    disposition: "tip" as const,
+                    viewGiftDetailsUrl,
+                  }
+                  try {
+                    const sessionRes = await fetch("/api/auth/session").catch(() => null)
+                    const session = sessionRes?.ok ? await sessionRes.json() : null
+                    const to = session?.user?.email ? [{ email: session.user.email, name: session.user.name }] : []
+                    if (to.length > 0) {
+                      const res = await fetch("/api/gifts/transparency-email", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ eventData, to }),
+                      })
+                      if (!res.ok) {
+                        const err = await res.json().catch(() => ({}))
+                        toast.error(err.error || "Could not send receipt email")
+                      } else toast.success("Receipt sent to your email")
+                    }
+                  } catch (e) {
+                    toast.error("Could not send receipt email")
+                  }
+                  setTipThankYouGift(null)
+                }}
+                className="w-full py-3 px-4 rounded-xl font-semibold text-white"
+                style={{ backgroundColor: "#EAB308" }}
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Gift Purchased Successfully — Case A (remaining > $5) — header/footer match Choose Your Preferred Options */}
+      {purchaseModal && purchaseModal.remaining > 5 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-hidden">
+            {/* Header — brown bar with logo + title */}
+            <div className="w-full h-[80px] bg-gradient-to-r from-[#6B4423] via-[#8B5A3C] to-[#6B4423] px-4 border-b-2 border-[#4A2F1A] flex items-center justify-center relative">
+              <h3 className="text-[18px] font-bold text-[#F5DEB3] flex items-center gap-2">
+                <img src="/images/LogoBee-V1.png" alt="" width={48} height={48} className="h-12 w-12 object-contain flex-shrink-0" />
+                Gift Purchased Successfully!
+              </h3>
+              <button
+                onClick={() => setPurchaseModal(null)}
+                className="absolute right-4 p-1.5 hover:bg-[#4A2F1A] rounded-full transition-colors"
+                aria-label="Close"
+              >
+                <X className="w-[18px] h-[18px] text-[#F5DEB3]" />
+              </button>
+            </div>
+
+            {/* Body — warm gradient same as Choose Your Preferred Options */}
+            <div className="p-5 overflow-y-auto max-h-[70vh] bg-gradient-to-br from-[#FEF7ED] via-[#FFF7ED] to-[#FFFBEB] space-y-5">
+              {/* Financial Summary — Remaining = Total Collected − Gift Total (always consistent) */}
+              {(() => {
+                const collected = purchaseModal.gift.currentAmount
+                const giftTotal = purchaseModal.productTotal
+                const remainingBalance = Math.max(0, Math.round((collected - giftTotal) * 100) / 100)
+                return (
+                  <>
+              <div>
+                <h3 className="text-sm font-bold text-[#654321] mb-3 flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                    <DollarSign className="w-4 h-4 text-amber-600" />
+                  </span>
+                  Financial Summary
+                </h3>
+                <div className="space-y-2 text-sm text-[#8B4513]">
+                  <div className="flex justify-between items-center gap-2">
+                    <span className="flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                        <Gift className="w-4 h-4 text-amber-600" />
+                      </span>
+                      Gift Total (with Tax/Shipping):
+                    </span>
+                    <span className="font-medium text-[#654321]">${giftTotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center gap-2">
+                    <span className="flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                        <Target className="w-4 h-4 text-emerald-600" />
+                      </span>
+                      Total Funds Collected:
+                    </span>
+                    <span className="font-medium text-[#654321]">${collected.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center gap-2">
+                    <span className="flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-full bg-[#FEF3C7] flex items-center justify-center flex-shrink-0">
+                        <Sparkles className="w-4 h-4 text-[#DAA520]" />
+                      </span>
+                      Remaining Balance:
+                    </span>
+                    <span className="font-bold text-[#DAA520]">${remainingBalance.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* A Little Something Extra — only when there is remaining balance */}
+              {remainingBalance > 0 && (
+              <div>
+                <h3 className="text-sm font-bold text-[#654321] flex items-center gap-2 mb-2">
+                  <span className="w-6 h-6 rounded-full bg-gradient-to-br from-amber-200 to-orange-300 flex items-center justify-center flex-shrink-0">
+                    <Gift className="w-4 h-4 text-amber-700" />
+                  </span>
+                  A Little Something Extra for {purchaseModal.recipientName}
+                </h3>
+                <p className="text-sm text-[#8B4513] leading-relaxed">
+                  Because the hive was so generous, there is ${remainingBalance.toFixed(2)} remaining! You can send it as an Amazon eGift Card so {purchaseModal.recipientName} can pick out one more treat when you’re ready.
+                </p>
+              </div>
+              )}
+
+              {/* Primary actions */}
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={() => { setPurchaseModal(null); router.push(`/gifts/${purchaseModal.gift.id}`); }}
+                  className="w-full py-2 text-sm font-semibold bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#3B2F0F] rounded-lg hover:shadow-md transition-all"
+                >
+                  View Gift Details
+                </button>
+                {remainingBalance > 0 && (
+                  <>
+                <p className="text-[10px] text-[#8B4513]/80 text-center">
+                  Optional: send the ${remainingBalance.toFixed(2)} bonus as an eGift Card from Amazon when you’re ready.
+                </p>
+                <button
+                  onClick={() => handleSendAmazonGiftCard(remainingBalance)}
+                  className="w-full py-2 rounded-lg text-sm font-medium text-[#654321] border border-[#DAA520]/50 bg-white hover:bg-amber-50/80 transition-all flex items-center justify-center gap-1.5"
+                >
+                  <ShoppingCart className="w-4 h-4 text-orange-500" />
+                  {`Open Amazon to send bonus ($${remainingBalance.toFixed(2)})`}
+                </button>
+                  </>
+                )}
+              </div>
+                  </>
+                );
+              })()}
+            </div>
+
+            {/* Footer — same as Add to Wishlist / Choose Your Preferred Options */}
+            <div className="w-full h-[50px] bg-gradient-to-r from-[#6B4423] via-[#8B5A3C] to-[#6B4423] border-t-2 border-[#4A2F1A]" />
+          </div>
+        </div>
+      )}
+
+      {/* Small Balance, Big Impact — Case B (remaining ≤ $5) */}
+      {purchaseModal && purchaseModal.remaining <= 5 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
+            <div className="p-6 flex items-center justify-between border-b border-[#DAA520]/20">
+              <div className="flex items-center gap-2">
+                <Heart className="w-6 h-6 text-[#DAA520]" />
+                <h3 className="text-lg font-bold text-[#654321]">✔ Small Balance, Big Impact</h3>
+              </div>
+              <button
+                onClick={() => { setPurchaseModal(null); setDonationCharity(null); }}
+                className="w-8 h-8 rounded-full bg-[#F5F1E8] hover:bg-[#EDE9E0] flex items-center justify-center text-[#654321]"
+                aria-label="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-[#8B4513]">
+                There is ${purchaseModal.remaining.toFixed(2)} remaining after the gift purchase. Choose a cause to donate it to:
+              </p>
+              <div className="space-y-2">
+                {DONATION_CHARITIES.map((c) => (
+                  <label
+                    key={c.id}
+                    className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-colors ${donationCharity === c.id ? "border-[#DAA520] bg-amber-50/50" : "border-[#DAA520]/20 hover:border-[#DAA520]/40"}`}
+                  >
+                    <input
+                      type="radio"
+                      name="donation-charity"
+                      checked={donationCharity === c.id}
+                      onChange={() => setDonationCharity(c.id)}
+                      className="mt-1 text-[#DAA520]"
+                    />
+                    <div>
+                      <p className="font-medium text-[#654321]">{c.name}</p>
+                      <p className="text-xs text-[#8B4513]/80">{c.description}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+              <button
+                onClick={async () => {
+                  if (!donationCharity) { toast.error("Please select a cause"); return }
+                  const charity = DONATION_CHARITIES.find((c) => c.id === donationCharity)
+                  const dedication = `On behalf of the ${purchaseModal.gift.name} group via Wishbee.ai`
+                  const viewGiftDetailsUrl = typeof window !== "undefined" ? `${window.location.origin}/gifts/${purchaseModal.gift.id}` : `/gifts/${purchaseModal.gift.id}`
+                  const receiptUrl = await saveDonationSettlement({
+                    giftId: purchaseModal.gift.id,
+                    amount: purchaseModal.remaining,
+                    charityId: donationCharity || "feeding-america",
+                    charityName: charity?.name ?? "the chosen cause",
+                    dedication,
+                    recipientName: purchaseModal.recipientName,
+                    giftName: purchaseModal.gift.name,
+                    totalFundsCollected: purchaseModal.gift.currentAmount,
+                    finalGiftPrice: purchaseModal.productTotal,
+                  })
+                  setDonationConfirmed({
+                    amount: purchaseModal.remaining,
+                    charityName: charity?.name ?? "the chosen cause",
+                    disposition: "charity",
+                    dedication,
+                    viewGiftDetailsUrl,
+                    receiptUrl: receiptUrl ?? undefined,
+                    recipientName: purchaseModal.recipientName,
+                    totalFundsCollected: purchaseModal.gift.currentAmount,
+                    finalGiftPrice: purchaseModal.productTotal,
+                  })
+                  setPurchaseModal(null)
+                  setDonationCharity(null)
+                }}
+                disabled={!donationCharity}
+                className="w-full py-3 bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#3B2F0F] font-semibold rounded-lg hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Confirm Scheduled Donation
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Donation Confirmation — Success */}
+      {donationConfirmed && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col">
+            {/* Header — same as Home page (brown gradient) */}
+            <div className="flex-shrink-0 w-full min-h-[5rem] bg-gradient-to-r from-[#6B4423] via-[#8B5A3C] to-[#6B4423] px-4 py-4 border-b-2 border-[#4A2F1A] flex items-center justify-center relative">
+              <h2 className="text-xl font-bold tracking-tight text-[#F5DEB3] flex items-center gap-2">
+                <span className="text-2xl" aria-hidden>🎉</span>
+                Success!
+              </h2>
+              <button
+                type="button"
+                onClick={() => setDonationConfirmed(null)}
+                className="absolute right-4 p-1.5 hover:bg-[#4A2F1A] rounded-full transition-colors"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5 text-[#F5DEB3]" />
+              </button>
+            </div>
+            {/* Body — warm gradient, clear typography */}
+            <div className="flex-1 p-6 bg-gradient-to-br from-[#FEF7ED] via-[#FFF7ED] to-[#FFFBEB] text-center">
+              <p className="text-base text-[#654321] leading-relaxed mb-2">
+                Success!{" "}
+                <span className="font-bold tabular-nums text-[#654321]">${donationConfirmed.amount.toFixed(2)}</span>
+                {" "}is scheduled to be donated to{" "}
+                <span className="font-semibold">{donationConfirmed.charityName}</span>
+                {" "}as part of the monthly Wishbee Hive gift 🎁
+              </p>
+              <p className="text-xs text-[#8B5A3C]/80 mb-2">
+                To maximize impact and eliminate individual fees, Wishbee pools micro-balances into one monthly collective donation.
+              </p>
+              <p className="text-sm text-[#8B5A3C]/85 mb-5">A confirmation has been emailed to the organizer.</p>
+              <div className="space-y-3">
+                <a
+                  href={donationConfirmed.receiptUrl || donationConfirmed.viewGiftDetailsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm font-semibold text-[#B8860B] hover:text-[#8B5A3C] underline underline-offset-2 transition-colors inline-block"
+                >
+                  View Donation Receipt
+                </a>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const eventData = {
+                      recipientName: donationConfirmed.recipientName,
+                      totalFundsCollected: donationConfirmed.totalFundsCollected,
+                      finalGiftPrice: donationConfirmed.finalGiftPrice,
+                      remainingBalance: donationConfirmed.amount,
+                      disposition: "charity" as const,
+                      charityName: donationConfirmed.charityName,
+                      viewGiftDetailsUrl: donationConfirmed.viewGiftDetailsUrl,
+                    }
+                    try {
+                      const sessionRes = await fetch("/api/auth/session").catch(() => null)
+                      const session = sessionRes?.ok ? await sessionRes.json() : null
+                      const to = session?.user?.email ? [{ email: session.user.email, name: session.user.name }] : []
+                      if (to.length > 0) {
+                        const res = await fetch("/api/gifts/transparency-email", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ eventData, to }),
+                        })
+                        if (!res.ok) {
+                          const err = await res.json().catch(() => ({}))
+                          toast.error(err.error || "Could not send receipt email")
+                        } else toast.success("Receipt sent to your email")
+                      }
+                    } catch (e) {
+                      toast.error("Could not send receipt email")
+                    }
+                    setDonationConfirmed(null)
+                  }}
+                  className="block w-full py-2.5 px-4 rounded-lg text-sm font-semibold text-[#654321] bg-white border-2 border-[#DAA520]/50 hover:bg-[#FFFBEB] hover:border-[#DAA520] transition-all"
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+            {/* Footer — same as Home page (brown gradient) */}
+            <div className="flex-shrink-0 w-full h-10 bg-gradient-to-r from-[#6B4423] via-[#8B5A3C] to-[#6B4423] border-t-2 border-[#4A2F1A]" />
+          </div>
+        </div>
+      )}
     </div>
   )
+}
+
+export default function ActiveGiftsPage() {
+  const mounted = useClientOnly()
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-[#F5F1E8] flex items-center justify-center">
+        <div className="animate-spin w-10 h-10 border-2 border-[#DAA520] border-t-transparent rounded-full" />
+      </div>
+    )
+  }
+  return <ActiveGiftsPageContent />
 }

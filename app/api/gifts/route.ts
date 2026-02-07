@@ -100,19 +100,52 @@ export async function POST(req: Request): Promise<Response> {
       return send500(message, err?.code)
     }
 
+    const initialContribution = giftData.initialContribution != null ? Number(giftData.initialContribution) : NaN
+    if (!isNaN(initialContribution) && initialContribution > 0) {
+      const evite = (savedGift.evite_settings as Record<string, unknown>) || {}
+      const list = Array.isArray(evite.contributionList) ? [...(evite.contributionList as { name?: string; email?: string; amount?: number; time?: string }[])] : []
+      list.unshift({
+        name: (user.user_metadata?.name as string) || (giftData.collectionTitle as string) || "Organizer",
+        email: user.email ?? "",
+        amount: initialContribution,
+        time: new Date().toISOString(),
+      })
+      const { error: updateErr } = await supabase
+        .from("gifts")
+        .update({
+          current_amount: initialContribution,
+          contributors: 1,
+          evite_settings: { ...evite, contributionList: list.slice(0, 50) },
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", savedGift.id)
+      if (updateErr) {
+        console.error("[v0] Failed to apply initial contribution:", updateErr?.message ?? updateErr)
+      } else {
+        console.log("[v0] Initial contribution applied:", initialContribution)
+      }
+    }
+
     console.log("[v0] Gift collection created successfully:", savedGift.id)
+
+    // Re-fetch so current_amount/contributors reflect initial contribution if any
+    let giftToReturn = savedGift
+    if (!isNaN(initialContribution) && initialContribution > 0) {
+      const { data: refreshed } = await supabase.from("gifts").select("*").eq("id", savedGift.id).single()
+      if (refreshed) giftToReturn = refreshed
+    }
 
     // Return shape expected by create form (id, gift with camelCase for client).
     // Do not spread giftData - it may contain circular refs or non-JSON-serializable values
     // and cause Response.json() to throw, resulting in 500 with empty body.
     const giftForClient = {
-      id: savedGift.id,
-      collectionTitle: savedGift.collection_title,
-      giftName: savedGift.gift_name,
-      description: savedGift.description,
-      targetAmount: Number(savedGift.target_amount),
-      currentAmount: Number(savedGift.current_amount),
-      contributors: savedGift.contributors,
+      id: giftToReturn.id,
+      collectionTitle: giftToReturn.collection_title,
+      giftName: giftToReturn.gift_name,
+      description: giftToReturn.description,
+      targetAmount: Number(giftToReturn.target_amount),
+      currentAmount: Number(giftToReturn.current_amount),
+      contributors: giftToReturn.contributors,
       deadline: savedGift.deadline,
       status: savedGift.status,
       bannerImage: savedGift.banner_image,

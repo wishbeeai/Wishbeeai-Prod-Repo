@@ -251,6 +251,7 @@ export function CreateGiftFormClient() {
   // Gift Created share modal state
   const [showGiftCreatedModal, setShowGiftCreatedModal] = useState(false)
   const [createdGiftMagicLink, setCreatedGiftMagicLink] = useState("")
+  const [createdGiftId, setCreatedGiftId] = useState<string | null>(null)
   const [linkCopied, setLinkCopied] = useState(false)
   
   // Review step edit mode
@@ -1325,6 +1326,10 @@ export function CreateGiftFormClient() {
             },
           },
           eviteSettings: eviteSettings || null,
+          // Self-contribution during create: record so progress shows on /gifts/active
+          ...(contributionComplete && myContributionAmount != null && Number(myContributionAmount) >= 1
+            ? { initialContribution: Number(myContributionAmount) }
+            : {}),
         }),
       })
 
@@ -1379,8 +1384,11 @@ export function CreateGiftFormClient() {
           
           if (magicLinkData.success) {
             console.log('[Gift Create] Magic link generated:', magicLinkData.magicLink.url)
-            sessionStorage.setItem(`gift_${data.id}_magicLink`, magicLinkData.magicLink.url)
-            router.push('/gifts/active')
+            const url = magicLinkData.magicLink.url
+            sessionStorage.setItem(`gift_${data.id}_magicLink`, url)
+            setCreatedGiftMagicLink(url)
+            setCreatedGiftId(String(data.id))
+            setCurrentStep(7)
             return
           }
         } catch (magicLinkError) {
@@ -1388,10 +1396,12 @@ export function CreateGiftFormClient() {
         }
       }
       
-      // No magic link or evite: store default link for share modal on Active page, then go to Active Gifts
+      // Use contribution link and stay on create page → show Share tab (step 7) in same form
       const defaultLink = `${window.location.origin}/gifts/contribute/${data.id}`
       sessionStorage.setItem(`gift_${data.id}_magicLink`, defaultLink)
-      router.push('/gifts/active')
+      setCreatedGiftMagicLink(defaultLink)
+      setCreatedGiftId(String(data.id))
+      setCurrentStep(7)
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not create gift collection."
       toast({ title: "Error", description: message, variant: "destructive" })
@@ -4365,31 +4375,36 @@ export function CreateGiftFormClient() {
             </div>
           )}
 
-          {/* Step 7: Gift Created / Share */}
+          {/* Step 7: Gift Created / Share — shown in same form after create (no redirect to Active) */}
           {currentStep === 7 && (
-            <div className="p-6 sm:p-10">
-              <div className="max-w-2xl mx-auto space-y-6">
+            <div className="p-8 sm:p-12 lg:p-16">
+              <div className="max-w-3xl mx-auto space-y-10">
                 {/* Header */}
-                <div className="text-center mb-4">
-                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#DAA520] to-[#F4C430] flex items-center justify-center mx-auto mb-4">
-                    <Gift className="w-10 h-10 text-white" />
+                <div className="text-center mb-8">
+                  <div className="w-24 h-24 rounded-full bg-gradient-to-br from-[#DAA520] to-[#F4C430] flex items-center justify-center mx-auto mb-6">
+                    <Gift className="w-12 h-12 text-white" />
                   </div>
-                  <h2 className="text-2xl font-bold text-[#654321]">Gift Created!</h2>
-                  <p className="text-[14px] text-[#8B4513]/70 mt-1">Share your contribution link with friends and family</p>
+                  <h2 className="text-3xl sm:text-4xl font-bold text-[#654321]">Gift Created!</h2>
+                  <p className="text-[15px] sm:text-base text-[#8B4513]/70 mt-3 max-w-xl mx-auto leading-relaxed">
+                    {contributionComplete
+                      ? "Your contribution was recorded. Share your contribution link with friends and family."
+                      : "Share your contribution link with friends and family"}
+                  </p>
                 </div>
 
-                {/* Share Card */}
-                <div className="bg-white rounded-2xl shadow-lg border border-[#DAA520]/20 p-8">
-                  {/* Contribution Link */}
-                  <div className="mb-6">
-                    <p className="text-[12px] text-[#8B4513]/60 uppercase tracking-wide mb-2 font-semibold">Contribution Link</p>
-                    <div className="bg-[#F5F1E8] rounded-xl p-4 border border-[#DAA520]/20">
-                      <p className="text-[12px] text-[#654321] font-mono break-all">{createdGiftMagicLink}</p>
+                {/* Share Card — same form style as Contribute step, increased length */}
+                <div className="bg-white rounded-2xl shadow-lg border border-[#DAA520]/20 p-10 sm:p-12 lg:p-14">
+                  {/* Contribution Link — taller area */}
+                  <div className="mb-10">
+                    <p className="text-xs sm:text-sm text-[#8B4513]/60 uppercase tracking-wide mb-3 font-semibold">Contribution Link</p>
+                    <div className="bg-[#F5F1E8] rounded-xl border border-[#DAA520]/20 min-h-[120px] sm:min-h-[140px] p-5 sm:p-6 flex items-center justify-center">
+                      <p className="text-sm sm:text-base text-[#654321] font-mono break-all text-center w-full">{createdGiftMagicLink}</p>
                     </div>
+                    <p className="text-xs text-[#8B4513]/50 mt-3">Anyone with this link can view and contribute to your gift collection.</p>
                   </div>
                   
                   {/* Share Buttons */}
-                  <div className="flex justify-center gap-3 mb-6">
+                  <div className="flex flex-wrap justify-center gap-4 mb-10">
                     <button
                       onClick={async () => {
                         try {
@@ -4401,9 +4416,9 @@ export function CreateGiftFormClient() {
                           toast({ title: "Error", description: "Failed to copy link", variant: "destructive" })
                         }
                       }}
-                      className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-white text-[14px] font-semibold shadow-md hover:shadow-lg hover:scale-105 transition-all"
+                      className="flex items-center gap-2 px-5 py-3 rounded-full bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-white text-[15px] font-semibold shadow-md hover:shadow-lg hover:scale-105 transition-all"
                     >
-                      {linkCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                      {linkCopied ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
                       {linkCopied ? 'Copied!' : 'Copy'}
                     </button>
                     <button
@@ -4412,9 +4427,9 @@ export function CreateGiftFormClient() {
                         const body = encodeURIComponent(`I've created a gift collection and would love for you to contribute!\n\nClick here to view and contribute: ${createdGiftMagicLink}`)
                         window.location.href = `mailto:?subject=${subject}&body=${body}`
                       }}
-                      className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-gradient-to-r from-[#EA580C] to-[#FB923C] text-white text-[14px] font-semibold shadow-md hover:shadow-lg hover:scale-105 transition-all"
+                      className="flex items-center gap-2 px-5 py-3 rounded-full bg-gradient-to-r from-[#EA580C] to-[#FB923C] text-white text-[15px] font-semibold shadow-md hover:shadow-lg hover:scale-105 transition-all"
                     >
-                      <Mail className="w-4 h-4" />
+                      <Mail className="w-5 h-5" />
                       Email
                     </button>
                     <button
@@ -4422,17 +4437,22 @@ export function CreateGiftFormClient() {
                         const message = encodeURIComponent(`I've created a gift collection and would love for you to contribute!\n\nClick here to view and contribute: ${createdGiftMagicLink}`)
                         window.open(`https://wa.me/?text=${message}`, '_blank')
                       }}
-                      className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-gradient-to-r from-[#25D366] to-[#128C7E] text-white text-[14px] font-semibold shadow-md hover:shadow-lg hover:scale-105 transition-all"
+                      className="flex items-center gap-2 px-5 py-3 rounded-full bg-gradient-to-r from-[#25D366] to-[#128C7E] text-white text-[15px] font-semibold shadow-md hover:shadow-lg hover:scale-105 transition-all"
                     >
-                      <MessageCircle className="w-4 h-4" />
+                      <MessageCircle className="w-5 h-5" />
                       WhatsApp
                     </button>
                   </div>
                   
-                  {/* Done Button */}
+                  {/* Done Button — clear share link so /gifts/active does not show Share widget again */}
                   <button
-                    onClick={() => router.push('/gifts/active')}
-                    className="w-full py-3 bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] text-[14px] font-bold rounded-xl hover:scale-[1.02] transition-all shadow-md"
+                    onClick={() => {
+                      if (createdGiftId) {
+                        sessionStorage.removeItem(`gift_${createdGiftId}_magicLink`)
+                      }
+                      router.push('/gifts/active')
+                    }}
+                    className="w-full py-2.5 bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] text-sm font-semibold rounded-xl hover:scale-[1.02] transition-all shadow-md"
                   >
                     Done
                   </button>

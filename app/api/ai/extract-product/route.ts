@@ -4161,7 +4161,7 @@ async function extractWithoutAI(
     
     log(`[v0] Found breadcrumbs: ${breadcrumbs.join(' > ')}`)
     
-    // Map Amazon categories to our categories
+    // Map Amazon categories to our categories (optional normalization)
     const categoryMap: { [key: string]: string } = {
       'kitchen': 'Kitchen Appliances',
       'kitchen & dining': 'Kitchen Appliances',
@@ -4178,19 +4178,31 @@ async function extractWithoutAI(
       'furniture': 'Furniture',
       'toys': 'Toys',
       'books': 'Books',
+      'beauty': 'Beauty & Personal Care',
+      'beauty & personal care': 'Beauty & Personal Care',
+      'skin care': 'Beauty & Personal Care',
+      'lip care': 'Beauty & Personal Care',
     }
     
-    // Check breadcrumbs for category matches
-    for (const crumb of breadcrumbs) {
-      const crumbLower = crumb.toLowerCase()
-      for (const [key, value] of Object.entries(categoryMap)) {
-        if (crumbLower.includes(key)) {
-          productData.category = value
-          log(`[v0] ✅ Extracted category from Amazon breadcrumb: ${value} (from "${crumb}")`)
-          break
+    // Prefer root (first) breadcrumb as category — e.g. "Beauty & Personal Care › Skin Care › Lip Care" → "Beauty & Personal Care"
+    if (breadcrumbs.length > 0 && (!productData.category || productData.category === "General")) {
+      const rootCrumb = breadcrumbs[0].trim()
+      const rootLower = rootCrumb.toLowerCase()
+      productData.category = categoryMap[rootLower] ?? rootCrumb
+      log(`[v0] ✅ Using root category from breadcrumb: ${productData.category}`)
+    } else {
+      // Fallback: check breadcrumbs for category map matches
+      for (const crumb of breadcrumbs) {
+        const crumbLower = crumb.toLowerCase()
+        for (const [key, value] of Object.entries(categoryMap)) {
+          if (crumbLower.includes(key)) {
+            productData.category = value
+            log(`[v0] ✅ Extracted category from Amazon breadcrumb: ${value} (from "${crumb}")`)
+            break
+          }
         }
+        if (productData.category && productData.category !== "General") break
       }
-      if (productData.category && productData.category !== "General") break
     }
   }
   

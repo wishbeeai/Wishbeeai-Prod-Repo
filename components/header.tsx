@@ -42,8 +42,14 @@ export function Header() {
     setOpenDropdown(null)
     setIsMobileMenuOpen(false)
     toast({
-      title: "Logged out",
-      description: "You've been successfully logged out.",
+      variant: "warm",
+      title: (
+        <span className="flex items-center gap-2 font-semibold">
+          <LogOut className="h-4 w-4 shrink-0" />
+          See you soon!
+        </span>
+      ),
+      description: "You've been successfully logged out. Thanks for using Wishbee.",
     })
   }
 

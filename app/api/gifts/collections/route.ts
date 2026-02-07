@@ -23,7 +23,10 @@ export async function GET(req: NextRequest) {
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
 
-    if (statusFilter !== "all") {
+    if (statusFilter === "past") {
+      // Past = completed OR (active with deadline passed)
+      query = query.or("status.eq.completed,status.eq.active")
+    } else if (statusFilter !== "all") {
       query = query.eq("status", statusFilter)
     }
 
@@ -39,7 +42,22 @@ export async function GET(req: NextRequest) {
       )
     }
 
-    const collections = (rows || []).map((g) => ({
+    let list = rows || []
+    const now = new Date().toISOString()
+    if (statusFilter === "past") {
+      list = list.filter(
+        (g: { status?: string; deadline?: string }) =>
+          g.status === "completed" || (g.deadline && g.deadline <= now)
+      )
+    } else if (statusFilter === "active") {
+      // Active = status active AND deadline still in the future (so they appear on /gifts/active, not /gifts/past)
+      list = list.filter(
+        (g: { status?: string; deadline?: string | null }) =>
+          g.status === "active" && (!g.deadline || g.deadline > now)
+      )
+    }
+
+    const collections = list.map((g: Record<string, unknown>) => ({
       id: g.id,
       name: g.collection_title || g.gift_name,
       image: g.banner_image || g.product_image || "/placeholder.svg",

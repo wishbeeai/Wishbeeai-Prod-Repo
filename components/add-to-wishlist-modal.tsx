@@ -2869,7 +2869,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                                 <img
                                   src={likeClippedImage || extractedProduct?.imageUrl || gift?.image || "/placeholder.svg"}
                                   alt={likeClippedTitle || extractedProduct?.productName || 'Selected product'}
-                                  className="w-32 h-32 object-contain rounded-lg bg-white border border-[#DAA520]/20"
+                                  className="w-48 h-48 object-contain rounded-lg bg-white border border-[#DAA520]/20"
                                 />
                                 {/* Product image edit: always visible when editing I Wish, else on hover (same as /gifts/create) */}
                                 <div className={`absolute inset-0 bg-black/50 rounded-lg transition-opacity flex items-center justify-center gap-1 ${isEditingIWish ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
@@ -4167,9 +4167,9 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                             ) : (
                               <div className="relative group">
                                 {altClippedImage ? (
-                                  <img src={amazonImageUrlToLarge(altClippedImage) || altClippedImage} alt={altClippedTitle || 'Alternative product'} className="w-32 h-32 object-contain rounded-lg bg-white border border-[#D97706]/20" />
+                                  <img src={amazonImageUrlToLarge(altClippedImage) || altClippedImage} alt={altClippedTitle || 'Alternative product'} className="w-48 h-48 object-contain rounded-lg bg-white border border-[#D97706]/20" />
                                 ) : (
-                                  <div className="w-32 h-32 rounded-lg bg-gradient-to-br from-amber-50 to-orange-50 border border-[#D97706]/20 flex items-center justify-center cursor-pointer hover:border-[#D97706]" onClick={() => setShowAltImageInput(true)}>
+                                  <div className="w-48 h-48 rounded-lg bg-gradient-to-br from-amber-50 to-orange-50 border border-[#D97706]/20 flex items-center justify-center cursor-pointer hover:border-[#D97706]" onClick={() => setShowAltImageInput(true)}>
                                     <span className="text-[#D97706] text-[9px] text-center px-1">Click to add</span>
                                   </div>
                                 )}

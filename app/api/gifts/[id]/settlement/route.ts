@@ -1,0 +1,131 @@
+import { type NextRequest, NextResponse } from "next/server"
+import { createClient, createAdminClient } from "@/lib/supabase/server"
+
+export const dynamic = "force-dynamic"
+
+type SettlementDisposition = "charity" | "tip" | "bonus"
+
+/**
+ * POST /api/gifts/[id]/settlement
+ * Creates a gift settlement record (donation, tip, or bonus) for receipt display.
+ * Body: { amount, disposition, charityName?, dedication?, recipientName, giftName, totalFundsCollected, finalGiftPrice }
+ * Returns: { id, ... } with the created settlement record.
+ */
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: giftId } = await params
+    if (!giftId) {
+      return NextResponse.json({ error: "Gift ID is required" }, { status: 400 })
+    }
+
+    let body: unknown
+    try {
+      body = await request.json()
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
+    }
+
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ error: "Body must be a JSON object" }, { status: 400 })
+    }
+
+    const b = body as {
+      amount?: number
+      disposition?: string
+      charityId?: string
+      charityName?: string
+      dedication?: string
+      recipientName?: string
+      giftName?: string
+      totalFundsCollected?: number
+      finalGiftPrice?: number
+    }
+
+    const amount = Number(b.amount)
+    const disposition = (b.disposition || "charity") as SettlementDisposition
+
+    if (isNaN(amount) || amount <= 0) {
+      return NextResponse.json({ error: "Valid amount is required" }, { status: 400 })
+    }
+
+    if (!["charity", "tip", "bonus"].includes(disposition)) {
+      return NextResponse.json({ error: "Invalid disposition (charity, tip, or bonus)" }, { status: 400 })
+    }
+
+    const supabase = await createClient()
+    const admin = createAdminClient()
+    const dbForRead = admin || supabase
+
+    // Verify gift exists
+    const { data: gift, error: giftError } = await dbForRead
+      .from("gifts")
+      .select("id, user_id, collection_title, gift_name")
+      .eq("id", giftId)
+      .single()
+
+    if (giftError || !gift) {
+      return NextResponse.json({ error: "Gift not found" }, { status: 404 })
+    }
+
+    const dedicationText = b.dedication || (disposition === "charity" && b.giftName
+      ? `On behalf of the ${b.giftName} group via Wishbee.ai`
+      : null)
+
+    // Use supabase (RLS) for insert - only gift owner can create settlements
+    // status column (when present via migration 020) defaults to 'pending_pool' for charity
+    const insertPayload: Record<string, unknown> = {
+      gift_id: giftId,
+      amount: Math.round(amount * 100) / 100,
+      disposition,
+      charity_id: disposition === "charity" ? (b.charityId || null) : null,
+      charity_name: disposition === "charity" ? (b.charityName || null) : null,
+      dedication: dedicationText,
+      recipient_name: b.recipientName || null,
+      gift_name: b.giftName || gift.collection_title || gift.gift_name || null,
+      total_funds_collected: b.totalFundsCollected != null ? Number(b.totalFundsCollected) : null,
+      final_gift_price: b.finalGiftPrice != null ? Number(b.finalGiftPrice) : null,
+    }
+    if (disposition === "tip") {
+      insertPayload.status = "completed"
+    }
+    const { data: settlement, error: insertError } = await supabase
+      .from("gift_settlements")
+      .insert(insertPayload)
+      .select()
+      .single()
+
+    if (insertError) {
+      console.error("[settlement] Insert error:", insertError)
+      return NextResponse.json(
+        { error: insertError.message || "Failed to save settlement" },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json({
+      success: true,
+      settlement: {
+        id: settlement.id,
+        giftId: settlement.gift_id,
+        amount: Number(settlement.amount),
+        disposition: settlement.disposition,
+        charityName: settlement.charity_name,
+        dedication: settlement.dedication,
+        recipientName: settlement.recipient_name,
+        giftName: settlement.gift_name,
+        totalFundsCollected: settlement.total_funds_collected != null ? Number(settlement.total_funds_collected) : null,
+        finalGiftPrice: settlement.final_gift_price != null ? Number(settlement.final_gift_price) : null,
+        createdAt: settlement.created_at,
+      },
+    })
+  } catch (err) {
+    console.error("[settlement] POST error:", err)
+    return NextResponse.json(
+      { error: "Failed to save settlement" },
+      { status: 500 }
+    )
+  }
+}
