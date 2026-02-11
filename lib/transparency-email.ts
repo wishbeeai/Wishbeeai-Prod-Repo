@@ -39,7 +39,7 @@ function getDispositionExplanation(data: TransparencyEmailEventData): string {
     return `The leftover ${balance} was sent as an Amazon eGift Card to ${recipientName}.`
   }
   if (disposition === "charity" && charityName) {
-    return `The leftover ${balance} is scheduled to be donated to ${charityName} as part of the monthly Wishbee Hive gift.`
+    return `The leftover ${balance} is scheduled to be donated to ${charityName} as part of the monthly Wishbee gift.`
   }
   if (disposition === "tip") {
     return `The leftover ${balance} has been added to the Wishbee development fund to help keep our AI free.`

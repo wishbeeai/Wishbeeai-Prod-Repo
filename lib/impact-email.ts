@@ -26,10 +26,10 @@ function formatMoney(n: number): string {
 }
 
 /**
- * Subject: 🐝 Impact Update: Your Hive's donation to [Charity Name] is complete!
+ * Subject: 🐝 Impact Update: Your Wishbee donation to [Charity Name] is complete!
  */
 export function getImpactEmailSubject(charityName: string): string {
-  return `🐝 Impact Update: Your Hive's donation to ${charityName} is complete!`
+  return `🐝 Impact Update: Your Wishbee donation to ${charityName} is complete!`
 }
 
 /**

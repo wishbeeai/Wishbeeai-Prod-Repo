@@ -1421,14 +1421,14 @@ export function CreateGiftFormClient() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Link
           href="/"
-          className="inline-flex items-center gap-2 text-[#8B5A3C] hover:text-[#6B4423] mb-6 transition-colors text-xs sm:text-sm md:text-base"
+          className="inline-flex items-center gap-2 text-[#8B5A3C] hover:text-[#6B4423] mb-6 transition-colors"
         >
-          <ArrowLeft className="w-3 h-3 sm:w-4 sm:h-4" />
+          <ArrowLeft className="w-4 h-4" />
           Back to Home
         </Link>
 
+        {/* Header — same as active */}
         <div className="mb-8">
-          {/* Header */}
           <div className="bg-card border border-border rounded-lg p-6 mb-8">
             <div className="flex flex-row items-center justify-center gap-2">
               <Gift className="w-5 h-5 sm:w-8 sm:h-8 md:w-10 md:h-10 text-[#DAA520] flex-shrink-0" />
@@ -1445,22 +1445,11 @@ export function CreateGiftFormClient() {
       {/* Main Content with Left Navigation */}
         <div className="bg-white rounded-2xl shadow-lg border border-[#DAA520]/20 overflow-hidden">
           
-          {/* Card Header - Same as wishlist product layout */}
-          <div className="bg-gradient-to-r from-[#B8860B] via-[#DAA520] to-[#F4C430] px-6 py-4">
-            <div className="flex items-center justify-center gap-3">
-              <Gift className="w-6 h-6 sm:w-8 sm:h-8 text-white drop-shadow-sm" />
-              <div className="text-center">
-                <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white drop-shadow-sm">Who is this gift for?</h2>
-                <p className="text-xs text-white/80">Complete each step to create your gift collection</p>
-              </div>
-            </div>
-          </div>
-
           {/* Two Column Layout: Left Nav + Content */}
           <div className="flex flex-col md:flex-row">
             {/* Left Navigation Sidebar */}
-            <div className="md:w-64 lg:w-72 bg-[#F5F1E8] border-b md:border-b-0 md:border-r border-[#DAA520]/20 p-4 md:p-6">
-              <div className="flex md:flex-col gap-2 md:gap-3 overflow-x-auto md:overflow-x-visible">
+            <div className="md:w-52 lg:w-60 bg-[#F5F1E8] border-b md:border-b-0 md:border-r border-[#DAA520]/20 p-3 md:p-4">
+              <div className="flex md:flex-col gap-1.5 md:gap-2 overflow-x-auto md:overflow-x-visible">
                 {STEPS.map((step, index) => {
                   const status = getStepStatus(step.id)
                   const Icon = step.icon
@@ -1469,15 +1458,15 @@ export function CreateGiftFormClient() {
                     <div key={step.id} className="flex md:flex-col items-center md:items-stretch">
                       <button
                         onClick={() => goToStep(step.id)}
-                        className={`flex items-center gap-3 px-3 py-3 md:py-4 rounded-xl transition-all w-full min-w-[140px] md:min-w-0 ${
+                        className={`flex items-center gap-2 px-2.5 py-2 md:py-2.5 rounded-lg transition-all w-full min-w-[100px] md:min-w-0 ${
                           status === 'current'
-                            ? 'bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-white shadow-lg'
+                            ? 'bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-white shadow-md'
                             : status === 'completed'
                             ? 'bg-white text-[#B8860B] border-2 border-[#DAA520]/30 hover:border-[#DAA520]'
                             : 'bg-white/50 text-gray-400 hover:bg-white hover:text-gray-600 border-2 border-transparent'
                         }`}
                       >
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
                           status === 'current'
                             ? 'bg-white/20'
                             : status === 'completed'
@@ -1485,19 +1474,19 @@ export function CreateGiftFormClient() {
                             : 'bg-gray-200'
                         }`}>
                           {status === 'completed' ? (
-                            <Check className="w-5 h-5" />
+                            <Check className="w-4 h-4" />
                           ) : (
-                            <Icon className="w-5 h-5" />
+                            <Icon className="w-4 h-4" />
                           )}
                         </div>
-                        <div className="text-left flex-1">
-                          <p className="text-sm font-bold leading-tight">{step.title}</p>
-                          <p className={`text-xs leading-tight mt-0.5 ${
+                        <div className="text-left flex-1 min-w-0">
+                          <p className="text-[14px] font-bold leading-tight">{step.title}</p>
+                          <p className={`text-[12px] leading-tight mt-0.5 ${
                             status === 'current' ? 'text-white/80' : 'opacity-60'
                           }`}>{step.description}</p>
                         </div>
                         {status === 'current' && (
-                          <ChevronRight className="w-5 h-5 hidden md:block" />
+                          <ChevronRight className="w-4 h-4 hidden md:block flex-shrink-0" />
                         )}
                       </button>
                       
@@ -1509,7 +1498,7 @@ export function CreateGiftFormClient() {
                             status === 'completed' ? 'bg-gradient-to-r from-[#DAA520] to-[#F4C430]' : 'bg-gray-300'
                           }`} />
                           {/* Desktop: vertical line */}
-                          <div className={`hidden md:block w-0.5 h-4 ml-8 ${
+                          <div className={`hidden md:block w-0.5 h-2 ml-6 ${
                             status === 'completed' ? 'bg-gradient-to-r from-[#DAA520] to-[#F4C430]' : 'bg-gray-300'
                           }`} />
                         </>
@@ -1520,17 +1509,17 @@ export function CreateGiftFormClient() {
               </div>
 
               {/* Progress Summary */}
-              <div className="hidden md:block mt-6 pt-6 border-t border-[#DAA520]/20">
-                <div className="bg-white rounded-lg p-4 border border-[#DAA520]/20">
-                  <p className="text-xs text-[#8B4513]/70 mb-2">Progress</p>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+              <div className="hidden md:block mt-4 pt-4 border-t border-[#DAA520]/20">
+                <div className="bg-white rounded-lg p-3 border border-[#DAA520]/20">
+                  <p className="text-[10px] text-[#8B4513]/70 mb-1.5">Progress</p>
+                  <div className="flex items-center gap-1.5">
+                    <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
                       <div 
                         className="h-full bg-gradient-to-r from-[#DAA520] to-[#F4C430] transition-all duration-300"
                         style={{ width: `${((currentStep - 1) / (STEPS.length - 1)) * 100}%` }}
                       />
                     </div>
-                    <span className="text-sm font-bold text-[#654321]">{currentStep}/{STEPS.length}</span>
+                    <span className="text-xs font-bold text-[#654321]">{currentStep}/{STEPS.length}</span>
                   </div>
                 </div>
               </div>

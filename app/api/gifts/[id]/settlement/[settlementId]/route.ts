@@ -40,6 +40,7 @@ export async function GET(
         amount: Number(settlement.amount),
         disposition: settlement.disposition,
         charityName: settlement.charity_name,
+        charityId: settlement.charity_id ?? null,
         dedication: settlement.dedication,
         recipientName: settlement.recipient_name,
         giftName: settlement.gift_name,

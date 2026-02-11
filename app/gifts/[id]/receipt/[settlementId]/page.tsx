@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { ArrowLeft, Heart, FileText } from "lucide-react"
+import { getCharityById } from "@/lib/charity-data"
 
 type ReceiptData = {
   id: string
@@ -11,6 +12,7 @@ type ReceiptData = {
   amount: number
   disposition: "charity" | "tip" | "bonus"
   charityName?: string | null
+  charityId?: string | null
   dedication?: string | null
   recipientName?: string | null
   giftName?: string | null
@@ -128,7 +130,7 @@ export default function DonationReceiptPage() {
                   <span className="font-bold tabular-nums text-[#654321]">${receipt.amount.toFixed(2)}</span>
                   {" "}is scheduled to be donated to{" "}
                   <span className="font-semibold">{receipt.charityName}</span>
-                  {" "}as part of the monthly Wishbee Hive gift 🎁
+                  {" "}as part of the monthly Wishbee gift 🎁
                 </>
               )}
               {isTip && (
@@ -185,6 +187,16 @@ export default function DonationReceiptPage() {
                   <span className="font-medium text-[#654321]">${receipt.finalGiftPrice.toFixed(2)}</span>
                 </div>
               )}
+              {isCharity && receipt.charityName && (() => {
+                const ein = receipt.charityId ? getCharityById(receipt.charityId)?.ein ?? null : null
+                const einDisplay = ein ?? "N/A"
+                return (
+                  <div className="flex justify-between text-sm pt-2 border-t border-[#DAA520]/20">
+                    <span className="text-[#8B5A3C]">Tax ID for {receipt.charityName}</span>
+                    <span className="font-medium text-[#654321]">{einDisplay}</span>
+                  </div>
+                )
+              })()}
               <div className="flex justify-between text-sm pt-2 border-t border-[#DAA520]/20">
                 <span className="text-[#8B5A3C]">Date</span>
                 <span className="font-medium text-[#654321]">{dateStr}</span>

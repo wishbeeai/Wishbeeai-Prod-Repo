@@ -23,6 +23,7 @@ import {
   Shield,
   Bell,
   CreditCard,
+  Wallet,
 } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
@@ -264,13 +265,22 @@ export default function ProfilePage() {
     <div className="min-h-screen bg-[#F5F1E8]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
-        <Link
-          href="/"
-          className="inline-flex items-center gap-2 text-[#8B5A3C] hover:text-[#6B4423] mb-6 transition-colors text-xs sm:text-sm md:text-base"
-        >
-          <ArrowLeft className="w-3 h-3 sm:w-4 sm:h-4" />
-          Back to Home
-        </Link>
+        <div className="flex flex-wrap items-center gap-4 mb-6">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 text-[#8B5A3C] hover:text-[#6B4423] transition-colors text-xs sm:text-sm md:text-base"
+          >
+            <ArrowLeft className="w-3 h-3 sm:w-4 sm:h-4" />
+            Back to Home
+          </Link>
+          <Link
+            href="/profile/wallet"
+            className="inline-flex items-center gap-2 text-[#8B5A3C] hover:text-[#6B4423] transition-colors text-xs sm:text-sm md:text-base"
+          >
+            <Wallet className="w-3 h-3 sm:w-4 sm:h-4" />
+            Wallet & Gift History
+          </Link>
+        </div>
 
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Left Column - Profile Info */}

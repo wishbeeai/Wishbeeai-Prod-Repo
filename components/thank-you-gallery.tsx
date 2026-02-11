@@ -17,7 +17,7 @@ export type ThankYouContributor = {
 export type ThankYouImpact =
   | { type: "charity"; charityName: string; amount: number }
   | { type: "bonus"; amount: number }
-  | { type: "hive"; amount: number }
+  | { type: "wishbee"; amount: number }
 
 export type ThankYouGalleryProps = {
   recipientName: string
@@ -181,7 +181,7 @@ export function ThankYouGallery({
           </div>
         </motion.section>
 
-        {/* Final Impact Badge — Bonus (≥$1), Charity, or Hive Supporter (<$1) */}
+        {/* Final Impact Badge — Bonus (≥$1), Charity, or Wishbee Supporter (<$1) */}
         {impact != null && (
           <motion.section
             initial={{ opacity: 0 }}
@@ -191,25 +191,25 @@ export function ThankYouGallery({
           >
             {impact.type === "charity" && (
               <p className="text-center text-sm text-[#8B4513] bg-white/80 rounded-xl py-3 px-4 border border-[#EAB308]/20 shadow-sm">
-                This Hive also supported <strong>{impact.charityName}</strong> with a{" "}
+                Wishbee also supported <strong>{impact.charityName}</strong> with a{" "}
                 <strong style={{ color: HONEY_GOLD }}>${impact.amount.toFixed(2)}</strong> donation!
               </p>
             )}
             {impact.type === "bonus" && impact.amount >= 1 && (
               <p className="text-center text-sm text-[#8B4513] bg-white/80 rounded-xl py-3 px-4 border border-[#EAB308]/20 shadow-sm">
-                This Hive sent a{" "}
+                Wishbee sent a{" "}
                 <strong style={{ color: HONEY_GOLD }}>${impact.amount.toFixed(2)}</strong> bonus gift
                 card!
               </p>
             )}
-            {(impact.type === "hive" || (impact.type === "bonus" && impact.amount < 1)) && (
+            {(impact.type === "wishbee" || (impact.type === "bonus" && impact.amount < 1)) && (
               <div className="text-center">
                 <span
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-[#654321] border-2 shadow-sm"
                   style={{ borderColor: HONEY_GOLD, backgroundColor: "#FEFCE8" }}
                 >
                   <span aria-hidden>🐝</span>
-                  Hive Supporter
+                  Wishbee Supporter
                 </span>
                 <p className="text-xs text-[#8B4513]/80 mt-1.5">
                   A small balance helped keep Wishbee ad-free.

@@ -65,10 +65,7 @@ export function BalanceSettlementCard({
           </div>
           <div className="flex justify-between items-center pt-2 border-t border-[#EAB308]/30">
             <span className="font-semibold text-[#654321]">Remaining balance</span>
-            <span
-              className="font-bold text-base"
-              style={{ color: HONEY_GOLD }}
-            >
+            <span className="font-bold text-base text-[#F5DEB3]">
               ${remainingBalance.toFixed(2)}
             </span>
           </div>

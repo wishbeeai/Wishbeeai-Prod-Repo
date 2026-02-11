@@ -3,13 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { ArrowLeft, Heart } from "lucide-react"
-
-const CHARITY_NAMES: Record<string, string> = {
-  "feeding-america": "Feeding America",
-  unicef: "UNICEF",
-  edf: "Environmental Defense Fund",
-  "red-cross": "American Red Cross",
-}
+import { getCharityById } from "@/lib/charity-data"
 
 /**
  * Public page for collective donation receipts.
@@ -35,7 +29,7 @@ export default function CollectiveReceiptPage({
   }
 
   const { charityId, batchId } = resolved
-  const charityName = CHARITY_NAMES[charityId] || charityId
+  const charityName = getCharityById(charityId)?.name ?? charityId
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#FEF7ED] via-[#FFF7ED] to-[#FFFBEB] py-8 px-4">
@@ -64,7 +58,7 @@ export default function CollectiveReceiptPage({
           <div className="p-6 space-y-4">
             <p className="text-base text-[#654321] leading-relaxed">
               Thank you for your generosity! This batch of donations has been officially contributed to{" "}
-              <strong>{charityName}</strong> as part of the Wishbee Hive monthly collective gift.
+              <strong>{charityName}</strong> as part of the Wishbee monthly collective gift.
             </p>
             <p className="text-xs text-[#8B5A3C]/80">
               Batch ID: {batchId}

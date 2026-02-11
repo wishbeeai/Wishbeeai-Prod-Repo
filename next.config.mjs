@@ -1,3 +1,6 @@
+import { createRequire } from "module"
+const require = createRequire(import.meta.url)
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   typescript: {
@@ -20,4 +23,17 @@ const nextConfig = {
   turbopack: {},
 }
 
-export default nextConfig
+let config = nextConfig
+try {
+  const { withSentryConfig } = require("@sentry/nextjs")
+  config = withSentryConfig(config, {
+    org: process.env.SENTRY_ORG,
+    project: process.env.SENTRY_PROJECT,
+    silent: true,
+    widenClientFileUpload: true,
+  })
+} catch {
+  // @sentry/nextjs not installed — app works without Sentry
+}
+
+export default config

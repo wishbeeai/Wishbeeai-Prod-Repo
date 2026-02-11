@@ -3,15 +3,9 @@ import {
   completeBatchAndSendImpactEmails,
   selectPendingBatchByCharity,
 } from "@/lib/monthly-donation-service"
+import { getCharityById } from "@/lib/charity-data"
 
 export const dynamic = "force-dynamic"
-
-const CHARITY_NAMES: Record<string, string> = {
-  "feeding-america": "Feeding America",
-  unicef: "UNICEF",
-  edf: "Environmental Defense Fund",
-  "red-cross": "American Red Cross",
-}
 
 /**
  * POST /api/gifts/complete-donation-batch
@@ -38,7 +32,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const charityName = CHARITY_NAMES[charityId] || charityId
+    const charityName = getCharityById(charityId)?.name ?? charityId
 
     const result = await completeBatchAndSendImpactEmails(
       charityId,

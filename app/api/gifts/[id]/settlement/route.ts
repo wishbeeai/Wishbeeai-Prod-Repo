@@ -1,5 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient, createAdminClient } from "@/lib/supabase/server"
+import { sendInstantDonationEmail } from "@/lib/email-service"
+import { checkAndTriggerRecipientNotification } from "@/lib/recipient-notification-service"
+import { notifyContributorsOfCompletion } from "@/lib/contributor-impact-service"
+import { Resend } from "resend"
+
+const RESEND_API_KEY = process.env.RESEND_API_KEY?.trim()
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3001"
 
 export const dynamic = "force-dynamic"
 
@@ -39,9 +46,12 @@ export async function POST(
       charityName?: string
       dedication?: string
       recipientName?: string
+      recipientEmail?: string
       giftName?: string
       totalFundsCollected?: number
       finalGiftPrice?: number
+      claimUrl?: string
+      orderId?: string
     }
 
     const amount = Number(b.amount)
@@ -84,11 +94,17 @@ export async function POST(
       charity_name: disposition === "charity" ? (b.charityName || null) : null,
       dedication: dedicationText,
       recipient_name: b.recipientName || null,
+      recipient_email: disposition === "bonus" ? (b.recipientEmail || null) : null,
       gift_name: b.giftName || gift.collection_title || gift.gift_name || null,
       total_funds_collected: b.totalFundsCollected != null ? Number(b.totalFundsCollected) : null,
       final_gift_price: b.finalGiftPrice != null ? Number(b.finalGiftPrice) : null,
     }
     if (disposition === "tip") {
+      insertPayload.status = "completed"
+    }
+    if (disposition === "bonus") {
+      if (b.claimUrl) insertPayload.claim_url = b.claimUrl
+      if (b.orderId) insertPayload.order_id = b.orderId
       insertPayload.status = "completed"
     }
     const { data: settlement, error: insertError } = await supabase
@@ -105,6 +121,56 @@ export async function POST(
       )
     }
 
+    if (RESEND_API_KEY && admin) {
+      const resend = new Resend(RESEND_API_KEY)
+      const from = process.env.TRANSPARENCY_EMAIL_FROM?.trim() || "Wishbee <onboarding@resend.dev>"
+      try {
+        await checkAndTriggerRecipientNotification(giftId, { resend, from })
+      } catch (e) {
+        console.error("[settlement] Recipient notification check error:", e)
+      }
+      try {
+        await notifyContributorsOfCompletion(giftId, { resend, from })
+      } catch (e) {
+        console.error("[settlement] Contributor impact notification error:", e)
+      }
+    }
+
+    if (disposition === "tip" && RESEND_API_KEY && admin && gift.user_id) {
+      try {
+        const { data } = await admin.auth.admin.getUserById(gift.user_id)
+        const user = data?.user
+        if (user?.email) {
+          const resend = new Resend(RESEND_API_KEY)
+          const from = process.env.TRANSPARENCY_EMAIL_FROM?.trim() || "Wishbee <onboarding@resend.dev>"
+          const donorName =
+            (user.user_metadata?.full_name as string) ||
+            (user.user_metadata?.name as string) ||
+            user.email.split("@")[0]
+          const receiptUrl = `${BASE_URL}/gifts/${giftId}/receipt/${settlement.id}`
+          await sendInstantDonationEmail(
+            {
+              donorName,
+              donorEmail: user.email,
+              charityName: "Wishbee",
+              netAmount: Number(settlement.amount),
+              feeAmount: 0,
+              totalCharged: Number(settlement.amount),
+              transactionId: settlement.id,
+              charityEIN: null,
+              coverFees: true,
+              disposition: "tip",
+              receiptUrl,
+              eventName: b.giftName || gift.collection_title || gift.gift_name || "Group gift",
+            },
+            { resend, from }
+          )
+        }
+      } catch (e) {
+        console.error("[settlement] Tip receipt email error:", e)
+      }
+    }
+
     return NextResponse.json({
       success: true,
       settlement: {
@@ -115,6 +181,8 @@ export async function POST(
         charityName: settlement.charity_name,
         dedication: settlement.dedication,
         recipientName: settlement.recipient_name,
+        claimUrl: (settlement as { claim_url?: string }).claim_url ?? null,
+        orderId: (settlement as { order_id?: string }).order_id ?? null,
         giftName: settlement.gift_name,
         totalFundsCollected: settlement.total_funds_collected != null ? Number(settlement.total_funds_collected) : null,
         finalGiftPrice: settlement.final_gift_price != null ? Number(settlement.final_gift_price) : null,

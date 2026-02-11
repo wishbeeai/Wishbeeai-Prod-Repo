@@ -1,62 +1,48 @@
 /**
- * Donation Service — Pooled donation logic & future API integration
+ * Donation Service — Immediate charity donation processing (no pooling).
  *
- * Wishbee pools micro-balances from group gifts into one monthly collective
- * donation to maximize impact and eliminate individual transaction fees.
+ * Donations are processed instantly via our secure partner network.
  *
  * FUTURE INTEGRATION:
  * - Stripe Connect: Use connected accounts to route funds to charity
- *   https://stripe.com/docs/connect
  * - PayPal Giving Fund: Donate via PayPal's charity network
- *   https://www.paypal.com/givingfund
  * - Network for Good: Charity donation API
- *   https://www.networkforgood.com/
  */
 
-export type PooledDonationStatus = "pending_pool" | "sent_to_charity"
+export type ImmediateDonationStatus = "completed" | "failed"
 
-export type PooledDonationRecord = {
-  id: string
+export type ImmediateDonationRequest = {
   giftId: string
   amount: number
+  netToCharity: number
+  fee: number
+  feeCovered: boolean
+  charityId: string
   charityName: string
-  dedicationText: string
-  status: PooledDonationStatus
-  createdAt: string
+  dedication: string
+  recipientEmail: string
+  recipientName: string
+  giftName: string
 }
 
 /**
- * Process pooled donation — placeholder for future API integration.
+ * Process immediate donation — placeholder for future payment API integration.
  *
  * When implemented, this will:
- * 1. Aggregate pending_pool settlements for the month
- * 2. Call Stripe Connect / PayPal Giving Fund API to transfer pooled amount
- * 3. Update settlement records to status: sent_to_charity
- * 4. Store transaction IDs for audit
- *
- * @example Future Stripe Connect flow:
- * const transfer = await stripe.transfers.create({
- *   amount: Math.round(pooledAmount * 100),
- *   currency: 'usd',
- *   destination: charityStripeAccountId,
- *   metadata: { dedication: dedicationText }
- * });
- *
- * @example Future PayPal Giving Fund flow:
- * const donation = await paypal.donations.create({
- *   amount: { value: pooledAmount, currency: 'USD' },
- *   recipient: charityPayPalId,
- *   note: dedicationText
- * });
+ * 1. Charge the user (Stripe/PayPal) for totalCharged = netToCharity + (fee if feeCovered)
+ * 2. Transfer netToCharity to the charity via partner network
+ * 3. Return success with transaction ID or failure with error message
  */
-export async function processPooledDonation(
-  _pooledRecords: PooledDonationRecord[]
+export async function processImmediateDonation(
+  _req: ImmediateDonationRequest
 ): Promise<{ success: boolean; transactionId?: string; error?: string }> {
   // TODO: Integrate with Stripe Connect or PayPal Giving Fund API
   // For now, return success to allow the UI flow to complete
-  console.log("[donationService] processPooledDonation called (placeholder)", {
-    recordCount: _pooledRecords.length,
-    totalAmount: _pooledRecords.reduce((sum, r) => sum + r.amount, 0),
+  console.log("[donationService] processImmediateDonation called (placeholder)", {
+    giftId: _req.giftId,
+    netToCharity: _req.netToCharity,
+    fee: _req.fee,
+    feeCovered: _req.feeCovered,
   })
   return { success: true }
 }

@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createAdminClient, createPublicClient } from "@/lib/supabase/server"
+import { createClient, createAdminClient, createPublicClient } from "@/lib/supabase/server"
 import { getContributionsForGift, addContribution } from "@/lib/gift-contributions-store"
+import { getCreditBalance, spendCredits } from "@/lib/user-credits"
 
 export async function POST(
   request: NextRequest,
@@ -15,6 +16,7 @@ export async function POST(
       contributorEmail,
       message,
       token, // Magic link token for validation
+      useCredits, // Use Wishbee Credits when logged in and balance >= amount
     } = body
 
     if (!giftId) {
@@ -33,6 +35,24 @@ export async function POST(
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(contributorEmail)) {
       return NextResponse.json({ error: "Invalid email format" }, { status: 400 })
+    }
+
+    if (useCredits === true) {
+      const authClient = await createClient()
+      const { data: { user } } = await authClient.auth.getUser()
+      if (!user?.id) {
+        return NextResponse.json({ error: "You must be signed in to use Wishbee Credits." }, { status: 401 })
+      }
+      const balance = await getCreditBalance(user.id)
+      if (balance < contributionAmount) {
+        return NextResponse.json({
+          error: `Insufficient Wishbee Credits. Balance: $${balance.toFixed(2)}. Need: $${contributionAmount.toFixed(2)}.`,
+        }, { status: 400 })
+      }
+      const spendResult = await spendCredits(user.id, contributionAmount, giftId)
+      if (!spendResult.success) {
+        return NextResponse.json({ error: spendResult.error ?? "Failed to spend credits." }, { status: 400 })
+      }
     }
 
     // Update gift progress in database. Prefer admin client so unauthenticated guests can update (RLS blocks anon).
@@ -107,6 +127,7 @@ export async function POST(
       const { error: insertErr } = await dbForWrites.from("gift_contributions").insert({
         gift_id: giftId,
         contributor_name: contributorName || null,
+        contributor_email: contributorEmail.trim() || null,
         amount: contributionAmount,
       })
       if (insertErr) console.warn("[Guest Contribution] gift_contributions insert error:", insertErr.message)
@@ -134,6 +155,7 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
+      paidWithCredits: useCredits === true,
       contribution: {
         id: contribution.id,
         amount: contribution.amount,
@@ -144,7 +166,9 @@ export async function POST(
         totalContributions: newTotal,
         contributorCount,
       },
-      message: "Thank you for your contribution! A confirmation has been sent to your email.",
+      message: useCredits === true
+        ? "Thank you! Your contribution was applied using Wishbee Credits."
+        : "Thank you for your contribution! A confirmation has been sent to your email.",
     })
   } catch (error) {
     console.error("[Guest Contribution] Error:", error)

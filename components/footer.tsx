@@ -10,9 +10,13 @@ export function Footer() {
     const routes: Record<string, string> = {
       "Help": "/help",
       "About": "/about",
-      "Contact": "/contact",
+      "About Donations": "/about-donations",
       "Gifting Guides": "/gifting-guides",
       "Refer a Friend": "/tell-a-friend",
+      "Privacy Policy": "/privacy",
+      "Terms of Service": "/terms",
+      "/privacy": "/privacy",
+      "/terms": "/terms",
     }
     
     const route = routes[section]
@@ -120,7 +124,11 @@ export function Footer() {
                 onChange={(e) => {
                   const value = e.target.value
                   if (value) {
-                    handleNavigationClick(value)
+                    if (value.startsWith("mailto:")) {
+                      window.location.href = value
+                    } else {
+                      handleNavigationClick(value)
+                    }
                     e.target.value = ""
                   }
                 }}
@@ -132,9 +140,11 @@ export function Footer() {
                 </option>
                 <option value="Help">Help</option>
                 <option value="About">About</option>
-                <option value="Contact">Contact</option>
+                <option value="About Donations">About Donations</option>
                 <option value="Gifting Guides">Gifting guides</option>
                 <option value="Refer a Friend">Refer a friend</option>
+                <option value="/privacy">Privacy Policy</option>
+                <option value="/terms">Terms of Service</option>
               </select>
 
               {/* Tablet/Desktop Horizontal Links */}
@@ -152,10 +162,10 @@ export function Footer() {
                   About
                 </Link>
                 <Link
-                  href="/contact"
+                  href="/about-donations"
                   className="text-[#F5DEB3] hover:text-[#F4C430] transition-all duration-300 cursor-pointer whitespace-nowrap border-b-2 border-transparent hover:border-[#F4C430]"
                 >
-                  Contact
+                  About Donations
                 </Link>
                 <Link
                   href="/gifting-guides"
@@ -334,9 +344,9 @@ export function Footer() {
             </button>
           </div>
 
-          {/* Center: Affiliate Disclaimer */}
+          {/* Center: Affiliate Disclaimer + Trust Badges */}
           <div className="text-sm flex-1 text-center">
-            <p className="mb-6 text-[10px] sm:text-xs lg:text-sm text-[#F5DEB3]">
+            <p className="mb-3 text-[10px] sm:text-xs lg:text-sm text-[#F5DEB3]">
               We keep the lights on with affiliate link fees. As an Amazon Associate we earn from qualifying purchases.{" "}
               <Link
                 href="/learn-more"
@@ -346,18 +356,18 @@ export function Footer() {
               </Link>
             </p>
             <p className="text-[9px] sm:text-xs text-[#F5DEB3]">
-              © 2025 Wishbee.ai{" "}
+              © 2026 Wishbee.ai. All rights reserved.{" "}
               <Link
-                href="/privacy-policy"
+                href="/privacy"
                 className="text-[#DAA520] underline hover:text-[#F4C430] transition-colors ml-3 font-medium"
               >
-                Privacy Policy
+                Privacy
               </Link>
               <Link
-                href="/terms-of-use"
+                href="/terms"
                 className="text-[#DAA520] underline hover:text-[#F4C430] transition-colors ml-3 font-medium"
               >
-                Terms of Use
+                Terms
               </Link>
             </p>
           </div>

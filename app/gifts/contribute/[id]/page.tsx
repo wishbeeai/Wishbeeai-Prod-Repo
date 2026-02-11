@@ -17,7 +17,8 @@ import {
   Lock,
   ArrowLeft,
   PartyPopper,
-  Send
+  Send,
+  Wallet
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -57,13 +58,19 @@ export default function GuestContributePage() {
   const [message, setMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
-  
+  const [paidWithCredits, setPaidWithCredits] = useState(false)
+
   // Payment step state
   const [showPaymentStep, setShowPaymentStep] = useState(false)
   const [cardNumber, setCardNumber] = useState('')
   const [cardExpiry, setCardExpiry] = useState('')
   const [cardCvc, setCardCvc] = useState('')
   const [cardError, setCardError] = useState('')
+
+  // Wishbee Credits (logged-in users)
+  const [creditBalance, setCreditBalance] = useState(0)
+  const [useCredits, setUseCredits] = useState(false)
+  const [creditsLoading, setCreditsLoading] = useState(false)
 
   // Validate magic link on mount
   useEffect(() => {
@@ -110,6 +117,28 @@ export default function GuestContributePage() {
 
     validateLink()
   }, [giftId, token])
+
+  // Fetch Wishbee Credits balance when contribution form is relevant (user may be logged in)
+  useEffect(() => {
+    let cancelled = false
+    async function fetchBalance() {
+      setCreditsLoading(true)
+      try {
+        const res = await fetch('/api/credits/balance', { credentials: 'include' })
+        if (cancelled) return
+        if (res.ok) {
+          const data = await res.json()
+          setCreditBalance(typeof data.balance === 'number' ? data.balance : 0)
+        }
+      } catch {
+        if (!cancelled) setCreditBalance(0)
+      } finally {
+        if (!cancelled) setCreditsLoading(false)
+      }
+    }
+    fetchBalance()
+    return () => { cancelled = true }
+  }, [])
 
   function getColorFromTheme(theme: string): string {
     // Warm colors only
@@ -167,6 +196,15 @@ export default function GuestContributePage() {
       return
     }
 
+    if (useCredits && creditBalance < parseFloat(amount)) {
+      toast({
+        title: "Insufficient Credits",
+        description: `Your Wishbee Credits ($${creditBalance.toFixed(2)}) are less than $${amount}. Use a card for this amount or lower it to use credits only.`,
+        variant: "destructive",
+      })
+      return
+    }
+
     setShowPaymentStep(true)
   }
 
@@ -174,31 +212,34 @@ export default function GuestContributePage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setCardError('')
-    
-    // Validate card details
-    const cleanCardNumber = cardNumber.replace(/\s/g, '')
-    if (cleanCardNumber.length < 15) {
-      setCardError('Please enter a valid card number')
-      return
-    }
-    
-    if (cardExpiry.length < 5) {
-      setCardError('Please enter a valid expiry date (MM/YY)')
-      return
-    }
-    
-    if (cardCvc.length < 3) {
-      setCardError('Please enter a valid CVC')
-      return
+
+    const payWithCredits = useCredits && creditBalance >= parseFloat(amount)
+
+    if (!payWithCredits) {
+      // Validate card details when not paying with credits
+      const cleanCardNumber = cardNumber.replace(/\s/g, '')
+      if (cleanCardNumber.length < 15) {
+        setCardError('Please enter a valid card number')
+        return
+      }
+      if (cardExpiry.length < 5) {
+        setCardError('Please enter a valid expiry date (MM/YY)')
+        return
+      }
+      if (cardCvc.length < 3) {
+        setCardError('Please enter a valid CVC')
+        return
+      }
     }
 
     setIsSubmitting(true)
 
     try {
-      // In production, this would tokenize the card with Stripe and process payment
-      // For demo, we simulate a payment delay
-      await new Promise(resolve => setTimeout(resolve, 1500))
-      
+      if (!payWithCredits) {
+        // Simulate payment delay when using card
+        await new Promise(resolve => setTimeout(resolve, 1500))
+      }
+
       const response = await fetch(`/api/gifts/${giftId}/guest-contribute`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -208,6 +249,7 @@ export default function GuestContributePage() {
           contributorEmail,
           message,
           token,
+          useCredits: payWithCredits,
         }),
       })
 
@@ -226,10 +268,13 @@ export default function GuestContributePage() {
               : prev
           )
         }
+        setPaidWithCredits(!!data.paidWithCredits)
         setIsSuccess(true)
         toast({
           title: "🎉 Thank You!",
-          description: "Your contribution has been received!",
+          description: data.paidWithCredits
+            ? "Your contribution was applied using Wishbee Credits."
+            : "Your contribution has been received!",
           variant: "warm",
         })
       } else {
@@ -307,7 +352,12 @@ export default function GuestContributePage() {
               <span className="text-[16px] font-bold text-[#654321]">${amount}</span>
               <span className="text-[14px] text-[#8B4513]/70">contributed</span>
             </div>
-            
+            {paidWithCredits && (
+              <p className="flex items-center justify-center gap-1.5 text-sm text-[#B8860B] font-medium mb-3">
+                <Wallet className="w-4 h-4" />
+                Paid with Wishbee Credits
+              </p>
+            )}
             <p className="text-[16px] text-[#8B4513] mb-5">
               Your generosity helps make this gift extra special!
             </p>
@@ -538,6 +588,29 @@ export default function GuestContributePage() {
                   />
                 </div>
 
+                {/* Use Wishbee Credits (logged-in users with balance) */}
+                {creditBalance > 0 && (
+                  <div className="rounded-xl border-2 border-[#DAA520]/30 bg-[#FEF7ED]/50 p-4">
+                    <label className="flex cursor-pointer items-center gap-3">
+                      <input
+                        type="checkbox"
+                        checked={useCredits}
+                        onChange={(e) => setUseCredits(e.target.checked)}
+                        className="h-4 w-4 rounded border-[#DAA520] text-[#DAA520 focus:ring-[#DAA520]"
+                      />
+                      <Wallet className="w-5 h-5 text-[#B8860B]" />
+                      <span className="text-[14px] font-semibold text-[#654321]">
+                        Use my Wishbee Credits (${creditBalance.toFixed(2)})
+                      </span>
+                    </label>
+                    {useCredits && amount && parseFloat(amount) > creditBalance && (
+                      <p className="mt-2 text-xs text-amber-700">
+                        Your balance is less than ${amount}. Lower the amount to pay fully with credits, or leave unchecked to pay by card.
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 {/* Continue to Payment */}
                 <Button
                   type="submit"
@@ -581,9 +654,40 @@ export default function GuestContributePage() {
                 {contributorName && (
                   <p className="text-xs text-[#8B4513]/60 mt-1">From: {contributorName}</p>
                 )}
+                {useCredits && creditBalance >= parseFloat(amount) && (
+                  <p className="mt-2 flex items-center gap-1.5 text-sm text-[#B8860B] font-medium">
+                    <Wallet className="w-4 h-4" />
+                    Paying with Wishbee Credits (${amount})
+                  </p>
+                )}
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-4">
+                {useCredits && creditBalance >= parseFloat(amount) ? (
+                  <div className="space-y-4">
+                    <Button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="w-full h-11 text-[14px] font-semibold rounded-lg shadow-md hover:scale-[1.02] transition-all disabled:opacity-50 bg-gradient-to-r from-[#B8860B] to-[#DAA520] text-white hover:from-[#DAA520] hover:to-[#B8860B]"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
+                          Applying credits...
+                        </>
+                      ) : (
+                        <>
+                          <Wallet className="w-4 h-4 mr-1.5" />
+                          Use Wishbee Credits — ${amount}
+                        </>
+                      )}
+                    </Button>
+                    <p className="text-center text-xs text-[#8B4513]/60">
+                      No card needed. Your balance will be updated after this contribution.
+                    </p>
+                  </div>
+                ) : (
+                  <>
                 {/* Card Number */}
                 <div className="space-y-2">
                   <Label className="text-[#654321] font-semibold">Card Number</Label>
@@ -657,6 +761,8 @@ export default function GuestContributePage() {
                   <Lock className="w-3 h-3" />
                   <span>256-bit SSL encrypted • Secure payment</span>
                 </div>
+                  </>
+                )}
               </form>
             </>
           )}
