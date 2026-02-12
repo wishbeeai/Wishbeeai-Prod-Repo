@@ -49,7 +49,7 @@ function clearConfetti() {
 }
 
 export type WishbeeRevealProps = {
-  /** Tremendous claim URL for the gift card */
+  /** Gift card claim URL (e.g. from Reloadly) */
   giftClaimUrl: string
   /** Gift card amount in dollars */
   giftAmount: number
@@ -200,7 +200,7 @@ export function WishbeeReveal({
                   className="flex items-center justify-center gap-2 w-full py-4 px-6 rounded-2xl font-semibold text-amber-900 bg-gradient-to-r from-amber-200 via-amber-100 to-amber-200 border border-amber-300/60 shadow-sm hover:shadow-md hover:from-amber-300 hover:via-amber-200 hover:to-amber-300 transition-all duration-200"
                 >
                   <Gift className="w-5 h-5" />
-                  Claim on Tremendous
+                  Claim your gift card
                 </a>
               </div>
             </motion.section>

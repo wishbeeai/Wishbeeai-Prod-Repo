@@ -1,9 +1,11 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname, useSearchParams } from "next/navigation"
+import { usePathname, useSearchParams, useRouter } from "next/navigation"
+import { useEffect } from "react"
 import { Gift, Heart, CreditCard, Wallet, ScrollText, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useSettlement } from "@/lib/settlement-context"
 
 const WISHBEE_YELLOW_ACTIVE = "bg-[#DAA520] border-[#B8860B] text-white"
 const WISHBEE_YELLOW_INACTIVE = "border-[#DAA520]/30 text-[#654321] hover:border-[#DAA520] hover:bg-[#FFFBEB]/80 bg-white"
@@ -12,7 +14,7 @@ const NAV_ITEMS = [
   { id: "balance", label: "Gift Rewards", tagline: "Send as gift card", path: "/settle/balance", icon: Gift, ariaLabel: "Gift Rewards" },
   { id: "charity", label: "Social Impact", tagline: "Donate to charity", path: "/settle/charity", icon: Heart, ariaLabel: "Social Impact" },
   { id: "refund-direct", label: "Card Refund", tagline: "To original payment method", path: "/settle/refund-direct", icon: CreditCard, ariaLabel: "Card Refund" },
-  { id: "refund-credits", label: "Store Credit", tagline: "As Wishbee store credits", path: "/settle/refund-credits", icon: Wallet, ariaLabel: "Store Credit" },
+  { id: "refund-credits", label: "Wishbee Credits", tagline: "As Wishbee store credits", path: "/settle/refund-credits", icon: Wallet, ariaLabel: "Wishbee Credits" },
   { id: "support", label: "Support Wishbee", tagline: "Tip the platform", path: "/settle/support-wishbee", icon: Sparkles, ariaLabel: "Support Wishbee" },
   { id: "history", label: "Settlement History", tagline: "Past settlements", path: "/settle/history", icon: ScrollText, ariaLabel: "Settlement History" },
 ] as const
@@ -20,15 +22,35 @@ const NAV_ITEMS = [
 export function SettleNav() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const router = useRouter()
+  const settlement = useSettlement()
   const giftId = searchParams.get("id")
   const query = giftId ? `?id=${encodeURIComponent(giftId)}` : ""
 
+  const showGiftCardTab = settlement?.showGiftCardTab ?? true
+  const giftCardHidden = !showGiftCardTab
+
+  const visibleItems = NAV_ITEMS.filter((item) => {
+    if (item.id === "balance") return showGiftCardTab
+    return true
+  })
+
+  // When Gift Card tab is hidden and user is on balance page, redirect to Wishbee Credits (default fallback)
+  useEffect(() => {
+    if (giftCardHidden && pathname === "/settle/balance") {
+      router.replace(`/settle/refund-credits${query}`)
+    }
+  }, [giftCardHidden, pathname, query, router])
+
   return (
     <nav
-      className={cn("flex flex-col gap-2 p-4 md:p-6 bg-[#F5F1E8] border-r border-[#DAA520]/20 min-h-[400px]")}
+      className={cn(
+        "flex flex-col gap-2 p-4 md:p-6 bg-[#F5F1E8] border-r border-[#DAA520]/20 min-h-[400px]",
+        giftCardHidden && "md:justify-center"
+      )}
       aria-label="Settlement options"
     >
-      {NAV_ITEMS.map((item) => {
+      {visibleItems.map((item) => {
         const Icon = item.icon
         const isActive = pathname === item.path
         const href = `${item.path}${query}`

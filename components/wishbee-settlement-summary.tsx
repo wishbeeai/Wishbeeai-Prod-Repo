@@ -1,7 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Loader2 } from "lucide-react"
+
+export type ReloadlyProductOption = { productId: number; productName: string }
 
 export type WishbeeSettlementSummaryProps = {
   giftId: string
@@ -51,8 +53,69 @@ export function WishbeeSettlementSummary({
   const [giftCardAmount, setGiftCardAmount] = useState(() => netToDistribute)
   const [recipientEmail, setRecipientEmail] = useState(initialRecipientEmail)
   const [loading, setLoading] = useState(false)
+  const [products, setProducts] = useState<ReloadlyProductOption[]>([])
+  const [productsLoading, setProductsLoading] = useState(true)
+  const [selectedProductId, setSelectedProductId] = useState<number | null>(null)
+  const [balanceOk, setBalanceOk] = useState<boolean | null>(null)
+  const [balanceLoading, setBalanceLoading] = useState(false)
 
   const giftCardClamped = Math.max(0, Math.min(netToDistribute, Math.round(giftCardAmount * 100) / 100))
+
+  // Fetch top 5 gift card brands (Reloadly)
+  useEffect(() => {
+    let cancelled = false
+    setProductsLoading(true)
+    fetch("/api/reloadly/products")
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled) return
+        const list = Array.isArray(data?.products) ? data.products : []
+        setProducts(
+          list.map((p: { productId: number; productName?: string }) => ({
+            productId: p.productId,
+            productName: p.productName ?? "Gift Card",
+          }))
+        )
+        if (list.length > 0 && selectedProductId == null) {
+          setSelectedProductId(list[0].productId)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setProducts([])
+      })
+      .finally(() => {
+        if (!cancelled) setProductsLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // Check Reloadly balance when amount or gift changes
+  useEffect(() => {
+    if (giftCardClamped < 1) {
+      setBalanceOk(null)
+      return
+    }
+    let cancelled = false
+    setBalanceLoading(true)
+    setBalanceOk(null)
+    fetch(`/api/gifts/${giftId}/reloadly-balance?amount=${encodeURIComponent(giftCardClamped)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled) return
+        setBalanceOk(data?.canFulfillGiftCard === true)
+      })
+      .catch(() => {
+        if (!cancelled) setBalanceOk(false)
+      })
+      .finally(() => {
+        if (!cancelled) setBalanceLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [giftId, giftCardClamped])
 
   const handleSendWishbee = async () => {
     const email = recipientEmail.trim()
@@ -67,9 +130,10 @@ export function WishbeeSettlementSummary({
 
     setLoading(true)
     try {
-      // Tremendous only: gift card amount + delivery. Charity is handled separately.
+      const productIdToSend = selectedProductId ?? products[0]?.productId
       const body = {
         amount: giftCardClamped,
+        ...(productIdToSend != null && { productId: productIdToSend }),
         recipientEmail: email,
         recipientName,
         giftName,
@@ -96,7 +160,13 @@ export function WishbeeSettlementSummary({
     }
   }
 
-  const canSend = recipientEmail.trim().length > 0 && giftCardClamped >= 1
+  const canFulfill = balanceOk === true
+  const refillingStock = giftCardClamped >= 1 && (balanceLoading || balanceOk === false)
+  const canSend =
+    recipientEmail.trim().length > 0 &&
+    giftCardClamped >= 1 &&
+    canFulfill &&
+    (selectedProductId != null || products[0]?.productId != null)
 
   return (
     <div className="space-y-5">
@@ -153,7 +223,28 @@ export function WishbeeSettlementSummary({
         />
       </div>
 
-      {/* Recipient email (required for Tremendous delivery) */}
+      {/* Gift card brand (top 5 from Reloadly) */}
+      {products.length > 0 && (
+        <div>
+          <label className="block text-xs font-medium text-[#654321] mb-1.5">Gift card brand</label>
+          <select
+            value={selectedProductId ?? ""}
+            onChange={(e) => setSelectedProductId(e.target.value ? Number(e.target.value) : null)}
+            className="w-full py-2 px-3 rounded-lg border-2 border-[#DAA520]/30 bg-white text-[#654321] focus:border-[#B8860B] outline-none"
+          >
+            {products.map((p) => (
+              <option key={p.productId} value={p.productId}>
+                {p.productName}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+      {productsLoading && products.length === 0 && (
+        <p className="text-sm text-[#8B5A3C]">Loading gift card options...</p>
+      )}
+
+      {/* Recipient email (required for gift card delivery) */}
       <div>
         <label className="block text-xs font-medium text-[#654321] mb-1.5">Recipient email (required)</label>
         <input
@@ -165,6 +256,13 @@ export function WishbeeSettlementSummary({
         />
       </div>
 
+      {/* Balance status: show when we can't fulfill (low/zero Reloadly balance) */}
+      {refillingStock && !loading && (
+        <p className="text-sm text-amber-800 bg-amber-50/90 border border-amber-200 rounded-lg py-2.5 px-3">
+          {balanceLoading ? "Checking balance…" : "Gift cards are temporarily resting. Try Wishbee Credits instead! 🐝"}
+        </p>
+      )}
+
       {/* Send Wishbee button */}
       <button
         type="button"
@@ -175,7 +273,7 @@ export function WishbeeSettlementSummary({
         {loading ? (
           <>
             <Loader2 className="w-4 h-4 animate-spin" aria-hidden />
-            <span>Sending gift card via Tremendous...</span>
+            <span>Sending gift card...</span>
           </>
         ) : (
           "Send Wishbee"

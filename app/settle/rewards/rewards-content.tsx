@@ -7,6 +7,7 @@ import { Gift, Award, Loader2, Check } from "lucide-react"
 import { toast } from "sonner"
 import { WishbeeSettlementSummary } from "@/components/wishbee-settlement-summary"
 import { CHARITY_DATA } from "@/lib/charity-data"
+import { useSettlement } from "@/lib/settlement-context"
 
 const DONATION_CHARITIES = CHARITY_DATA.filter((c) => c.id !== "support-wishbee")
 
@@ -21,6 +22,7 @@ type GiftData = {
 export function RewardsContent() {
   const searchParams = useSearchParams()
   const giftId = searchParams.get("id")
+  const settlement = useSettlement()
 
   const [gift, setGift] = useState<GiftData | null>(null)
   const [loading, setLoading] = useState(!!giftId)
@@ -28,6 +30,11 @@ export function RewardsContent() {
   const [selectedCharityId, setSelectedCharityId] = useState("feeding-america")
 
   const remaining = gift ? Math.max(0, Math.round((gift.currentAmount - gift.targetAmount) * 100) / 100) : 0
+
+  // Inform settlement context of current surplus so Gift Card tab visibility can be computed
+  useEffect(() => {
+    settlement?.setCurrentSurplus(remaining)
+  }, [remaining, settlement])
   const recipientName =
     gift?.recipientName?.trim() ||
     (gift?.name ? gift.name.replace(/'s.*| for .*/i, "").trim() : "") ||
@@ -98,7 +105,7 @@ export function RewardsContent() {
             <Gift className="w-5 h-5" aria-hidden />
             Claim gift card
           </a>
-          <p className="text-[10px] text-[#8B5A3C]/80 mt-3">Powered by Tremendous</p>
+          <p className="text-[10px] text-[#8B5A3C]/80 mt-3">Gift card via Reloadly</p>
           <Link href="/gifts/active" className="mt-6 inline-block text-sm font-medium text-[#DAA520] hover:text-[#B8860B]">
             Back to Active Gifts
           </Link>
@@ -117,13 +124,13 @@ export function RewardsContent() {
           <div>
             <h1 className="text-xl font-bold text-[#654321]">Gift Rewards</h1>
             <p className="text-sm text-[#8B5A3C]/90">
-              Convert your group gift pool into store gift cards (Target, Amazon) via Tremendous.
+              Convert your group gift pool into store gift cards (Target, Amazon).
             </p>
           </div>
         </div>
         <div className="rounded-xl border-2 border-[#DAA520]/20 bg-white p-6">
           <p className="text-sm text-[#654321]">
-            Select a gift from <Link href="/gifts/active" className="font-semibold text-[#DAA520] hover:text-[#B8860B]">Active Gifts</Link> and click &quot;Settle balance&quot; to send the remaining balance as a Tremendous gift card.
+            Select a gift from <Link href="/gifts/active" className="font-semibold text-[#DAA520] hover:text-[#B8860B]">Active Gifts</Link> and click &quot;Settle balance&quot; to send the remaining balance as a gift card.
           </p>
         </div>
       </div>
@@ -158,7 +165,7 @@ export function RewardsContent() {
           </h1>
         </div>
         <p className="text-xs sm:text-sm text-[#8B5A3C]/90 text-center mt-2">
-          Send your remaining balance as a gift card via Tremendous.
+          Send your remaining balance as a gift card.
         </p>
       </div>
       <div className="rounded-xl border-2 border-[#DAA520]/20 bg-white p-6">
@@ -174,7 +181,7 @@ export function RewardsContent() {
           onSelectedCharityChange={setSelectedCharityId}
           totalFundsCollected={gift.currentAmount}
           finalGiftPrice={Math.round((gift.currentAmount - remaining) * 100) / 100}
-          giftCardBrand="Tremendous (multi-brand)"
+          giftCardBrand="Gift Card (multi-brand)"
           onSuccess={({ claimUrl }) => setSuccessClaimUrl(claimUrl)}
           onError={(err) => toast.error(err)}
         />

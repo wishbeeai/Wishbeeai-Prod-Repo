@@ -2,22 +2,24 @@ import { type NextRequest, NextResponse } from "next/server"
 import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { checkAndTriggerRecipientNotification } from "@/lib/recipient-notification-service"
 import { notifyContributorsOfCompletion } from "@/lib/contributor-impact-service"
-import { createTremendousReward } from "@/lib/tremendous"
+import { getReloadlyClient } from "@/lib/reloadly"
+import { processStoreCredits } from "@/lib/actions/settle"
 import { Resend } from "resend"
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY?.trim()
 const BASE_URL =
   process.env.NEXT_PUBLIC_BASE_URL ||
   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000")
+const RELOADLY_DEFAULT_PRODUCT_ID = process.env.RELOADLY_DEFAULT_PRODUCT_ID?.trim()
 
 export const dynamic = "force-dynamic"
 
 /**
  * POST /api/gifts/[id]/settle-wishbee
- * SettleWishbee server action:
- * 1. Call Tremendous for the gift amount first → save bonus settlement with claimUrl.
- * 2. If leftover balance > 0, call existing charity logic (separate; do NOT combine).
- * 3. Mark gift status as 'settled' only after BOTH calls succeed.
+ * 1. Call Reloadly placeOrder for the gift amount → save bonus settlement with redeemCode/claimUrl.
+ * 2. On Reloadly failure (e.g. balance too low), issue Wishbee Credits to contributors instead.
+ * 3. If leftover balance > 0, call existing charity logic (separate).
+ * 4. Mark gift status as 'settled' (or 'settled_credits' when fallback) only after succeed.
  */
 export async function POST(
   request: NextRequest,
@@ -42,6 +44,7 @@ export async function POST(
 
     const b = body as {
       amount?: number
+      productId?: number
       recipientEmail?: string
       recipientName?: string
       giftName?: string
@@ -79,36 +82,77 @@ export async function POST(
     const recipientName = (b.recipientName ?? "").trim() || "Recipient"
     if (!recipientEmail) {
       return NextResponse.json(
-        { error: "recipientEmail is required for Tremendous link delivery" },
+        { error: "recipientEmail is required for gift card delivery" },
         { status: 400 }
       )
     }
 
-    // ——— Step 1: Tremendous for the gift amount first ———
-    const tremendousResult = await createTremendousReward({
+    let productId: number | null =
+      typeof b.productId === "number" && !isNaN(b.productId) ? b.productId : null
+    if (productId == null && RELOADLY_DEFAULT_PRODUCT_ID) {
+      productId = parseInt(RELOADLY_DEFAULT_PRODUCT_ID, 10)
+    }
+    if (productId == null || isNaN(productId)) {
+      try {
+        const products = await getReloadlyClient().getProducts()
+        const first = products[0] as { productId?: number } | undefined
+        productId = first?.productId ?? null
+      } catch {
+        // ignore
+      }
+    }
+    if (productId == null || isNaN(productId)) {
+      return NextResponse.json(
+        { error: "Reloadly product not configured. Send productId, set RELOADLY_DEFAULT_PRODUCT_ID, or ensure products are available." },
+        { status: 502 }
+      )
+    }
+
+    // ——— Step 1: Reloadly placeOrder for the gift amount ———
+    const orderResult = await getReloadlyClient().createOrder({
+      productId,
       amount,
       recipientEmail,
       recipientName,
-      externalId: `gift-${giftId}-bonus-${Date.now()}`,
     })
 
-    if (!tremendousResult.success) {
-      console.error("[settle-wishbee] Tremendous failed:", tremendousResult.error)
+    if (!orderResult.success) {
+      console.error("[settle-wishbee] Reloadly order failed:", orderResult.error)
+      // Fallback: issue Wishbee Credits to contributors so the user isn't stuck
+      try {
+        const creditResult = await processStoreCredits(giftId, Math.round(amount * 100) / 100)
+        if (creditResult.success) {
+          return NextResponse.json({
+            success: true,
+            fallbackToCredits: true,
+            message: "Gift card was unavailable; Wishbee Credits have been issued to contributors instead.",
+            creditsIssuedCount: creditResult.creditsIssuedCount,
+            failedCount: creditResult.failedCount,
+            status: "settled_credits",
+          })
+        }
+      } catch (fallbackErr) {
+        console.error("[settle-wishbee] Fallback to credits failed:", fallbackErr)
+      }
       return NextResponse.json(
         {
-          error: tremendousResult.error || "Gift card creation failed. Please try again or contact support.",
+          error: orderResult.error || "Gift card creation failed. Please try again or use Store Credit instead.",
         },
         { status: 502 }
       )
     }
 
-    // ——— Step 2: Save bonus settlement with claimUrl (delivery.link) and orderId ———
+    const redeemCodeOrInfo = orderResult.redeemCode ?? orderResult.infoText ?? null
+    const claimUrl = orderResult.claimUrl ?? null
+
+    // ——— Step 2: Save bonus settlement with redeemCode/claimUrl and orderId ———
     const insertPayload = {
       gift_id: giftId,
       amount: Math.round(amount * 100) / 100,
       disposition: "bonus" as const,
-      claim_url: tremendousResult.claimUrl,
-      order_id: tremendousResult.orderId,
+      claim_url: claimUrl,
+      order_id: orderResult.orderId,
+      gc_claim_code: redeemCodeOrInfo,
       recipient_email: recipientEmail,
       recipient_name: recipientName,
       gift_name: b.giftName ?? gift.collection_title ?? gift.gift_name ?? null,
@@ -160,14 +204,14 @@ export async function POST(
           {
             error: charityData?.error ?? "Gift card was sent, but charity donation failed. Please retry the charity step.",
             bonusSettlementId: settlement.id,
-            claimUrl: tremendousResult.claimUrl,
+            claimUrl: claimUrl ?? (settlement as { claim_url?: string }).claim_url,
           },
           { status: 502 }
         )
       }
     }
 
-    // ——— Step 4: Mark as SETTLED only after BOTH (Tremendous + charity when applicable) succeed ———
+    // ——— Step 4: Mark as SETTLED only after BOTH (Reloadly + charity when applicable) succeed ———
     const { error: updateError } = await supabase
       .from("gifts")
       .update({ status: "settled" })
@@ -176,7 +220,7 @@ export async function POST(
     if (updateError) {
       console.error("[settle-wishbee] Failed to mark gift as settled:", updateError)
       return NextResponse.json(
-        { error: "Settlement saved but status update failed", claimUrl: tremendousResult.claimUrl, settlementId: settlement.id },
+        { error: "Settlement saved but status update failed", claimUrl: claimUrl ?? (settlement as { claim_url?: string }).claim_url, settlementId: settlement.id },
         { status: 500 }
       )
     }
@@ -196,18 +240,22 @@ export async function POST(
       }
     }
 
+    const settlementRow = settlement as { claim_url?: string; order_id?: string; gc_claim_code?: string }
     return NextResponse.json({
       success: true,
-      claimUrl: tremendousResult.claimUrl,
-      orderId: tremendousResult.orderId,
+      claimUrl: claimUrl ?? settlementRow.claim_url,
+      orderId: orderResult.orderId ?? settlementRow.order_id,
+      redeemCode: orderResult.redeemCode ?? settlementRow.gc_claim_code,
+      infoText: orderResult.infoText ?? settlementRow.gc_claim_code,
       status: "settled",
       settlement: {
         id: settlement.id,
         giftId: settlement.gift_id,
         amount: Number(settlement.amount),
         disposition: settlement.disposition,
-        claimUrl: (settlement as { claim_url?: string }).claim_url ?? tremendousResult.claimUrl,
-        orderId: (settlement as { order_id?: string }).order_id ?? tremendousResult.orderId,
+        claimUrl: settlementRow.claim_url ?? claimUrl,
+        orderId: settlementRow.order_id ?? orderResult.orderId,
+        redeemCode: settlementRow.gc_claim_code ?? orderResult.redeemCode ?? orderResult.infoText,
         recipientName: settlement.recipient_name,
         recipientEmail: settlement.recipient_email,
         createdAt: settlement.created_at,

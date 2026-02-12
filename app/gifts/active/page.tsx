@@ -134,12 +134,12 @@ function ActiveGiftsPageContent() {
   const [selectedCharityId, setSelectedCharityId] = useState<string>("feeding-america")
   /** Modal shown before opening Amazon: displays instructions and "Open Amazon" button so message is visible in front */
   const [amazonGiftCardModal, setAmazonGiftCardModal] = useState<{ amount: number } | null>(null)
-  /** Recipient email for Tremendous bonus gift card (Settle flow) */
+  /** Recipient email for bonus gift card (Settle flow) */
   const [bonusRecipientEmail, setBonusRecipientEmail] = useState("")
-  /** Loading state for settle-wishbee (Tremendous) request */
+  /** Loading state for settle-wishbee (Reloadly) request */
   const [settleWishbeeLoading, setSettleWishbeeLoading] = useState(false)
-  /** After successful Tremendous gift card: show claim URL and "Powered by Tremendous" */
-  const [tremendousSuccessModal, setTremendousSuccessModal] = useState<{ claimUrl: string; amount: number; recipientName: string } | null>(null)
+  /** After successful gift card: show claim URL and optional redeem code */
+  const [giftCardSuccessModal, setGiftCardSuccessModal] = useState<{ claimUrl: string; amount: number; recipientName: string; redeemCode?: string } | null>(null)
   /** Dev Tools — only visible on localhost for testing email flow */
   const [devToolsOpen, setDevToolsOpen] = useState(false)
   const [devGiftId, setDevGiftId] = useState("")
@@ -1101,7 +1101,7 @@ function ActiveGiftsPageContent() {
                     const micro = rem < 1
                     const navItems: { id: "gift-card" | "charity" | "support-wishbee" | "settlement-history" | "send-wishbee"; label: string; icon: typeof Gift; desc: string; disabled: boolean }[] = [
                       { id: "send-wishbee", label: "Send Wishbee", icon: Gift, desc: "Close pool & send", disabled: micro },
-                      { id: "gift-card", label: "Send Bonus Gift Card", icon: Gift, desc: "Powered by Tremendous", disabled: micro },
+                      { id: "gift-card", label: "Send Bonus Gift Card", icon: Gift, desc: "Gift card via Reloadly", disabled: micro },
                       { id: "charity", label: "Donate to Charity", icon: Heart, desc: "Choose a cause", disabled: micro },
                       { id: "support-wishbee", label: "Support Wishbee", icon: Sparkles, desc: "Tip the platform", disabled: false },
                       { id: "settlement-history", label: "Settlement History", icon: ScrollText, desc: "View past transactions", disabled: false },
@@ -1155,17 +1155,18 @@ function ActiveGiftsPageContent() {
                       onSelectedCharityChange={setSelectedCharityId}
                       totalFundsCollected={settleBalanceModal.gift.currentAmount}
                       finalGiftPrice={Math.round((settleBalanceModal.gift.currentAmount - settleBalanceModal.remaining) * 100) / 100}
-                      giftCardBrand="Tremendous (multi-brand)"
-                      onSuccess={({ claimUrl, settlement }) => {
+                      giftCardBrand="Gift Card (via Reloadly)"
+                      onSuccess={({ claimUrl, settlement, redeemCode }) => {
                         const amt = (settlement as { amount?: number })?.amount ?? settleBalanceModal!.remaining
-                        setTremendousSuccessModal({
+                        setGiftCardSuccessModal({
                           claimUrl,
                           amount: amt,
                           recipientName: settleBalanceModal!.recipientName,
+                          redeemCode: redeemCode ?? (settlement as { redeemCode?: string })?.redeemCode,
                         })
                         setSettleBalanceModal(null)
                         setBonusRecipientEmail("")
-                        toast.success("Wishbee sent! Share the claim link with the recipient.")
+                        toast.success("Wishbee sent! Share the claim link or code with the recipient.")
                       }}
                       onError={(err) => toast.error(err)}
                     />
@@ -1185,7 +1186,7 @@ function ActiveGiftsPageContent() {
                   <div className="max-w-md mx-auto space-y-3">
                     <h3 className="text-sm font-bold text-[#654321]">Send as Bonus Gift Card</h3>
                     <p className="text-xs text-[#8B5A3C]/90">
-                      Send ${settleBalanceModal.remaining.toFixed(2)} as a gift card so {settleBalanceModal.recipientName} can pick one more treat. Powered by Tremendous.
+                      Send ${settleBalanceModal.remaining.toFixed(2)} as a gift card so {settleBalanceModal.recipientName} can pick one more treat.
                     </p>
                     <label className="block text-xs font-medium text-[#654321]">
                       Recipient email (required for delivery)
@@ -1226,10 +1227,11 @@ function ActiveGiftsPageContent() {
                             toast.error(data?.error ?? "Gift card failed. Please try again.")
                             return
                           }
-                          setTremendousSuccessModal({
-                            claimUrl: data.claimUrl,
+                          setGiftCardSuccessModal({
+                            claimUrl: data.claimUrl ?? "#",
                             amount: settleBalanceModal.remaining,
                             recipientName: settleBalanceModal.recipientName,
+                            redeemCode: data.redeemCode,
                           })
                           setSettleBalanceModal(null)
                           setBonusRecipientEmail("")
@@ -1245,7 +1247,7 @@ function ActiveGiftsPageContent() {
                       <Gift className="w-4 h-4" />
                       {settleWishbeeLoading ? "Sending…" : `Send $${settleBalanceModal.remaining.toFixed(2)} gift card`}
                     </button>
-                    <p className="text-[10px] text-[#8B5A3C]/80">Powered by Tremendous</p>
+                    <p className="text-[10px] text-[#8B5A3C]/80">Gift card via Reloadly</p>
                   </div>
                 )}
 
@@ -1422,8 +1424,8 @@ function ActiveGiftsPageContent() {
         </div>
       )}
 
-      {/* Tremendous gift card success — claim URL and "Powered by Tremendous" */}
-      {tremendousSuccessModal && (
+      {/* Gift card success — claim URL and optional redeem code (Reloadly) */}
+      {giftCardSuccessModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col">
             <div className="flex-shrink-0 w-full min-h-[4rem] bg-gradient-to-r from-[#6B4423] via-[#8B5A3C] to-[#6B4423] px-4 py-3 border-b-2 border-[#4A2F1A] flex items-center justify-center relative">
@@ -1433,7 +1435,7 @@ function ActiveGiftsPageContent() {
               </div>
               <button
                 type="button"
-                onClick={() => setTremendousSuccessModal(null)}
+                onClick={() => setGiftCardSuccessModal(null)}
                 className="absolute right-4 p-1.5 hover:bg-[#4A2F1A] rounded-full transition-colors"
                 aria-label="Close"
               >
@@ -1442,10 +1444,15 @@ function ActiveGiftsPageContent() {
             </div>
             <div className="p-5 space-y-4 bg-gradient-to-br from-[#FEF7ED] via-[#FFF7ED] to-[#FFFBEB]">
               <p className="text-sm text-[#654321] leading-relaxed">
-                A ${tremendousSuccessModal.amount.toFixed(2)} gift card is ready for {tremendousSuccessModal.recipientName}. Share the link below or open it to claim.
+                A ${giftCardSuccessModal.amount.toFixed(2)} gift card is ready for {giftCardSuccessModal.recipientName}. Share the link below or open it to claim.
               </p>
+              {giftCardSuccessModal.redeemCode && (
+                <p className="text-sm font-mono font-semibold text-[#654321] bg-[#F5F1E8] rounded-lg py-2 px-3 text-center">
+                  Code: {giftCardSuccessModal.redeemCode}
+                </p>
+              )}
               <a
-                href={tremendousSuccessModal.claimUrl}
+                href={giftCardSuccessModal.claimUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-full py-3 px-4 rounded-lg text-sm font-bold bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#3B2F0F] shadow-md hover:brightness-105 flex items-center justify-center gap-2 border-2 border-[#B8860B]/50"
@@ -1453,7 +1460,7 @@ function ActiveGiftsPageContent() {
                 <Gift className="w-5 h-5" />
                 Claim your gift card
               </a>
-              <p className="text-[10px] text-[#8B5A3C]/80 text-center">Powered by Tremendous</p>
+              <p className="text-[10px] text-[#8B5A3C]/80 text-center">Gift card via Reloadly</p>
             </div>
             <div className="flex-shrink-0 w-full h-10 bg-gradient-to-r from-[#6B4423] via-[#8B5A3C] to-[#6B4423] border-t-2 border-[#4A2F1A]" />
           </div>

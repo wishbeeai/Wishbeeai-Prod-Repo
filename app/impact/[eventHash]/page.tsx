@@ -185,7 +185,7 @@ export default function ImpactByHashPage() {
                   <Gift className="w-5 h-5" />
                   Claim your gift card
                 </a>
-                <p className="text-[10px] text-[#8B5A3C]/80 text-center">Powered by Tremendous</p>
+                <p className="text-[10px] text-[#8B5A3C]/80 text-center">Gift card via Reloadly</p>
                 <p className="text-[11px] text-[#8B5A3C]/70 text-center pt-1">
                   Having trouble claiming your gift?{" "}
                   <a

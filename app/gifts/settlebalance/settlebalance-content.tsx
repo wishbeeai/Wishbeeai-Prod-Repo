@@ -31,6 +31,7 @@ export function SettleBalanceContent() {
   const [loading, setLoading] = useState(!!giftId)
   const [error, setError] = useState<string | null>(null)
   const [successClaimUrl, setSuccessClaimUrl] = useState<string | null>(null)
+  const [successRedeemCode, setSuccessRedeemCode] = useState<string | null>(null)
   const [remainingBalanceView, setRemainingBalanceView] = useState<NavId>("send-wishbee")
   const [bonusRecipientEmail, setBonusRecipientEmail] = useState("")
   const [settleWishbeeLoading, setSettleWishbeeLoading] = useState(false)
@@ -289,7 +290,7 @@ export function SettleBalanceContent() {
     )
   }
 
-  // Success state: show claim link and link back to active (Tremendous gift card)
+  // Success state: show claim link and/or digital code (Gift Card via Reloadly)
   if (successClaimUrl) {
     return (
       <div className="min-h-screen bg-[#F5F1E8]">
@@ -307,8 +308,14 @@ export function SettleBalanceContent() {
             </div>
             <h2 className="text-xl font-bold text-[#654321]">Wishbee sent!</h2>
             <p className="text-sm text-[#8B5A3C]/90 mt-2">
-              A ${remaining.toFixed(2)} gift card is ready for {recipientName}. Share the link below or open it to claim.
+              A ${remaining.toFixed(2)} gift card is ready for {recipientName}. Share the link or code below to claim.
             </p>
+            {successRedeemCode && (
+              <div className="mt-4 p-4 rounded-xl bg-[#FFFBEB] border-2 border-[#DAA520]/30">
+                <p className="text-xs font-medium text-[#654321] mb-1">Gift card code</p>
+                <p className="text-base font-mono font-bold text-[#654321] break-all select-all">{successRedeemCode}</p>
+              </div>
+            )}
             <a
               href={successClaimUrl}
               target="_blank"
@@ -318,7 +325,7 @@ export function SettleBalanceContent() {
               <Gift className="w-5 h-5" />
               Claim gift card
             </a>
-            <p className="text-[10px] text-[#8B5A3C]/80 mt-3">Powered by Tremendous</p>
+            <p className="text-[10px] text-[#8B5A3C]/80 mt-3">Gift Card (via Reloadly)</p>
             <Link
               href="/gifts/active"
               className="mt-6 inline-block text-sm font-medium text-[#DAA520] hover:text-[#B8860B]"
@@ -367,7 +374,7 @@ export function SettleBalanceContent() {
                   Remaining Balance
                 </h2>
                 <p className="text-xs text-white/80 mt-0.5">
-                  ${remaining.toFixed(2)} — Send as gift card via Tremendous
+                  ${remaining.toFixed(2)} — Send as gift card
                 </p>
               </div>
             </div>
@@ -381,7 +388,7 @@ export function SettleBalanceContent() {
                   const micro = remaining < 1
                   const navItems: { id: NavId; label: string; icon: typeof Gift; desc: string; disabled: boolean }[] = [
                     { id: "send-wishbee", label: "Send Wishbee", icon: Gift, desc: "Close pool & send", disabled: micro },
-                    { id: "gift-card", label: "Send Bonus Gift Card", icon: Gift, desc: "Powered by Tremendous", disabled: micro },
+                    { id: "gift-card", label: "Send Bonus Gift Card", icon: Gift, desc: "Gift Card (via Reloadly)", disabled: micro },
                     { id: "charity", label: "Donate to Charity", icon: Heart, desc: "Choose a cause", disabled: micro },
                     { id: "support-wishbee", label: "Support Wishbee", icon: Sparkles, desc: "Tip the platform", disabled: false },
                     { id: "settlement-history", label: "Settlement History", icon: ScrollText, desc: "View past transactions", disabled: false },
@@ -435,8 +442,11 @@ export function SettleBalanceContent() {
                     onSelectedCharityChange={setSelectedCharityId}
                     totalFundsCollected={gift.currentAmount}
                     finalGiftPrice={Math.round((gift.currentAmount - remaining) * 100) / 100}
-                    giftCardBrand="Tremendous (multi-brand)"
-                    onSuccess={({ claimUrl }) => setSuccessClaimUrl(claimUrl)}
+                    giftCardBrand="Gift Card (via Reloadly)"
+                    onSuccess={({ claimUrl, redeemCode }) => {
+                      setSuccessClaimUrl(claimUrl)
+                      setSuccessRedeemCode(redeemCode ?? null)
+                    }}
                     onError={(err) => toast.error(err)}
                   />
                 </div>
@@ -453,7 +463,7 @@ export function SettleBalanceContent() {
                 <div className="max-w-md mx-auto space-y-3">
                   <h3 className="text-sm font-bold text-[#654321]">Send as Bonus Gift Card</h3>
                   <p className="text-xs text-[#8B5A3C]/90">
-                    Send ${remaining.toFixed(2)} as a gift card so {recipientName} can pick one more treat. Powered by Tremendous.
+                    Send ${remaining.toFixed(2)} as a gift card so {recipientName} can pick one more treat.
                   </p>
                   <label className="block text-xs font-medium text-[#654321]">Recipient email (required for delivery)</label>
                   <input
@@ -491,9 +501,15 @@ export function SettleBalanceContent() {
                           toast.error(data?.error ?? "Gift card failed. Please try again.")
                           return
                         }
-                        setSuccessClaimUrl(data.claimUrl)
+                        if (data.fallbackToCredits) {
+                          toast.success(data.message ?? "Wishbee Credits have been issued to contributors instead.")
+                          setBonusRecipientEmail("")
+                          return
+                        }
+                        setSuccessClaimUrl(data.claimUrl ?? null)
+                        setSuccessRedeemCode(data.redeemCode ?? data.settlement?.redeemCode ?? data.infoText ?? null)
                         setBonusRecipientEmail("")
-                        toast.success("Gift card created! Share the claim link with the recipient.")
+                        toast.success("Gift card created! Share the claim link or code with the recipient.")
                       } catch {
                         toast.error("Something went wrong. Please try again.")
                       } finally {
@@ -505,7 +521,7 @@ export function SettleBalanceContent() {
                     <Gift className="w-4 h-4" />
                     {settleWishbeeLoading ? "Sending…" : `Send $${remaining.toFixed(2)} gift card`}
                   </button>
-                  <p className="text-[10px] text-[#8B5A3C]/80">Powered by Tremendous</p>
+                  <p className="text-[10px] text-[#8B5A3C]/80">Gift Card (via Reloadly)</p>
                 </div>
               )}
 
