@@ -198,6 +198,18 @@ export async function GET(
         created_at: gift.created_at,
         status: gift.status,
         recipientName: gift.recipient_name,
+        recipientEmail: typeof evite.recipientEmail === "string" && evite.recipientEmail.trim() ? evite.recipientEmail.trim() : null,
+        recipientAddress:
+          evite.recipientAddress && typeof evite.recipientAddress === "object" && !Array.isArray(evite.recipientAddress)
+            ? {
+                line1: typeof (evite.recipientAddress as Record<string, unknown>).line1 === "string" ? (evite.recipientAddress as Record<string, string>).line1 : null,
+                line2: typeof (evite.recipientAddress as Record<string, unknown>).line2 === "string" ? (evite.recipientAddress as Record<string, string>).line2 : null,
+                city: typeof (evite.recipientAddress as Record<string, unknown>).city === "string" ? (evite.recipientAddress as Record<string, string>).city : null,
+                state: typeof (evite.recipientAddress as Record<string, unknown>).state === "string" ? (evite.recipientAddress as Record<string, string>).state : null,
+                zip: typeof (evite.recipientAddress as Record<string, unknown>).zip === "string" ? (evite.recipientAddress as Record<string, string>).zip : null,
+                country: typeof (evite.recipientAddress as Record<string, unknown>).country === "string" ? (evite.recipientAddress as Record<string, string>).country : null,
+              }
+            : null,
         occasion: gift.occasion,
         contributeUrl,
         organizerDisplayName,

@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic"
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY?.trim()
 const DEFAULT_FROM = "Wishbee <onboarding@resend.dev>"
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3001"
+import { getServerBaseUrl } from "@/lib/base-url"
 
 /**
  * POST /api/donations/process-instant
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const receiptUrl = `${BASE_URL}/gifts/${giftId}/receipt/${settlement.id}`
+    const receiptUrl = `${getServerBaseUrl()}/gifts/${giftId}/receipt/${settlement.id}`
 
     let organizerEmail = ""
     let organizerName = "Organizer"

@@ -3,6 +3,8 @@
  * Supports charity donations and Support Wishbee (tip) with distinct templates.
  */
 
+import { getServerBaseUrl } from "@/lib/base-url"
+
 const COLORS = {
   gold: "#DAA520",
   honey: "#F4C430",
@@ -162,9 +164,8 @@ function buildCharityDonationHtml(result: DonationResult): string {
 
 function buildSupportWishbeeHtml(result: DonationResult): string {
   const amount = formatMoney(result.netAmount)
-  const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3001"
   const receiptUrl =
-    result.receiptUrl || `${BASE_URL}/gifts/receipt/${result.transactionId}`
+    result.receiptUrl || `${getServerBaseUrl()}/gifts/receipt/${result.transactionId}`
 
   return `
 <!DOCTYPE html>

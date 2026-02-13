@@ -1,7 +1,8 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useSearchParams } from "next/navigation"
 import { ArrowLeft, Gift } from "lucide-react"
 
 export function SettleLayoutClient({
@@ -10,7 +11,30 @@ export function SettleLayoutClient({
   children: React.ReactNode
 }) {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const isSettle = pathname.startsWith("/settle")
+  const giftId = searchParams.get("id")
+  const [collectionTitle, setCollectionTitle] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!giftId || !isSettle) {
+      setCollectionTitle(null)
+      return
+    }
+    let cancelled = false
+    fetch(`/api/gifts/${giftId}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        const title = data?.gift?.name ?? data?.gift?.collectionTitle ?? data?.gift?.giftName ?? data?.name
+        if (!cancelled && title) setCollectionTitle(title)
+      })
+      .catch(() => {
+        if (!cancelled) setCollectionTitle(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [giftId, isSettle])
 
   return (
     <div className="min-h-screen bg-[#F5F1E8]">
@@ -34,9 +58,11 @@ export function SettleLayoutClient({
                   Settle Balance
                 </h1>
               </div>
-              <p className="text-xs sm:text-sm text-muted-foreground text-center mt-2">
-                Choose how to use your remaining balance: gift cards, charity, refunds, credits, or support the platform.
-              </p>
+              {collectionTitle && (
+                <p className="text-base font-semibold text-[#654321] text-center mt-2" aria-label={`Settlement for ${collectionTitle}`}>
+                  {collectionTitle}
+                </p>
+              )}
             </div>
           </div>
         )}

@@ -137,9 +137,6 @@ export function CharityContent() {
               View receipt
             </a>
           )}
-          <Link href="/gifts/active" className="mt-6 inline-block text-sm font-medium text-[#DAA520] hover:text-[#B8860B]">
-            Back to Active Gifts
-          </Link>
         </div>
       </div>
     )

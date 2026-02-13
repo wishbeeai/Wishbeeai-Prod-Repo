@@ -6,7 +6,7 @@ import { notifyContributorsOfCompletion } from "@/lib/contributor-impact-service
 import { Resend } from "resend"
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY?.trim()
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3001"
+import { getServerBaseUrl } from "@/lib/base-url"
 
 export const dynamic = "force-dynamic"
 
@@ -147,7 +147,7 @@ export async function POST(
             (user.user_metadata?.full_name as string) ||
             (user.user_metadata?.name as string) ||
             user.email.split("@")[0]
-          const receiptUrl = `${BASE_URL}/gifts/${giftId}/receipt/${settlement.id}`
+          const receiptUrl = `${getServerBaseUrl()}/gifts/${giftId}/receipt/${settlement.id}`
           await sendInstantDonationEmail(
             {
               donorName,

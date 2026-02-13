@@ -147,11 +147,6 @@ export default function DonationReceiptPage() {
                 </>
               )}
               </p>
-              {isCharity && (
-                <p className="text-xs text-[#8B5A3C]/80">
-                  To maximize impact and eliminate individual fees, Wishbee pools micro-balances into one monthly collective donation.
-                </p>
-              )}
             </div>
 
             {receipt.dedication && (

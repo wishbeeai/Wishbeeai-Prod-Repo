@@ -228,6 +228,30 @@ export async function POST(
     if (RESEND_API_KEY && admin) {
       const resend = new Resend(RESEND_API_KEY)
       const from = process.env.TRANSPARENCY_EMAIL_FROM?.trim() || "Wishbee <onboarding@resend.dev>"
+      // Send gift card delivery email to recipient (claim link) immediately
+      try {
+        const claimLink = claimUrl ?? (settlement as { claim_url?: string }).claim_url
+        const redeemCode = (settlement as { gc_claim_code?: string }).gc_claim_code ?? orderResult.redeemCode ?? orderResult.infoText
+        if (recipientEmail && (claimLink || redeemCode)) {
+          const claimHtml = claimLink
+            ? `<p style="margin: 0 0 20px; font-size: 15px; color: #654321;">Your gift card is ready. Click the button below to claim it.</p>
+  <p style="margin: 0 0 24px; text-align: center;"><a href="${claimLink}" style="display: inline-block; padding: 14px 28px; background: linear-gradient(135deg, #DAA520 0%, #F4C430 100%); color: #654321; font-weight: 700; font-size: 15px; text-decoration: none; border-radius: 12px;">Claim your gift card</a></p>`
+            : redeemCode
+              ? `<p style="margin: 0 0 20px; font-size: 15px; color: #654321;">Your gift card code:</p><p style="margin: 0 0 24px; font-size: 18px; font-weight: 700; letter-spacing: 2px;">${redeemCode}</p>`
+              : ""
+          if (claimHtml) {
+            const html = `<!DOCTYPE html><html><body style="margin:0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #F5F1E8;"><div style="max-width:560px; margin:0 auto; padding:24px;"><table role="presentation" width="100%" style="background:#fff; border-radius:16px; box-shadow:0 10px 40px rgba(101,67,33,0.12);"><tr><td style="padding:28px 24px; background: linear-gradient(135deg, #DAA520 0%, #F4C430 100%); text-align:center;"><h1 style="margin:0; font-size:22px; font-weight:700; color:#fff;">Your gift card is ready</h1></td></tr><tr><td style="padding:28px 24px;"><p style="margin:0 0 20px; font-size:15px; color:#8B4513;">Hi ${recipientName},</p>${claimHtml}<p style="margin:0; font-size:12px; color:#8B4513;">— Wishbee</p></td></tr></table></div></body></html>`
+            await resend.emails.send({
+              from,
+              to: recipientEmail,
+              subject: `Your gift card is ready, ${recipientName}!`,
+              html,
+            })
+          }
+        }
+      } catch (e) {
+        console.error("[settle-wishbee] Gift card delivery email error:", e)
+      }
       try {
         await checkAndTriggerRecipientNotification(giftId, { resend, from })
       } catch (e) {

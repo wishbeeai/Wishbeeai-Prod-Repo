@@ -17,6 +17,7 @@ type GiftData = {
   targetAmount: number
   currentAmount: number
   recipientName?: string | null
+  recipientEmail?: string | null
 }
 
 export function RewardsContent() {
@@ -64,6 +65,7 @@ export function RewardsContent() {
         targetAmount: Number(g.targetAmount) ?? 0,
         currentAmount: Number(g.currentAmount) ?? 0,
         recipientName: g.recipientName ?? null,
+        recipientEmail: g.recipientEmail ?? null,
       })
     } catch {
       setGift(null)
@@ -175,15 +177,18 @@ export function RewardsContent() {
           grossWishbeeFunds={remaining}
           mainGiftAmount={remaining}
           recipientName={recipientName}
-          recipientEmail=""
+          recipientEmail={gift.recipientEmail?.trim() ?? ""}
           charities={DONATION_CHARITIES}
           selectedCharityId={selectedCharityId}
           onSelectedCharityChange={setSelectedCharityId}
           totalFundsCollected={gift.currentAmount}
           finalGiftPrice={Math.round((gift.currentAmount - remaining) * 100) / 100}
           giftCardBrand="Gift Card (multi-brand)"
-          onSuccess={({ claimUrl }) => setSuccessClaimUrl(claimUrl)}
-          onError={(err) => toast.error(err)}
+          onSuccess={({ claimUrl }) => {
+            setSuccessClaimUrl(claimUrl)
+            toast.success("Settlement successful! Your gift card has been sent.")
+          }}
+          onError={(err) => toast.error(typeof err === "string" ? err : err instanceof Error ? err.message : "Something went wrong.")}
         />
       </div>
     </div>

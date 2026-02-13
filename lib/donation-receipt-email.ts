@@ -3,6 +3,8 @@
  * No charity dedication metadata in subject/body for Support Wishbee path.
  */
 
+import { getServerBaseUrl } from "@/lib/base-url"
+
 const COLORS = {
   gold: "#DAA520",
   honey: "#F4C430",
@@ -151,8 +153,7 @@ export async function sendInstantReceipt(
   params: SendInstantReceiptParams,
   options: { resend: InstanceType<typeof import("resend").Resend>; from?: string }
 ): Promise<{ sent: number; failed: number; errors: string[] }> {
-  const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3001"
-  const receiptUrl = params.receiptUrl || `${BASE_URL}/gifts/receipt/${params.transactionId}`
+  const receiptUrl = params.receiptUrl || `${getServerBaseUrl()}/gifts/receipt/${params.transactionId}`
   return sendDonationReceiptEmail(
     {
       organizerName: params.name || "Organizer",

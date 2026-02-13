@@ -24,6 +24,7 @@ import {
   User,
   Gift as GiftIcon,
   PartyPopper,
+  MapPin,
 } from "lucide-react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
@@ -151,6 +152,16 @@ export default function GiftDetailPage() {
     organizer: string
     recentContributions: { name: string; email?: string; amount: number; time: string }[]
     contributeUrl?: string
+    recipientName?: string | null
+    recipientEmail?: string | null
+    recipientAddress?: {
+      line1?: string | null
+      line2?: string | null
+      city?: string | null
+      state?: string | null
+      zip?: string | null
+      country?: string | null
+    } | null
   } | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailNotFound, setDetailNotFound] = useState(false)
@@ -215,6 +226,9 @@ export default function GiftDetailPage() {
           organizer: g.organizerDisplayName ?? "Gift organizer",
           recentContributions: g.recentContributions ?? [],
           contributeUrl: g.contributeUrl,
+          recipientName: g.recipientName ?? null,
+          recipientEmail: g.recipientEmail ?? null,
+          recipientAddress: g.recipientAddress ?? null,
         })
       })
       .catch(() => {})
@@ -253,6 +267,9 @@ export default function GiftDetailPage() {
           organizer: g.organizerDisplayName ?? "Gift organizer",
           recentContributions: g.recentContributions ?? [],
           contributeUrl: g.contributeUrl,
+          recipientName: g.recipientName ?? null,
+          recipientEmail: g.recipientEmail ?? null,
+          recipientAddress: g.recipientAddress ?? null,
         })
       })
       .catch(() => {
@@ -979,6 +996,60 @@ export default function GiftDetailPage() {
                   <Calendar className="w-5 h-5 text-[#DAA520]" />
                   <span>Ends on {gift.endDate}</span>
                 </div>
+                {gift.recipientName?.trim() && (
+                  <div className="flex items-center gap-3 text-[#8B4513]">
+                    <User className="w-5 h-5 text-[#DAA520]" />
+                    <span>
+                      <span className="font-medium text-[#654321]">Recipient Name:</span>{" "}
+                      {gift.recipientName}
+                    </span>
+                  </div>
+                )}
+                {gift.recipientEmail?.trim() && (
+                  <div className="flex items-center gap-3 text-[#8B4513]">
+                    <Mail className="w-5 h-5 text-[#DAA520]" />
+                    <span>
+                      <span className="font-medium text-[#654321]">Recipient Email:</span>{" "}
+                      <a href={`mailto:${gift.recipientEmail}`} className="text-[#B8860B] hover:underline">
+                        {gift.recipientEmail}
+                      </a>
+                    </span>
+                  </div>
+                )}
+                {gift.recipientAddress &&
+                  (gift.recipientAddress.line1 ||
+                    gift.recipientAddress.line2 ||
+                    gift.recipientAddress.city ||
+                    gift.recipientAddress.state ||
+                    gift.recipientAddress.zip ||
+                    gift.recipientAddress.country) && (
+                  <div className="flex items-start gap-3 text-[#8B4513]">
+                    <MapPin className="w-5 h-5 text-[#DAA520] flex-shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-medium text-[#654321]">Recipient Address:</span>
+                      <address className="not-italic text-sm mt-1 space-y-0.5">
+                        {gift.recipientAddress.line1 && <span className="block">{gift.recipientAddress.line1}</span>}
+                        {gift.recipientAddress.line2 && <span className="block">{gift.recipientAddress.line2}</span>}
+                        {(gift.recipientAddress.city ||
+                          gift.recipientAddress.state ||
+                          gift.recipientAddress.zip ||
+                          gift.recipientAddress.country) && (
+                          <span className="block">
+                            {[gift.recipientAddress.city, gift.recipientAddress.state, gift.recipientAddress.zip]
+                              .filter(Boolean)
+                              .join(", ")}
+                            {gift.recipientAddress.country && (
+                              <span>
+                                {gift.recipientAddress.city || gift.recipientAddress.state || gift.recipientAddress.zip ? " " : ""}
+                                {gift.recipientAddress.country}
+                              </span>
+                            )}
+                          </span>
+                        )}
+                      </address>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="mb-6">

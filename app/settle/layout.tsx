@@ -18,10 +18,22 @@ function SettleLoading() {
   )
 }
 
+function SettleLayoutClientFallback() {
+  return (
+    <div className="flex flex-col md:flex-row gap-0 min-h-[480px] rounded-2xl overflow-hidden bg-white shadow-lg border border-[#DAA520]/20">
+      <div className="md:w-64 lg:w-72 flex-shrink-0 bg-[#F5F1E8] animate-pulse" />
+      <div className="flex-1 flex items-center justify-center p-8">
+        <div className="animate-pulse text-sm text-[#654321]">Loading...</div>
+      </div>
+    </div>
+  )
+}
+
 export default function SettleLayout({ children }: { children: React.ReactNode }) {
   return (
-    <SettleLayoutClient>
-      <SettlementProvider>
+    <Suspense fallback={<SettleLayoutClientFallback />}>
+      <SettleLayoutClient>
+        <SettlementProvider>
         <div className="flex flex-col md:flex-row gap-0 md:gap-0 rounded-2xl overflow-hidden bg-white shadow-lg border border-[#DAA520]/20 min-h-[480px]">
         <aside className="md:w-64 lg:w-72 flex-shrink-0 border-r border-[#DAA520]/20" aria-label="Settlement navigation">
           <Suspense fallback={<div className="p-4 animate-pulse bg-[#F5F1E8] min-h-[400px]" />}>
@@ -37,5 +49,6 @@ export default function SettleLayout({ children }: { children: React.ReactNode }
       </div>
       </SettlementProvider>
     </SettleLayoutClient>
+    </Suspense>
   )
 }

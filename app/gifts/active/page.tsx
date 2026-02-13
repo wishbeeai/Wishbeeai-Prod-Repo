@@ -1168,7 +1168,7 @@ function ActiveGiftsPageContent() {
                         setBonusRecipientEmail("")
                         toast.success("Wishbee sent! Share the claim link or code with the recipient.")
                       }}
-                      onError={(err) => toast.error(err)}
+                      onError={(err) => toast.error(typeof err === "string" ? err : err instanceof Error ? err.message : "Something went wrong.")}
                     />
                   </div>
                 )}
@@ -1189,7 +1189,7 @@ function ActiveGiftsPageContent() {
                       Send ${settleBalanceModal.remaining.toFixed(2)} as a gift card so {settleBalanceModal.recipientName} can pick one more treat.
                     </p>
                     <label className="block text-xs font-medium text-[#654321]">
-                      Recipient email (required for delivery)
+                      Recipient Email (required for delivery)
                     </label>
                     <input
                       type="email"

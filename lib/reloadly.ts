@@ -9,6 +9,7 @@ import { cache } from "react"
 
 const AUTH_URL = "https://auth.reloadly.com/oauth/token"
 const SANDBOX_BASE = "https://giftcards-sandbox.reloadly.com"
+/** Required audience for Reloadly Gift Cards (sandbox). Must match for token generation. */
 const SANDBOX_AUDIENCE = "https://giftcards-sandbox.reloadly.com"
 
 /** Token cache: refresh when less than 1 minute until expiry (24h lifetime in sandbox). */
@@ -90,6 +91,7 @@ export class ReloadlyClient {
       ...options,
       headers: {
         "Content-Type": "application/json",
+        Accept: "application/com.reloadly.giftcards-v1+json",
         Authorization: `Bearer ${token}`,
         ...(options.headers as Record<string, string>),
       },
@@ -103,12 +105,33 @@ export class ReloadlyClient {
   }
 
   /**
-   * Fetch gift card products. Filter to top brands (Amazon, Target, Starbucks, etc.) when used for UI.
+   * Fetch all gift card products. Optionally filter by country (e.g. "US" for USA).
+   * Uses Reloadly's countryCode param and paginates through all pages (large page size).
    */
-  async getProducts(): Promise<ReloadlyProduct[]> {
-    const data = await this.request<{ content?: ReloadlyProduct[]; data?: ReloadlyProduct[] }>("/products")
-    const content = data?.content ?? data?.data
-    const list = Array.isArray(content) ? content : []
+  async getProducts(countryCode?: string): Promise<ReloadlyProduct[]> {
+    const pageSize = 500
+    const countryParam = countryCode ? `&countryCode=${encodeURIComponent(countryCode.toUpperCase())}` : ""
+    const baseQuery = `/products?size=${pageSize}&page=`
+    type PageResponse = {
+      content?: ReloadlyProduct[]
+      data?: ReloadlyProduct[]
+      totalPages?: number
+      totalElements?: number
+      number?: number
+    }
+    const first = await this.request<PageResponse | ReloadlyProduct[]>(`${baseQuery}0${countryParam}`)
+    const isDirectArray = Array.isArray(first)
+    const content = isDirectArray ? first : (first as PageResponse)?.content ?? (first as PageResponse)?.data
+    let list = Array.isArray(content) ? [...content] : []
+    const totalElements = isDirectArray ? list.length : (first as PageResponse)?.totalElements ?? list.length
+    const totalPages =
+      (first as PageResponse)?.totalPages ?? Math.max(1, Math.ceil(totalElements / pageSize))
+    for (let page = 1; page < totalPages; page++) {
+      const next = await this.request<PageResponse | ReloadlyProduct[]>(`${baseQuery}${page}${countryParam}`)
+      const nextArr = Array.isArray(next) ? next : (next as PageResponse)?.content ?? (next as PageResponse)?.data
+      if (Array.isArray(nextArr) && nextArr.length > 0) list = list.concat(nextArr)
+      else if (!Array.isArray(nextArr) || nextArr.length === 0) break
+    }
     return list as ReloadlyProduct[]
   }
 

@@ -250,9 +250,6 @@ export function SettleBalanceContent() {
                 View receipt
               </a>
             )}
-            <Link href="/gifts/active" className="mt-6 inline-block text-sm font-medium text-[#DAA520] hover:text-[#B8860B]">
-              Back to Active Gifts
-            </Link>
           </div>
         </div>
       </div>
@@ -281,9 +278,6 @@ export function SettleBalanceContent() {
                 View receipt
               </a>
             )}
-            <Link href="/gifts/active" className="mt-6 inline-block text-sm font-medium text-[#DAA520] hover:text-[#B8860B]">
-              Back to Active Gifts
-            </Link>
           </div>
         </div>
       </div>
@@ -447,7 +441,7 @@ export function SettleBalanceContent() {
                       setSuccessClaimUrl(claimUrl)
                       setSuccessRedeemCode(redeemCode ?? null)
                     }}
-                    onError={(err) => toast.error(err)}
+                    onError={(err) => toast.error(typeof err === "string" ? err : err instanceof Error ? err.message : "Something went wrong.")}
                   />
                 </div>
               )}
@@ -465,7 +459,7 @@ export function SettleBalanceContent() {
                   <p className="text-xs text-[#8B5A3C]/90">
                     Send ${remaining.toFixed(2)} as a gift card so {recipientName} can pick one more treat.
                   </p>
-                  <label className="block text-xs font-medium text-[#654321]">Recipient email (required for delivery)</label>
+                  <label className="block text-xs font-medium text-[#654321]">Recipient Email (required for delivery)</label>
                   <input
                     type="email"
                     placeholder="recipient@example.com"

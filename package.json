@@ -7,7 +7,8 @@
     "dev": "next dev --hostname 127.0.0.1 -p 3001 --webpack",
     "lint": "eslint .",
     "start": "next start",
-    "test": "playwright test"
+    "test": "playwright test",
+    "deploy": "vercel --prod"
   },
   "dependencies": {
     "@ai-sdk/openai": "^2.0.89",

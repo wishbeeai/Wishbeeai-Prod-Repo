@@ -11,8 +11,7 @@ import { sendInstantReceipt } from "@/lib/donation-receipt-email"
 import { checkAndTriggerRecipientNotification } from "@/lib/recipient-notification-service"
 import { notifyContributorsOfCompletion } from "@/lib/contributor-impact-service"
 import { Resend } from "resend"
-
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3001"
+import { getServerBaseUrl } from "@/lib/base-url"
 
 export type PostSettlementEmailOptions = {
   resend: InstanceType<typeof Resend>
@@ -71,7 +70,7 @@ export async function sendOrganizerTaxReceipt(
       ? getCharityEin(settlement.charity_id)
       : null
   const eventName = settlement.gift_name ?? gift.collection_title ?? gift.gift_name ?? "Group gift"
-  const receiptUrl = `${BASE_URL}/receipt/${settlementId}`
+  const receiptUrl = `${getServerBaseUrl()}/receipt/${settlementId}`
 
   try {
   const result = await sendInstantReceipt(

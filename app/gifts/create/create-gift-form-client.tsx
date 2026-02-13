@@ -55,6 +55,8 @@ import {
   SlidersHorizontal,
   Grid3x3,
   List,
+  MapPin,
+  Phone,
 } from "lucide-react"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -115,6 +117,14 @@ export function CreateGiftFormClient() {
   // Step 1: Purpose
   const [collectionTitle, setCollectionTitle] = useState("")
   const [recipientName, setRecipientName] = useState("")
+  const [recipientEmail, setRecipientEmail] = useState("")
+  const [recipientPhone, setRecipientPhone] = useState("")
+  const [recipientAddressLine1, setRecipientAddressLine1] = useState("")
+  const [recipientAddressLine2, setRecipientAddressLine2] = useState("")
+  const [recipientCity, setRecipientCity] = useState("")
+  const [recipientState, setRecipientState] = useState("")
+  const [recipientZip, setRecipientZip] = useState("")
+  const [recipientCountry, setRecipientCountry] = useState("")
   const [occasion, setOccasion] = useState("")
   const [deadline, setDeadline] = useState("")
   
@@ -1325,7 +1335,26 @@ export function CreateGiftFormClient() {
               specs: altEditableSpecs || null,
             },
           },
-          eviteSettings: eviteSettings || null,
+          eviteSettings: {
+            ...(eviteSettings || {}),
+            recipientEmail: recipientEmail.trim() || undefined,
+            recipientPhone: recipientPhone.trim() || undefined,
+            recipientAddress:
+              recipientAddressLine1.trim() ||
+              recipientCity.trim() ||
+              recipientState.trim() ||
+              recipientZip.trim() ||
+              recipientCountry.trim()
+              ? {
+                  line1: recipientAddressLine1.trim() || undefined,
+                  line2: recipientAddressLine2.trim() || undefined,
+                  city: recipientCity.trim() || undefined,
+                  state: recipientState.trim() || undefined,
+                  zip: recipientZip.trim() || undefined,
+                  country: recipientCountry.trim() || undefined,
+                }
+              : undefined,
+          },
           // Self-contribution during create: record so progress shows on /gifts/active
           ...(contributionComplete && myContributionAmount != null && Number(myContributionAmount) >= 1
             ? { initialContribution: Number(myContributionAmount) }
@@ -1564,6 +1593,84 @@ export function CreateGiftFormClient() {
                     placeholder="Who will receive this gift?"
                     className="border-2 border-[#DAA520]/30 focus:border-[#DAA520] h-12 text-base"
                   />
+                </div>
+
+                {/* Recipient Email */}
+                <div className="space-y-2">
+                  <Label className="text-[#654321] font-semibold flex items-center gap-2">
+                    <Mail className="w-4 h-4 text-[#DAA520]" />
+                    Recipient Email
+                  </Label>
+                  <Input
+                    type="email"
+                    value={recipientEmail}
+                    onChange={(e) => setRecipientEmail(e.target.value)}
+                    placeholder="e.g. recipient@email.com"
+                    className="border-2 border-[#DAA520]/30 focus:border-[#DAA520] h-12 text-base"
+                  />
+                </div>
+
+                {/* Recipient Phone Number */}
+                <div className="space-y-2">
+                  <Label className="text-[#654321] font-semibold flex items-center gap-2">
+                    <Phone className="w-4 h-4 text-[#DAA520]" />
+                    Recipient Phone Number
+                  </Label>
+                  <Input
+                    type="tel"
+                    value={recipientPhone}
+                    onChange={(e) => setRecipientPhone(e.target.value)}
+                    placeholder="e.g. +1 (555) 123-4567"
+                    className="border-2 border-[#DAA520]/30 focus:border-[#DAA520] h-12 text-base"
+                  />
+                </div>
+
+                {/* Recipient Address */}
+                <div className="space-y-3">
+                  <Label className="text-[#654321] font-semibold flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-[#DAA520]" />
+                    Recipient Address
+                  </Label>
+                  <Input
+                    value={recipientAddressLine1}
+                    onChange={(e) => setRecipientAddressLine1(e.target.value)}
+                    placeholder="Street address"
+                    className="border-2 border-[#DAA520]/30 focus:border-[#DAA520] h-12 text-base"
+                  />
+                  <Input
+                    value={recipientAddressLine2}
+                    onChange={(e) => setRecipientAddressLine2(e.target.value)}
+                    placeholder="Apartment, suite, etc. (optional)"
+                    className="border-2 border-[#DAA520]/30 focus:border-[#DAA520] h-12 text-base"
+                  />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <Input
+                      value={recipientCity}
+                      onChange={(e) => setRecipientCity(e.target.value)}
+                      placeholder="City"
+                      className="border-2 border-[#DAA520]/30 focus:border-[#DAA520] h-12 text-base"
+                    />
+                    <Input
+                      value={recipientState}
+                      onChange={(e) => setRecipientState(e.target.value)}
+                      placeholder="State / Province"
+                      className="border-2 border-[#DAA520]/30 focus:border-[#DAA520] h-12 text-base"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <Input
+                      value={recipientZip}
+                      onChange={(e) => setRecipientZip(e.target.value)}
+                      placeholder="ZIP / Postal code"
+                      className="border-2 border-[#DAA520]/30 focus:border-[#DAA520] h-12 text-base"
+                    />
+                    <Input
+                      value={recipientCountry}
+                      onChange={(e) => setRecipientCountry(e.target.value)}
+                      placeholder="Country"
+                      className="border-2 border-[#DAA520]/30 focus:border-[#DAA520] h-12 text-base"
+                    />
+                  </div>
                 </div>
 
                 {/* Occasion */}

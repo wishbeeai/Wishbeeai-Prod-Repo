@@ -59,8 +59,9 @@ export function SettlementProvider({
     }
   }, [balanceFetchedAt])
 
+  // Show Gift Card tab while loading (optimistic), or when balance is sufficient. Only hide when we know balance < surplus.
   const showGiftCardTab =
-    reloadlyBalance !== null && reloadlyBalance >= currentSurplus
+    reloadlyBalance === null || reloadlyBalance >= currentSurplus
 
   const value: SettlementContextValue = {
     reloadlyBalance,
