@@ -47,6 +47,7 @@ export default function ProfilePage() {
     joinDate: "",
     birthday: "",
   })
+  const [profileRefresh, setProfileRefresh] = useState(0)
 
   // Fetch profile data from Supabase
   useEffect(() => {
@@ -124,7 +125,7 @@ export default function ProfilePage() {
     if (!authLoading) {
       fetchProfile()
     }
-  }, [user, authLoading])
+  }, [user, authLoading, profileRefresh])
 
   const [stats] = useState({
     totalGifts: 24,
@@ -187,10 +188,15 @@ export default function ProfilePage() {
         return
       }
       setIsEditing(false)
+      setProfileRefresh((n) => n + 1)
       if (data?.warning) {
-        toast.success("Profile updated (name saved).", { description: data.warning })
+        toast.success("Name and email saved.", {
+          description: "Phone, location, and bio will save after your admin runs the profile migration in Supabase.",
+        })
       } else {
-        toast.success("Profile updated successfully!")
+        toast.success("Profile updated", {
+          description: "Your changes have been saved. Phone, location, and bio are updated.",
+        })
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
@@ -272,13 +278,6 @@ export default function ProfilePage() {
           >
             <ArrowLeft className="w-3 h-3 sm:w-4 sm:h-4" />
             Back to Home
-          </Link>
-          <Link
-            href="/profile/wallet"
-            className="inline-flex items-center gap-2 text-[#8B5A3C] hover:text-[#6B4423] transition-colors text-xs sm:text-sm md:text-base"
-          >
-            <Wallet className="w-3 h-3 sm:w-4 sm:h-4" />
-            Wallet & Gift History
           </Link>
         </div>
 
@@ -655,6 +654,13 @@ export default function ProfilePage() {
                 >
                   <CreditCard className="w-4 h-4 sm:w-5 sm:h-5 text-[#DAA520]" />
                   <span className="text-xs sm:text-sm text-[#654321]">Payment Methods</span>
+                </Link>
+                <Link
+                  href="/profile/wallet"
+                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-[#F5F1E8] transition-colors"
+                >
+                  <Wallet className="w-4 h-4 sm:w-5 sm:h-5 text-[#DAA520]" />
+                  <span className="text-xs sm:text-sm text-[#654321]">Wallet & Gift History</span>
                 </Link>
               </div>
             </div>
