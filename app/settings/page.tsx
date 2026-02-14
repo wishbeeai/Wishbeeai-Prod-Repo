@@ -18,7 +18,10 @@ import {
   Brain,
   Loader2,
   Settings,
+  ChevronDown,
 } from "lucide-react"
+import { TwoFactorEnrollDialog, unenrollTwoFactor } from "@/components/settings/two-factor-enroll-dialog"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -36,12 +39,12 @@ export default function SettingsPage() {
     }>
   >([])
 
-  // Account Settings
+  // Account Settings (loaded from profile; same data as Profile page)
   const [accountSettings, setAccountSettings] = useState({
-    username: "john_doe",
-    email: "john.doe@example.com",
-    phone: "+1 (555) 123-4567",
-    displayName: "John Doe",
+    username: "",
+    email: "",
+    phone: "",
+    displayName: "",
   })
 
   // Notification Settings
@@ -71,6 +74,21 @@ export default function SettingsPage() {
     confirmPassword: "",
     twoFactorAuth: false,
   })
+  const [show2FAEnrollDialog, setShow2FAEnrollDialog] = useState(false)
+  const [show2FADisableConfirm, setShow2FADisableConfirm] = useState(false)
+  const [disabling2FA, setDisabling2FA] = useState(false)
+
+  // Expand/collapse state for right-side sections (all collapsed by default)
+  const [sectionOpen, setSectionOpen] = useState<Record<string, boolean>>({
+    account: false,
+    notifications: false,
+    privacy: false,
+    security: false,
+    ai: false,
+    payment: false,
+  })
+  const toggleSection = (id: string) =>
+    setSectionOpen((prev) => ({ ...prev, [id]: !prev[id] }))
 
   // AI Preferences
   const [aiPreferences, setAiPreferences] = useState({
@@ -123,6 +141,13 @@ export default function SettingsPage() {
         if (paymentRes.ok) {
           const paymentData = await paymentRes.json()
           setPaymentSettings(paymentData)
+        }
+
+        // Load security settings (includes 2FA status from Supabase MFA)
+        const securityRes = await fetch("/api/settings/security")
+        if (securityRes.ok) {
+          const securityData = await securityRes.json()
+          setSecuritySettings((prev) => ({ ...prev, twoFactorAuth: !!securityData.twoFactorAuth }))
         }
       } catch (error) {
         console.error("[v0] Error loading settings:", error)
@@ -178,22 +203,32 @@ export default function SettingsPage() {
         body: JSON.stringify(data),
       })
 
+      const result = await response.json().catch(() => ({}))
       if (!response.ok) {
-        throw new Error("Failed to save settings")
+        const msg = typeof result?.error === "string" ? result.error : "Failed to save settings"
+        throw new Error(msg)
       }
 
-      const result = await response.json()
       console.log("[v0] Settings saved successfully:", result)
 
       toast({
         title: "Settings saved",
         description: `Your ${section} settings have been updated successfully.`,
       })
+      if (section === "security") {
+        setSecuritySettings((prev) => ({
+          ...prev,
+          currentPassword: "",
+          newPassword: "",
+          confirmPassword: "",
+        }))
+      }
     } catch (error) {
       console.error("[v0] Error saving settings:", error)
+      const msg = error instanceof Error ? error.message : "Failed to save settings. Please try again."
       toast({
         title: "Error",
-        description: "Failed to save settings. Please try again.",
+        description: msg,
         variant: "destructive",
       })
     } finally {
@@ -221,12 +256,18 @@ export default function SettingsPage() {
         }),
       })
 
-      if (!response.ok) {
-        throw new Error("Failed to get AI recommendations")
-      }
-
-      const data = await response.json()
+      const data = await response.json().catch(() => ({}))
       console.log("[v0] Received AI recommendations:", data)
+
+      if (!response.ok) {
+        const msg = typeof data?.error === "string" ? data.error : "Failed to get AI recommendations"
+        toast({
+          title: "Error",
+          description: msg,
+          variant: "destructive",
+        })
+        return
+      }
 
       if (data.recommendations && data.recommendations.length > 0) {
         setAiRecommendations(data.recommendations)
@@ -418,12 +459,22 @@ export default function SettingsPage() {
           {/* Settings Content */}
           <div className="lg:col-span-2 space-y-6">
             {/* Account Settings */}
-            <div id="account" className="bg-white rounded-xl shadow-lg border-2 border-[#DAA520]/20 p-4 sm:p-6">
-              <h2 className="text-base sm:text-lg md:text-xl font-bold text-[#654321] mb-4 flex items-center gap-2">
-                <User className="w-5 h-5 sm:w-6 sm:h-6 text-[#DAA520]" />
-                Account Information
-              </h2>
-              <div className="space-y-3 sm:space-y-4">
+            <Collapsible
+              open={sectionOpen.account}
+              onOpenChange={() => toggleSection("account")}
+            >
+              <div id="account" className="bg-white rounded-xl shadow-lg border-2 border-[#DAA520]/20 overflow-hidden">
+                <CollapsibleTrigger className="w-full p-4 sm:p-6 flex items-center justify-between gap-2 hover:bg-[#F5F1E8]/50 transition-colors text-left">
+                  <h2 className="text-base sm:text-lg md:text-xl font-bold text-[#654321] flex items-center gap-2">
+                    <User className="w-5 h-5 sm:w-6 sm:h-6 text-[#DAA520]" />
+                    Account Information
+                  </h2>
+                  <ChevronDown
+                    className={`w-5 h-5 text-[#8B4513] shrink-0 transition-transform duration-200 ${sectionOpen.account ? "rotate-180" : ""}`}
+                  />
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="px-4 sm:px-6 pb-4 sm:pb-6 pt-0 space-y-3 sm:space-y-4">
                 <div>
                   <label className="block text-[11px] sm:text-sm font-medium text-[#654321] mb-2">Username</label>
                   <input
@@ -477,18 +528,30 @@ export default function SettingsPage() {
                     </>
                   )}
                 </button>
+                  </div>
+                </CollapsibleContent>
               </div>
-            </div>
+            </Collapsible>
 
             {/* Notifications */}
-            <div id="notifications" className="bg-white rounded-xl shadow-lg border-2 border-[#DAA520]/20 p-4 sm:p-6">
-              <h2 className="text-base sm:text-lg md:text-xl font-bold text-[#654321] mb-4 flex items-center gap-2">
-                <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-gradient-to-br from-amber-500 to-yellow-500 flex items-center justify-center">
-                  <Bell className="w-3 h-3 sm:w-4 sm:h-4 text-white" />
-                </div>
-                Notification Preferences
-              </h2>
-              <div className="space-y-3 sm:space-y-4">
+            <Collapsible
+              open={sectionOpen.notifications}
+              onOpenChange={() => toggleSection("notifications")}
+            >
+              <div id="notifications" className="bg-white rounded-xl shadow-lg border-2 border-[#DAA520]/20 overflow-hidden">
+                <CollapsibleTrigger className="w-full p-4 sm:p-6 flex items-center justify-between gap-2 hover:bg-[#F5F1E8]/50 transition-colors text-left">
+                  <h2 className="text-base sm:text-lg md:text-xl font-bold text-[#654321] flex items-center gap-2">
+                    <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-gradient-to-br from-amber-500 to-yellow-500 flex items-center justify-center">
+                      <Bell className="w-3 h-3 sm:w-4 sm:h-4 text-white" />
+                    </div>
+                    Notification Preferences
+                  </h2>
+                  <ChevronDown
+                    className={`w-5 h-5 text-[#8B4513] shrink-0 transition-transform duration-200 ${sectionOpen.notifications ? "rotate-180" : ""}`}
+                  />
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="px-4 sm:px-6 pb-4 sm:pb-6 pt-0 space-y-3 sm:space-y-4">
                 {Object.entries(notificationSettings).map(([key, value]) => (
                   <div key={key} className="flex items-center justify-between py-2">
                     <span className="text-[11px] sm:text-sm font-medium text-[#654321] capitalize">
@@ -525,16 +588,28 @@ export default function SettingsPage() {
                     </>
                   )}
                 </button>
+                  </div>
+                </CollapsibleContent>
               </div>
-            </div>
+            </Collapsible>
 
             {/* Privacy Settings */}
-            <div id="privacy" className="bg-white rounded-xl shadow-lg border-2 border-[#DAA520]/20 p-4 sm:p-6">
-              <h2 className="text-base sm:text-lg md:text-xl font-bold text-[#654321] mb-4 flex items-center gap-2">
-                <Shield className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-600" />
-                Privacy Settings
-              </h2>
-              <div className="space-y-3 sm:space-y-4">
+            <Collapsible
+              open={sectionOpen.privacy}
+              onOpenChange={() => toggleSection("privacy")}
+            >
+              <div id="privacy" className="bg-white rounded-xl shadow-lg border-2 border-[#DAA520]/20 overflow-hidden">
+                <CollapsibleTrigger className="w-full p-4 sm:p-6 flex items-center justify-between gap-2 hover:bg-[#F5F1E8]/50 transition-colors text-left">
+                  <h2 className="text-base sm:text-lg md:text-xl font-bold text-[#654321] flex items-center gap-2">
+                    <Shield className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-600" />
+                    Privacy Settings
+                  </h2>
+                  <ChevronDown
+                    className={`w-5 h-5 text-[#8B4513] shrink-0 transition-transform duration-200 ${sectionOpen.privacy ? "rotate-180" : ""}`}
+                  />
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="px-4 sm:px-6 pb-4 sm:pb-6 pt-0 space-y-3 sm:space-y-4">
                 <div>
                   <label className="block text-[11px] sm:text-sm font-medium text-[#654321] mb-2">
                     Profile Visibility
@@ -587,16 +662,28 @@ export default function SettingsPage() {
                     </>
                   )}
                 </button>
+                  </div>
+                </CollapsibleContent>
               </div>
-            </div>
+            </Collapsible>
 
             {/* Security Settings */}
-            <div id="security" className="bg-white rounded-xl shadow-lg border-2 border-[#DAA520]/20 p-4 sm:p-6">
-              <h2 className="text-base sm:text-lg md:text-xl font-bold text-[#654321] mb-4 flex items-center gap-2">
-                <Lock className="w-5 h-5 sm:w-6 sm:h-6 text-rose-500" />
-                Security Settings
-              </h2>
-              <div className="space-y-3 sm:space-y-4">
+            <Collapsible
+              open={sectionOpen.security}
+              onOpenChange={() => toggleSection("security")}
+            >
+              <div id="security" className="bg-white rounded-xl shadow-lg border-2 border-[#DAA520]/20 overflow-hidden">
+                <CollapsibleTrigger className="w-full p-4 sm:p-6 flex items-center justify-between gap-2 hover:bg-[#F5F1E8]/50 transition-colors text-left">
+                  <h2 className="text-base sm:text-lg md:text-xl font-bold text-[#654321] flex items-center gap-2">
+                    <Lock className="w-5 h-5 sm:w-6 sm:h-6 text-rose-500" />
+                    Security Settings
+                  </h2>
+                  <ChevronDown
+                    className={`w-5 h-5 text-[#8B4513] shrink-0 transition-transform duration-200 ${sectionOpen.security ? "rotate-180" : ""}`}
+                  />
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="px-4 sm:px-6 pb-4 sm:pb-6 pt-0 space-y-3 sm:space-y-4">
                 <div>
                   <label className="block text-[11px] sm:text-sm font-medium text-[#654321] mb-2">
                     Current Password
@@ -652,29 +739,77 @@ export default function SettingsPage() {
                     className="w-full px-3 sm:px-4 py-2 border-2 border-[#DAA520]/30 rounded-lg focus:outline-none focus:border-[#DAA520] text-[11px] sm:text-sm"
                   />
                 </div>
-                <div className="flex items-center justify-between py-3 border-t-2 border-[#DAA520]/20 mt-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 py-3 border-t-2 border-[#DAA520]/20 mt-4">
                   <div>
                     <div className="text-[11px] sm:text-sm font-medium text-[#654321]">Two-Factor Authentication</div>
-                    <div className="text-[9px] sm:text-xs text-[#8B4513]/70">Add an extra layer of security</div>
+                    <div className="text-[9px] sm:text-xs text-[#8B4513]/70">Add an extra layer of security with an authenticator app</div>
                   </div>
-                  <button
-                    onClick={() =>
-                      setSecuritySettings({
-                        ...securitySettings,
-                        twoFactorAuth: !securitySettings.twoFactorAuth,
-                      })
-                    }
-                    className={`relative inline-flex h-5 w-9 sm:h-6 sm:w-11 items-center rounded-full transition-colors ${
-                      securitySettings.twoFactorAuth ? "bg-gradient-to-br from-rose-500 to-red-600" : "bg-gray-300"
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-3 w-3 sm:h-4 sm:w-4 transform rounded-full bg-white transition-transform ${
-                        securitySettings.twoFactorAuth ? "translate-x-5 sm:translate-x-6" : "translate-x-1"
-                      }`}
-                    />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {securitySettings.twoFactorAuth ? (
+                      <>
+                        <span className="text-xs text-emerald-600 font-medium">Enabled</span>
+                        <button
+                          type="button"
+                          onClick={() => setShow2FADisableConfirm(true)}
+                          disabled={disabling2FA}
+                          className="px-3 py-1.5 text-xs font-medium rounded-lg border border-rose-200 text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+                        >
+                          {disabling2FA ? "…" : "Disable 2FA"}
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setShow2FAEnrollDialog(true)}
+                        className="px-3 py-1.5 text-xs font-medium rounded-lg bg-rose-500 text-white hover:bg-rose-600"
+                      >
+                        Enable 2FA
+                      </button>
+                    )}
+                  </div>
                 </div>
+                <TwoFactorEnrollDialog
+                  open={show2FAEnrollDialog}
+                  onOpenChange={setShow2FAEnrollDialog}
+                  onSuccess={() => {
+                    setSecuritySettings((prev) => ({ ...prev, twoFactorAuth: true }))
+                    toast({ title: "2FA enabled", description: "Your account is now protected with two-factor authentication." })
+                  }}
+                />
+                {show2FADisableConfirm && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                    <div className="bg-white rounded-xl shadow-xl border-2 border-[#DAA520]/20 p-6 max-w-sm w-full">
+                      <p className="text-sm text-[#654321] mb-4">Disable two-factor authentication? Your account will be less secure.</p>
+                      <div className="flex gap-2 justify-end">
+                        <button
+                          type="button"
+                          onClick={() => setShow2FADisableConfirm(false)}
+                          className="px-4 py-2 text-sm rounded-lg border border-[#DAA520]/40 text-[#654321]"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            setDisabling2FA(true)
+                            const { error } = await unenrollTwoFactor()
+                            setDisabling2FA(false)
+                            setShow2FADisableConfirm(false)
+                            if (error) {
+                              toast({ title: "Could not disable 2FA", description: error, variant: "destructive" })
+                              return
+                            }
+                            setSecuritySettings((prev) => ({ ...prev, twoFactorAuth: false }))
+                            toast({ title: "2FA disabled", description: "Two-factor authentication has been turned off." })
+                          }}
+                          className="px-4 py-2 text-sm rounded-lg bg-rose-500 text-white hover:bg-rose-600 disabled:opacity-50"
+                        >
+                          Disable
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <button
                   onClick={() => handleSaveSettings("security")}
                   disabled={isSaving}
@@ -692,22 +827,35 @@ export default function SettingsPage() {
                     </>
                   )}
                 </button>
+                  </div>
+                </CollapsibleContent>
               </div>
-            </div>
+            </Collapsible>
 
             {/* AI Preferences */}
-            <div id="ai" className="bg-white rounded-xl shadow-lg border-2 border-[#DAA520]/20 p-4 sm:p-6">
-              <h2 className="text-base sm:text-lg md:text-xl font-bold text-[#654321] mb-2 flex items-center gap-2">
-                <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 flex items-center justify-center">
-                  <Sparkles className="w-3 h-3 sm:w-4 sm:h-4 text-white" />
-                </div>
-                AI Preferences
-              </h2>
-              <p className="text-[10px] sm:text-xs md:text-sm text-[#8B4513]/70 mb-4">
-                AI-Powered Features help you make smarter decisions, discover better gifts, and optimize your gifting
-                experience.
-              </p>
-              <div className="space-y-3 sm:space-y-4">
+            <Collapsible
+              open={sectionOpen.ai}
+              onOpenChange={() => toggleSection("ai")}
+            >
+              <div id="ai" className="bg-white rounded-xl shadow-lg border-2 border-[#DAA520]/20 overflow-hidden">
+                <CollapsibleTrigger className="w-full p-4 sm:p-6 flex items-center justify-between gap-2 hover:bg-[#F5F1E8]/50 transition-colors text-left">
+                  <h2 className="text-base sm:text-lg md:text-xl font-bold text-[#654321] flex items-center gap-2">
+                    <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 flex items-center justify-center">
+                      <Sparkles className="w-3 h-3 sm:w-4 sm:h-4 text-white" />
+                    </div>
+                    AI Preferences
+                  </h2>
+                  <ChevronDown
+                    className={`w-5 h-5 text-[#8B4513] shrink-0 transition-transform duration-200 ${sectionOpen.ai ? "rotate-180" : ""}`}
+                  />
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="px-4 sm:px-6 pb-4 sm:pb-6 pt-0">
+                  <p className="text-[10px] sm:text-xs md:text-sm text-[#8B4513]/70 mb-4">
+                    AI-Powered Features help you make smarter decisions, discover better gifts, and optimize your gifting
+                    experience.
+                  </p>
+                  <div className="space-y-3 sm:space-y-4">
                 {Object.entries(aiPreferences).map(([key, value]) => (
                   <div key={key} className="flex items-center justify-between py-2">
                     <span className="text-[11px] sm:text-sm font-medium text-[#654321] capitalize">
@@ -744,18 +892,31 @@ export default function SettingsPage() {
                     </>
                   )}
                 </button>
+                  </div>
+                  </div>
+                </CollapsibleContent>
               </div>
-            </div>
+            </Collapsible>
 
             {/* Payment Settings */}
-            <div id="payment" className="bg-white rounded-xl shadow-lg border-2 border-[#DAA520]/20 p-4 sm:p-6">
-              <h2 className="text-base sm:text-lg md:text-xl font-bold text-[#654321] mb-4 flex items-center gap-2">
-                <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center">
-                  <CreditCard className="w-3 h-3 sm:w-4 sm:h-4 text-white" />
-                </div>
-                Payment Settings
-              </h2>
-              <div className="space-y-3 sm:space-y-4">
+            <Collapsible
+              open={sectionOpen.payment}
+              onOpenChange={() => toggleSection("payment")}
+            >
+              <div id="payment" className="bg-white rounded-xl shadow-lg border-2 border-[#DAA520]/20 overflow-hidden">
+                <CollapsibleTrigger className="w-full p-4 sm:p-6 flex items-center justify-between gap-2 hover:bg-[#F5F1E8]/50 transition-colors text-left">
+                  <h2 className="text-base sm:text-lg md:text-xl font-bold text-[#654321] flex items-center gap-2">
+                    <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center">
+                      <CreditCard className="w-3 h-3 sm:w-4 sm:h-4 text-white" />
+                    </div>
+                    Payment Settings
+                  </h2>
+                  <ChevronDown
+                    className={`w-5 h-5 text-[#8B4513] shrink-0 transition-transform duration-200 ${sectionOpen.payment ? "rotate-180" : ""}`}
+                  />
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="px-4 sm:px-6 pb-4 sm:pb-6 pt-0 space-y-3 sm:space-y-4">
                 <div>
                   <label className="block text-[11px] sm:text-sm font-medium text-[#654321] mb-2">
                     Default Payment Method
@@ -825,8 +986,10 @@ export default function SettingsPage() {
                     </>
                   )}
                 </button>
+                  </div>
+                </CollapsibleContent>
               </div>
-            </div>
+            </Collapsible>
           </div>
         </div>
       </div>

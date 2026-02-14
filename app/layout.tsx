@@ -5,6 +5,7 @@ import { Analytics } from "@vercel/analytics/next"
 import { Toaster } from "@/components/ui/toaster"
 import { Toaster as SonnerToaster } from "sonner"
 import { AuthProvider } from "@/lib/auth-context"
+import { MfaGate } from "@/components/MfaGate"
 import "./globals.css"
 
 const poppins = Poppins({
@@ -88,7 +89,9 @@ export default function RootLayout({
         className={`${inter.variable} ${poppins.variable} ${shadowsIntoLight.variable} ${kalam.variable} ${dancingScript.variable} ${pacifico.variable} font-sans antialiased`}
       >
         <AuthProvider>
+          <MfaGate>
           {children}
+          </MfaGate>
           <Toaster />
           <SonnerToaster 
             position="top-right" 

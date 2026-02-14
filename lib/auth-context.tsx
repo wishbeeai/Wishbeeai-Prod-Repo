@@ -24,6 +24,8 @@ function normalizeEmail(email: string): string {
 interface AuthContextType {
   user: User | null;
   loading: boolean;
+  needsMfaVerification: boolean;
+  verifyMfa: (code: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, name: string) => Promise<SignUpResult>;
   signOut: () => Promise<void>;
@@ -36,24 +38,62 @@ const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [needsMfaVerification, setNeedsMfaVerification] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    let mounted = true;
+    const run = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (mounted) {
+        setUser(session?.user ?? null);
+        setLoading(false);
+      }
+      if (session?.user) {
+        const { data } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+        if (mounted && data?.nextLevel === 'aal2' && data?.currentLevel !== 'aal2') {
+          setNeedsMfaVerification(true);
+        }
+      }
+    };
+    run();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!mounted) return;
       setUser(session?.user ?? null);
-      setLoading(false);
+      if (session?.user) {
+        supabase.auth.mfa.getAuthenticatorAssuranceLevel().then(({ data }) => {
+          if (mounted && data?.nextLevel === 'aal2' && data?.currentLevel !== 'aal2') {
+            setNeedsMfaVerification(true);
+          } else if (mounted) {
+            setNeedsMfaVerification(false);
+          }
+        });
+      } else {
+        setNeedsMfaVerification(false);
+      }
     });
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, [supabase.auth]);
 
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+  const verifyMfa = async (code: string) => {
+    const { data: factors } = await supabase.auth.mfa.listFactors();
+    const totpFactor = factors?.totp?.[0];
+    if (!totpFactor?.id) throw new Error('No authenticator found.');
+    const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({ factorId: totpFactor.id });
+    if (challengeError) throw challengeError;
+    const challengeId = challengeData?.id;
+    if (!challengeId) throw new Error('Could not create challenge');
+    const { error: verifyError } = await supabase.auth.mfa.verify({
+      factorId: totpFactor.id,
+      challengeId,
+      code: code.trim(),
     });
-
-    return () => subscription.unsubscribe();
-  }, []);
+    if (verifyError) throw verifyError;
+    setNeedsMfaVerification(false);
+  };
 
   const signIn = async (email: string, password: string) => {
     const normalized = normalizeEmail(email);
@@ -138,7 +178,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signUp, signOut, resendConfirmationEmail, resetPasswordForEmail }}>
+    <AuthContext.Provider value={{ user, loading, needsMfaVerification, verifyMfa, signIn, signUp, signOut, resendConfirmationEmail, resetPasswordForEmail }}>
       {children}
     </AuthContext.Provider>
   );

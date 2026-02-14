@@ -51,16 +51,38 @@ interface WalletHistoryTableProps {
   transactions: CreditTransactionRow[]
 }
 
+function TypeBadge({ type }: { type: string }) {
+  const styles =
+    type === "REFUND" || type === "BONUS"
+      ? "bg-emerald-100 text-emerald-800 border-emerald-200"
+      : "bg-[#FFFBEB] text-[#8B5A3C] border-[#DAA520]/30"
+  return (
+    <span
+      className={`inline-block text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md border ${styles}`}
+    >
+      {type}
+    </span>
+  )
+}
+
 export function WalletHistoryTable({ transactions }: WalletHistoryTableProps) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="bg-[#FEF7ED] border-b border-[#DAA520]/20">
-            <th className="text-left py-4 px-6 font-semibold text-[#654321]">Date</th>
-            <th className="text-left py-4 px-6 font-semibold text-[#654321]">Activity</th>
-            <th className="text-left py-4 px-6 font-semibold text-[#654321]">Wishbee Pool</th>
-            <th className="text-right py-4 px-6 font-semibold text-[#654321]">Amount</th>
+          <tr className="bg-[#FAF8F5] border-b-2 border-[#E8E0D5]">
+            <th className="text-left py-4 px-6 font-semibold text-[#8B5A3C] uppercase tracking-wider text-xs">
+              Date
+            </th>
+            <th className="text-left py-4 px-6 font-semibold text-[#8B5A3C] uppercase tracking-wider text-xs">
+              Activity
+            </th>
+            <th className="text-left py-4 px-6 font-semibold text-[#8B5A3C] uppercase tracking-wider text-xs">
+              Wishbee Pool
+            </th>
+            <th className="text-right py-4 px-6 font-semibold text-[#8B5A3C] uppercase tracking-wider text-xs">
+              Amount
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -73,19 +95,20 @@ export function WalletHistoryTable({ transactions }: WalletHistoryTableProps) {
             return (
               <tr
                 key={row.id}
-                className="border-b border-[#DAA520]/10 last:border-0 hover:bg-[#FFFBEB]/50 transition-colors"
+                className="border-b border-[#E8E0D5] last:border-0 hover:bg-[#FFFBEB]/60 transition-colors"
               >
                 <td className="py-4 px-6 text-[#8B5A3C]/90 tabular-nums">
                   {formatDate(row.created_at)}
                 </td>
-                <td className="py-4 px-6 text-[#654321]">
-                  <span className="flex items-center gap-1.5">
-                    {activityLabel(row)}
+                <td className="py-4 px-6">
+                  <span className="flex items-center gap-2 flex-wrap">
+                    <TypeBadge type={row.type} />
+                    <span className="text-[#654321]">{activityLabel(row)}</span>
                     {tooltipText && (
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <span
-                            className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#DAA520]/20 text-[#B8860B] cursor-help"
+                            className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#DAA520]/20 text-[#B8860B] cursor-help shrink-0"
                             aria-label="Details"
                           >
                             <Info className="w-3 h-3" />
@@ -102,16 +125,16 @@ export function WalletHistoryTable({ transactions }: WalletHistoryTableProps) {
                   {row.wishbee_id ? (
                     <Link
                       href={`/gifts/${row.wishbee_id}`}
-                      className="font-medium text-[#DAA520] hover:text-[#B8860B] underline underline-offset-2"
+                      className="font-medium text-[#B8860B] hover:text-[#8B5A3C] underline underline-offset-2"
                     >
                       {giftDisplayName(row)}
                     </Link>
                   ) : (
-                    <span className="text-[#8B5A3C]/60">—</span>
+                    <span className="text-[#8B5A3C]/50">—</span>
                   )}
                 </td>
                 <td
-                  className={`py-4 px-6 text-right font-semibold tabular-nums ${
+                  className={`py-4 px-6 text-right font-bold tabular-nums ${
                     isAddition ? "text-emerald-600" : "text-[#654321]"
                   }`}
                 >

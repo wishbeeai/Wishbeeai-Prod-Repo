@@ -24,6 +24,7 @@ import {
   Bell,
   CreditCard,
   Wallet,
+  Zap,
 } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
@@ -69,15 +70,14 @@ export default function ProfilePage() {
           .single()
 
         if (error) {
-          // Only log errors that aren't "profile doesn't exist" (PGRST116)
-          // PGRST116 means no rows returned, which is expected for new users
-          if (error.code !== "PGRST116") {
-            console.error("Error fetching profile:", {
-              message: error.message,
-              code: error.code,
-              details: error.details,
-              hint: error.hint,
-            })
+          // PGRST116 = no rows (expected for new users). Don't log that.
+          const isNoRows = error.code === "PGRST116" || (error.message ?? "").toLowerCase().includes("0 rows")
+          if (!isNoRows) {
+            const msg = error.message ?? String(error)
+            const code = error.code ?? ""
+            if (msg || code) {
+              console.error("Error fetching profile:", msg, code ? `(${code})` : "")
+            }
           }
           // If profile doesn't exist or there's an error, use auth user data
           setProfileData({
@@ -103,8 +103,9 @@ export default function ProfilePage() {
             setProfileImage(profile.profile_image)
           }
         }
-      } catch (error) {
-        console.error("Error fetching profile:", error)
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        if (msg) console.error("Error fetching profile:", msg)
         // Fallback to user email
         if (user?.email) {
           setProfileData({
@@ -136,18 +137,7 @@ export default function ProfilePage() {
     averageContribution: 77,
   })
 
-  const [badges] = useState([
-    { id: 1, name: "Early Adopter", icon: "🌟", earned: "2024-01-15", description: "One of the first 100 users" },
-    { id: 2, name: "Gift Master", icon: "🎁", earned: "2024-03-20", description: "Organized 10+ gift collections" },
-    { id: 3, name: "Generous Giver", icon: "💝", earned: "2024-05-10", description: "Contributed over $1,000" },
-    {
-      id: 4,
-      name: "Community Builder",
-      icon: "🤝",
-      earned: "2024-06-15",
-      description: "Created 3+ active groups",
-    },
-  ])
+  const [badges] = useState<{ id: number; name: string; icon: string; earned: string; description: string }[]>([])
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -204,38 +194,29 @@ export default function ProfilePage() {
     }
   }
 
-  const generateAIRecommendations = async () => {
+  const generateAIRecommendations = () => {
     setLoadingAI(true)
-    try {
-      setTimeout(() => {
-        setAiRecommendations({
-          personalityType: "The Thoughtful Organizer",
-          giftingStyle: "You excel at coordinating group efforts and ensuring everyone feels included",
-          strengths: [
-            "Consistent contributor with high engagement",
-            "Strong network builder across multiple groups",
-            "Excellent at timing and occasion planning",
-          ],
-          suggestions: [
-            "Consider creating a recurring gift fund for annual celebrations",
-            "Your contribution pattern suggests you're ideal for leading larger gift campaigns",
-            "Connect your Work Friends group with Family Circle for cross-group celebrations",
-          ],
-          upcomingOpportunities: [
-            { event: "Mike's Birthday", date: "2025-01-10", suggestedAmount: "$50-75" },
-            { event: "Team Anniversary", date: "2025-02-01", suggestedAmount: "$30-50" },
-          ],
-          optimalContributionAmount: 85,
-          bestGiftingDays: ["Fridays", "Early mornings"],
-        })
-        setLoadingAI(false)
-        toast.success("AI recommendations generated!")
-      }, 2000)
-    } catch (error) {
-      console.error("Error generating recommendations:", error)
-      toast.error("Failed to generate AI recommendations")
+    setTimeout(() => {
+      const name = profileData.name?.trim() || "Member"
+      const joinDate = profileData.joinDate || "—"
+      setAiRecommendations({
+        personalityType: `${name} · Wishbee Member`,
+        giftingStyle: `Member since ${joinDate}. Insights here are based on your profile only. Create gifts or contribute to pools to see activity-based insights in the future.`,
+        strengths: [
+          "You're part of the Wishbee community.",
+          profileData.bio?.trim() ? "You've shared a bit about yourself in your bio." : null,
+        ].filter(Boolean) as string[],
+        suggestions: [
+          "Create a gift or contribute to a pool to build your gifting history.",
+          "Visit Wallet & Gift History to see credits and activity once you've participated.",
+        ],
+        upcomingOpportunities: [],
+        optimalContributionAmount: null,
+        bestGiftingDays: null,
+      })
       setLoadingAI(false)
-    }
+      toast.success("Insights updated from your profile.")
+    }, 800)
   }
 
   // Show loading state
@@ -519,80 +500,93 @@ export default function ProfilePage() {
                       <p className="text-xs sm:text-sm text-[#8B4513]/70">{aiRecommendations.giftingStyle}</p>
                     </div>
 
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div>
-                        <h3 className="font-bold text-[#654321] mb-2 flex items-center gap-2 text-sm sm:text-base">
-                          <Award className="w-3 h-3 sm:w-4 sm:h-4 text-[#DAA520]" />
-                          Your Strengths
-                        </h3>
-                        <ul className="space-y-1">
-                          {aiRecommendations.strengths.map((strength: string, index: number) => (
-                            <li key={index} className="text-xs sm:text-sm text-[#8B4513]/80 flex items-start gap-2">
-                              <span className="text-[#DAA520] mt-1">•</span>
-                              {strength}
-                            </li>
-                          ))}
-                        </ul>
+                    {(aiRecommendations.strengths?.length > 0 || aiRecommendations.suggestions?.length > 0) && (
+                      <div className="grid md:grid-cols-2 gap-4">
+                        {aiRecommendations.strengths?.length > 0 && (
+                          <div>
+                            <h3 className="font-bold text-[#654321] mb-2 flex items-center gap-2 text-sm sm:text-base">
+                              <Award className="w-3 h-3 sm:w-4 sm:h-4 text-[#DAA520]" />
+                              Your Strengths
+                            </h3>
+                            <ul className="space-y-1">
+                              {aiRecommendations.strengths.map((strength: string, index: number) => (
+                                <li key={index} className="text-xs sm:text-sm text-[#8B4513]/80 flex items-start gap-2">
+                                  <span className="text-[#DAA520] mt-1">•</span>
+                                  {strength}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {aiRecommendations.suggestions?.length > 0 && (
+                          <div>
+                            <h3 className="font-bold text-[#654321] mb-2 flex items-center gap-2 text-sm sm:text-base">
+                              <Target className="w-3 h-3 sm:w-4 sm:h-4 text-[#DAA520]" />
+                              Suggestions
+                            </h3>
+                            <ul className="space-y-1">
+                              {aiRecommendations.suggestions.map((suggestion: string, index: number) => (
+                                <li key={index} className="text-xs sm:text-sm text-[#8B4513]/80 flex items-start gap-2">
+                                  <span className="text-[#DAA520] mt-1">•</span>
+                                  {suggestion}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
                       </div>
+                    )}
 
-                      <div>
-                        <h3 className="font-bold text-[#654321] mb-2 flex items-center gap-2 text-sm sm:text-base">
-                          <Target className="w-3 h-3 sm:w-4 sm:h-4 text-[#DAA520]" />
-                          Suggestions
-                        </h3>
-                        <ul className="space-y-1">
-                          {aiRecommendations.suggestions.map((suggestion: string, index: number) => (
-                            <li key={index} className="text-xs sm:text-sm text-[#8B4513]/80 flex items-start gap-2">
-                              <span className="text-[#DAA520] mt-1">•</span>
-                              {suggestion}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-
-                    <div className="p-4 bg-[#F5F1E8] rounded-lg">
-                      <h3 className="font-bold text-[#654321] mb-3 text-sm sm:text-base">Upcoming Opportunities</h3>
-                      <div className="space-y-2">
-                        {aiRecommendations.upcomingOpportunities.map((opp: any, index: number) => (
-                          <div
-                            key={index}
-                            className="flex items-center justify-between text-[10px] sm:text-xs md:text-sm"
-                          >
-                            <div className="flex-1 min-w-0">
-                              <span className="font-semibold text-[#654321]">{opp.event}</span>
-                              <span className="text-[#8B4513]/70 ml-1 sm:ml-2 text-[9px] sm:text-[10px] md:text-xs">
-                                {opp.date}
+                    {Array.isArray(aiRecommendations.upcomingOpportunities) && aiRecommendations.upcomingOpportunities.length > 0 && (
+                      <div className="p-4 bg-[#F5F1E8] rounded-lg">
+                        <h3 className="font-bold text-[#654321] mb-3 text-sm sm:text-base">Upcoming Opportunities</h3>
+                        <div className="space-y-2">
+                          {aiRecommendations.upcomingOpportunities.map((opp: { event: string; date: string; suggestedAmount: string }, index: number) => (
+                            <div
+                              key={index}
+                              className="flex items-center justify-between text-[10px] sm:text-xs md:text-sm"
+                            >
+                              <div className="flex-1 min-w-0">
+                                <span className="font-semibold text-[#654321]">{opp.event}</span>
+                                <span className="text-[#8B4513]/70 ml-1 sm:ml-2 text-[9px] sm:text-[10px] md:text-xs">
+                                  {opp.date}
+                                </span>
+                              </div>
+                              <span className="text-[#DAA520] font-bold ml-2 text-[10px] sm:text-xs md:text-sm whitespace-nowrap">
+                                {opp.suggestedAmount}
                               </span>
                             </div>
-                            <span className="text-[#DAA520] font-bold ml-2 text-[10px] sm:text-xs md:text-sm whitespace-nowrap">
-                              {opp.suggestedAmount}
-                            </span>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    )}
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="p-4 bg-gradient-to-br from-[#DAA520]/10 to-[#F4C430]/10 rounded-lg text-center">
-                        <div className="text-xl sm:text-2xl font-bold text-[#654321] mb-1">
-                          ${aiRecommendations.optimalContributionAmount}
-                        </div>
-                        <div className="text-[10px] sm:text-xs text-[#8B4513]/70">Optimal Contribution Amount</div>
+                    {(aiRecommendations.optimalContributionAmount != null || (Array.isArray(aiRecommendations.bestGiftingDays) && aiRecommendations.bestGiftingDays.length > 0)) && (
+                      <div className="grid grid-cols-2 gap-4">
+                        {aiRecommendations.optimalContributionAmount != null && (
+                          <div className="p-4 bg-gradient-to-br from-[#DAA520]/10 to-[#F4C430]/10 rounded-lg text-center">
+                            <div className="text-xl sm:text-2xl font-bold text-[#654321] mb-1">
+                              ${aiRecommendations.optimalContributionAmount}
+                            </div>
+                            <div className="text-[10px] sm:text-xs text-[#8B4513]/70">Optimal Contribution Amount</div>
+                          </div>
+                        )}
+                        {Array.isArray(aiRecommendations.bestGiftingDays) && aiRecommendations.bestGiftingDays.length > 0 && (
+                          <div className="p-4 bg-gradient-to-br from-[#DAA520]/10 to-[#F4C430]/10 rounded-lg text-center">
+                            <div className="text-xs sm:text-sm font-bold text-[#654321] mb-1">
+                              {aiRecommendations.bestGiftingDays.join(", ")}
+                            </div>
+                            <div className="text-[10px] sm:text-xs text-[#8B4513]/70">Best Gifting Days</div>
+                          </div>
+                        )}
                       </div>
-                      <div className="p-4 bg-gradient-to-br from-[#DAA520]/10 to-[#F4C430]/10 rounded-lg text-center">
-                        <div className="text-xs sm:text-sm font-bold text-[#654321] mb-1">
-                          {aiRecommendations.bestGiftingDays.join(", ")}
-                        </div>
-                        <div className="text-[10px] sm:text-xs text-[#8B4513]/70">Best Gifting Days</div>
-                      </div>
-                    </div>
+                    )}
                   </div>
                 ) : (
                   <div className="text-center py-8">
                     <Brain className="w-10 h-10 sm:w-12 sm:h-12 text-[#DAA520]/30 mx-auto mb-3" />
                     <p className="text-xs sm:text-sm text-[#8B4513]/70">
-                      Click "Generate Insights" to get personalized AI recommendations based on your gifting history
+                      Click "Generate Insights" to see insights based on your profile. Activity-based insights will appear as you create and contribute to gifts.
                     </p>
                   </div>
                 )}
@@ -609,30 +603,39 @@ export default function ProfilePage() {
                 Achievements
               </h2>
               <div className="space-y-3">
-                {badges.map((badge) => (
-                  <div
-                    key={badge.id}
-                    className="p-3 bg-gradient-to-br from-[#DAA520]/10 to-[#F4C430]/10 rounded-lg border-2 border-[#DAA520]/20"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="text-2xl sm:text-3xl">{badge.icon}</div>
-                      <div className="flex-1">
-                        <h3 className="font-bold text-[#654321] text-xs sm:text-sm">{badge.name}</h3>
-                        <p className="text-[10px] sm:text-xs text-[#8B4513]/70 mb-1">{badge.description}</p>
-                        <p className="text-[10px] sm:text-xs text-[#DAA520] flex items-center gap-1">
-                          <Calendar className="w-3 h-3" />
-                          {new Date(badge.earned).toLocaleDateString()}
-                        </p>
+                {badges.length === 0 ? (
+                  <p className="text-sm text-[#8B4513]/80 py-2">
+                    Achievements will appear here when you earn them—create gifts, contribute to pools, or join groups to unlock badges.
+                  </p>
+                ) : (
+                  badges.map((badge) => (
+                    <div
+                      key={badge.id}
+                      className="p-3 bg-gradient-to-br from-[#DAA520]/10 to-[#F4C430]/10 rounded-lg border-2 border-[#DAA520]/20"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="text-2xl sm:text-3xl">{badge.icon}</div>
+                        <div className="flex-1">
+                          <h3 className="font-bold text-[#654321] text-xs sm:text-sm">{badge.name}</h3>
+                          <p className="text-[10px] sm:text-xs text-[#8B4513]/70 mb-1">{badge.description}</p>
+                          <p className="text-[10px] sm:text-xs text-[#DAA520] flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            {new Date(badge.earned).toLocaleDateString()}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
 
             {/* Quick Actions */}
             <div className="bg-white rounded-xl shadow-lg border-2 border-[#DAA520]/20 p-6">
-              <h2 className="text-lg sm:text-xl font-bold text-[#654321] mb-4">Quick Actions</h2>
+              <h2 className="text-lg sm:text-xl font-bold text-[#654321] mb-4 flex items-center gap-2">
+                <Zap className="w-4 h-4 sm:w-5 sm:h-5 text-[#DAA520]" />
+                Quick Actions
+              </h2>
               <div className="space-y-2">
                 <Link
                   href="/settings"
@@ -649,7 +652,7 @@ export default function ProfilePage() {
                   <span className="text-xs sm:text-sm text-[#654321]">Notification Settings</span>
                 </Link>
                 <Link
-                  href="/settings"
+                  href="/profile/payment-methods"
                   className="flex items-center gap-3 p-3 rounded-lg hover:bg-[#F5F1E8] transition-colors"
                 >
                   <CreditCard className="w-4 h-4 sm:w-5 sm:h-5 text-[#DAA520]" />

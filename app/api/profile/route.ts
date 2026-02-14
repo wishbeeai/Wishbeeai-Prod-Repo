@@ -44,6 +44,55 @@ function basePayload(userId: string, body: Record<string, unknown>) {
   }
 }
 
+/** GET current user's profile (for settings and profile page). */
+export async function GET() {
+  try {
+    const authClient = await createClient()
+    const { data: { user }, error: authError } = await authClient.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+    const db = createAdminClient() ?? authClient
+    const { data: profile, error } = await db
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .single()
+    if (error && error.code !== "PGRST116") {
+      console.error("[profile] GET error:", error.message)
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
+    const row = profile ?? {}
+    return NextResponse.json({
+      id: user.id,
+      email: row.email ?? user.email ?? "",
+      name: row.name ?? user.user_metadata?.name ?? null,
+      phone: row.phone ?? null,
+      location: row.location ?? null,
+      bio: row.bio ?? null,
+      birthday: row.birthday ?? null,
+      profile_image: row.profile_image ?? null,
+      created_at: row.created_at ?? user.created_at,
+      profile_visibility: row.profile_visibility ?? "friends",
+      weekly_digest: row.weekly_digest ?? false,
+      email_notifications: row.email_notifications ?? true,
+      push_notifications: row.push_notifications ?? true,
+      sms_notifications: row.sms_notifications ?? false,
+      gift_reminders: row.gift_reminders ?? true,
+      contribution_updates: row.contribution_updates ?? true,
+      group_invites: row.group_invites ?? true,
+      marketing_emails: row.marketing_emails ?? false,
+      show_contributions: row.show_contributions ?? true,
+      show_wishlist: row.show_wishlist ?? true,
+      allow_friend_requests: row.allow_friend_requests ?? true,
+    })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error("[profile] GET Error:", message)
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
+}
+
 export async function PUT(request: Request) {
   let body: Record<string, unknown>
   try {
