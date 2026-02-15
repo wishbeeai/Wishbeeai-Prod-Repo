@@ -32,7 +32,7 @@ export async function POST() {
     const stripe = new Stripe(secretKey, { apiVersion: "2024-11-20.acacia" })
     const setupIntent = await stripe.setupIntents.create({
       customer: customerId,
-      payment_method_types: ["card"],
+      payment_method_types: ["card", "paypal", "link"],
       usage: "off_session",
       metadata: { wishbee_user_id: user.id },
     })

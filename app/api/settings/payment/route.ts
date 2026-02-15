@@ -1,7 +1,16 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient, createAdminClient } from "@/lib/supabase/server"
 
-const VALID_PAYMENT_METHODS = ["credit-card", "paypal", "apple-pay", "google-pay", "venmo", "cash-app"]
+const VALID_PAYMENT_METHODS = [
+  "credit-card",
+  "paypal",
+  "mastercard",
+  "amex",
+  "discover",
+  "venmo",
+  "zip",
+  "apple-pay",
+]
 const VALID_CURRENCIES = ["USD", "EUR", "GBP", "CAD"]
 
 const DEFAULT_PAYMENT = {

@@ -8,7 +8,6 @@ import {
   ArrowLeft,
   Bell,
   Lock,
-  CreditCard,
   Shield,
   Eye,
   EyeOff,
@@ -85,7 +84,6 @@ export default function SettingsPage() {
     privacy: false,
     security: false,
     ai: false,
-    payment: false,
   })
   const toggleSection = (id: string) =>
     setSectionOpen((prev) => ({ ...prev, [id]: !prev[id] }))
@@ -96,13 +94,6 @@ export default function SettingsPage() {
     autoExtract: true,
     smartRecommendations: true,
     personalizedInsights: true,
-  })
-
-  // Payment Settings
-  const [paymentSettings, setPaymentSettings] = useState({
-    defaultPaymentMethod: "credit-card",
-    savePaymentInfo: true,
-    currency: "USD",
   })
 
   useEffect(() => {
@@ -134,13 +125,6 @@ export default function SettingsPage() {
         if (aiRes.ok) {
           const aiData = await aiRes.json()
           setAiPreferences(aiData)
-        }
-
-        // Load payment settings
-        const paymentRes = await fetch("/api/settings/payment")
-        if (paymentRes.ok) {
-          const paymentData = await paymentRes.json()
-          setPaymentSettings(paymentData)
         }
 
         // Load security settings (includes 2FA status from Supabase MFA)
@@ -184,10 +168,6 @@ export default function SettingsPage() {
         case "AI":
           endpoint = "/api/settings/ai-preferences"
           data = aiPreferences
-          break
-        case "payment":
-          endpoint = "/api/settings/payment"
-          data = paymentSettings
           break
         default:
           throw new Error("Invalid section")
@@ -309,7 +289,7 @@ export default function SettingsPage() {
         {/* Header */}
         <Link
           href="/profile"
-          className="inline-flex items-center gap-2 text-[#8B5A3C] hover:text-[#6B4423] mb-6 transition-colors text-[10px] sm:text-sm"
+          className="inline-flex items-center gap-2 text-[#8B5A3C] hover:text-[#6B4423] mb-6 transition-colors text-[16px]"
         >
           <ArrowLeft className="w-3 h-3 sm:w-4 sm:h-4" />
           <span>Back to Profile</span>
@@ -442,15 +422,6 @@ export default function SettingsPage() {
                     <Sparkles className="w-2.5 h-2.5 sm:w-4 sm:h-4 text-white" />
                   </div>
                   <span className="font-medium text-[#654321] text-[11px] sm:text-sm md:text-base">AI Preferences</span>
-                </a>
-                <a
-                  href="#payment"
-                  className="flex items-center gap-2 sm:gap-3 px-2 sm:px-4 py-2 sm:py-3 rounded-lg hover:bg-[#F5F1E8] transition-colors"
-                >
-                  <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center">
-                    <CreditCard className="w-2 h-2 sm:w-3 sm:h-3 text-white" />
-                  </div>
-                  <span className="font-medium text-[#654321] text-[11px] sm:text-sm md:text-base">Payment</span>
                 </a>
               </nav>
             </div>
@@ -898,98 +869,6 @@ export default function SettingsPage() {
               </div>
             </Collapsible>
 
-            {/* Payment Settings */}
-            <Collapsible
-              open={sectionOpen.payment}
-              onOpenChange={() => toggleSection("payment")}
-            >
-              <div id="payment" className="bg-white rounded-xl shadow-lg border-2 border-[#DAA520]/20 overflow-hidden">
-                <CollapsibleTrigger className="w-full p-4 sm:p-6 flex items-center justify-between gap-2 hover:bg-[#F5F1E8]/50 transition-colors text-left">
-                  <h2 className="text-base sm:text-lg md:text-xl font-bold text-[#654321] flex items-center gap-2">
-                    <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center">
-                      <CreditCard className="w-3 h-3 sm:w-4 sm:h-4 text-white" />
-                    </div>
-                    Payment Settings
-                  </h2>
-                  <ChevronDown
-                    className={`w-5 h-5 text-[#8B4513] shrink-0 transition-transform duration-200 ${sectionOpen.payment ? "rotate-180" : ""}`}
-                  />
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <div className="px-4 sm:px-6 pb-4 sm:pb-6 pt-0 space-y-3 sm:space-y-4">
-                <div>
-                  <label className="block text-[11px] sm:text-sm font-medium text-[#654321] mb-2">
-                    Default Payment Method
-                  </label>
-                  <select
-                    value={paymentSettings.defaultPaymentMethod}
-                    onChange={(e) => setPaymentSettings({ ...paymentSettings, defaultPaymentMethod: e.target.value })}
-                    className="w-full px-3 sm:px-4 py-2 border-2 border-[#DAA520]/30 rounded-lg focus:outline-none focus:border-[#DAA520] text-[11px] sm:text-sm"
-                  >
-                    <option value="credit-card">Credit Card</option>
-                    <option value="paypal">PayPal</option>
-                    <option value="apple-pay">Apple Pay</option>
-                    <option value="google-pay">Google Pay</option>
-                    <option value="venmo">Venmo</option>
-                    <option value="cash-app">Cash App</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[11px] sm:text-sm font-medium text-[#654321] mb-2">Currency</label>
-                  <select
-                    value={paymentSettings.currency}
-                    onChange={(e) => setPaymentSettings({ ...paymentSettings, currency: e.target.value })}
-                    className="w-full px-3 sm:px-4 py-2 border-2 border-[#DAA520]/30 rounded-lg focus:outline-none focus:border-[#DAA520] text-[11px] sm:text-sm"
-                  >
-                    <option value="USD">USD - US Dollar</option>
-                    <option value="EUR">EUR - Euro</option>
-                    <option value="GBP">GBP - British Pound</option>
-                    <option value="CAD">CAD - Canadian Dollar</option>
-                  </select>
-                </div>
-                <div className="flex items-center justify-between py-2">
-                  <span className="text-[11px] sm:text-sm font-medium text-[#654321]">Save Payment Information</span>
-                  <button
-                    onClick={() =>
-                      setPaymentSettings({
-                        ...paymentSettings,
-                        savePaymentInfo: !paymentSettings.savePaymentInfo,
-                      })
-                    }
-                    className={`relative inline-flex h-5 w-9 sm:h-6 sm:w-11 items-center rounded-full transition-colors ${
-                      paymentSettings.savePaymentInfo
-                        ? "bg-gradient-to-br from-emerald-500 to-green-600"
-                        : "bg-gray-300"
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-3 w-3 sm:h-4 sm:w-4 transform rounded-full bg-white transition-transform ${
-                        paymentSettings.savePaymentInfo ? "translate-x-5 sm:translate-x-6" : "translate-x-1"
-                      }`}
-                    />
-                  </button>
-                </div>
-                <button
-                  onClick={() => handleSaveSettings("payment")}
-                  disabled={isSaving}
-                  className="flex items-center justify-center gap-1 sm:gap-2 px-3 py-1.5 sm:px-6 sm:py-2 bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#3B2F0F] rounded-lg text-[10px] sm:text-sm md:text-sm font-semibold hover:shadow-lg transition-all disabled:opacity-50 w-full sm:w-auto mx-auto"
-                >
-                  {isSaving ? (
-                    <>
-                      <Loader2 className="w-2.5 h-2.5 sm:w-4 sm:h-4 animate-spin" />
-                      <span>Saving...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Save className="w-2.5 h-2.5 sm:w-4 sm:h-4" />
-                      <span>Save Payment Settings</span>
-                    </>
-                  )}
-                </button>
-                  </div>
-                </CollapsibleContent>
-              </div>
-            </Collapsible>
           </div>
         </div>
       </div>

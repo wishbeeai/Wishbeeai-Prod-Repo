@@ -32,19 +32,19 @@ export default async function WalletPage() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
         <Link
           href="/profile"
-          className="inline-flex items-center gap-2 text-[#8B5A3C] hover:text-[#654321] mb-8 transition-colors text-sm font-medium"
+          className="inline-flex items-center gap-2 text-[#8B5A3C] hover:text-[#654321] mb-8 transition-colors text-[16px] font-medium"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Profile
         </Link>
 
         <header className="mb-10 text-center">
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-[#654321] flex items-center justify-center gap-3">
-            <span className="flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-[#DAA520] to-[#B8860B] text-white shadow-lg">
-              <Wallet className="w-6 h-6 sm:w-7 sm:h-7" aria-hidden />
-            </span>
-            Wallet & Gift History
-          </h1>
+          <div className="flex items-center justify-center gap-2 sm:gap-3 mb-2">
+            <Wallet className="w-5 h-5 sm:w-8 sm:h-8 text-[#654321]" aria-hidden />
+            <h1 className="text-[30px] font-bold text-[#654321]">
+              Wallet & Gift History
+            </h1>
+          </div>
           <p className="text-[#8B5A3C]/90 mt-2 text-sm sm:text-base max-w-lg mx-auto">
             Your Wishbee Credits balance and contribution activity across gift pools.
           </p>
@@ -68,7 +68,7 @@ export default async function WalletPage() {
                   className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-[#3B2F0F] bg-gradient-to-r from-[#DAA520] via-[#F4C430] to-[#DAA520] hover:brightness-110 shadow-md transition-all"
                 >
                   <Gift className="w-4 h-4" />
-                  Start a New Wishbee
+                  Start a New Gift
                 </Link>
                 <Link
                   href="/settle/support-wishbee"
@@ -96,12 +96,12 @@ export default async function WalletPage() {
               <WalletHistoryTable transactions={transactions} />
             ) : (
               <div className="px-6 sm:px-8 py-16 sm:py-20 text-center">
-                <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#FEF3C7] to-[#FDE68A] flex items-center justify-center mx-auto mb-6 shadow-inner border border-[#DAA520]/20">
-                  <Wallet className="w-10 h-10 text-[#B8860B]" aria-hidden />
+                <div className="flex items-center justify-center mx-auto mb-6">
+                  <Wallet className="w-16 h-16 text-[#DAA520]/60" aria-hidden />
                 </div>
                 <h3 className="text-xl font-semibold text-[#654321] mb-2">No history yet</h3>
                 <p className="text-sm text-[#8B5A3C]/90 max-w-sm mx-auto mb-8 leading-relaxed">
-                  Join a gift pool as a contributor or create your own Wishbee to see your credits and
+                  Join a gift pool as a contributor or create your own Gift to see your credits and
                   activity here.
                 </p>
                 <Link
@@ -109,7 +109,7 @@ export default async function WalletPage() {
                   className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-[#3B2F0F] bg-gradient-to-r from-[#DAA520] to-[#F4C430] hover:shadow-lg transition-all"
                 >
                   <Gift className="w-4 h-4" />
-                  Browse active gifts
+                  Browse Active Gifts
                 </Link>
               </div>
             )}

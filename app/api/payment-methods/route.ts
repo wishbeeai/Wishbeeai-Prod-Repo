@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { getOrCreateStripeCustomer, getStripeCustomerId } from "@/lib/stripe-customer"
+import { getStripeCustomerId } from "@/lib/stripe-customer"
 import Stripe from "stripe"
 
 async function getAuthUser() {
@@ -28,17 +28,26 @@ export async function GET() {
     const stripe = new Stripe(secretKey, { apiVersion: "2024-11-20.acacia" })
     const methods = await stripe.paymentMethods.list({
       customer: customerId,
-      type: "card",
     })
 
-    const paymentMethods = methods.data.map((pm) => ({
-      id: pm.id,
-      brand: pm.card?.brand,
-      last4: pm.card?.last4,
-      expMonth: pm.card?.exp_month,
-      expYear: pm.card?.exp_year,
-      isDefault: false,
-    }))
+    const paymentMethods = methods.data.map((pm) => {
+      if (pm.type === "card" && pm.card) {
+        return {
+          id: pm.id,
+          brand: pm.card.brand,
+          last4: pm.card.last4,
+          expMonth: pm.card.exp_month,
+          expYear: pm.card.exp_year,
+        }
+      }
+      return {
+        id: pm.id,
+        brand: pm.type,
+        last4: undefined,
+        expMonth: undefined,
+        expYear: undefined,
+      }
+    })
 
     return NextResponse.json({ paymentMethods })
   } catch (err) {
