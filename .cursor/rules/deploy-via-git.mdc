@@ -1,0 +1,20 @@
+---
+description: Wishbee deployment - always deploy via Git
+alwaysApply: true
+---
+
+# Wishbee Deployment
+
+**Always deploy Wishbee to production via Git.**
+
+- Do **not** use `vercel --prod` or Vercel CLI for deployment
+- Deployment is triggered by pushing commits to the connected Git branch (e.g. `main`)
+- Vercel auto-deploys when changes are pushed to the linked repository
+
+## Deployment Steps
+
+1. Commit changes: `git add .` and `git commit -m "Your message"`
+2. Push to the production branch: `git push origin main` (or your configured branch)
+3. Vercel will automatically build and deploy
+
+When asked to deploy, instruct the user to push to Git—do not run `npm run deploy` or `vercel --prod`.

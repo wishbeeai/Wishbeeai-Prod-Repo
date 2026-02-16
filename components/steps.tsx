@@ -4,7 +4,7 @@ export function Steps() {
   return (
     <section
       id="how-it-works"
-      className="relative bg-gradient-to-b from-[#FFF8E7] via-[#F4E4C1] to-[#FFE4B5] py-8 sm:py-10 md:py-12 lg:py-14 overflow-hidden"
+      className="relative bg-gradient-to-b from-[#FFFDF7] via-[#FFF8EE] to-[#FFF5E6] py-8 sm:py-10 md:py-12 lg:py-14 overflow-hidden"
     >
       <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-transparent via-[#DAA520] to-transparent shadow-lg"></div>
 
@@ -92,20 +92,20 @@ export function Steps() {
             Turn a Gift Idea into Celebration in Just Minutes with Our Fast Gift Platform.
           </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 lg:gap-10 max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 lg:gap-10 max-w-6xl mx-auto">
             {/* Step 1 */}
             <div className="flex flex-col items-center text-center group">
               <div className="relative mb-4">
-                <div className="w-full sm:w-80 md:w-72 lg:w-80 h-48 sm:h-56 md:h-52 lg:h-56 flex items-center justify-center transition-transform duration-300 group-hover:scale-105 rounded-lg overflow-hidden shadow-lg">
+                <div className="w-full max-w-full aspect-[4/3] flex items-center justify-center transition-transform duration-300 group-hover:scale-105 rounded-lg overflow-hidden shadow-lg">
                   <img
                     src="/images/clipautotag-step1.png"
                     alt="Clip & Auto-Tag"
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover object-[center_40%] brightness-95"
                   />
                 </div>
               </div>
 
-              <h3 className="text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl font-semibold text-[#8B4513] tracking-wide mb-2 font-sans">
+              <h3 className="text-sm sm:text-base md:text-lg lg:text-xl font-semibold text-[#8B4513] tracking-wide mb-2 font-sans">
                 1. Clip & Auto-Tag
               </h3>
 
@@ -119,12 +119,17 @@ export function Steps() {
             {/* Step 2 - Share & Fund */}
             <div className="flex flex-col items-center text-center group">
               <div className="relative mb-4">
-                <div className="w-full sm:w-80 md:w-72 lg:w-80 h-48 sm:h-56 md:h-52 lg:h-56 flex items-center justify-center transition-transform duration-300 group-hover:scale-105 rounded-lg overflow-hidden shadow-lg">
+                <div className="w-full max-w-full aspect-[4/3] flex items-center justify-center transition-transform duration-300 group-hover:scale-105 rounded-lg overflow-hidden shadow-lg relative">
                   <img src="/images/steps2-final.png" alt="Share & Fund" className="w-full h-full object-cover" />
+                  <img
+                    src="/images/share-fund-icon.png"
+                    alt=""
+                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-28 h-28 sm:w-32 sm:h-32 lg:w-36 lg:h-36 object-contain drop-shadow-xl mix-blend-multiply brightness-90 contrast-125"
+                  />
                 </div>
               </div>
 
-              <h3 className="text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl font-semibold text-[#8B4513] tracking-wide mb-2 font-sans">
+              <h3 className="text-sm sm:text-base md:text-lg lg:text-xl font-semibold text-[#8B4513] tracking-wide mb-2 font-sans">
                 2. Share & Fund
               </h3>
 
@@ -138,18 +143,46 @@ export function Steps() {
             {/* Step 3 */}
             <div className="flex flex-col items-center text-center group">
               <div className="relative mb-4">
-                <div className="w-full sm:w-80 md:w-72 lg:w-80 h-48 sm:h-56 md:h-52 lg:h-56 relative transition-transform duration-300 group-hover:scale-105 rounded-lg overflow-hidden shadow-lg">
-                  <img src="/images/step3-final.png" alt="Buy & Celebrate" className="w-full h-full object-cover" />
+                <div className="w-full max-w-full aspect-[4/3] flex items-center justify-center transition-transform duration-300 group-hover:scale-105 rounded-lg overflow-hidden shadow-lg">
+                  <img src="/images/step3-final.png" alt="Buy & Celebrate" className="w-full h-full object-cover object-[center_80%] brightness-95" />
                 </div>
               </div>
 
-              <h3 className="text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl font-semibold text-[#8B4513] tracking-wide mb-2 font-sans">
+              <h3 className="text-sm sm:text-base md:text-lg lg:text-xl font-semibold text-[#8B4513] tracking-wide mb-2 font-sans">
                 3. Buy & Celebrate
               </h3>
 
               <div className="md:h-20 lg:h-24 flex items-center">
                 <p className="text-[0.7rem] sm:text-xs md:text-base text-[#8B4513]/80 leading-relaxed font-light max-w-xl text-balance font-sans">
                   Secure Checkout to Buy the Perfect Surprise Gift and Celebrate Hassle-Free Gifting.
+                </p>
+              </div>
+            </div>
+
+            {/* Step 4 */}
+            <div className="flex flex-col items-center text-center group">
+              <div className="relative mb-4">
+                <div className="w-full max-w-full aspect-[4/3] flex items-center justify-center transition-transform duration-300 group-hover:scale-105 rounded-lg overflow-hidden shadow-lg relative">
+                  <img
+                    src="/images/step4-settle.png"
+                    alt="Purchase & Settle"
+                    className="w-full h-full object-cover"
+                  />
+                  <img
+                    src="/images/step4-settle-icon.png"
+                    alt=""
+                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 object-contain drop-shadow-md mix-blend-multiply"
+                  />
+                </div>
+              </div>
+
+              <h3 className="text-sm sm:text-base md:text-lg lg:text-xl font-semibold text-[#8B4513] tracking-wide mb-2 font-sans">
+                4. Settle Balance
+              </h3>
+
+              <div className="md:h-20 lg:h-24 flex items-center">
+                <p className="text-[0.7rem] sm:text-xs md:text-base text-[#8B4513]/80 leading-relaxed font-light max-w-xl text-balance font-sans">
+                  Buy your gift and easily settle the remaining balance your way—via rewards, donations, or credits.
                 </p>
               </div>
             </div>

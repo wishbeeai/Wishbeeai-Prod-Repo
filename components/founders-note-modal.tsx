@@ -66,8 +66,8 @@ export function FoundersNoteModal({ open, onClose, giftId }: FoundersNoteModalPr
               <div className="p-6 sm:p-8 text-center">
                 {/* Logo / seal at top */}
                 <div className="flex justify-center mb-5">
-                  <div className="flex items-center justify-center w-16 h-16 rounded-full bg-[#DAA520]/20 border-2 border-[#DAA520]/30 shadow-inner overflow-hidden" aria-hidden>
-                    <img src="/images/LogoBee-V1.png" alt="Wishbee" width={48} height={48} className="object-contain w-12 h-12" />
+                  <div className="flex items-center justify-center w-14 h-14 rounded-full bg-[#DAA520]/20 border-2 border-[#DAA520]/30 shadow-inner overflow-visible" aria-hidden>
+                    <img src="/images/LogoBee-V1.png" alt="Wishbee" width={32} height={32} className="object-contain w-8 h-8" />
                   </div>
                 </div>
 

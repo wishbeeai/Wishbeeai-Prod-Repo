@@ -59,41 +59,41 @@ export function QuickStartCards() {
 
       {/* Group Gifting */}
       <section className="px-4 bg-white">
-        <div className="container mx-auto max-w-7xl py-20">
+        <div className="container mx-auto max-w-7xl pt-10 pb-6">
           <div className="text-center mb-12">
-            <h2 className="text-xl sm:text-2xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-gray-900 mb-4">
+            <h2 className="text-[30px] font-bold text-[#8B4513] mb-4">
               Two Ways to Give Better
             </h2>
-            <p className="text-xs sm:text-sm md:text-lg text-gray-600 max-w-2xl mx-auto">
+            <p className="text-xs sm:text-sm md:text-lg text-[#8B4513]/80 font-light max-w-2xl mx-auto leading-relaxed">
               Whether pooling together or giving solo, Wishbee makes it easy
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-8 mb-16">
+          <div className="grid md:grid-cols-2 gap-8 mb-6">
             <div className="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-3xl p-4 sm:p-6 md:p-8 lg:p-10 border-2 border-amber-200 hover:border-amber-400 transition-all hover:shadow-2xl">
               <div className="flex items-center gap-2 sm:gap-3 md:gap-4 mb-4 sm:mb-5 md:mb-6">
                 <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-2xl bg-gradient-to-br from-[#DAA520] to-[#FFD700] flex items-center justify-center shadow-lg flex-shrink-0">
                   <Users className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 text-white" />
                 </div>
-                <h3 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-gray-900">Group Gifting</h3>
+                <h3 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-[#8B4513]">Group Gifting</h3>
               </div>
-              <p className="text-xs sm:text-sm md:text-base lg:text-lg text-gray-600 mb-4 sm:mb-5 md:mb-6">
+              <p className="text-xs sm:text-sm md:text-base lg:text-lg text-[#8B4513]/80 font-light mb-4 sm:mb-5 md:mb-6 leading-relaxed">
                 Pool group contributions from friends and family to give something truly special together.
               </p>
               <ul className="space-y-2 sm:space-y-2.5 md:space-y-3 mb-6 sm:mb-7 md:mb-8">
-                <li className="flex items-start gap-2 sm:gap-2.5 md:gap-3 text-gray-700 text-xs sm:text-sm md:text-base">
+                <li className="flex items-start gap-2 sm:gap-2.5 md:gap-3 text-[#8B4513]/80 text-xs sm:text-sm md:text-base font-light">
                   <span className="text-amber-600 font-bold flex-shrink-0">✓</span>
                   <span>Create collections with AI-generated banners</span>
                 </li>
-                <li className="flex items-start gap-2 sm:gap-2.5 md:gap-3 text-gray-700 text-xs sm:text-sm md:text-base">
+                <li className="flex items-start gap-2 sm:gap-2.5 md:gap-3 text-[#8B4513]/80 text-xs sm:text-sm md:text-base font-light">
                   <span className="text-amber-600 font-bold flex-shrink-0">✓</span>
                   <span>Share via email or social media</span>
                 </li>
-                <li className="flex items-start gap-2 sm:gap-2.5 md:gap-3 text-gray-700 text-xs sm:text-sm md:text-base">
+                <li className="flex items-start gap-2 sm:gap-2.5 md:gap-3 text-[#8B4513]/80 text-xs sm:text-sm md:text-base font-light">
                   <span className="text-amber-600 font-bold flex-shrink-0">✓</span>
                   <span>Everyone contributes their own amount</span>
                 </li>
-                <li className="flex items-start gap-2 sm:gap-2.5 md:gap-3 text-gray-700 text-xs sm:text-sm md:text-base">
+                <li className="flex items-start gap-2 sm:gap-2.5 md:gap-3 text-[#8B4513]/80 text-xs sm:text-sm md:text-base font-light">
                   <span className="text-amber-600 font-bold flex-shrink-0">✓</span>
                   <span>Track real-time progress with AI insights</span>
                 </li>
@@ -112,25 +112,25 @@ export function QuickStartCards() {
                 <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-2xl bg-gradient-to-br from-[#DAA520] to-[#FFD700] flex items-center justify-center shadow-lg flex-shrink-0">
                   <Heart className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 text-white" />
                 </div>
-                <h3 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-gray-900">Solo Gifting</h3>
+                <h3 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-[#8B4513]">Solo Gifting</h3>
               </div>
-              <p className="text-xs sm:text-sm md:text-base lg:text-lg text-gray-600 mb-4 sm:mb-5 md:mb-6">
+              <p className="text-xs sm:text-sm md:text-base lg:text-lg text-[#8B4513]/80 font-light mb-4 sm:mb-5 md:mb-6 leading-relaxed">
                 Fund the entire gift yourself for any special occasion and give something truly meaningful.
               </p>
               <ul className="space-y-2 sm:space-y-2.5 md:space-y-3 mb-6 sm:mb-7 md:mb-8">
-                <li className="flex items-start gap-2 sm:gap-2.5 md:gap-3 text-gray-700 text-xs sm:text-sm md:text-base">
+                <li className="flex items-start gap-2 sm:gap-2.5 md:gap-3 text-[#8B4513]/80 text-xs sm:text-sm md:text-base font-light">
                   <span className="text-orange-600 font-bold flex-shrink-0">✓</span>
                   <span>Personalized AI gift recommendations</span>
                 </li>
-                <li className="flex items-start gap-2 sm:gap-2.5 md:gap-3 text-gray-700 text-xs sm:text-sm md:text-base">
+                <li className="flex items-start gap-2 sm:gap-2.5 md:gap-3 text-[#8B4513]/80 text-xs sm:text-sm md:text-base font-light">
                   <span className="text-orange-600 font-bold flex-shrink-0">✓</span>
                   <span>Auto-extract details from any retailer URL</span>
                 </li>
-                <li className="flex items-start gap-2 sm:gap-2.5 md:gap-3 text-gray-700 text-xs sm:text-sm md:text-base">
+                <li className="flex items-start gap-2 sm:gap-2.5 md:gap-3 text-[#8B4513]/80 text-xs sm:text-sm md:text-base font-light">
                   <span className="text-orange-600 font-bold flex-shrink-0">✓</span>
                   <span>AI insights and savings tips</span>
                 </li>
-                <li className="flex items-start gap-2 sm:gap-2.5 md:gap-3 text-gray-700 text-xs sm:text-sm md:text-base">
+                <li className="flex items-start gap-2 sm:gap-2.5 md:gap-3 text-[#8B4513]/80 text-xs sm:text-sm md:text-base font-light">
                   <span className="text-orange-600 font-bold flex-shrink-0">✓</span>
                   <span>Smart organization with filters and sorting</span>
                 </li>
@@ -147,7 +147,7 @@ export function QuickStartCards() {
 
       {/* Why Choose Wishbee section now full page width outside container */}
       <section className="bg-white">
-        <div className="relative bg-gradient-to-b from-[#FFF8E7] via-[#F4E4C1] to-[#FFE4B5] rounded-none overflow-hidden py-12 md:py-16">
+        <div className="relative bg-gradient-to-b from-[#FFFDF7] via-[#FFF8EE] to-[#FFF5E6] rounded-none overflow-hidden py-12 md:py-16">
           {/* Top decorative accent */}
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#DAA520] to-transparent"></div>
 

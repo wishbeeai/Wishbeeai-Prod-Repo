@@ -1652,7 +1652,7 @@ export function MyWishlistDisplay() {
                                       {[1,2,3,4,5].map((s) => (<svg key={s} className="w-3.5 h-3.5" viewBox="0 0 24 24" fill={s <= Math.round(item.rating || 0) ? "#F4C430" : "#E5E7EB"} stroke="#F4C430" strokeWidth="1"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>))}
                                     </div>
                                     <span className="text-[11px] font-bold text-[#654321]">{item.rating?.toFixed(1)}</span>
-                                    {item.reviewCount && <span className="text-[10px] text-gray-500">({item.reviewCount.toLocaleString()})</span>}
+                                    {item.reviewCount && <span className="text-[10px] text-gray-500"> {item.reviewCount.toLocaleString()}</span>}
                                   </div>
                                 )}
                                 <div className="flex flex-wrap gap-1.5 mb-2">
@@ -2216,7 +2216,7 @@ export function MyWishlistDisplay() {
                                             {[1,2,3,4,5].map((s) => (<svg key={s} className="w-3.5 h-3.5" viewBox="0 0 24 24" fill={s <= Math.round((item.preferenceOptions.alternative as any).rating || 0) ? "#F4C430" : "#E5E7EB"} stroke="#F4C430" strokeWidth="1"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>))}
                                           </div>
                                           <span className="text-[11px] font-bold text-[#654321]">{((item.preferenceOptions.alternative as any).rating as number)?.toFixed(1)}</span>
-                                          {(item.preferenceOptions.alternative as any).reviewCount && <span className="text-[10px] text-gray-500">({((item.preferenceOptions.alternative as any).reviewCount as number).toLocaleString()})</span>}
+                                          {(item.preferenceOptions.alternative as any).reviewCount && <span className="text-[10px] text-gray-500"> {((item.preferenceOptions.alternative as any).reviewCount as number).toLocaleString()}</span>}
                                         </div>
                                       )}
                                       {/* Badges */}

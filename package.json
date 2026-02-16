@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "start": "next start",
     "test": "playwright test",
-    "deploy": "vercel --prod"
+    "deploy": "echo 'Deploy via Git: push to main to trigger Vercel auto-deploy'"
   },
   "dependencies": {
     "@ai-sdk/openai": "^2.0.89",

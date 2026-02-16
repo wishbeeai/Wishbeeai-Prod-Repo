@@ -24,7 +24,7 @@ export async function GET(req: Request) {
         productName: gift.product_name,
         image: gift.image,
         category: gift.category,
-        source: gift.source,
+        source: typeof gift.source === 'string' ? gift.source.replace(/\)+$/, '').replace(/^\)+/, '').trim() : gift.source,
         price: parseFloat(gift.price.toString()),
         originalPrice: gift.original_price ? parseFloat(gift.original_price.toString()) : undefined,
         rating: parseFloat(gift.rating.toString()),

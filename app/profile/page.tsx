@@ -128,14 +128,45 @@ export default function ProfilePage() {
     }
   }, [user, authLoading, profileRefresh])
 
-  const [stats] = useState({
-    totalGifts: 24,
-    totalContributed: 1850,
-    groupsJoined: 5,
-    friendsHelped: 32,
-    successRate: 95,
-    averageContribution: 77,
-  })
+  // Fetch real gifting stats
+  useEffect(() => {
+    async function fetchStats() {
+      if (!user) {
+        setStats(null)
+        return
+      }
+      try {
+        const res = await fetch("/api/profile/stats")
+        if (res.ok) {
+          const data = await res.json()
+          setStats({
+            totalGifts: data.totalGifts ?? 0,
+            totalContributed: data.totalContributed ?? 0,
+            poolsJoined: data.poolsJoined ?? 0,
+            contributionCount: data.contributionCount ?? 0,
+            successRate: data.successRate ?? null,
+            averageContribution: data.averageContribution ?? null,
+          })
+        } else {
+          setStats(null)
+        }
+      } catch {
+        setStats(null)
+      }
+    }
+    if (!authLoading && user) {
+      fetchStats()
+    }
+  }, [user, authLoading])
+
+  const [stats, setStats] = useState<{
+    totalGifts: number
+    totalContributed: number
+    poolsJoined: number
+    contributionCount: number
+    successRate: number | null
+    averageContribution: number | null
+  } | null>(null)
 
   const [badges] = useState<{ id: number; name: string; icon: string; earned: string; description: string }[]>([])
 
@@ -397,7 +428,7 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {/* Statistics Grid */}
+            {/* Statistics Grid — real data only */}
             <div className="bg-white rounded-xl shadow-lg border-2 border-[#DAA520]/20 p-6">
               <h2 className="text-lg sm:text-xl font-bold text-[#654321] mb-4 flex items-center gap-2">
                 <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-[#DAA520]" />
@@ -410,7 +441,7 @@ export default function ProfilePage() {
                       <Gift className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                     </div>
                   </div>
-                  <div className="text-xl sm:text-2xl font-bold text-[#654321]">{stats.totalGifts}</div>
+                  <div className="text-xl sm:text-2xl font-bold text-[#654321]">{stats?.totalGifts ?? "—"}</div>
                   <div className="text-[10px] sm:text-xs text-[#8B4513]/70">Total Gifts</div>
                 </div>
 
@@ -420,7 +451,9 @@ export default function ProfilePage() {
                       <DollarSign className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                     </div>
                   </div>
-                  <div className="text-xl sm:text-2xl font-bold text-[#654321]">${stats.totalContributed}</div>
+                  <div className="text-xl sm:text-2xl font-bold text-[#654321]">
+                    {stats != null ? `$${stats.totalContributed}` : "—"}
+                  </div>
                   <div className="text-[10px] sm:text-xs text-[#8B4513]/70">Total Contributed</div>
                 </div>
 
@@ -430,8 +463,8 @@ export default function ProfilePage() {
                       <Users className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                     </div>
                   </div>
-                  <div className="text-xl sm:text-2xl font-bold text-[#654321]">{stats.groupsJoined}</div>
-                  <div className="text-[10px] sm:text-xs text-[#8B4513]/70">Groups Joined</div>
+                  <div className="text-xl sm:text-2xl font-bold text-[#654321]">{stats?.poolsJoined ?? "—"}</div>
+                  <div className="text-[10px] sm:text-xs text-[#8B4513]/70">Pools Joined</div>
                 </div>
 
                 <div className="text-center p-4 bg-gradient-to-br from-rose-100/50 to-pink-100/50 rounded-lg border-2 border-rose-300/20">
@@ -440,8 +473,8 @@ export default function ProfilePage() {
                       <Heart className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                     </div>
                   </div>
-                  <div className="text-xl sm:text-2xl font-bold text-[#654321]">{stats.friendsHelped}</div>
-                  <div className="text-[10px] sm:text-xs text-[#8B4513]/70">Friends Helped</div>
+                  <div className="text-xl sm:text-2xl font-bold text-[#654321]">{stats?.contributionCount ?? "—"}</div>
+                  <div className="text-[10px] sm:text-xs text-[#8B4513]/70">Contributions</div>
                 </div>
 
                 <div className="text-center p-4 bg-gradient-to-br from-[#DAA520]/10 to-[#F4C430]/10 rounded-lg border-2 border-[#DAA520]/20">
@@ -450,7 +483,9 @@ export default function ProfilePage() {
                       <Target className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                     </div>
                   </div>
-                  <div className="text-xl sm:text-2xl font-bold text-[#654321]">{stats.successRate}%</div>
+                  <div className="text-xl sm:text-2xl font-bold text-[#654321]">
+                    {stats?.successRate != null ? `${stats.successRate}%` : "—"}
+                  </div>
                   <div className="text-[10px] sm:text-xs text-[#8B4513]/70">Success Rate</div>
                 </div>
 
@@ -460,7 +495,9 @@ export default function ProfilePage() {
                       <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                     </div>
                   </div>
-                  <div className="text-xl sm:text-2xl font-bold text-[#654321]">${stats.averageContribution}</div>
+                  <div className="text-xl sm:text-2xl font-bold text-[#654321]">
+                    {stats?.averageContribution != null ? `$${stats.averageContribution}` : "—"}
+                  </div>
                   <div className="text-[10px] sm:text-xs text-[#8B4513]/70">Avg. Contribution</div>
                 </div>
               </div>

@@ -405,7 +405,7 @@ function SingleProductView({ data }: { data: SharedData }) {
                 </span>
                 {data.product.reviewCount && (
                   <span className="text-xs text-[#95A5A6]">
-                    ({data.product.reviewCount.toLocaleString()} reviews)
+                    {data.product.reviewCount.toLocaleString()} reviews
                   </span>
                 )}
               </div>
@@ -551,7 +551,7 @@ function ProductCard({ item, index }: { item: SharedProduct; index: number }) {
             <span className="text-[11px] text-[#8B6914] font-medium">
               {item.rating.toFixed(1)}
               {item.reviewCount && (
-                <span className="text-[#A0522D]/70"> ({item.reviewCount.toLocaleString()})</span>
+                <span className="text-[#A0522D]/70"> {item.reviewCount.toLocaleString()}</span>
               )}
             </span>
           </div>

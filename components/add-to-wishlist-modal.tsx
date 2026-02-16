@@ -2954,7 +2954,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                                 </div>
                                 <span className="text-[10px] font-bold text-[#654321]">{(parseFloat(iWishRating) || extractedProduct?.rating || gift?.rating)?.toFixed(1)}</span>
                                 {(parseInt(iWishReviewCount) || extractedProduct?.reviewCount || gift?.reviewCount) && (
-                                  <span className="text-[9px] text-gray-500">({(parseInt(iWishReviewCount) || extractedProduct?.reviewCount || gift?.reviewCount)?.toLocaleString()})</span>
+                                  <span className="text-[9px] text-gray-500"> {(parseInt(iWishReviewCount) || extractedProduct?.reviewCount || gift?.reviewCount)?.toLocaleString()}</span>
                                 )}
                               </div>
                             ) : null}
@@ -4256,7 +4256,7 @@ export function AddToWishlistModal({ gift, isOpen, onClose, wishlistItemId, onSa
                                 </div>
                                 <span className="text-[10px] font-bold text-[#654321]">{(parseFloat(altRating) || extractedProduct?.rating || gift?.rating)?.toFixed(1)}</span>
                                 {(parseInt(altReviewCount) || extractedProduct?.reviewCount || gift?.reviewCount) && (
-                                  <span className="text-[9px] text-gray-500">({(parseInt(altReviewCount) || extractedProduct?.reviewCount || gift?.reviewCount)?.toLocaleString()})</span>
+                                  <span className="text-[9px] text-gray-500"> {(parseInt(altReviewCount) || extractedProduct?.reviewCount || gift?.reviewCount)?.toLocaleString()}</span>
                                 )}
                               </div>
                             ) : null}

@@ -138,10 +138,10 @@ export function AIGiftAssistant() {
               <Sparkles className="w-4 h-4" />
               AI-Powered Magic
             </div>
-            <h2 className="text-xl sm:text-2xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-gray-900 mb-4">
+            <h2 className="text-[30px] font-bold text-[#654321] mb-4">
               Smart Gift Creation Tools
             </h2>
-            <p className="text-xs sm:text-sm md:text-lg text-gray-700 max-w-2xl mx-auto">
+            <p className="text-xs sm:text-sm md:text-lg text-[#8B4513]/80 font-light max-w-2xl mx-auto leading-relaxed">
               Start creating with AI - generate stunning banners and extract product details
             </p>
           </div>
@@ -152,10 +152,10 @@ export function AIGiftAssistant() {
                 <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center shadow-lg flex-shrink-0">
                   <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                 </div>
-                <h3 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900">Generate Custom Banner</h3>
+                <h3 className="text-lg sm:text-xl md:text-2xl font-bold text-[#654321]">Generate Custom Banner</h3>
               </div>
 
-              <p className="text-sm sm:text-base text-gray-600 mb-4">
+              <p className="text-sm sm:text-base text-[#8B4513]/80 mb-4">
                 Create stunning AI-generated banners for your gift collections
               </p>
 
@@ -170,14 +170,14 @@ export function AIGiftAssistant() {
                 <Button
                   onClick={handleGenerateBanner}
                   disabled={!collectionTitle.trim()}
-                  className="w-full bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 hover:from-amber-600 hover:via-orange-600 hover:to-rose-600 text-white py-2.5 sm:py-3 text-sm sm:text-base font-semibold border-2 border-amber-400/30 shadow-[0_8px_30px_rgba(251,146,60,0.4)] hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed rounded-full"
+                  className="w-full mt-6 bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 hover:from-amber-600 hover:via-orange-600 hover:to-rose-600 text-white py-2.5 sm:py-3 text-sm sm:text-base font-semibold border-2 border-amber-400/30 shadow-[0_8px_30px_rgba(251,146,60,0.4)] hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed rounded-full"
                 >
                   <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 mr-1.5 sm:mr-2" />
                   Generate Banner with AI
                   <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 ml-1.5 sm:ml-2" />
                 </Button>
 
-                <p className="text-xs text-gray-500 text-center">
+                <p className="text-xs text-[#8B4513]/80 text-center">
                   You'll be taken to create your gift collection with a custom AI banner
                 </p>
               </div>
@@ -188,10 +188,10 @@ export function AIGiftAssistant() {
                 <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-orange-400 to-amber-600 flex items-center justify-center shadow-lg flex-shrink-0">
                   <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                 </div>
-                <h3 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900">Extract Product Details</h3>
+                <h3 className="text-lg sm:text-xl md:text-2xl font-bold text-[#654321]">Extract Product Details</h3>
               </div>
 
-              <p className="text-sm sm:text-base text-gray-600 mb-4">
+              <p className="text-sm sm:text-base text-[#8B4513]/80 mb-4">
                 Instantly extract product information from any URL using AI
               </p>
 
@@ -206,14 +206,14 @@ export function AIGiftAssistant() {
                 <Button
                   onClick={handleExtractProduct}
                   disabled={!productUrl.trim()}
-                  className="w-full bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 hover:from-amber-600 hover:via-orange-600 hover:to-rose-600 text-white py-2.5 sm:py-3 text-sm sm:text-base font-semibold border-2 border-amber-400/30 shadow-[0_8px_30px_rgba(251,146,60,0.4)] hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed rounded-full"
+                  className="w-full mt-6 bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 hover:from-amber-600 hover:via-orange-600 hover:to-rose-600 text-white py-2.5 sm:py-3 text-sm sm:text-base font-semibold border-2 border-amber-400/30 shadow-[0_8px_30px_rgba(251,146,60,0.4)] hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed rounded-full"
                 >
                   <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 mr-1.5 sm:mr-2" />
                   Extract with AI
                   <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 ml-1.5 sm:ml-2" />
                 </Button>
 
-                <p className="text-xs text-gray-500 text-center">
+                <p className="text-xs text-[#8B4513]/80 text-center">
                   You'll be taken to add the extracted product to your wishlist
                 </p>
               </div>

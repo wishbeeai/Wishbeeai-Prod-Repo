@@ -65,14 +65,16 @@ export default async function WalletPage() {
               <div className="flex flex-wrap gap-2 mt-6 justify-center">
                 <Link
                   href="/gifts/create"
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-[#3B2F0F] bg-gradient-to-r from-[#DAA520] via-[#F4C430] to-[#DAA520] hover:brightness-110 shadow-md transition-all"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-lg text-sm font-semibold text-[#3B2F0F] bg-gradient-to-r from-[#DAA520] via-[#F4C430] to-[#DAA520] hover:brightness-110 shadow-md transition-all"
+                  style={{ width: 155.30, height: 35.95 }}
                 >
                   <Gift className="w-4 h-4" />
                   Start a New Gift
                 </Link>
                 <Link
                   href="/settle/support-wishbee"
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-[#654321] border-2 border-[#DAA520]/50 bg-[#FFFBEB]/50 hover:border-[#DAA520] hover:bg-[#FFFBEB] transition-all"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-lg text-sm font-semibold text-[#654321] border-2 border-[#DAA520]/50 bg-[#FFFBEB]/50 hover:border-[#DAA520] hover:bg-[#FFFBEB] transition-all"
+                  style={{ width: 155.30, height: 35.95 }}
                 >
                   <Sparkles className="w-4 h-4 text-[#B8860B]" />
                   Support Wishbee
@@ -99,10 +101,13 @@ export default async function WalletPage() {
                 <div className="flex items-center justify-center mx-auto mb-6">
                   <Wallet className="w-16 h-16 text-[#DAA520]/60" aria-hidden />
                 </div>
-                <h3 className="text-xl font-semibold text-[#654321] mb-2">No history yet</h3>
+                <h3 className="text-xl font-semibold text-[#654321] mb-2">
+                  {balance > 0 ? "No transaction history yet" : "No history yet"}
+                </h3>
                 <p className="text-sm text-[#8B5A3C]/90 max-w-sm mx-auto mb-8 leading-relaxed">
-                  Join a gift pool as a contributor or create your own Gift to see your credits and
-                  activity here.
+                  {balance > 0
+                    ? "You have credits available above. When you receive or use credits from gift pools (refunds, contributions, or bonuses), those transactions will appear here."
+                    : "Join a gift pool as a contributor or create your own Gift to see your credits and activity here."}
                 </p>
                 <Link
                   href="/gifts/active"

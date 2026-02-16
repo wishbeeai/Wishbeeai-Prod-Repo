@@ -880,7 +880,7 @@ export default function TrendingGiftsPage() {
                   {gift.source && (
                     <p className="text-xs text-[#8B4513]/60 mb-1.5 flex items-center gap-1">
                       <span className="w-1 h-1 bg-[#DAA520] rounded-full"></span>
-                      From {gift.source}
+                      From {String(gift.source).replace(/\)+$/, '').trim()}
                     </p>
                   )}
                   {/* Rating - Partial star fill */}
@@ -921,7 +921,7 @@ export default function TrendingGiftsPage() {
                       </div>
                       <span className="text-sm font-bold text-[#654321]">{gift.rating.toFixed(1)}</span>
                       {gift.reviewCount && gift.reviewCount > 0 && (
-                        <span className="text-xs text-gray-500">({gift.reviewCount.toLocaleString()})</span>
+                        <span className="text-xs text-gray-500"> {gift.reviewCount.toLocaleString()}</span>
                       )}
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -1106,7 +1106,7 @@ export default function TrendingGiftsPage() {
                             <p>{gift.giftName}</p>
                           </TooltipContent>
                         </Tooltip>
-                        {gift.source && <p className="text-sm text-[#8B4513]/70 mb-2">From {gift.source}</p>}
+                        {gift.source && <p className="text-sm text-[#8B4513]/70 mb-2">From {String(gift.source).replace(/\)+$/, '').trim()}</p>}
                         {/* Product Specifications - List View */}
                         <div className="mb-2 min-h-[140px] bg-gradient-to-r from-[#6B4423]/5 to-[#8B5A3C]/5 rounded-lg p-2 border border-[#8B5A3C]/10">
                           <p className="text-xs font-semibold text-[#6B4423] uppercase tracking-wide mb-1">Specifications</p>
@@ -1193,7 +1193,7 @@ export default function TrendingGiftsPage() {
                           </div>
                           <span className="text-sm font-bold text-[#654321]">{gift.rating.toFixed(1)}</span>
                           {gift.reviewCount && gift.reviewCount > 0 && (
-                            <span className="text-sm text-gray-500">({gift.reviewCount.toLocaleString()} reviews)</span>
+                            <span className="text-sm text-gray-500"> {gift.reviewCount.toLocaleString()} reviews</span>
                           )}
                           <Tooltip>
                             <TooltipTrigger asChild>

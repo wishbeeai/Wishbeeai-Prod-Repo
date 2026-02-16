@@ -134,7 +134,7 @@ export function ShareWidget() {
   }
 
   return (
-    <section className="relative bg-gradient-to-br from-[#F5F1E8] via-[#EDE6D6] to-[#F5F1E8] text-gray-900 py-10 sm:py-12 md:py-16 lg:py-20 overflow-hidden">
+    <section className="relative bg-gradient-to-br from-[#F5F1E8] via-[#EDE6D6] to-[#F5F1E8] text-gray-900 py-6 sm:py-8 md:py-10 lg:py-12 overflow-hidden">
       {/* Animated background elements with honey colors */}
       <div className="absolute top-1/4 left-0 w-96 h-96 bg-[#DAA520]/15 rounded-full blur-3xl animate-pulse"></div>
       <div className="absolute bottom-1/4 right-0 w-96 h-96 bg-[#F4C430]/10 rounded-full blur-3xl animate-pulse delay-700"></div>

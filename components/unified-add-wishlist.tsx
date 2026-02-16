@@ -2158,7 +2158,7 @@ export function UnifiedAddWishlist() {
                     </div>
                     <span className="text-sm font-bold text-[#654321]">{extractedProduct.rating.toFixed(1)}</span>
                     {extractedProduct.reviewCount && extractedProduct.reviewCount > 0 && (
-                      <span className="text-xs text-gray-500">({extractedProduct.reviewCount.toLocaleString()})</span>
+                      <span className="text-xs text-gray-500"> {extractedProduct.reviewCount.toLocaleString()}</span>
                     )}
                   </div>
                 )}

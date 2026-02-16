@@ -532,6 +532,19 @@ npx shadcn@latest add [component-name]
 - Add proper error handling
 - Include loading states
 
+## 🚀 Deployment
+
+**Wishbee deploys to production via Git.** Do not use the Vercel CLI.
+
+1. Commit and push changes to the production branch (e.g. `main`)
+2. Vercel automatically builds and deploys on push
+
+```bash
+git add .
+git commit -m "Your changes"
+git push origin main
+```
+
 ## 📄 License
 
 This project is private and proprietary.

@@ -2049,12 +2049,12 @@ export function CreateGiftFormClient() {
                                   {gift.originalPrice != null && gift.originalPrice > priceVal && <div className="absolute top-2 right-2 bg-gradient-to-r from-red-500 to-rose-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">SALE</div>}
                                 </div>
                                 <div className="p-3 flex-grow flex flex-col">
-                                  <Tooltip><TooltipTrigger asChild><h3 className="text-sm font-semibold text-[#654321] mb-1 line-clamp-2 min-h-[2.5rem] cursor-pointer">{name}</h3></TooltipTrigger><TooltipContent className="max-w-[280px] bg-[#4A2F1A] text-white text-xs p-2 rounded-lg"><p>{name}</p></TooltipContent></Tooltip>
-                                  {gift.source && <p className="text-xs text-[#8B4513]/60 mb-1 flex items-center gap-1"><span className="w-1 h-1 bg-[#DAA520] rounded-full" /> From {gift.source}</p>}
+                                  <Tooltip><TooltipTrigger asChild><h3 className="text-sm font-semibold text-[#654321] mb-1 line-clamp-2 min-h-[2.5rem] cursor-pointer rounded px-1 -mx-1 hover:bg-amber-50/80 transition-colors">{name}</h3></TooltipTrigger><TooltipContent className="max-w-[280px] bg-amber-50/95 text-[#654321] text-xs p-2 rounded-lg border border-amber-200 shadow-lg"><p>{name}</p></TooltipContent></Tooltip>
+                                  {gift.source && <p className="text-xs text-[#8B4513]/60 mb-1 flex items-center gap-1"><span className="w-1 h-1 bg-[#DAA520] rounded-full" /> From {String(gift.source).replace(/\)+$/, "").trim()}</p>}
                                   {gift.rating > 0 && (
                                     <div className="flex items-center gap-1.5 mb-1">
-                                      <div className="flex items-center gap-0.5">{[1,2,3,4,5].map((i) => { const fill = Math.max(0, Math.min(1, (gift.rating ?? 0) - (i - 1))); const pct = Math.round(fill * 100); const id = `star-cg-${gift.id}-${i}`; return <svg key={i} className="w-3 h-3" viewBox="0 0 24 24" fill="none"><defs><linearGradient id={id} x1="0%" y1="0%" x2="100%" y2="0%"><stop offset={`${pct}%`} stopColor="#F4C430" /><stop offset={`${pct}%`} stopColor="#E5E7EB" /></linearGradient></defs><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill={`url(#${id})`} stroke="#F4C430" strokeWidth="1" /></svg> })})</div>
-                                      <span className="text-xs font-bold text-[#654321]">{gift.rating?.toFixed(1)}</span>{gift.reviewCount > 0 && <span className="text-xs text-gray-500">({gift.reviewCount})</span>}
+                                      <div className="flex items-center gap-0.5">{[1,2,3,4,5].map((i) => { const fill = Math.max(0, Math.min(1, (gift.rating ?? 0) - (i - 1))); const pct = Math.round(fill * 100); const id = `star-cg-${gift.id}-${i}`; return <svg key={i} className="w-3 h-3" viewBox="0 0 24 24" fill="none"><defs><linearGradient id={id} x1="0%" y1="0%" x2="100%" y2="0%"><stop offset={`${pct}%`} stopColor="#F4C430" /><stop offset={`${pct}%`} stopColor="#E5E7EB" /></linearGradient></defs><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill={`url(#${id})`} stroke="#F4C430" strokeWidth="1" /></svg> })}</div>
+                                      <span className="text-xs font-bold text-[#654321]">{gift.rating?.toFixed(1)}</span>{gift.reviewCount > 0 && <span className="text-xs text-gray-500"> ({gift.reviewCount})</span>}
                                     </div>
                                   )}
                                   {(gift.amazonChoice || gift.bestSeller || gift.overallPick) && (
@@ -2091,8 +2091,8 @@ export function CreateGiftFormClient() {
                               <div key={gift.id} className="bg-white rounded-xl shadow-lg border-2 border-[#DAA520]/20 p-4 hover:shadow-xl transition-all flex gap-4 items-start">
                                 <div className="relative flex-shrink-0"><img src={gift.image || "/placeholder.svg"} alt={name} className="w-24 h-24 object-contain bg-white rounded-lg border-2 border-[#DAA520]" />{gift.originalPrice != null && gift.originalPrice > priceVal && <div className="absolute top-0 left-0 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">SALE</div>}</div>
                                 <div className="flex-1 min-w-0">
-                                  <h3 className="text-base font-bold text-[#654321] line-clamp-2 mb-1">{name}</h3>
-                                  {gift.source && <p className="text-xs text-[#8B4513]/70 mb-1">From {gift.source}</p>}
+                                  <h3 className="text-base font-bold text-[#654321] line-clamp-2 mb-1 rounded px-1 -mx-1 hover:bg-amber-50/80 transition-colors cursor-default">{name}</h3>
+                                  {gift.source && <p className="text-xs text-[#8B4513]/70 mb-1">From {String(gift.source).replace(/\)+$/, "").trim()}</p>}
                                   <div className="flex flex-wrap items-center gap-2 mb-1">
                                     {gift.category && (() => { const c = getCategoryColorTrending(gift.category); return <span className={`text-xs px-2 py-0.5 rounded-full font-medium bg-gradient-to-r ${c.bg} ${c.text} border ${c.border}`}>{gift.category}</span> })()}
                                     {gift.rating > 0 && <span className="flex items-center gap-0.5 text-xs"><Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />{gift.rating.toFixed(1)}{gift.reviewCount > 0 ? ` (${gift.reviewCount})` : ""}</span>}
@@ -2370,7 +2370,7 @@ export function CreateGiftFormClient() {
                                         </div>
                                         <span className="text-[10px] font-bold text-[#654321]">{extractedProduct.rating.toFixed(1)}</span>
                                         {extractedProduct.reviewCount && extractedProduct.reviewCount > 0 && (
-                                          <span className="text-[9px] text-gray-500">({extractedProduct.reviewCount.toLocaleString()})</span>
+                                          <span className="text-[9px] text-gray-500"> {extractedProduct.reviewCount.toLocaleString()}</span>
                                         )}
                                       </div>
                                     )}
@@ -2781,7 +2781,7 @@ export function CreateGiftFormClient() {
                                         </div>
                                         <span className="text-[10px] font-bold text-[#654321]">{(altRating ?? extractedProduct?.rating ?? 0).toFixed(1)}</span>
                                         {(altReviewCount ?? extractedProduct?.reviewCount) && (altReviewCount ?? extractedProduct?.reviewCount) > 0 && (
-                                          <span className="text-[9px] text-gray-500">({(altReviewCount ?? extractedProduct?.reviewCount ?? 0).toLocaleString()})</span>
+                                          <span className="text-[9px] text-gray-500"> {(altReviewCount ?? extractedProduct?.reviewCount ?? 0).toLocaleString()}</span>
                                         )}
                                       </div>
                                     )}
@@ -3864,7 +3864,7 @@ export function CreateGiftFormClient() {
                                   </div>
                                   <span className="text-[10px] font-bold text-[#654321]">{extractedProduct.rating.toFixed(1)}</span>
                                   {extractedProduct.reviewCount && extractedProduct.reviewCount > 0 && (
-                                    <span className="text-[9px] text-gray-500">({extractedProduct.reviewCount.toLocaleString()})</span>
+                                    <span className="text-[9px] text-gray-500"> {extractedProduct.reviewCount.toLocaleString()}</span>
                                   )}
                                 </div>
                               )}
@@ -4729,7 +4729,7 @@ export function CreateGiftFormClient() {
                   {previewProduct.rating > 0 && (
                     <span className="flex items-center gap-1 text-sm text-amber-600 mt-1">
                       <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-                      {previewProduct.rating?.toFixed(1)} {previewProduct.reviewCount ? `(${previewProduct.reviewCount} reviews)` : ""}
+                      {previewProduct.rating?.toFixed(1)} {previewProduct.reviewCount ? `${previewProduct.reviewCount} reviews` : ""}
                     </span>
                   )}
                   {(previewProduct.amazonChoice || previewProduct.bestSeller || previewProduct.overallPick) && (
