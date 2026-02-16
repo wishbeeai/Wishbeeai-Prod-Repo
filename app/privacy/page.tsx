@@ -1,6 +1,6 @@
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
-import { Shield, Database, Building2, Lock, Heart, Mail, Cookie, BarChart3, Cpu, MailPlus, Clock, Users, RefreshCw } from "lucide-react"
+import { Shield, Database, Building2, Lock, Heart, Mail, Cookie, BarChart3, Cpu, MailPlus, Clock, Users, RefreshCw, Building } from "lucide-react"
 
 export const metadata = {
   title: "2025 Wishbee.ai Privacy Policy",
@@ -8,6 +8,16 @@ export const metadata = {
 }
 
 const SECTIONS = [
+  {
+    icon: Building,
+    title: "Data Controller",
+    body: (
+      <>
+        The data controller responsible for your personal information is Complete Attire LLC, doing business as Complete AI IT Services. Any inquiries regarding your data privacy should be directed to{" "}
+        <a href="mailto:email@wishbee.ai" className="text-[#B8860B] hover:text-[#DAA520] underline font-medium">email@wishbee.ai</a>.
+      </>
+    ),
+  },
   {
     icon: Database,
     title: "Data Collection",
@@ -44,10 +54,14 @@ const SECTIONS = [
   },
   {
     icon: Cookie,
-    title: "Affiliate Tracking and Third-Party Cookies",
+    title: "Affiliate Partnerships",
     body: (
       <>
-        To facilitate our group gifting services and earn commissions that support the platform, Wishbee uses third-party affiliate service providers, including Amazon, Sovrn, and Skimlinks. When you interact with a product link on our platform, these providers may place a cookie on your browser or use similar tracking technologies to collect technical information (such as your IP address and device identifier) to track successful transactions.
+        To support our service, Wishbee.ai utilizes affiliate marketing networks including Sovrn Commerce and Skimlinks. When you click on product links or clip items to your wishlist, these third parties may use cookies and tracking identifiers to attribute sales and earn us a commission. This data is handled in accordance with the privacy policies of our partners:
+        <br /><br />
+        <a href="https://www.sovrn.com/privacy-policy/privacy-policy/" target="_blank" rel="noopener noreferrer" className="text-[#B8860B] hover:text-[#DAA520] underline font-medium">Sovrn Privacy Policy</a>
+        {" · "}
+        <a href="https://skimlinks.com/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-[#B8860B] hover:text-[#DAA520] underline font-medium">Skimlinks Privacy Policy</a>
         <br /><br />
         You can manage your cookie preferences through your browser settings or opt-out of certain tracking by visiting the Network Advertising Initiative or the privacy portals of our respective partners.
       </>

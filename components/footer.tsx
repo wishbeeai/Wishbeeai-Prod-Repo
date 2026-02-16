@@ -356,7 +356,7 @@ export function Footer() {
               </Link>
             </p>
             <p className="text-[9px] sm:text-xs text-[#F5DEB3]">
-              © 2026 Wishbee.ai. All rights reserved.{" "}
+              © 2026 Wishbee.ai | Operated by Complete AI IT Services{" "}
               <Link
                 href="/privacy"
                 className="text-[#DAA520] underline hover:text-[#F4C430] transition-colors ml-3 font-medium"

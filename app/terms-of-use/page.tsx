@@ -10,8 +10,8 @@ export const metadata = {
 const SECTIONS = [
   {
     icon: CheckCircle,
-    title: "Acceptance of Terms",
-    body: "By accessing and using Wishbee.ai, you accept and agree to be bound by these Terms of Use. If you do not agree to these terms, please do not use our service.",
+    title: "Ownership and Agreement",
+    body: "This website and the Wishbee.ai platform (the \"Service\") are owned and operated by Complete AI IT Services, a trade name (DBA) of Complete Attire LLC (\"Company,\" \"we,\" \"us,\" or \"our\"). By accessing or using Wishbee.ai, you agree to be bound by these Terms of Service.",
   },
   {
     icon: Settings,
@@ -48,6 +48,11 @@ const SECTIONS = [
     icon: CreditCard,
     title: "Payments and Refunds",
     body: "All payments are processed securely through Stripe. Refund policies are determined on a case-by-case basis. Please contact support for refund requests.",
+  },
+  {
+    icon: CreditCard,
+    title: "Financial Transactions",
+    body: "All financial settlements, including \"Settle Balance\" payouts, refunds, and Wishbee Credits, are processed and managed by Complete Attire LLC.",
   },
   {
     icon: Link2,
