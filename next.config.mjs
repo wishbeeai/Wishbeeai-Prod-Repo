@@ -21,6 +21,11 @@ const nextConfig = {
   },
   // Empty turbopack config to satisfy Next 16 (avoids webpack/turbopack conflict)
   turbopack: {},
+  async redirects() {
+    return [
+      { source: '/privacy-policy', destination: '/privacy', permanent: true },
+    ]
+  },
 }
 
 let config = nextConfig

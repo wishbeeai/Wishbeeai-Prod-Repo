@@ -1,6 +1,6 @@
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
-import { FileText, CheckCircle, Settings, User, CreditCard, Copyright, AlertTriangle, Mail } from "lucide-react"
+import { FileText, CheckCircle, Settings, User, CreditCard, Copyright, AlertTriangle, Mail, Link2, Calendar, Edit3, Ban, RefreshCw } from "lucide-react"
 
 export const metadata = {
   title: "Terms of Use - Wishbee.ai",
@@ -35,9 +35,30 @@ const SECTIONS = [
     body: "You are responsible for maintaining the confidentiality of your account credentials and for all activities that occur under your account. You agree to notify us immediately of any unauthorized use.",
   },
   {
+    icon: Calendar,
+    title: "Age Requirement",
+    body: "You must be at least 13 years of age (or the age of digital consent in your jurisdiction) to use Wishbee. If you are under 18, you must have parental or guardian consent to use our service.",
+  },
+  {
+    icon: Edit3,
+    title: "User-Generated Content",
+    body: "When you create wishlists, share gift collections, or post content on Wishbee, you grant us a license to use, display, and distribute that content in connection with operating the service. You represent that you have the right to share any content you post and that it does not violate the rights of others.",
+  },
+  {
     icon: CreditCard,
     title: "Payments and Refunds",
     body: "All payments are processed securely through Stripe. Refund policies are determined on a case-by-case basis. Please contact support for refund requests.",
+  },
+  {
+    icon: Link2,
+    title: "Affiliate Disclosure & Commercial Relationship",
+    body: (
+      <>
+        Wishbee is a shopping and group gifting platform. We want to be transparent about how we keep the lights on. Wishbee participates in various affiliate marketing programs. This means that when you click on a product link or &quot;clip&quot; an item to your wishlist and a purchase is later made, we may receive a commission from the retailer at no additional cost to you.
+        <br /><br />
+        Our AI-powered tools (including our product extraction and tagging features) are designed to provide convenience and suggestions. However, the presence of a product on Wishbee does not constitute an endorsement, and we are not responsible for the fulfillment, shipping, or quality of items purchased from third-party retailers.
+      </>
+    ),
   },
   {
     icon: Copyright,
@@ -48,6 +69,16 @@ const SECTIONS = [
     icon: AlertTriangle,
     title: "Limitation of Liability",
     body: "Wishbee.ai is provided \"as is\" without warranties of any kind. We are not liable for any indirect, incidental, or consequential damages arising from your use of the service.",
+  },
+  {
+    icon: Ban,
+    title: "Termination",
+    body: "We may suspend or terminate your account and access to the service at any time, with or without cause or notice. You may also close your account at any time. Upon termination, your right to use the service ceases immediately.",
+  },
+  {
+    icon: RefreshCw,
+    title: "Modifications",
+    body: "We may update these Terms of Use from time to time. We will notify you of material changes by posting the updated terms on our site and updating the effective date. Continued use of the service after changes constitutes acceptance of the new terms.",
   },
 ]
 
@@ -100,7 +131,6 @@ export default function TermsOfUsePage() {
                   >
                     email@wishbee.ai
                   </a>
-                  .
                 </p>
               </section>
             </div>

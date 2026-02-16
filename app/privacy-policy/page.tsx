@@ -62,6 +62,18 @@ export default function PrivacyPolicyPage() {
 
           <section>
             <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-[#654321] mb-4">
+              Affiliate Tracking and Third-Party Cookies
+            </h2>
+            <p>
+              To facilitate our group gifting services and earn commissions that support the platform, Wishbee uses third-party affiliate service providers, including Amazon, Sovrn, and Skimlinks. When you interact with a product link on our platform, these providers may place a cookie on your browser or use similar tracking technologies to collect technical information (such as your IP address and device identifier) to track successful transactions.
+            </p>
+            <p>
+              You can manage your cookie preferences through your browser settings or opt-out of certain tracking by visiting the Network Advertising Initiative or the privacy portals of our respective partners.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-[#654321] mb-4">
               Data Security
             </h2>
             <p>
