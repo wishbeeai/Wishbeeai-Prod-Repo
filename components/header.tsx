@@ -135,7 +135,7 @@ export function Header() {
                 })
               }}
             >
-              <div className="relative h-14 w-auto sm:h-16 sm:w-auto md:h-20 md:w-auto lg:h-24 lg:w-auto xl:h-28 xl:w-auto flex-shrink-0 transition-transform duration-300 group-hover:scale-105">
+              <div className="relative h-12 w-auto sm:h-14 sm:w-auto md:h-16 md:w-auto lg:h-20 lg:w-auto xl:h-24 xl:w-auto flex-shrink-0 transition-transform duration-300 group-hover:scale-105">
                 <Image
                   src="/images/LogoBee-V1.png"
                   alt="Wishbee Logo"

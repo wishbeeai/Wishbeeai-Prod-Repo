@@ -55,7 +55,7 @@ export function TrackManage() {
         </div>
 
         {/* Features Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 lg:gap-10">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 lg:gap-10 mb-8 sm:mb-10 md:mb-12 lg:mb-16">
           {features.map((feature, index) => {
             const Icon = feature.icon
 

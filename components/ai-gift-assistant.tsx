@@ -131,7 +131,7 @@ export function AIGiftAssistant() {
       />
       <SignUpModal isOpen={isSignUpModalOpen} onClose={() => setIsSignUpModalOpen(false)} />
 
-      <section className="py-16 px-4 bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50">
+      <section className="relative py-16 px-4 bg-gradient-to-br from-[#FFFDF7] via-[#FFFBF5] to-[#FFF8EE]">
         <div className="container mx-auto max-w-7xl">
           <div className="text-center mb-12">
             <div className="inline-flex items-center gap-2 bg-gradient-to-r from-yellow-400 to-amber-500 text-white px-6 py-2 rounded-full text-sm font-bold mb-4 shadow-md">
@@ -220,6 +220,9 @@ export function AIGiftAssistant() {
             </div>
           </div>
         </div>
+
+        {/* Bottom decorative accent */}
+        <div className="absolute bottom-0 left-0 w-full h-2 bg-gradient-to-r from-transparent via-[#DAA520] to-transparent shadow-lg"></div>
       </section>
     </>
   )
