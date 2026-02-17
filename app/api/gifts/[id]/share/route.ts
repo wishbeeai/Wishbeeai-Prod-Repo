@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { getServerBaseUrl } from "@/lib/base-url"
 
 export async function POST(
   request: NextRequest,
@@ -20,7 +21,7 @@ export async function POST(
       return NextResponse.json({ error: "Gift ID and name are required" }, { status: 400 })
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3001"
+    const baseUrl = getServerBaseUrl()
     const slug = String(giftName).toLowerCase().replace(/[^a-z0-9]+/g, "-")
     const shareUrl = `${baseUrl}/gifts/share/${slug}-${giftId}`
 

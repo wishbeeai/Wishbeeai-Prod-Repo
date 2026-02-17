@@ -790,7 +790,7 @@ export default function GiftDetailPage() {
       return
     }
     if (goalReached) {
-      toast.info("The main gift is fully funded! Your contribution will be added to an Amazon eGift Card bonus for the recipient.", {
+      toast.info("The main gift is fully funded! Your contribution will be added to an eGift Card bonus for the recipient.", {
         duration: 6000,
         style: { background: "linear-gradient(to right, #FEF3C7, #FDE68A)", color: "#654321", border: "2px solid #DAA520" },
       })
@@ -1091,7 +1091,7 @@ export default function GiftDetailPage() {
               </button>
               {goalReached && (
                 <p className="text-xs text-[#8B4513]/80 mt-2 text-center">
-                  Extra contributions go to an Amazon eGift Card bonus for the recipient. The organizer can settle the balance from Active Gifts.
+                  Extra contributions go to an eGift Card bonus for the recipient. The organizer can settle the balance from Active Gifts.
                 </p>
               )}
             </div>

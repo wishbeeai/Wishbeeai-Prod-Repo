@@ -169,16 +169,37 @@ export default function ProfilePage() {
   } | null>(null)
 
   const [badges] = useState<{ id: number; name: string; icon: string; earned: string; description: string }[]>([])
+  const [uploadingImage, setUploadingImage] = useState(false)
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setProfileImage(reader.result as string)
-        toast.success("Profile image updated!")
+    if (!file) return
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Image must be smaller than 2MB")
+      return
+    }
+    setUploadingImage(true)
+    try {
+      const formData = new FormData()
+      formData.append("file", file)
+      const res = await fetch("/api/profile/upload-image", {
+        method: "POST",
+        body: formData,
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error(data?.error || "Failed to upload image")
+        return
       }
-      reader.readAsDataURL(file)
+      if (data?.url) {
+        setProfileImage(data.url)
+        toast.success("Profile image uploaded! Click Save to keep changes.")
+      }
+    } catch (err) {
+      toast.error("Failed to upload image")
+    } finally {
+      setUploadingImage(false)
+      ;(e.target as HTMLInputElement).value = ""
     }
   }
 
@@ -308,15 +329,20 @@ export default function ProfilePage() {
                   />
                   <label
                     htmlFor="profile-upload"
-                    className="absolute bottom-0 right-0 bg-gradient-to-r from-[#DAA520] to-[#F4C430] p-2 rounded-full cursor-pointer hover:shadow-lg transition-all"
+                    className={`absolute bottom-0 right-0 bg-gradient-to-r from-[#DAA520] to-[#F4C430] p-2 rounded-full cursor-pointer hover:shadow-lg transition-all ${uploadingImage ? "opacity-70 pointer-events-none" : ""}`}
                   >
-                    <Camera className="w-4 h-4 text-[#3B2F0F]" />
+                    {uploadingImage ? (
+                      <div className="w-4 h-4 border-2 border-[#3B2F0F] border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Camera className="w-4 h-4 text-[#3B2F0F]" />
+                    )}
                     <input
                       id="profile-upload"
                       type="file"
-                      accept="image/*"
+                      accept="image/jpeg,image/png,image/webp,image/gif"
                       onChange={handleImageUpload}
                       className="hidden"
+                      disabled={uploadingImage}
                     />
                   </label>
                 </div>

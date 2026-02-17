@@ -145,7 +145,7 @@ export function QuickStartCards() {
         </div>
       </section>
 
-      {/* Why Choose Wishbee section now full page width outside container */}
+      {/* Why Wishbee section now full page width outside container */}
       <section className="bg-white">
         <div className="relative bg-gradient-to-b from-[#FFFDF7] via-[#FFF8EE] to-[#FFF5E6] rounded-none overflow-hidden pt-12 md:pt-16 pb-16 sm:pb-20 md:pb-24 lg:pb-28">
           {/* Animated falling honey drops - decorative elements */}
@@ -183,7 +183,7 @@ export function QuickStartCards() {
                   className="font-bold text-[#8B4513] mb-4 inline-flex items-center justify-center gap-2 whitespace-nowrap"
                   style={{ width: 367.73, height: 40, fontSize: '30px' }}
                 >
-                  Why Choose Wishbee?
+                  Why Wishbee?
                   <img
                     src="/images/Honey_Bee_Trail.png"
                     alt=""

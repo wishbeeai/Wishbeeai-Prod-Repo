@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { getContributionsForGift } from "@/lib/gift-contributions-store"
+import { getServerBaseUrl } from "@/lib/base-url"
 
 export const dynamic = "force-dynamic"
 
@@ -66,7 +67,7 @@ export async function GET(
     }
     const token = evite.magicLinkToken as string | undefined
     const expiresAt = evite.magicLinkExpiresAt as string | undefined
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3001"
+    const baseUrl = getServerBaseUrl()
     const contributeUrl =
       token && expiresAt && new Date(expiresAt) > new Date()
         ? `${baseUrl}/gifts/contribute/${giftId}?token=${token}`

@@ -73,7 +73,7 @@ export function Steps() {
                 style={{ animationDuration: "2.5s" }}
               />
             </h2>
-            {/* Decorative curved arrow - same as Why Choose Wishbee */}
+            {/* Decorative curved arrow - same as Why Wishbee */}
             <div className="relative w-full min-h-[2rem] flex justify-center -mb-4">
               <svg
                 className="absolute -top-4 left-1/2 -translate-x-1/2 w-48 h-12 opacity-40"

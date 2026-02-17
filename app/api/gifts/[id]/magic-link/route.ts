@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import crypto from "crypto"
 import { createClient } from "@/lib/supabase/server"
+import { getServerBaseUrl } from "@/lib/base-url"
 
 // In-memory cache for magic links (DB is source of truth; cache avoids DB read on every validate)
 const magicLinkStore = new Map<string, {
@@ -89,7 +90,7 @@ export async function POST(
       settings,
     })
 
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3001"
+    const baseUrl = getServerBaseUrl()
     const magicLinkUrl = `${baseUrl}/gifts/contribute/${giftId}?token=${token}`
 
     console.log(`[Magic Link] Generated for gift ${giftId}:`, magicLinkUrl)
