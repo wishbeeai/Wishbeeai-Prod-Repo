@@ -59,7 +59,7 @@ export function QuickStartCards() {
 
       {/* Group Gifting */}
       <section className="px-4 bg-white">
-        <div className="container mx-auto max-w-7xl pt-10 pb-6">
+        <div className="container mx-auto max-w-7xl pt-10 pb-12 sm:pb-14 md:pb-16 lg:pb-20">
           <div className="text-center mb-12">
             <h2 className="text-[30px] font-bold text-[#8B4513] mb-4">
               Two Ways to Give Better
@@ -147,7 +147,7 @@ export function QuickStartCards() {
 
       {/* Why Choose Wishbee section now full page width outside container */}
       <section className="bg-white">
-        <div className="relative bg-gradient-to-b from-[#FFFDF7] via-[#FFF8EE] to-[#FFF5E6] rounded-none overflow-hidden py-12 md:py-16">
+        <div className="relative bg-gradient-to-b from-[#FFFDF7] via-[#FFF8EE] to-[#FFF5E6] rounded-none overflow-hidden pt-12 md:pt-16 pb-16 sm:pb-20 md:pb-24 lg:pb-28">
           {/* Top decorative accent */}
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#DAA520] to-transparent"></div>
 

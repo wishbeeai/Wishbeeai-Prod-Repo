@@ -72,7 +72,7 @@ export function TrendingGifts() {
 
   const trendingGifts = useMemo(() => getDailyRotatedGifts(allGifts.length > 0 ? allGifts : FALLBACK_GIFTS, 4), [allGifts])
   return (
-    <section className="relative py-12 px-4 bg-gradient-to-b from-[#FFFDF7] via-[#FFF8EE] to-[#FFF5E6] overflow-hidden">
+    <section className="relative pt-12 pb-16 sm:pb-20 md:pb-24 lg:pb-28 px-4 bg-gradient-to-b from-[#FFFDF7] via-[#FFF8EE] to-[#FFF5E6] overflow-hidden">
       <div className="container mx-auto max-w-6xl relative z-10">
         <div className="text-center mb-6">
           <h2 className="text-[30px] font-bold text-[#8B4513] mb-1">
