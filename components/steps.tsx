@@ -197,7 +197,28 @@ export function Steps() {
         </div>
       </div>
 
-      <div className="absolute bottom-0 left-0 w-full h-2 bg-gradient-to-r from-transparent via-[#DAA520] to-transparent shadow-lg"></div>
+      {/* Bottom wavy divider */}
+      <div className="absolute bottom-0 left-0 w-full overflow-hidden leading-[0]">
+        <svg
+          viewBox="0 0 1200 60"
+          preserveAspectRatio="none"
+          className="relative block w-full h-8 sm:h-10 md:h-12"
+        >
+          <defs>
+            <linearGradient id="how-it-works-wave" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="transparent" />
+              <stop offset="30%" stopColor="#F4C430" stopOpacity="0.5" />
+              <stop offset="50%" stopColor="#DAA520" />
+              <stop offset="70%" stopColor="#F4C430" stopOpacity="0.5" />
+              <stop offset="100%" stopColor="transparent" />
+            </linearGradient>
+          </defs>
+          <path
+            fill="url(#how-it-works-wave)"
+            d="M0,30 Q300,0 600,30 T1200,30 V60 H0 Z"
+          />
+        </svg>
+      </div>
     </section>
   )
 }

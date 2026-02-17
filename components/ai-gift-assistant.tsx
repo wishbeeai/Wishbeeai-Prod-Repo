@@ -220,9 +220,6 @@ export function AIGiftAssistant() {
             </div>
           </div>
         </div>
-
-        {/* Bottom decorative accent */}
-        <div className="absolute bottom-0 left-0 w-full h-2 bg-gradient-to-r from-transparent via-[#DAA520] to-transparent shadow-lg"></div>
       </section>
     </>
   )

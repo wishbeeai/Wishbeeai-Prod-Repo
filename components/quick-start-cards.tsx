@@ -148,9 +148,6 @@ export function QuickStartCards() {
       {/* Why Choose Wishbee section now full page width outside container */}
       <section className="bg-white">
         <div className="relative bg-gradient-to-b from-[#FFFDF7] via-[#FFF8EE] to-[#FFF5E6] rounded-none overflow-hidden pt-12 md:pt-16 pb-16 sm:pb-20 md:pb-24 lg:pb-28">
-          {/* Top decorative accent */}
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#DAA520] to-transparent"></div>
-
           {/* Animated falling honey drops - decorative elements */}
           <div
             className="absolute top-8 left-[15%] w-2.5 h-3.5 bg-gradient-to-b from-[#FFD700] to-[#DAA520] rounded-full animate-bounce opacity-60"
@@ -255,14 +252,8 @@ export function QuickStartCards() {
                   </p>
                 </div>
               </div>
-
-              {/* Decorative bottom accent */}
-              <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-32 h-1 bg-gradient-to-r from-transparent via-[#FFD700] to-transparent rounded-full"></div>
             </div>
           </div>
-
-          {/* Bottom decorative accent */}
-          <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#DAA520] to-transparent"></div>
         </div>
       </section>
     </>
