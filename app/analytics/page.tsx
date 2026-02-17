@@ -89,14 +89,23 @@ export default function AnalyticsPage() {
         }),
       })
 
-      if (!response.ok) throw new Error("Failed to fetch AI insights")
+      if (!response.ok) {
+        const errBody = await response.json().catch(() => ({}))
+        console.warn("AI insights fetch failed:", response.status, errBody)
+        toast.error("AI insights temporarily unavailable")
+        return
+      }
 
       const data = await response.json()
+      if (data.error) {
+        toast.error("AI insights temporarily unavailable")
+        return
+      }
       setAiInsights(data)
       toast.success("AI insights generated successfully!")
     } catch (error) {
-      console.error("Error fetching AI insights:", error)
-      toast.error("Failed to generate AI insights")
+      console.warn("AI insights fetch error:", error)
+      toast.error("AI insights temporarily unavailable")
     } finally {
       setLoadingInsights(false)
     }

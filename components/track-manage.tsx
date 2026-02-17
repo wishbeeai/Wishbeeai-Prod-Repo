@@ -1,28 +1,35 @@
 "use client"
 
+import Link from "next/link"
 import { Activity, ArrowRightLeft, Users } from "lucide-react"
 
 const features = [
   {
     icon: Activity,
-    title: "Automatic Tracking",
-    description: "Real-time monitoring of all gift contributions and fund allocations with detailed activity logs.",
+    title: "Activity & Insights",
+    description: "View gifting statistics, logs, and trends across your history. Data-driven overview of your contributions.",
+    learnMoreOnNewLine: true,
+    href: "/analytics",
   },
   {
     icon: ArrowRightLeft,
-    title: "Withdrawals & Transfers",
-    description: "Seamlessly transfer pooled funds or process withdrawals with secure payment processing.",
+    title: "Active Gift Collections",
+    description: "Manage ongoing gifts. Share, remind, settle balances, and complete purchases.",
+    learnMoreOnNewLine: true,
+    href: "/gifts/active",
   },
   {
     icon: Users,
-    title: "User Management",
-    description: "Manage contributors, set permissions, and control access to your group gifting campaigns.",
+    title: "Team Management",
+    description: "Easily invite contributors, assign organizer roles, and manage who can view or edit your gift collections.",
+    learnMoreOnNewLine: true,
+    href: "/groups",
   },
 ]
 
 export function TrackManage() {
   return (
-    <section className="relative py-6 sm:py-8 md:py-10 lg:py-12 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-[#F5F1E8] via-[#EDE6D6] to-[#F5F1E8] overflow-hidden">
+    <section className="relative py-6 sm:py-8 md:py-10 lg:py-12 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-[#FFFDF7] via-[#FFFBF5] to-[#FFFDF7] overflow-hidden">
       {/* Decorative background elements */}
       <div className="absolute top-0 right-0 w-96 h-96 bg-[#DAA520]/10 rounded-full blur-3xl"></div>
       <div className="absolute bottom-0 left-0 w-96 h-96 bg-[#F4C430]/10 rounded-full blur-3xl"></div>
@@ -64,7 +71,7 @@ export function TrackManage() {
                 <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-[#DAA520]/15 to-transparent rounded-tr-2xl rounded-bl-full opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
 
                 <div className="relative z-10">
-                  <div className="mb-5 sm:mb-6 flex justify-center lg:justify-start">
+                  <div className="mb-5 sm:mb-6 flex justify-center">
                     <div className="relative inline-block">
                       {/* Multiple glow effects */}
                       <div className="absolute inset-0 bg-gradient-to-br from-[#DAA520] to-[#F4C430] rounded-2xl blur-2xl opacity-0 group-hover:opacity-60 transition-all duration-500 animate-pulse"></div>
@@ -92,20 +99,55 @@ export function TrackManage() {
                   </div>
 
                   {/* Content */}
-                  <h3 className="text-base sm:text-lg font-bold text-[#654321] mb-3 group-hover:text-[#8B4513] transition-colors duration-300 tracking-tight text-center lg:text-left">
+                  <h3 className="text-base sm:text-lg font-bold text-[#654321] mb-3 group-hover:text-[#8B4513] transition-colors duration-300 tracking-tight text-center">
                     {feature.title}
                   </h3>
-                  <p className="text-xs sm:text-sm text-[#8B4513]/70 leading-relaxed font-light text-center lg:text-left">
-                    {feature.description}
+                  <p className="text-xs sm:text-sm text-[#8B4513]/70 leading-relaxed font-light text-center">
+                    {'learnMoreOnNewLine' in feature && feature.learnMoreOnNewLine ? (
+                      <>
+                        {feature.description}
+                        <br />
+                        <Link
+                          href={feature.href}
+                          className="inline-flex items-center gap-1 text-xs font-medium text-[#DAA520] hover:text-[#B8860B] transition-colors duration-300 group-hover:translate-x-0.5"
+                        >
+                          Learn more
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </Link>
+                      </>
+                    ) : 'descriptionLines' in feature && feature.descriptionLines ? (
+                      <>
+                        {feature.descriptionLines[0]}
+                        <br />
+                        {feature.descriptionLines[1]}
+                        <br />
+                        <Link
+                          href={feature.href}
+                          className="inline-flex items-center gap-1 text-xs font-medium text-[#DAA520] hover:text-[#B8860B] transition-colors duration-300 group-hover:translate-x-0.5"
+                        >
+                          Learn more
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </Link>
+                      </>
+                    ) : (
+                      <>
+                        {feature.description}{' '}
+                        <Link
+                          href={feature.href}
+                          className="inline-flex items-center gap-1 text-xs font-medium text-[#DAA520] hover:text-[#B8860B] transition-colors duration-300 group-hover:translate-x-0.5"
+                        >
+                          Learn more
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </Link>
+                      </>
+                    )}
                   </p>
-
-                  {/* Hover arrow */}
-                  <div className="mt-4 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-0 group-hover:translate-x-2 justify-center lg:justify-start">
-                    <span className="text-xs font-medium text-[#DAA520]">Learn more</span>
-                    <svg className="w-4 h-4 text-[#DAA520]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </div>
                 </div>
               </div>
             )

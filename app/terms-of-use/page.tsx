@@ -57,9 +57,12 @@ const SECTIONS = [
   {
     icon: Link2,
     title: "Affiliate Disclosure & Commercial Relationship",
+    id: "affiliate-disclosure",
     body: (
       <>
         Wishbee is a shopping and group gifting platform. We want to be transparent about how we keep the lights on. Wishbee participates in various affiliate marketing programs. This means that when you click on a product link or &quot;clip&quot; an item to your wishlist and a purchase is later made, we may receive a commission from the retailer at no additional cost to you.
+        <br /><br />
+        As an Amazon Associate we earn from qualifying purchases.
         <br /><br />
         Our AI-powered tools (including our product extraction and tagging features) are designed to provide convenience and suggestions. However, the presence of a product on Wishbee does not constitute an endorsement, and we are not responsible for the fulfillment, shipping, or quality of items purchased from third-party retailers.
       </>
@@ -108,9 +111,10 @@ export default function TermsOfUsePage() {
             </div>
 
             <div className="space-y-6">
-              {SECTIONS.map(({ icon: Icon, title, body }) => (
+              {SECTIONS.map(({ icon: Icon, title, body, id }) => (
                 <section
                   key={title}
+                  id={id}
                   className="rounded-xl border border-[#DAA520]/20 bg-white/60 p-5 sm:p-6"
                 >
                   <h2 className="flex items-center gap-2 text-base sm:text-lg font-bold text-[#654321] mb-3">

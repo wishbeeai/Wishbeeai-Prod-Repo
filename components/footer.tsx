@@ -346,15 +346,6 @@ export function Footer() {
 
           {/* Center: Affiliate Disclaimer + Trust Badges */}
           <div className="text-sm flex-1 text-center">
-            <p className="mb-3 text-[10px] sm:text-xs lg:text-sm text-[#F5DEB3]">
-              We keep the lights on with affiliate link fees. As an Amazon Associate we earn from qualifying purchases.{" "}
-              <Link
-                href="/learn-more"
-                className="text-[#DAA520] underline hover:text-[#F4C430] transition-colors font-medium"
-              >
-                Learn more
-              </Link>
-            </p>
             <p className="text-[9px] sm:text-xs text-[#F5DEB3]">
               © 2026 Wishbee.ai | Operated by Complete AI IT Services{" "}
               <Link

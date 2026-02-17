@@ -172,23 +172,28 @@ export default function GroupsPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Link
           href="/"
-          className="inline-flex items-center gap-2 text-[#8B5A3C] hover:text-[#6B4423] mb-6 transition-colors text-sm"
+          className="inline-flex items-center gap-2 text-[#8B5A3C] hover:text-[#6B4423] mb-6 transition-colors font-medium text-xs sm:text-sm"
         >
-          <ArrowLeft className="w-4 h-4" />
+          <ArrowLeft className="w-3 h-3 sm:w-4 sm:h-4" />
           Back to Home
         </Link>
 
         <div className="mb-8">
-          <div className="text-center mb-6">
-            <div className="flex items-center gap-3 justify-center mb-2">
-              <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-gradient-to-br from-[#DAA520] to-[#F4C430] flex items-center justify-center flex-shrink-0">
-                <Users className="w-5 h-5 md:w-6 md:h-6 text-white" />
-              </div>
-              <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-[#654321]">My Groups</h1>
+          <div className="bg-card border border-border rounded-lg p-6 mb-8">
+            <div className="flex flex-row items-center justify-center gap-2">
+              <Users className="w-5 h-5 sm:w-7 sm:h-7 md:w-8 md:h-8 text-[#DAA520] flex-shrink-0 mt-0.5" />
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground whitespace-nowrap">
+                My Groups
+              </h1>
             </div>
-            <p className="text-[#8B4513]/80 mb-3">Manage your gifting groups with AI insights</p>
+            <p className="text-[10px] sm:text-xs md:text-sm text-muted-foreground text-center mt-2">
+              Manage your gifting groups with AI insights
+            </p>
+          </div>
+
+          <div className="flex justify-center mb-6">
             <Link href="/groups/create" className="inline-block">
-              <button className="inline-flex items-center justify-center flex-shrink-0 w-full px-4 py-2 bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#3B2F0F] rounded-full font-semibold hover:shadow-lg transition-all text-sm whitespace-nowrap">
+              <button className="inline-flex items-center justify-center flex-shrink-0 px-4 py-2 bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#3B2F0F] rounded-full font-semibold hover:shadow-lg transition-all text-sm whitespace-nowrap">
                 Create Group
               </button>
             </Link>
@@ -372,14 +377,7 @@ export default function GroupsPage() {
                 <Users className="w-8 h-8 text-[#DAA520]" />
               </div>
               <h3 className="text-lg font-semibold text-[#654321] mb-2">No groups yet</h3>
-              <p className="text-sm text-[#8B4513]/70 mb-4">Create your first group to start gifting together!</p>
-              <Link
-                href="/groups/create"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] font-semibold rounded-full hover:scale-105 transition-all"
-              >
-                <Users className="w-4 h-4" />
-                Create Group
-              </Link>
+              <p className="text-sm text-[#8B4513]/70">Create your first group to start gifting together!</p>
             </div>
           )}
 

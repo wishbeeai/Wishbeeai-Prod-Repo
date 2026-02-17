@@ -70,7 +70,7 @@ export function QuickStartCards() {
           </div>
 
           <div className="grid md:grid-cols-2 gap-8 mb-6">
-            <div className="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-3xl p-4 sm:p-6 md:p-8 lg:p-10 border-2 border-amber-200 hover:border-amber-400 transition-all hover:shadow-2xl">
+            <div className="bg-gradient-to-br from-[#FFFDF7] to-[#FFFBF5] rounded-3xl p-4 sm:p-6 md:p-8 lg:p-10 border border-amber-200/60 hover:border-amber-300/80 transition-all hover:shadow-2xl">
               <div className="flex items-center gap-2 sm:gap-3 md:gap-4 mb-4 sm:mb-5 md:mb-6">
                 <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-2xl bg-gradient-to-br from-[#DAA520] to-[#FFD700] flex items-center justify-center shadow-lg flex-shrink-0">
                   <Users className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 text-white" />
@@ -100,14 +100,14 @@ export function QuickStartCards() {
               </ul>
               <Button
                 onClick={handleCreateGroupGifting}
-                className="w-full lg:w-auto bg-gradient-to-r from-[#DAA520] to-[#FFD700] hover:from-[#B8860B] hover:to-[#DAA520] text-white py-1.5 sm:py-3 md:py-4 lg:py-3 px-2 sm:px-6 text-xs sm:text-sm md:text-base lg:text-base font-bold transition-all duration-200 border border-[#DAA520]/30 shadow-md hover:shadow-xl"
+                className="w-full bg-gradient-to-r from-[#DAA520] to-[#FFD700] hover:from-[#B8860B] hover:to-[#DAA520] text-white py-1.5 sm:py-3 md:py-4 lg:py-5 text-xs sm:text-sm md:text-base lg:text-lg font-bold transition-all duration-200 border border-[#DAA520]/30 shadow-md hover:shadow-xl"
               >
                 Create Group Gifting
               </Button>
             </div>
 
             {/* Solo Gifting */}
-            <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-3xl p-4 sm:p-6 md:p-8 lg:p-10 border-2 border-orange-200 hover:border-orange-400 transition-all hover:shadow-2xl">
+            <div className="bg-gradient-to-br from-[#FFFDF7] to-[#FFF8F0] rounded-3xl p-4 sm:p-6 md:p-8 lg:p-10 border border-orange-200/60 hover:border-orange-300/80 transition-all hover:shadow-2xl">
               <div className="flex items-center gap-2 sm:gap-3 md:gap-4 mb-4 sm:mb-5 md:mb-6">
                 <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-2xl bg-gradient-to-br from-[#DAA520] to-[#FFD700] flex items-center justify-center shadow-lg flex-shrink-0">
                   <Heart className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 text-white" />
@@ -181,32 +181,20 @@ export function QuickStartCards() {
 
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="relative z-10">
-              <div className="text-center mb-10">
-                <h3 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-[#8B4513] mb-4 relative inline-block">
+              <div className="text-center mb-12 sm:mb-14 md:mb-16">
+                <h3
+                  className="font-bold text-[#8B4513] mb-4 inline-flex items-center justify-center gap-2 whitespace-nowrap"
+                  style={{ width: 367.73, height: 40, fontSize: '30px' }}
+                >
                   Why Choose Wishbee?
-                  <span
-                    className="absolute -right-8 sm:-right-10 top-0 text-2xl sm:text-3xl animate-bounce"
-                    style={{ animationDuration: "3s" }}
-                  >
-                    🐝
-                  </span>
+                  <img
+                    src="/images/Honey_Bee_Trail.png"
+                    alt=""
+                    aria-hidden
+                    className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 lg:w-28 lg:h-28 xl:w-32 xl:h-32 object-contain shrink-0 mix-blend-darken animate-bounce mt-1 sm:mt-1.5"
+                    style={{ animationDuration: "2.5s" }}
+                  />
                 </h3>
-                {/* Decorative curved arrow */}
-                <div className="relative inline-block">
-                  <svg
-                    className="absolute -top-2 left-1/2 -translate-x-1/2 w-48 h-12 opacity-40"
-                    viewBox="0 0 200 50"
-                    fill="none"
-                  >
-                    <path
-                      d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 00-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-                      stroke="#8B4513"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeDasharray="4 4"
-                    />
-                  </svg>
-                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -243,7 +231,7 @@ export function QuickStartCards() {
                     Flexible Payment Options
                   </h4>
                   <p className="text-xs sm:text-sm md:text-base text-[#8B4513]/80 leading-relaxed font-light">
-                    Multiple payment methods (Card, PayPal, Apple Pay, Google Pay, Venmo, Cash App)
+                    Multiple payment methods (Card, PayPal, Apple Pay, Google Pay, Venmo)
                   </p>
                 </div>
 

@@ -32,7 +32,15 @@ export async function POST(req: NextRequest) {
     // Generate a unique ID
     const groupId = `group_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     
-    // Create group object
+    // Build member_roles: creator is admin, first member is admin, rest are members
+    const memberRoles: Record<string, 'admin' | 'member'> = {}
+    const creatorEmail = user.email?.toLowerCase()
+    if (creatorEmail) memberRoles[creatorEmail] = 'admin'
+    groupData.memberEmails.forEach((email: string, i: number) => {
+      const e = String(email).toLowerCase()
+      if (!memberRoles[e]) memberRoles[e] = i === 0 ? 'admin' : 'member'
+    })
+
     const group = {
       id: groupId,
       created_by: user.id,
@@ -42,6 +50,7 @@ export async function POST(req: NextRequest) {
       status: 'active',
       created_at: new Date().toISOString(),
       member_emails: groupData.memberEmails,
+      member_roles: memberRoles,
       member_count: groupData.memberEmails.length,
     }
     

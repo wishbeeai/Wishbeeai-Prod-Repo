@@ -138,7 +138,7 @@ export function Header() {
               <div className="relative h-14 w-auto sm:h-16 sm:w-auto md:h-20 md:w-auto lg:h-24 lg:w-auto xl:h-28 xl:w-auto flex-shrink-0 transition-transform duration-300 group-hover:scale-105">
                 <Image
                   src="/images/LogoBee-V1.png"
-                  alt="Wishbee.ai Logo"
+                  alt="Wishbee Logo"
                   width={1024}
                   height={1024}
                   className="h-full w-auto object-contain transition-all duration-300"
@@ -147,7 +147,7 @@ export function Header() {
               </div>
               <div className="flex flex-col gap-0.5 items-end -ml-3">
                 <span className="text-[#F5DEB3] font-bold text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl leading-tight tracking-tight group-hover:text-[#DAA520] transition-all duration-300 drop-shadow-[0_2px_4px_rgba(0,0,0,0.2)]">
-                  Wishbee.ai
+                  Wishbee
                 </span>
                 <span className="text-[#F4C430] text-[10px] sm:text-xs md:text-sm lg:text-base font-bold tracking-normal italic group-hover:text-[#FFD700] group-hover:tracking-wide transition-all duration-300 font-[family-name:var(--font-shadows)] text-right drop-shadow-[0_1px_2px_rgba(0,0,0,0.15)]">
                   Gift What They Love

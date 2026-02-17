@@ -8,17 +8,17 @@ import {
   Users,
   Gift,
   Calendar,
-  Mail,
   UserPlus,
   Settings,
   Share2,
   Loader2,
   Crown,
-  Clock,
   CheckCircle,
   XCircle,
+  Trash2,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { useAuth } from '@/lib/auth-context'
 
 interface GroupMember {
   email: string
@@ -33,6 +33,7 @@ interface Group {
   groupPhoto?: string
   memberCount: number
   memberEmails: string[]
+  members?: GroupMember[]
   createdDate: string
   status: string
   isOwner: boolean
@@ -41,11 +42,18 @@ interface Group {
 export default function GroupDetailPage() {
   const params = useParams()
   const router = useRouter()
+  const { user: authUser } = useAuth()
   const groupId = params.id as string
 
   const [group, setGroup] = useState<Group | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [showSettings, setShowSettings] = useState(false)
+  const [showInvite, setShowInvite] = useState(false)
+  const [settingsName, setSettingsName] = useState('')
+  const [settingsDesc, setSettingsDesc] = useState('')
+  const [inviteEmails, setInviteEmails] = useState('')
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     fetchGroup()
@@ -73,6 +81,104 @@ export default function GroupDetailPage() {
       setError(err instanceof Error ? err.message : 'Failed to load group')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const members = group?.members ?? group?.memberEmails?.map((email, i) => ({
+    email,
+    role: (i === 0 ? 'admin' : 'member') as 'admin' | 'member',
+    status: 'active' as const,
+  })) ?? []
+
+  const handleOpenSettings = () => {
+    setSettingsName(group?.groupName ?? '')
+    setSettingsDesc(group?.description ?? '')
+    setShowSettings(true)
+  }
+
+  const handleSaveSettings = async () => {
+    if (!group) return
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/groups/${groupId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          groupName: settingsName,
+          description: settingsDesc,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to update')
+      toast.success('Settings saved')
+      setShowSettings(false)
+      fetchGroup()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to save')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleInvite = async () => {
+    const emails = inviteEmails.split(/[\s,;]+/).filter(Boolean)
+    if (emails.length === 0) {
+      toast.error('Enter at least one email')
+      return
+    }
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/groups/${groupId}/invite`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emails }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to invite')
+      toast.success(data.message || 'Invites sent')
+      setShowInvite(false)
+      setInviteEmails('')
+      fetchGroup()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to invite')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleRemoveMember = async (email: string) => {
+    if (!confirm(`Remove ${email} from the group?`)) return
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/groups/${groupId}/members?email=${encodeURIComponent(email)}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to remove')
+      toast.success('Member removed')
+      setShowSettings(false)
+      fetchGroup()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to remove')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleChangeRole = async (email: string, role: 'admin' | 'member') => {
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/groups/${groupId}/members`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, role }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to update role')
+      toast.success('Role updated')
+      fetchGroup()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update role')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -167,12 +273,12 @@ export default function GroupDetailPage() {
             <div className="absolute top-4 right-4 flex gap-2">
               <button
                 onClick={handleShare}
-                className="p-2 bg-white/20 hover:bg-white/30 rounded-full text-white transition-colors"
+                className="p-2 bg-white/20 hover:bg-white/30 rounded-full text-[#4a3728] transition-colors"
               >
                 <Share2 className="w-5 h-5" />
               </button>
               {group.isOwner && (
-                <button className="p-2 bg-white/20 hover:bg-white/30 rounded-full text-white transition-colors">
+                <button onClick={handleOpenSettings} className="p-2 bg-white/20 hover:bg-white/30 rounded-full text-[#4a3728] transition-colors">
                   <Settings className="w-5 h-5" />
                 </button>
               )}
@@ -222,7 +328,7 @@ export default function GroupDetailPage() {
             </h2>
             
             {group.isOwner && (
-              <button className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] text-xs font-semibold rounded-full hover:scale-105 transition-all">
+              <button onClick={() => setShowInvite(true)} className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] text-xs font-semibold rounded-full hover:scale-105 transition-all">
                 <UserPlus className="w-3.5 h-3.5" />
                 Invite
               </button>
@@ -230,23 +336,20 @@ export default function GroupDetailPage() {
           </div>
 
           <div className="space-y-3">
-            {group.memberEmails.map((email, index) => (
+            {members.map((m) => (
               <div
-                key={email}
+                key={m.email}
                 className="flex items-center justify-between p-3 bg-[#F5F1E8] rounded-lg"
               >
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#DAA520] to-[#F4C430] flex items-center justify-center text-white font-semibold">
-                    {email.charAt(0).toUpperCase()}
+                    {m.email.charAt(0).toUpperCase()}
                   </div>
                   <div>
-                    <p className="font-medium text-[#654321]">{email}</p>
-                    <p className="text-xs text-[#8B4513]/70">
-                      {index === 0 ? 'Admin' : 'Member'}
-                    </p>
+                    <p className="font-medium text-[#654321]">{m.email}</p>
+                    <p className="text-xs text-[#8B4513]/70 capitalize">{m.role}</p>
                   </div>
                 </div>
-                
                 <span className="flex items-center gap-1 text-xs text-green-600">
                   <CheckCircle className="w-3.5 h-3.5" />
                   Active
@@ -284,6 +387,109 @@ export default function GroupDetailPage() {
             </div>
           </button>
         </div>
+
+        {/* Settings Modal */}
+        {showSettings && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+            <div className="bg-white rounded-2xl shadow-xl border-2 border-[#DAA520]/30 max-w-lg w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-bold text-[#654321]">Group Settings</h2>
+                  <button onClick={() => setShowSettings(false)} className="p-2 hover:bg-[#F5F1E8] rounded-lg">
+                    <XCircle className="w-5 h-5 text-[#8B4513]" />
+                  </button>
+                </div>
+                <div className="space-y-4 mb-6">
+                  <div>
+                    <label className="block text-sm font-medium text-[#654321] mb-1">Group name</label>
+                    <input
+                      type="text"
+                      value={settingsName}
+                      onChange={(e) => setSettingsName(e.target.value)}
+                      className="w-full px-4 py-2 border-2 border-[#DAA520]/30 rounded-lg focus:border-[#DAA520] outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-[#654321] mb-1">Description</label>
+                    <textarea
+                      value={settingsDesc}
+                      onChange={(e) => setSettingsDesc(e.target.value)}
+                      rows={2}
+                      className="w-full px-4 py-2 border-2 border-[#DAA520]/30 rounded-lg focus:border-[#DAA520] outline-none"
+                    />
+                  </div>
+                </div>
+                <h3 className="text-sm font-semibold text-[#654321] mb-3">Members & permissions</h3>
+                <div className="space-y-2 mb-6">
+                  {members.map((m) => (
+                    <div key={m.email} className="flex items-center justify-between gap-2 p-3 bg-[#F5F1E8] rounded-lg">
+                      <span className="text-sm font-medium text-[#654321] truncate flex-1">{m.email}</span>
+                      <select
+                        value={m.role}
+                        onChange={(e) => handleChangeRole(m.email, e.target.value as 'admin' | 'member')}
+                        disabled={saving || authUser?.email?.toLowerCase() === m.email.toLowerCase()}
+                        className="text-xs px-2 py-1 border border-[#DAA520]/40 rounded bg-white text-[#654321] disabled:opacity-60"
+                      >
+                        <option value="admin">Admin</option>
+                        <option value="member">Member</option>
+                      </select>
+                      {authUser?.email?.toLowerCase() !== m.email.toLowerCase() && (
+                      <button
+                        onClick={() => handleRemoveMember(m.email)}
+                        disabled={saving}
+                        className="p-1.5 text-red-600 hover:bg-red-50 rounded"
+                        title="Remove member"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2 justify-end">
+                  <button onClick={() => setShowSettings(false)} className="px-4 py-2 text-[#654321] hover:bg-[#F5F1E8] rounded-lg">
+                    Cancel
+                  </button>
+                  <button onClick={handleSaveSettings} disabled={saving} className="px-4 py-2 bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] font-semibold rounded-lg disabled:opacity-50">
+                    {saving ? 'Saving...' : 'Save'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Invite Modal */}
+        {showInvite && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+            <div className="bg-white rounded-2xl shadow-xl border-2 border-[#DAA520]/30 max-w-md w-full">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-bold text-[#654321]">Invite members</h2>
+                  <button onClick={() => { setShowInvite(false); setInviteEmails('') }} className="p-2 hover:bg-[#F5F1E8] rounded-lg">
+                    <XCircle className="w-5 h-5 text-[#8B4513]" />
+                  </button>
+                </div>
+                <p className="text-sm text-[#8B4513]/80 mb-3">Enter email addresses (comma or space separated)</p>
+                <textarea
+                  value={inviteEmails}
+                  onChange={(e) => setInviteEmails(e.target.value)}
+                  placeholder="friend@example.com, another@example.com"
+                  rows={3}
+                  className="w-full px-4 py-2 border-2 border-[#DAA520]/30 rounded-lg focus:border-[#DAA520] outline-none mb-4"
+                />
+                <div className="flex gap-2 justify-end">
+                  <button onClick={() => { setShowInvite(false); setInviteEmails('') }} className="px-4 py-2 text-[#654321] hover:bg-[#F5F1E8] rounded-lg">
+                    Cancel
+                  </button>
+                  <button onClick={handleInvite} disabled={saving} className="px-4 py-2 bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#654321] font-semibold rounded-lg disabled:opacity-50">
+                    {saving ? 'Sending...' : 'Send invites'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

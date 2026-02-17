@@ -4,7 +4,7 @@ export function Steps() {
   return (
     <section
       id="how-it-works"
-      className="relative bg-gradient-to-b from-[#FFFDF7] via-[#FFF8EE] to-[#FFF5E6] py-8 sm:py-10 md:py-12 lg:py-14 overflow-hidden"
+      className="relative bg-gradient-to-b from-[#FFFDF7] via-[#FFF8EE] to-[#FFF5E6] pt-8 sm:pt-10 md:pt-12 lg:pt-14 pb-8 sm:pb-10 md:pb-12 lg:pb-14 overflow-hidden"
     >
       <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-transparent via-[#DAA520] to-transparent shadow-lg"></div>
 
@@ -59,20 +59,24 @@ export function Steps() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="relative">
           {/* Heading */}
-          <div className="text-center mb-6 sm:mb-8">
-            <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-[#8B4513] mb-4 relative inline-block font-[family-name:var(--font-shadows)]">
+          <div className="text-center mb-2 sm:mb-3">
+            <h2
+              className="font-bold text-[#8B4513] mb-0 inline-flex items-center justify-center gap-2 font-[family-name:var(--font-shadows)]"
+              style={{ width: 370.53, height: 60, fontSize: '48px' }}
+            >
               How it works
-              <span
-                className="absolute -right-12 top-0 text-3xl sm:text-4xl animate-bounce drop-shadow-none"
-                style={{ animationDuration: "3s", background: "transparent" }}
-              >
-                🐝
-              </span>
+              <img
+                src="/images/Honey_Bee_Trail.png"
+                alt=""
+                aria-hidden
+                className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 lg:w-28 lg:h-28 xl:w-32 xl:h-32 object-contain shrink-0 mix-blend-darken animate-bounce mt-1 sm:mt-1.5"
+                style={{ animationDuration: "2.5s" }}
+              />
             </h2>
-            <div className="relative inline-block">
-              {/* Hand-drawn arrow curve */}
+            {/* Decorative curved arrow - same as Why Choose Wishbee */}
+            <div className="relative w-full min-h-[2rem] flex justify-center -mb-4">
               <svg
-                className="absolute -top-2 left-1/2 -translate-x-1/2 w-64 h-16 opacity-40"
+                className="absolute -top-4 left-1/2 -translate-x-1/2 w-48 h-12 opacity-40"
                 viewBox="0 0 200 50"
                 fill="none"
               >

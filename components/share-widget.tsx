@@ -134,10 +134,15 @@ export function ShareWidget() {
   }
 
   return (
-    <section className="relative bg-gradient-to-br from-[#F5F1E8] via-[#EDE6D6] to-[#F5F1E8] text-gray-900 py-6 sm:py-8 md:py-10 lg:py-12 overflow-hidden">
-      {/* Animated background elements with honey colors */}
-      <div className="absolute top-1/4 left-0 w-96 h-96 bg-[#DAA520]/15 rounded-full blur-3xl animate-pulse"></div>
-      <div className="absolute bottom-1/4 right-0 w-96 h-96 bg-[#F4C430]/10 rounded-full blur-3xl animate-pulse delay-700"></div>
+    <section className="relative bg-gradient-to-b from-[#FFFDF7] via-[#FFF8EE] to-[#FFF5E6] text-gray-900 py-8 sm:py-10 md:py-12 lg:py-14 overflow-hidden">
+      <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-transparent via-[#DAA520] to-transparent shadow-lg"></div>
+      {/* Animated falling honey drops - same as How it works */}
+      <div className="absolute top-10 left-[10%] w-3 h-4 bg-gradient-to-b from-[#FFD700] to-[#DAA520] rounded-full animate-bounce opacity-70" style={{ animationDuration: "2s", animationDelay: "0s" }}></div>
+      <div className="absolute top-20 left-[25%] w-2.5 h-3.5 bg-gradient-to-b from-[#F4C430] to-[#DAA520] rounded-full animate-bounce opacity-60" style={{ animationDuration: "2.5s", animationDelay: "0.5s" }}></div>
+      <div className="absolute top-16 left-[40%] w-2 h-3 bg-gradient-to-b from-[#FFD700] to-[#DAA520] rounded-full animate-bounce opacity-50" style={{ animationDuration: "3s", animationDelay: "1s" }}></div>
+      <div className="absolute top-12 left-[55%] w-3 h-4 bg-gradient-to-b from-[#DAA520] to-[#B8860B] rounded-full animate-bounce opacity-65" style={{ animationDuration: "2.2s", animationDelay: "0.3s" }}></div>
+      <div className="absolute top-24 left-[70%] w-2.5 h-3.5 bg-gradient-to-b from-[#FFD700] to-[#DAA520] rounded-full animate-bounce opacity-55" style={{ animationDuration: "2.8s", animationDelay: "0.8s" }}></div>
+      <div className="absolute top-14 left-[85%] w-2 h-3 bg-gradient-to-b from-[#F4C430] to-[#DAA520] rounded-full animate-bounce opacity-70" style={{ animationDuration: "2.4s", animationDelay: "1.2s" }}></div>
 
       <div className="max-w-6xl mx-auto text-center px-4 sm:px-6 md:px-8 lg:px-12 relative z-10">
         <div className="mb-12 sm:mb-16 space-y-6">
@@ -196,6 +201,7 @@ export function ShareWidget() {
           ))}
         </div>
       </div>
+      <div className="absolute bottom-0 left-0 w-full h-2 bg-gradient-to-r from-transparent via-[#DAA520] to-transparent shadow-lg"></div>
     </section>
   )
 }
