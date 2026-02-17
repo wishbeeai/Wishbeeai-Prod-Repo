@@ -1,6 +1,6 @@
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
-import { FileText, CheckCircle, Settings, User, CreditCard, Copyright, AlertTriangle, Mail, Link2, Calendar, Edit3, Ban, RefreshCw } from "lucide-react"
+import { FileText, CheckCircle, Settings, User, CreditCard, Copyright, AlertTriangle, Mail, Link2, Calendar, Edit3, Ban, RefreshCw, Scale, Package } from "lucide-react"
 
 export const metadata = {
   title: "Terms of Use - Wishbee.ai",
@@ -46,8 +46,20 @@ const SECTIONS = [
   },
   {
     icon: CreditCard,
-    title: "Payments and Refunds",
-    body: "All payments are processed securely through Stripe. Refund policies are determined on a case-by-case basis. Please contact support for refund requests.",
+    title: "Payments, Service Fee & Stripe Policies",
+    body: (
+      <>
+        All payments are processed securely through Stripe.
+        <br /><br />
+        <strong>Service Fee:</strong> Once a gift goal is reached and our AI has performed the coordination, the service fee is non-refundable.
+        <br /><br />
+        <strong>Refund Policy:</strong> As a service-based platform, Wishbee fees are for the coordination of gifting. Retailer refunds are subject to the specific store&apos;s policy. Please contact support for refund requests regarding Wishbee fees.
+        <br /><br />
+        <strong>Delivery Policy:</strong> Wishbee coordinates the funding; physical delivery is handled by the third-party merchant selected by the user.
+        <br /><br />
+        <strong>Cancellation:</strong> Users can cancel a gift pool at any time before the funding goal is met without incurring our service fee.
+      </>
+    ),
   },
   {
     icon: CreditCard,
@@ -64,9 +76,14 @@ const SECTIONS = [
         <br /><br />
         As an Amazon Associate we earn from qualifying purchases.
         <br /><br />
-        Our AI-powered tools (including our product extraction and tagging features) are designed to provide convenience and suggestions. However, the presence of a product on Wishbee does not constitute an endorsement, and we are not responsible for the fulfillment, shipping, or quality of items purchased from third-party retailers.
+        Our AI-powered tools (including our product extraction and tagging features) are designed to provide convenience and suggestions. However, the presence of a product on Wishbee does not constitute an endorsement.
       </>
     ),
+  },
+  {
+    icon: Package,
+    title: "No Warranty on Third-Party Retailers",
+    body: "Wishbee is not responsible for the shipping, quality, availability, or fulfillment of products from external stores (e.g., Amazon or other retailers). Products may go out of stock or change in price. Users purchase directly from the merchant, and any issues with delivery or product quality are between the user and the retailer.",
   },
   {
     icon: Copyright,
@@ -75,18 +92,41 @@ const SECTIONS = [
   },
   {
     icon: AlertTriangle,
-    title: "Limitation of Liability",
-    body: "Wishbee.ai is provided \"as is\" without warranties of any kind. We are not liable for any indirect, incidental, or consequential damages arising from your use of the service.",
+    title: "LIMITATION OF LIABILITY",
+    id: "limitation-of-liability",
+    legalSection: true,
+    body: (
+      <>
+        <p className="mb-4">TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL COMPLETE AI IT SERVICES, ITS PARENT COMPANY COMPLETE ATTIRE LLC, OR ITS OFFICERS, DIRECTORS, EMPLOYEES, OR AGENTS BE LIABLE FOR ANY INDIRECT, PUNITIVE, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR EXEMPLARY DAMAGES, INCLUDING WITHOUT LIMITATION DAMAGES FOR LOSS OF PROFITS, GOODWILL, USE, DATA, OR OTHER INTANGIBLE LOSSES, ARISING OUT OF OR RELATING TO THE USE OF, OR INABILITY TO USE, THE WISHBEE.AI SERVICE.</p>
+        <p className="mb-4">UNDER NO CIRCUMSTANCES WILL COMPLETE ATTIRE LLC BE RESPONSIBLE FOR ANY DAMAGE, LOSS, OR INJURY RESULTING FROM HACKING, TAMPERING, OR OTHER UNAUTHORIZED ACCESS OR USE OF THE SERVICE OR YOUR ACCOUNT OR THE INFORMATION CONTAINED THEREIN.</p>
+        <p className="mb-4">TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, COMPLETE ATTIRE LLC ASSUMES NO LIABILITY OR RESPONSIBILITY FOR ANY (I) ERRORS, MISTAKES, OR INACCURACIES OF AI-GENERATED CONTENT OR PRODUCT DATA; (II) PERSONAL INJURY OR PROPERTY DAMAGE, OF ANY NATURE WHATSOEVER, RESULTING FROM YOUR ACCESS TO OR USE OF OUR SERVICE; (III) ANY UNAUTHORIZED ACCESS TO OR USE OF OUR SECURE SERVERS AND/OR ANY AND ALL PERSONAL INFORMATION STORED THEREIN; AND (IV) ANY ERRORS OR OMISSIONS IN ANY CONTENT OR FOR ANY LOSS OR DAMAGE INCURRED AS A RESULT OF THE USE OF ANY CONTENT POSTED, EMAILED, TRANSMITTED, OR OTHERWISE MADE AVAILABLE THROUGH THE SERVICE.</p>
+        <p>IN NO EVENT SHALL COMPLETE ATTIRE LLC&apos;S TOTAL LIABILITY TO YOU FOR ALL DAMAGES, LOSSES, AND CAUSES OF ACTION EXCEED THE AMOUNT PAID BY YOU TO WISHBEE.AI IN THE TWELVE (12) MONTHS PRECEDING THE EVENT GIVING RISE TO THE CLAIM, OR ONE HUNDRED DOLLARS ($100.00), WHICHEVER IS GREATER.</p>
+      </>
+    ),
+  },
+  {
+    icon: Scale,
+    title: "DISPUTE RESOLUTION & BINDING ARBITRATION",
+    id: "dispute-resolution",
+    legalSection: true,
+    body: (
+      <p>PLEASE READ THIS SECTION CAREFULLY. IT AFFECTS YOUR RIGHTS. YOU AND COMPLETE ATTIRE LLC AGREE THAT ANY DISPUTE, CLAIM, OR CONTROVERSY ARISING OUT OF OR RELATING TO THESE TERMS OR THE USE OF WISHBEE.AI WILL BE SETTLED BY BINDING ARBITRATION INSTEAD OF IN A COURT OF LAW. YOU AGREE TO WAIVE YOUR RIGHT TO A JURY TRIAL AND YOUR RIGHT TO PARTICIPATE IN A CLASS ACTION LAWSUIT OR CLASS-WIDE ARBITRATION. THE ARBITRATION SHALL BE CONDUCTED IN THE STATE WHERE COMPLETE ATTIRE LLC IS REGISTERED, PURSUANT TO THE CONSUMER ARBITRATION RULES OF THE AMERICAN ARBITRATION ASSOCIATION (AAA).</p>
+    ),
   },
   {
     icon: Ban,
     title: "Termination",
-    body: "We may suspend or terminate your account and access to the service at any time, with or without cause or notice. You may also close your account at any time. Upon termination, your right to use the service ceases immediately.",
+    body: "We may suspend or terminate your account and access to the service at any time, with or without cause or notice. We reserve the right to ban users who use the group funding feature for fraudulent purposes or who otherwise abuse the service. You may also close your account at any time. Upon termination, your right to use the service ceases immediately.",
   },
   {
     icon: RefreshCw,
     title: "Modifications",
     body: "We may update these Terms of Use from time to time. We will notify you of material changes by posting the updated terms on our site and updating the effective date. Continued use of the service after changes constitutes acceptance of the new terms.",
+  },
+  {
+    icon: Scale,
+    title: "Governing Law & LLC Protection",
+    body: "All disputes arising from or relating to these Terms or the Wishbee service shall be governed by the laws of the state where Complete Attire LLC is registered. Complete Attire LLC operates the Wishbee platform, and any legal proceedings shall be subject to the jurisdiction of the courts in that state.",
   },
 ]
 
@@ -108,20 +148,28 @@ export default function TermsOfUsePage() {
                 </h1>
               </div>
               <p className="mt-2 text-sm text-[#8B5A3C]/80">Terms and conditions for using our service</p>
+              <p className="mt-1 text-xs text-[#8B5A3C]/60">Last Updated: February 14, 2025</p>
             </div>
 
             <div className="space-y-6">
-              {SECTIONS.map(({ icon: Icon, title, body, id }) => (
+              {SECTIONS.map(({ icon: Icon, title, body, id, legalSection }) => (
                 <section
                   key={title}
                   id={id}
                   className="rounded-xl border border-[#DAA520]/20 bg-white/60 p-5 sm:p-6"
                 >
-                  <h2 className="flex items-center gap-2 text-base sm:text-lg font-bold text-[#654321] mb-3">
-                    <Icon className="w-5 h-5 text-[#B8860B] flex-shrink-0" aria-hidden />
-                    {title}
-                  </h2>
-                  <div className="text-sm sm:text-base text-[#654321]/95 leading-relaxed">
+                  {legalSection ? (
+                    <h3 className="flex items-center gap-2 text-base sm:text-lg font-bold text-[#1a1a1a] mb-3">
+                      <Icon className="w-5 h-5 text-[#B8860B] flex-shrink-0" aria-hidden />
+                      {title}
+                    </h3>
+                  ) : (
+                    <h2 className="flex items-center gap-2 text-base sm:text-lg font-bold text-[#654321] mb-3">
+                      <Icon className="w-5 h-5 text-[#B8860B] flex-shrink-0" aria-hidden />
+                      {title}
+                    </h2>
+                  )}
+                  <div className={`text-sm sm:text-base leading-relaxed ${legalSection ? "text-[#1a1a1a]" : "text-[#654321]/95"}`}>
                     {body}
                   </div>
                 </section>

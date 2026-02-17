@@ -1,7 +1,8 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { ArrowRight } from "lucide-react"
+import { ArrowRight, Info } from "lucide-react"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import Image from "next/image"
 import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
@@ -20,21 +21,108 @@ type DisplayGift = {
   overallPick?: boolean
 }
 
-// Fallback data when API returns no gifts (name, category, price, image only)
-const FALLBACK_GIFTS: DisplayGift[] = [
-  { id: 1, name: "Premium Espresso Machine", category: "Home & Kitchen", price: 899, image: "/professional-espresso-setup.png" },
-  { id: 2, name: "Designer Handbag", category: "Fashion", price: 1250, image: "/luxury-quilted-handbag.png" },
-  { id: 3, name: "Smart Home Hub Package", category: "Tech", price: 650, image: "/smart-home-devices.jpg" },
-  { id: 4, name: "Professional Camera Kit", category: "Photography", price: 1899, image: "/camera-kit-professional.jpg" },
-]
+// Unique color for each category - matches Trending gifts page
+function getCategoryColor(category: string): { bg: string; text: string; border: string } {
+  const map: Record<string, { bg: string; text: string; border: string }> = {
+    Electronics: { bg: "from-rose-100 to-pink-100", text: "text-rose-700", border: "border-rose-200" },
+    "Home & Kitchen": { bg: "from-amber-100 to-yellow-100", text: "text-amber-700", border: "border-amber-200" },
+    Clothing: { bg: "from-violet-100 to-purple-100", text: "text-violet-700", border: "border-violet-200" },
+    Beauty: { bg: "from-pink-100 to-fuchsia-100", text: "text-pink-700", border: "border-pink-200" },
+    Sports: { bg: "from-emerald-100 to-teal-100", text: "text-emerald-700", border: "border-emerald-200" },
+    Toys: { bg: "from-orange-100 to-amber-100", text: "text-orange-700", border: "border-orange-200" },
+    Books: { bg: "from-indigo-100 to-blue-100", text: "text-indigo-700", border: "border-indigo-200" },
+    Fashion: { bg: "from-violet-100 to-indigo-100", text: "text-violet-700", border: "border-violet-200" },
+    Photography: { bg: "from-blue-100 to-indigo-100", text: "text-blue-700", border: "border-blue-200" },
+    Tech: { bg: "from-zinc-100 to-neutral-100", text: "text-zinc-700", border: "border-zinc-200" },
+    Food: { bg: "from-lime-100 to-green-100", text: "text-lime-700", border: "border-lime-200" },
+    Jewelry: { bg: "from-fuchsia-100 to-purple-100", text: "text-fuchsia-700", border: "border-fuchsia-200" },
+    "Pet Supplies": { bg: "from-cyan-100 to-sky-100", text: "text-cyan-700", border: "border-cyan-200" },
+    Garden: { bg: "from-green-100 to-emerald-100", text: "text-green-700", border: "border-green-200" },
+    Automotive: { bg: "from-slate-100 to-gray-100", text: "text-slate-700", border: "border-slate-200" },
+    Health: { bg: "from-teal-100 to-cyan-100", text: "text-teal-700", border: "border-teal-200" },
+    Baby: { bg: "from-sky-100 to-blue-100", text: "text-sky-700", border: "border-sky-200" },
+    Office: { bg: "from-stone-100 to-neutral-100", text: "text-stone-700", border: "border-stone-200" },
+    General: { bg: "from-amber-100 to-orange-100", text: "text-amber-800", border: "border-amber-200" },
+    Gifts: { bg: "from-yellow-100 to-amber-100", text: "text-yellow-700", border: "border-yellow-200" },
+  }
+  const lower = category.toLowerCase()
+  for (const [key, val] of Object.entries(map)) {
+    if (lower.includes(key.toLowerCase()) || key.toLowerCase().includes(lower)) return val
+  }
+  const hash = category.split("").reduce((a, c) => a + c.charCodeAt(0), 0)
+  const fallbacks = [
+    { bg: "from-rose-100 to-pink-100", text: "text-rose-700", border: "border-rose-200" },
+    { bg: "from-amber-100 to-yellow-100", text: "text-amber-700", border: "border-amber-200" },
+    { bg: "from-violet-100 to-purple-100", text: "text-violet-700", border: "border-violet-200" },
+    { bg: "from-emerald-100 to-teal-100", text: "text-emerald-700", border: "border-emerald-200" },
+    { bg: "from-indigo-100 to-blue-100", text: "text-indigo-700", border: "border-indigo-200" },
+    { bg: "from-fuchsia-100 to-purple-100", text: "text-fuchsia-700", border: "border-fuchsia-200" },
+    { bg: "from-cyan-100 to-sky-100", text: "text-cyan-700", border: "border-cyan-200" },
+    { bg: "from-lime-100 to-green-100", text: "text-lime-700", border: "border-lime-200" },
+    { bg: "from-orange-100 to-amber-100", text: "text-orange-700", border: "border-orange-200" },
+  ]
+  return fallbacks[hash % fallbacks.length]
+}
 
-function getDailyRotatedGifts(allGifts: DisplayGift[], count = 4) {
-  const total = allGifts.length
-  if (total === 0) return []
-  const windows = Math.max(1, Math.floor(total / count))
-  const dayOffset = Math.floor(Date.now() / (1000 * 60 * 60 * 24)) % windows
-  const start = dayOffset * count
-  return allGifts.slice(start, start + count)
+/**
+ * Picks diverse gifts from every category, rotating daily.
+ * - Groups gifts by category (normalized)
+ * - Picks 1 from each category first for variety
+ * - Uses day seed to rotate which items show each day
+ */
+function getDailyRotatedGifts(allGifts: DisplayGift[], count = 4): DisplayGift[] {
+  if (allGifts.length === 0) return []
+
+  const daySeed = Math.floor(Date.now() / (1000 * 60 * 60 * 24))
+
+  // Group by normalized category
+  const byCategory = new Map<string, DisplayGift[]>()
+  for (const g of allGifts) {
+    const cat = (g.category || "General").trim().toLowerCase() || "general"
+    if (!byCategory.has(cat)) byCategory.set(cat, [])
+    byCategory.get(cat)!.push(g)
+  }
+
+  const categories = Array.from(byCategory.keys())
+  if (categories.length === 0) return allGifts.slice(0, count)
+
+  // Shuffle category order by day for rotation
+  const shuffledCats = [...categories].sort((a, b) => {
+    const hash = (s: string) => s.split("").reduce((acc, c) => (acc * 31 + c.charCodeAt(0)) | 0, 0)
+    return (hash(a) + daySeed) % 1000 - (hash(b) + daySeed) % 1000
+  })
+
+  const result: DisplayGift[] = []
+  const usedIds = new Set<string | number>()
+
+  // Round 1: pick one from each category (diverse)
+  for (const cat of shuffledCats) {
+    if (result.length >= count) break
+    const gifts = byCategory.get(cat) ?? []
+    if (gifts.length === 0) continue
+    const idx = (daySeed + result.length) % gifts.length
+    const pick = gifts[idx]
+    if (!usedIds.has(pick.id)) {
+      result.push(pick)
+      usedIds.add(pick.id)
+    }
+  }
+
+  // Round 2+: fill remaining slots from any category, rotating by day
+  if (result.length < count) {
+    const flat = allGifts.filter((g) => !usedIds.has(g.id))
+    const start = (daySeed * count) % Math.max(1, flat.length)
+    for (let i = 0; i < count - result.length && i < flat.length; i++) {
+      const idx = (start + i) % flat.length
+      const pick = flat[idx]
+      if (!usedIds.has(pick.id)) {
+        result.push(pick)
+        usedIds.add(pick.id)
+      }
+    }
+  }
+
+  return result.slice(0, count)
 }
 
 export function TrendingGifts() {
@@ -61,16 +149,16 @@ export function TrendingGifts() {
           }))
           setAllGifts(mapped)
         } else {
-          setAllGifts(FALLBACK_GIFTS)
+          setAllGifts([])
         }
       } catch {
-        setAllGifts(FALLBACK_GIFTS)
+        setAllGifts([])
       }
     }
     fetchTrending()
   }, [])
 
-  const trendingGifts = useMemo(() => getDailyRotatedGifts(allGifts.length > 0 ? allGifts : FALLBACK_GIFTS, 4), [allGifts])
+  const trendingGifts = useMemo(() => getDailyRotatedGifts(allGifts, 4), [allGifts])
   return (
     <section className="relative pt-12 pb-16 sm:pb-20 md:pb-24 lg:pb-28 px-4 bg-gradient-to-b from-[#FFFDF7] via-[#FFF8EE] to-[#FFF5E6] overflow-hidden">
       <div className="container mx-auto max-w-6xl relative z-10">
@@ -78,7 +166,7 @@ export function TrendingGifts() {
           <h2 className="text-[30px] font-bold text-[#8B4513] mb-1">
             Trending Picks
           </h2>
-          <p className="text-xs sm:text-sm md:text-base text-[#8B4513]/80 font-light mb-3 leading-relaxed">Our most popular and highly-rated gifts.</p>
+          <p className="text-xs sm:text-sm md:text-base text-[#8B4513]/80 font-light mb-3 leading-relaxed">Our most popular and highly-rated gifts from every category.</p>
 
           <Link href="/gifts/trending" className="inline-block">
             <Button className="bg-gradient-to-r from-[#DAA520] to-[#FFD700] hover:from-[#B8860B] hover:to-[#DAA520] text-white shadow-lg hover:shadow-xl transition-all hover:scale-105 border-2 border-amber-400 hover:border-amber-400 hover:-translate-y-2">
@@ -105,6 +193,14 @@ export function TrendingGifts() {
                   />
                 </div>
                 <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                {gift.category && (() => {
+                  const colors = getCategoryColor(gift.category)
+                  return (
+                    <div className={`absolute top-3 left-3 bg-gradient-to-r ${colors.bg} backdrop-blur-sm ${colors.text} px-3 py-1 rounded-full text-xs font-bold shadow-md border ${colors.border}`}>
+                      {gift.category}
+                    </div>
+                  )
+                })()}
                 {gift.originalPrice != null && gift.originalPrice > gift.price && (
                   <div className="absolute top-3 right-3 bg-gradient-to-r from-red-500 to-rose-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-lg animate-pulse">
                     SALE
@@ -113,10 +209,6 @@ export function TrendingGifts() {
               </div>
 
               <div className="p-6">
-                <div className="text-xs text-[#8B4513] uppercase tracking-wider font-bold mb-2 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#8B4513]" />
-                  {gift.category}
-                </div>
                 <h3
                   className="font-bold text-[#8B4513] mb-2 text-[16px] line-clamp-3 group-hover:text-[#8B4513]/90 transition-colors"
                   title={gift.name}
@@ -148,25 +240,31 @@ export function TrendingGifts() {
                     </div>
                     <span className="text-sm font-bold text-[#8B4513]">{gift.rating.toFixed(1)}</span>
                     {gift.reviewCount != null && gift.reviewCount > 0 && (
-                      <span className="text-xs text-[#8B4513]/80"> {gift.reviewCount.toLocaleString()}</span>
+                      <span className="text-xs text-[#8B4513]/80"> ({gift.reviewCount.toLocaleString()})</span>
                     )}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="w-3.5 h-3.5 text-[#8B4513]/60 hover:text-[#8B4513] cursor-help ml-1 flex-shrink-0" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-[220px] bg-[#FFFBF5] text-[#654321] border border-[#DAA520]/30 text-xs p-2 rounded-lg shadow-lg">
+                        <p>Ratings, reviews, and prices are shown as captured when the item was added and may change on the retailer&apos;s website.</p>
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
                 )}
 
-                {/* Badges - same as Trending */}
-                {(gift.amazonChoice || gift.bestSeller || gift.overallPick) && (
-                  <div className="flex flex-wrap gap-1 mb-2 min-h-[24px]">
-                    {gift.amazonChoice && (
-                      <span className="bg-gradient-to-r from-gray-900 to-black text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-sm">Amazon&apos;s Choice</span>
-                    )}
-                    {gift.bestSeller && (
-                      <span className="text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-sm" style={{ backgroundColor: "#D14900" }}>#1 Best Seller</span>
-                    )}
-                    {gift.overallPick && (
-                      <span className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-sm">⭐ Overall Pick</span>
-                    )}
-                  </div>
-                )}
+                {/* Badges - always reserve one line so layout stays consistent */}
+                <div className="flex flex-wrap gap-1 mb-2 min-h-[24px] items-center">
+                  {gift.amazonChoice && (
+                    <span className="bg-gradient-to-r from-gray-900 to-black text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-sm">Amazon&apos;s Choice</span>
+                  )}
+                  {gift.bestSeller && (
+                    <span className="text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-sm" style={{ backgroundColor: "#D14900" }}>#1 Best Seller</span>
+                  )}
+                  {gift.overallPick && (
+                    <span className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-sm">⭐ Overall Pick</span>
+                  )}
+                </div>
 
                 {/* List price & Sale price - same as Trending */}
                 <div className="flex items-baseline gap-1.5 flex-wrap">

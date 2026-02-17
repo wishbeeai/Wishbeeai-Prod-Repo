@@ -135,7 +135,6 @@ export function ShareWidget() {
 
   return (
     <section className="relative bg-gradient-to-b from-[#FFFDF7] via-[#FFF8EE] to-[#FFF5E6] text-gray-900 pt-8 sm:pt-10 md:pt-12 lg:pt-14 pb-12 sm:pb-14 md:pb-16 lg:pb-20 overflow-hidden">
-      <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-transparent via-[#DAA520] to-transparent shadow-lg"></div>
       {/* Animated falling honey drops - same as How it works */}
       <div className="absolute top-10 left-[10%] w-3 h-4 bg-gradient-to-b from-[#FFD700] to-[#DAA520] rounded-full animate-bounce opacity-70" style={{ animationDuration: "2s", animationDelay: "0s" }}></div>
       <div className="absolute top-20 left-[25%] w-2.5 h-3.5 bg-gradient-to-b from-[#F4C430] to-[#DAA520] rounded-full animate-bounce opacity-60" style={{ animationDuration: "2.5s", animationDelay: "0.5s" }}></div>

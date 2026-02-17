@@ -1,6 +1,7 @@
 "use client"
 
 import Image from "next/image"
+import { Gift, Wallet, CheckCircle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 
 export function Hero() {
@@ -176,6 +177,48 @@ export function Hero() {
                 {/* Shimmer effect */}
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
               </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom feature strip */}
+        <div className="mt-12 sm:mt-16 md:mt-20 lg:mt-24 pt-8 sm:pt-10 md:pt-12 border-t border-[#DAA520]/40">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
+            <div className="group relative bg-white/50 backdrop-blur-sm rounded-2xl p-5 sm:p-6 border border-[#DAA520]/20 shadow-[0_4px_20px_rgba(139,69,19,0.08)] hover:shadow-[0_8px_30px_rgba(218,165,32,0.15)] hover:border-[#DAA520]/40 transition-all duration-300 text-center">
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 rounded-xl bg-gradient-to-br from-[#DAA520] to-[#F4C430] flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
+                <Gift className="w-6 h-6 text-white" strokeWidth={2.5} />
+              </div>
+              <div className="pt-6">
+                <h3 className="text-base sm:text-lg font-bold text-[#654321] mb-1">Always 100% Free</h3>
+                <p className="text-sm font-semibold text-[#8B4513] mb-2">Universal Wishlists</p>
+                <p className="text-xs sm:text-sm text-[#8B4513]/80 font-light leading-relaxed">
+                  Clip any product from any store with our AI.
+                </p>
+              </div>
+            </div>
+            <div className="group relative bg-white/50 backdrop-blur-sm rounded-2xl p-5 sm:p-6 border border-[#DAA520]/20 shadow-[0_4px_20px_rgba(139,69,19,0.08)] hover:shadow-[0_8px_30px_rgba(218,165,32,0.15)] hover:border-[#DAA520]/40 transition-all duration-300 text-center">
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 rounded-xl bg-gradient-to-br from-[#DAA520] to-[#F4C430] flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
+                <Wallet className="w-6 h-6 text-white" strokeWidth={2.5} />
+              </div>
+              <div className="pt-6">
+                <h3 className="text-base sm:text-lg font-bold text-[#654321] mb-1">Pay-As-You-Go</h3>
+                <p className="text-sm font-semibold text-[#8B4513] mb-2">AI Group Gifting</p>
+                <p className="text-xs sm:text-sm text-[#8B4513]/80 font-light leading-relaxed">
+                  No monthly or yearly subscription traps.
+                </p>
+              </div>
+            </div>
+            <div className="group relative bg-white/50 backdrop-blur-sm rounded-2xl p-5 sm:p-6 border border-[#DAA520]/20 shadow-[0_4px_20px_rgba(139,69,19,0.08)] hover:shadow-[0_8px_30px_rgba(218,165,32,0.15)] hover:border-[#DAA520]/40 transition-all duration-300 text-center">
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 rounded-xl bg-gradient-to-br from-[#DAA520] to-[#F4C430] flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
+                <CheckCircle className="w-6 h-6 text-white" strokeWidth={2.5} />
+              </div>
+              <div className="pt-6">
+                <h3 className="text-base sm:text-lg font-bold text-[#654321] mb-1">Success Only</h3>
+                <p className="text-sm font-semibold text-[#8B4513] mb-2">Simple Service Fee</p>
+                <p className="text-xs sm:text-sm text-[#8B4513]/80 font-light leading-relaxed">
+                  Only pay when your gift goal is reached.
+                </p>
+              </div>
             </div>
           </div>
         </div>

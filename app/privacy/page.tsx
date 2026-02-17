@@ -1,6 +1,6 @@
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
-import { Shield, Database, Building2, Lock, Heart, Mail, Cookie, BarChart3, Cpu, MailPlus, Clock, Users, RefreshCw, Building } from "lucide-react"
+import { Shield, Database, Building2, Lock, Heart, Mail, Cookie, BarChart3, Cpu, MailPlus, Clock, Users, RefreshCw, Building, Puzzle } from "lucide-react"
 
 export const metadata = {
   title: "2025 Wishbee.ai Privacy Policy",
@@ -23,7 +23,7 @@ const SECTIONS = [
     title: "Data Collection",
     body: (
       <>
-        We collect information you provide directly, including: account information (name, email, phone, location, bio, birthday, profile image), wishlist items and product preferences, payment information (processed by Stripe—we do not store full card numbers), and information you submit when creating or contributing to group gifts. We use this data to coordinate gift pools, notify contributors, deliver receipts, and operate the service.
+        We collect information you provide directly, including: account information (name, email, phone, location, bio, birthday, profile image), product URLs and user-selected gift data when you clip items to your wishlist, wishlist items and product preferences, payment information (processed by Stripe—we do not store full card numbers), and information you submit when creating or contributing to group gifts. We use this data to coordinate gift pools, notify contributors, deliver receipts, and operate the service.
       </>
     ),
   },
@@ -35,7 +35,7 @@ const SECTIONS = [
   {
     icon: Cpu,
     title: "AI Processing",
-    body: "Our AI-powered features (product extraction from URLs, banner generation, description enhancement) may process product links and content you provide through third-party AI providers. This processing helps deliver convenience features such as auto-tagging and suggestions. We do not use your data to train AI models for purposes unrelated to providing our service.",
+    body: "Our AI-powered features (product extraction from URLs, banner generation, description enhancement) may process product links and content you provide through third-party AI providers. This processing helps deliver convenience features such as auto-tagging and suggestions and improves the AI's product recognition. We do not use your data to train AI models for purposes unrelated to providing our service, and we do not sell your data to third parties.",
   },
   {
     icon: MailPlus,
@@ -44,13 +44,17 @@ const SECTIONS = [
   },
   {
     icon: Building2,
-    title: "Third-Party Partners",
+    title: "Third-Party Partners & Financial Data",
     body: (
       <>
-        Payment data is handled by <strong>Stripe</strong>. Wishbee does not store full credit card numbers. Card
-        details are processed directly by our payment partner and are not retained on our systems.
+        Payment data is handled by <strong>Stripe</strong>. Wishbee does not store full credit card numbers. Card details are processed directly by our payment partner and are not retained on our systems. We do not store sensitive financial data such as credit card numbers on our servers.
       </>
     ),
+  },
+  {
+    icon: Puzzle,
+    title: "Extension Permissions",
+    body: "Our browser extension is used to help you clip products to your wishlist. The extension only reads data on tabs where you explicitly choose to clip a product. We do not read or collect data from your browsing activity outside of those intentional clip actions.",
   },
   {
     icon: Cookie,
