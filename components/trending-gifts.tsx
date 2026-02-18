@@ -193,19 +193,21 @@ export function TrendingGifts() {
                   />
                 </div>
                 <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                {gift.category && (() => {
-                  const colors = getCategoryColor(gift.category)
-                  return (
-                    <div className={`absolute top-3 left-3 bg-gradient-to-r ${colors.bg} backdrop-blur-sm ${colors.text} px-3 py-1 rounded-full text-xs font-bold shadow-md border ${colors.border}`}>
-                      {gift.category}
+                <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-2">
+                  {gift.category ? (() => {
+                    const colors = getCategoryColor(gift.category)
+                    return (
+                      <div className={`min-w-0 flex-1 truncate bg-gradient-to-r ${colors.bg} backdrop-blur-sm ${colors.text} px-3 py-1 rounded-full text-xs font-bold shadow-md border ${colors.border}`} title={gift.category}>
+                        {gift.category}
+                      </div>
+                    )
+                  })() : <div className="min-w-0 flex-1" />}
+                  {gift.originalPrice != null && gift.originalPrice > gift.price && (
+                    <div className="flex-shrink-0 bg-gradient-to-r from-red-500 to-rose-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-lg animate-pulse">
+                      SALE
                     </div>
-                  )
-                })()}
-                {gift.originalPrice != null && gift.originalPrice > gift.price && (
-                  <div className="absolute top-3 right-3 bg-gradient-to-r from-red-500 to-rose-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-lg animate-pulse">
-                    SALE
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
 
               <div className="p-6">

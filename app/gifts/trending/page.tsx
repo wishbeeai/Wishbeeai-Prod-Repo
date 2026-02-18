@@ -75,29 +75,30 @@ export default function TrendingGiftsPage() {
     )
   }
 
-  // Unique color for each category
-  const getCategoryColor = (category: string): { bg: string; text: string; border: string } => {
-    const categoryColors: Record<string, { bg: string; text: string; border: string }> = {
-      'Electronics': { bg: 'from-rose-100 to-pink-100', text: 'text-rose-700', border: 'border-rose-200' },
-      'Home & Kitchen': { bg: 'from-amber-100 to-yellow-100', text: 'text-amber-700', border: 'border-amber-200' },
-      'Clothing': { bg: 'from-violet-100 to-purple-100', text: 'text-violet-700', border: 'border-violet-200' },
-      'Beauty': { bg: 'from-pink-100 to-fuchsia-100', text: 'text-pink-700', border: 'border-pink-200' },
-      'Sports': { bg: 'from-emerald-100 to-teal-100', text: 'text-emerald-700', border: 'border-emerald-200' },
-      'Toys': { bg: 'from-orange-100 to-amber-100', text: 'text-orange-700', border: 'border-orange-200' },
-      'Books': { bg: 'from-indigo-100 to-blue-100', text: 'text-indigo-700', border: 'border-indigo-200' },
-      'Food': { bg: 'from-lime-100 to-green-100', text: 'text-lime-700', border: 'border-lime-200' },
-      'Jewelry': { bg: 'from-fuchsia-100 to-purple-100', text: 'text-fuchsia-700', border: 'border-fuchsia-200' },
-      'Pet Supplies': { bg: 'from-cyan-100 to-sky-100', text: 'text-cyan-700', border: 'border-cyan-200' },
-      'Garden': { bg: 'from-green-100 to-emerald-100', text: 'text-green-700', border: 'border-green-200' },
-      'Automotive': { bg: 'from-slate-100 to-gray-100', text: 'text-slate-700', border: 'border-slate-200' },
-      'Health': { bg: 'from-teal-100 to-cyan-100', text: 'text-teal-700', border: 'border-teal-200' },
-      'Baby': { bg: 'from-sky-100 to-blue-100', text: 'text-sky-700', border: 'border-sky-200' },
-      'Office': { bg: 'from-stone-100 to-neutral-100', text: 'text-stone-700', border: 'border-stone-200' },
-      'Fashion': { bg: 'from-violet-100 to-indigo-100', text: 'text-violet-700', border: 'border-violet-200' },
-      'Photography': { bg: 'from-blue-100 to-indigo-100', text: 'text-blue-700', border: 'border-blue-200' },
-      'Tech': { bg: 'from-zinc-100 to-neutral-100', text: 'text-zinc-700', border: 'border-zinc-200' },
-      'General': { bg: 'from-amber-100 to-orange-100', text: 'text-amber-800', border: 'border-amber-200' },
-      'Gifts': { bg: 'from-yellow-100 to-amber-100', text: 'text-yellow-700', border: 'border-yellow-200' },
+  // Unique warm and cold color for each category - no duplicates
+  // cardBg = subtle background for the gift card
+  const getCategoryColor = (category: string): { bg: string; text: string; border: string; cardBg: string } => {
+    const categoryColors: Record<string, { bg: string; text: string; border: string; cardBg: string }> = {
+      'Electronics': { bg: 'from-blue-100 to-sky-100', text: 'text-blue-700', border: 'border-blue-200', cardBg: 'from-white to-blue-50/50' },
+      'Home & Kitchen': { bg: 'from-amber-100 to-yellow-100', text: 'text-amber-700', border: 'border-amber-200', cardBg: 'from-white to-amber-50/40' },
+      'Clothing': { bg: 'from-violet-100 to-purple-100', text: 'text-violet-700', border: 'border-violet-200', cardBg: 'from-white to-violet-50/50' },
+      'Beauty': { bg: 'from-pink-100 to-fuchsia-100', text: 'text-pink-700', border: 'border-pink-200', cardBg: 'from-white to-pink-50/50' },
+      'Sports': { bg: 'from-emerald-100 to-teal-100', text: 'text-emerald-700', border: 'border-emerald-200', cardBg: 'from-white to-emerald-50/50' },
+      'Toys': { bg: 'from-orange-100 to-amber-100', text: 'text-orange-700', border: 'border-orange-200', cardBg: 'from-white to-orange-50/50' },
+      'Books': { bg: 'from-indigo-100 to-blue-100', text: 'text-indigo-700', border: 'border-indigo-200', cardBg: 'from-white to-indigo-50/50' },
+      'Food': { bg: 'from-yellow-100 to-lime-100', text: 'text-yellow-800', border: 'border-yellow-200', cardBg: 'from-white to-yellow-50/50' },
+      'Jewelry': { bg: 'from-rose-100 to-pink-100', text: 'text-rose-700', border: 'border-rose-200', cardBg: 'from-white to-rose-50/50' },
+      'Pet Supplies': { bg: 'from-teal-100 to-cyan-100', text: 'text-teal-700', border: 'border-teal-200', cardBg: 'from-white to-teal-50/50' },
+      'Garden': { bg: 'from-green-100 to-emerald-100', text: 'text-green-700', border: 'border-green-200', cardBg: 'from-white to-green-50/50' },
+      'Automotive': { bg: 'from-slate-100 to-gray-100', text: 'text-slate-700', border: 'border-slate-200', cardBg: 'from-white to-slate-100/50' },
+      'Health': { bg: 'from-cyan-100 to-sky-100', text: 'text-cyan-700', border: 'border-cyan-200', cardBg: 'from-white to-cyan-50/50' },
+      'Baby': { bg: 'from-sky-100 to-blue-100', text: 'text-sky-700', border: 'border-sky-200', cardBg: 'from-white to-sky-50/50' },
+      'Office': { bg: 'from-stone-100 to-neutral-100', text: 'text-stone-700', border: 'border-stone-200', cardBg: 'from-white to-stone-100/50' },
+      'Fashion': { bg: 'from-fuchsia-100 to-purple-100', text: 'text-fuchsia-700', border: 'border-fuchsia-200', cardBg: 'from-white to-fuchsia-50/50' },
+      'Photography': { bg: 'from-purple-100 to-indigo-100', text: 'text-purple-700', border: 'border-purple-200', cardBg: 'from-white to-purple-50/50' },
+      'Tech': { bg: 'from-slate-100 to-blue-100', text: 'text-slate-800', border: 'border-slate-200', cardBg: 'from-white to-slate-50/50' },
+      'General': { bg: 'from-amber-100 to-orange-100', text: 'text-amber-800', border: 'border-amber-200', cardBg: 'from-white to-amber-100/40' },
+      'Gifts': { bg: 'from-rose-100 to-red-100', text: 'text-rose-800', border: 'border-rose-200', cardBg: 'from-white to-rose-100/40' },
     }
     
     // Check for exact match first
@@ -113,18 +114,18 @@ export default function TrendingGiftsPage() {
       }
     }
     
-    // Fallback: hash-based from a pool of unique colors (no duplicates from above)
+    // Fallback: hash-based from a pool of unique warm and cold colors
     const hash = category.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
     const colorOptions = [
-      { bg: 'from-rose-100 to-pink-100', text: 'text-rose-700', border: 'border-rose-200' },
-      { bg: 'from-amber-100 to-yellow-100', text: 'text-amber-700', border: 'border-amber-200' },
-      { bg: 'from-violet-100 to-purple-100', text: 'text-violet-700', border: 'border-violet-200' },
-      { bg: 'from-emerald-100 to-teal-100', text: 'text-emerald-700', border: 'border-emerald-200' },
-      { bg: 'from-indigo-100 to-blue-100', text: 'text-indigo-700', border: 'border-indigo-200' },
-      { bg: 'from-fuchsia-100 to-purple-100', text: 'text-fuchsia-700', border: 'border-fuchsia-200' },
-      { bg: 'from-cyan-100 to-sky-100', text: 'text-cyan-700', border: 'border-cyan-200' },
-      { bg: 'from-lime-100 to-green-100', text: 'text-lime-700', border: 'border-lime-200' },
-      { bg: 'from-orange-100 to-amber-100', text: 'text-orange-700', border: 'border-orange-200' },
+      { bg: 'from-rose-100 to-pink-100', text: 'text-rose-700', border: 'border-rose-200', cardBg: 'from-white to-rose-50/50' },
+      { bg: 'from-amber-100 to-yellow-100', text: 'text-amber-700', border: 'border-amber-200', cardBg: 'from-white to-amber-50/50' },
+      { bg: 'from-blue-100 to-sky-100', text: 'text-blue-700', border: 'border-blue-200', cardBg: 'from-white to-blue-50/50' },
+      { bg: 'from-violet-100 to-purple-100', text: 'text-violet-700', border: 'border-violet-200', cardBg: 'from-white to-violet-50/50' },
+      { bg: 'from-emerald-100 to-teal-100', text: 'text-emerald-700', border: 'border-emerald-200', cardBg: 'from-white to-emerald-50/50' },
+      { bg: 'from-orange-100 to-amber-100', text: 'text-orange-700', border: 'border-orange-200', cardBg: 'from-white to-orange-50/50' },
+      { bg: 'from-indigo-100 to-blue-100', text: 'text-indigo-700', border: 'border-indigo-200', cardBg: 'from-white to-indigo-50/50' },
+      { bg: 'from-teal-100 to-cyan-100', text: 'text-teal-700', border: 'border-teal-200', cardBg: 'from-white to-teal-50/50' },
+      { bg: 'from-fuchsia-100 to-purple-100', text: 'text-fuchsia-700', border: 'border-fuchsia-200', cardBg: 'from-white to-fuchsia-50/50' },
     ]
     return colorOptions[hash % colorOptions.length]
   }
@@ -845,10 +846,13 @@ export default function TrendingGiftsPage() {
           </div>
         ) : viewMode === "grid" ? (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredAndSortedGifts.map((gift) => (
+            {filteredAndSortedGifts.map((gift) => {
+              const colors = gift.category ? getCategoryColor(gift.category) : null
+              const cardBg = colors?.cardBg ?? "from-white to-amber-50/30"
+              return (
               <div
                 key={gift.id}
-                className="bg-gradient-to-br from-white to-amber-50/30 rounded-2xl shadow-lg border border-[#DAA520]/30 overflow-hidden hover:shadow-2xl hover:border-[#DAA520]/60 transition-all duration-300 group flex flex-col h-full"
+                className={`bg-gradient-to-br ${cardBg} rounded-2xl shadow-lg border border-[#DAA520]/30 overflow-hidden hover:shadow-2xl hover:border-[#DAA520]/60 transition-all duration-300 group flex flex-col h-full`}
               >
                 {/* Image Section */}
                 <div className="relative overflow-hidden">
@@ -1079,14 +1083,18 @@ export default function TrendingGiftsPage() {
                   )}
                 </div>
               </div>
-            ))}
+            )
+          })}
           </div>
         ) : (
           <div className="space-y-4">
-            {filteredAndSortedGifts.map((gift) => (
+            {filteredAndSortedGifts.map((gift) => {
+              const listColors = gift.category ? getCategoryColor(gift.category) : null
+              const listCardBg = listColors?.cardBg ?? "from-white to-amber-50/30"
+              return (
               <div
                 key={gift.id}
-                className="bg-white rounded-xl shadow-lg border-2 border-[#DAA520]/20 p-6 hover:shadow-xl transition-all group"
+                className={`bg-gradient-to-br ${listCardBg} rounded-xl shadow-lg border-2 border-[#DAA520]/20 p-6 hover:shadow-xl transition-all group`}
               >
                 <div className="flex gap-6">
                   <div className="relative flex-shrink-0">
@@ -1293,7 +1301,8 @@ export default function TrendingGiftsPage() {
                   </div>
                 </div>
               </div>
-            ))}
+            )
+            })}
           </div>
         )}
 
