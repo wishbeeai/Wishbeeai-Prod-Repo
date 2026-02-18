@@ -3,8 +3,10 @@
 import type React from "react"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { X, Mail, Lock, Eye, EyeOff, User, Phone, MapPin, CheckCircle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { useAuth } from "@/lib/auth-context"
 
 interface SignUpModalProps {
   isOpen: boolean
@@ -24,17 +26,18 @@ export function SignUpModal({ isOpen, onClose, onSwitchToLogin, onSignUpSuccess 
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const { toast } = useToast()
+  const { signUp } = useAuth()
+  const router = useRouter()
 
   if (!isOpen) return null
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // Validation
     if (!name || !email || !password || !confirmPassword) {
       toast({
         title: "Missing fields",
-        description: "Please fill in all fields",
+        description: "Please fill in all required fields",
         variant: "destructive",
       })
       return
@@ -59,33 +62,53 @@ export function SignUpModal({ isOpen, onClose, onSwitchToLogin, onSignUpSuccess 
     }
 
     setIsLoading(true)
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-    setIsLoading(false)
-
-    toast({
-      variant: "warm",
-      title: (
-        <span className="flex items-center gap-2 font-semibold">
-          <CheckCircle className="h-4 w-4 shrink-0" />
-          Account created!
-        </span>
-      ),
-      description: "Welcome to Wishbee.ai — you're all set to start gifting together.",
-    })
-
-    if (onSignUpSuccess) {
-      onSignUpSuccess()
-    } else {
-      onClose()
+    try {
+      const result = await signUp(email.trim().toLowerCase(), password, name, {
+        phone: phone.trim() || undefined,
+        location: location.trim() || undefined,
+      })
+      if (result.needsEmailConfirmation) {
+        toast({
+          variant: "warm",
+          title: (
+            <span className="flex items-center gap-2 font-semibold">
+              <CheckCircle className="h-4 w-4 shrink-0" />
+              Account created!
+            </span>
+          ),
+          description: "Check your email (and spam folder) for the verification link. Sign in after confirming.",
+        })
+      } else {
+        toast({
+          variant: "warm",
+          title: (
+            <span className="flex items-center gap-2 font-semibold">
+              <CheckCircle className="h-4 w-4 shrink-0" />
+              Welcome to Wishbee!
+            </span>
+          ),
+          description: "You're all set to start gifting together.",
+        })
+        router.push("/profile")
+      }
+      if (onSignUpSuccess) onSignUpSuccess()
+      else onClose()
+      setName("")
+      setEmail("")
+      setPhone("")
+      setLocation("")
+      setPassword("")
+      setConfirmPassword("")
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Sign up failed. Try again."
+      toast({
+        title: "Sign up failed",
+        description: msg,
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
     }
-
-    // Reset form
-    setName("")
-    setEmail("")
-    setPhone("")
-    setLocation("")
-    setPassword("")
-    setConfirmPassword("")
   }
 
   const handleBackdropClick = (e: React.MouseEvent) => {

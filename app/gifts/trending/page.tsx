@@ -7,6 +7,8 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { AddToWishlistModal } from "@/components/add-to-wishlist-modal"
+import { SignUpModal } from "@/components/signup-modal"
+import { LoginModal } from "@/components/login-modal"
 import { useAuth } from "@/lib/auth-context"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 
@@ -62,6 +64,8 @@ export default function TrendingGiftsPage() {
   const [selectedGiftForAttributes, setSelectedGiftForAttributes] = useState<Gift | null>(null)
   const [isAttributesModalOpen, setIsAttributesModalOpen] = useState(false)
   const [expandedSpecs, setExpandedSpecs] = useState<Record<string, boolean>>({})
+  const [showSignUpModal, setShowSignUpModal] = useState(false)
+  const [showLoginModal, setShowLoginModal] = useState(false)
   
   // Check if current user is admin
   const isAdmin = user?.email?.toLowerCase().trim() === ADMIN_EMAIL.toLowerCase()
@@ -394,9 +398,18 @@ export default function TrendingGiftsPage() {
     }
   }
 
-  // Handle "Add to Wishlist" button click - checks for variants
+  // Handle "Add to Wishlist" button click - checks for auth and variants
   const handleAddToWishlistClick = (e: React.MouseEvent, gift: Gift) => {
     e.stopPropagation()
+    
+    if (!user) {
+      setShowSignUpModal(true)
+      toast.info("Sign up to add to your wishlist", {
+        description: "Create a free account to save items to your wishlist",
+        duration: 4000,
+      })
+      return
+    }
     
     if (hasVariantOptions(gift)) {
       // Product has variant options - open modal
@@ -1314,6 +1327,20 @@ export default function TrendingGiftsPage() {
             setIsWishlistModalOpen(false)
             setSelectedGiftForWishlist(null)
           }}
+        />
+
+        {/* Sign up modal - shown when guest tries to add to wishlist */}
+        <SignUpModal
+          isOpen={showSignUpModal}
+          onClose={() => setShowSignUpModal(false)}
+          onSwitchToLogin={() => {
+            setShowSignUpModal(false)
+            setShowLoginModal(true)
+          }}
+        />
+        <LoginModal
+          isOpen={showLoginModal}
+          onClose={() => setShowLoginModal(false)}
         />
 
         {/* Product Attributes Modal */}

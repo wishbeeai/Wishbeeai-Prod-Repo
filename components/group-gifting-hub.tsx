@@ -602,7 +602,7 @@ export function GroupGiftingHub() {
     setIsSignUpModalOpen(false)
     toast({
       title: "Account created!",
-      description: "Welcome to Wishbee.ai! You can now add products to your collection",
+      description: "Welcome to Wishbee! You can now add products to your collection",
     })
   }
 

@@ -151,6 +151,7 @@ function ActiveGiftsPageContent() {
     try {
       const res = await fetch("/api/gifts/collections?status=active")
       if (res.status === 401) {
+        // Guest: show demo. Signed-in users never hit 401.
         setActiveGifts(DEMO_ACTIVE_GIFTS)
         setLoading(false)
         return
@@ -184,11 +185,13 @@ function ActiveGiftsPageContent() {
         }
       })
       // Only show gifts whose deadline has not passed (deadline-passed appear on /gifts/past)
+      // Signed-in users: show only their own gifts; never show demo (demo is for guests only)
       const activeOnly = list.filter((g: { daysLeft: number }) => g.daysLeft > 0)
-      const toShow = activeOnly.length > 0 ? activeOnly : (list.length > 0 ? [] : DEMO_ACTIVE_GIFTS.filter((g) => g.daysLeft > 0).map((g) => ({ ...g, fundingStatus: "active" as const })))
+      const toShow = activeOnly.length > 0 ? activeOnly : []
       setActiveGifts(toShow)
     } catch {
-      setActiveGifts(DEMO_ACTIVE_GIFTS.filter((g) => g.daysLeft > 0).map((g) => ({ ...g, fundingStatus: "active" as const })))
+      // On fetch error, show empty (could be signed-in user); avoid showing demo for signed-in users
+      setActiveGifts([])
     } finally {
       setLoading(false)
     }
@@ -697,7 +700,27 @@ function ActiveGiftsPageContent() {
           </div>
         </div>
 
+        {/* Empty state — friendly message when no active gifts */}
+        {activeGifts.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-16 px-6 bg-white rounded-2xl border-2 border-[#DAA520]/20 shadow-sm">
+            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#DAA520]/20 to-[#F4C430]/30 flex items-center justify-center mb-6">
+              <Gift className="w-10 h-10 text-[#8B5A3C]" />
+            </div>
+            <h2 className="text-xl font-bold text-[#654321] mb-2">No active gift collections yet</h2>
+            <p className="text-center text-[#8B4513]/80 text-sm sm:text-base max-w-md mb-6">
+              Create your first group gift collection and invite friends and family to contribute together.
+            </p>
+            <Link
+              href="/gifts/create"
+              className="inline-flex items-center px-4 py-2 text-sm font-semibold bg-gradient-to-r from-[#DAA520] to-[#F4C430] text-[#3B2F0F] rounded-full hover:from-[#F4C430] hover:to-[#DAA520] shadow-md hover:shadow transition-all"
+            >
+              Create Gift Collection
+            </Link>
+          </div>
+        )}
+
         {/* Gift Cards Grid — same as past */}
+        {activeGifts.length > 0 && (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {activeGifts.map((gift) => {
             const recipientName = gift.name.replace(/'s.*| for .*/i, "").trim() || "the recipient"
@@ -861,6 +884,7 @@ function ActiveGiftsPageContent() {
             )
           })}
         </div>
+        )}
         </>
         )}
 

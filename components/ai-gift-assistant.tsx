@@ -129,7 +129,14 @@ export function AIGiftAssistant() {
           setIsSignUpModalOpen(true)
         }}
       />
-      <SignUpModal isOpen={isSignUpModalOpen} onClose={() => setIsSignUpModalOpen(false)} />
+      <SignUpModal
+        isOpen={isSignUpModalOpen}
+        onClose={() => setIsSignUpModalOpen(false)}
+        onSwitchToLogin={() => {
+          setIsSignUpModalOpen(false)
+          setIsLoginModalOpen(true)
+        }}
+      />
 
       <section className="relative py-16 pb-20 sm:pb-24 md:pb-28 lg:pb-32 px-4 bg-gradient-to-br from-[#FFFDF7] via-[#FFFBF5] to-[#FFF8EE]">
         <div className="container mx-auto max-w-7xl">

@@ -29,6 +29,11 @@ export function Header() {
     setIsSignUpModalOpen(true)
   }
 
+  const handleSwitchToLogin = () => {
+    setIsSignUpModalOpen(false)
+    setIsLoginModalOpen(true)
+  }
+
   const handleLoginSuccess = () => {
     setIsLoginModalOpen(false)
     toast({
@@ -120,7 +125,7 @@ export function Header() {
         onClose={() => setIsLoginModalOpen(false)}
         onLoginSuccess={handleLoginSuccess}
       />
-      <SignUpModal isOpen={isSignUpModalOpen} onClose={() => setIsSignUpModalOpen(false)} />
+      <SignUpModal isOpen={isSignUpModalOpen} onClose={() => setIsSignUpModalOpen(false)} onSwitchToLogin={handleSwitchToLogin} />
 
       <header className="sticky top-0 z-50 bg-gradient-to-r from-[#6B4423] via-[#8B5A3C] to-[#6B4423] shadow-xl border-b-2 md:border-b-4 border-[#4A2F1A] overflow-visible">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">

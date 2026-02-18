@@ -55,7 +55,14 @@ export function QuickStartCards() {
           setIsSignUpModalOpen(true)
         }}
       />
-      <SignUpModal isOpen={isSignUpModalOpen} onClose={() => setIsSignUpModalOpen(false)} />
+      <SignUpModal
+        isOpen={isSignUpModalOpen}
+        onClose={() => setIsSignUpModalOpen(false)}
+        onSwitchToLogin={() => {
+          setIsSignUpModalOpen(false)
+          setIsLoginModalOpen(true)
+        }}
+      />
 
       {/* Group Gifting */}
       <section className="px-4 bg-white">

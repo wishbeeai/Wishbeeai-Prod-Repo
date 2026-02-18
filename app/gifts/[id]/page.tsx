@@ -1084,14 +1084,14 @@ export default function GiftDetailPage() {
                     Opening...
                   </>
                 ) : goalReached ? (
-                  "Add to the Bonus"
+                  "Add to Bonus"
                 ) : (
                   "Contribute Now"
                 )}
               </button>
               {goalReached && (
                 <p className="text-xs text-[#8B4513]/80 mt-2 text-center">
-                  Extra contributions go to an eGift Card bonus for the recipient. The organizer can settle the balance from Active Gifts.
+                  Bonus contributions can be issued as a Gift Card, donated to charity, converted to Wishbee Store Credits, or used to Support Wishbee.
                 </p>
               )}
             </div>

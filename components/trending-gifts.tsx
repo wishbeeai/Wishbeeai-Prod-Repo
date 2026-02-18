@@ -21,45 +21,55 @@ type DisplayGift = {
   overallPick?: boolean
 }
 
-// Unique color for each category - matches Trending gifts page
+// Unique color per category label - adjusts based on label name (exact, partial, or hash)
 function getCategoryColor(category: string): { bg: string; text: string; border: string } {
   const map: Record<string, { bg: string; text: string; border: string }> = {
-    Electronics: { bg: "from-rose-100 to-pink-100", text: "text-rose-700", border: "border-rose-200" },
+    Electronics: { bg: "from-blue-100 to-sky-100", text: "text-blue-700", border: "border-blue-200" },
     "Home & Kitchen": { bg: "from-amber-100 to-yellow-100", text: "text-amber-700", border: "border-amber-200" },
     Clothing: { bg: "from-violet-100 to-purple-100", text: "text-violet-700", border: "border-violet-200" },
     Beauty: { bg: "from-pink-100 to-fuchsia-100", text: "text-pink-700", border: "border-pink-200" },
     Sports: { bg: "from-emerald-100 to-teal-100", text: "text-emerald-700", border: "border-emerald-200" },
     Toys: { bg: "from-orange-100 to-amber-100", text: "text-orange-700", border: "border-orange-200" },
     Books: { bg: "from-indigo-100 to-blue-100", text: "text-indigo-700", border: "border-indigo-200" },
-    Fashion: { bg: "from-violet-100 to-indigo-100", text: "text-violet-700", border: "border-violet-200" },
-    Photography: { bg: "from-blue-100 to-indigo-100", text: "text-blue-700", border: "border-blue-200" },
-    Tech: { bg: "from-zinc-100 to-neutral-100", text: "text-zinc-700", border: "border-zinc-200" },
-    Food: { bg: "from-lime-100 to-green-100", text: "text-lime-700", border: "border-lime-200" },
-    Jewelry: { bg: "from-fuchsia-100 to-purple-100", text: "text-fuchsia-700", border: "border-fuchsia-200" },
-    "Pet Supplies": { bg: "from-cyan-100 to-sky-100", text: "text-cyan-700", border: "border-cyan-200" },
+    Food: { bg: "from-yellow-100 to-lime-100", text: "text-yellow-800", border: "border-yellow-200" },
+    Jewelry: { bg: "from-rose-100 to-pink-100", text: "text-rose-700", border: "border-rose-200" },
+    "Pet Supplies": { bg: "from-teal-100 to-cyan-100", text: "text-teal-700", border: "border-teal-200" },
     Garden: { bg: "from-green-100 to-emerald-100", text: "text-green-700", border: "border-green-200" },
     Automotive: { bg: "from-slate-100 to-gray-100", text: "text-slate-700", border: "border-slate-200" },
-    Health: { bg: "from-teal-100 to-cyan-100", text: "text-teal-700", border: "border-teal-200" },
+    Health: { bg: "from-cyan-100 to-sky-100", text: "text-cyan-700", border: "border-cyan-200" },
     Baby: { bg: "from-sky-100 to-blue-100", text: "text-sky-700", border: "border-sky-200" },
     Office: { bg: "from-stone-100 to-neutral-100", text: "text-stone-700", border: "border-stone-200" },
+    Fashion: { bg: "from-fuchsia-100 to-purple-100", text: "text-fuchsia-700", border: "border-fuchsia-200" },
+    Photography: { bg: "from-purple-100 to-indigo-100", text: "text-purple-700", border: "border-purple-200" },
+    Tech: { bg: "from-slate-100 to-blue-100", text: "text-slate-800", border: "border-slate-200" },
     General: { bg: "from-amber-100 to-orange-100", text: "text-amber-800", border: "border-amber-200" },
-    Gifts: { bg: "from-yellow-100 to-amber-100", text: "text-yellow-700", border: "border-yellow-200" },
+    Gifts: { bg: "from-rose-100 to-red-100", text: "text-rose-800", border: "border-rose-200" },
   }
   const lower = category.toLowerCase()
+  if (map[category]) return map[category]
   for (const [key, val] of Object.entries(map)) {
-    if (lower.includes(key.toLowerCase()) || key.toLowerCase().includes(lower)) return val
+    const k = key.toLowerCase()
+    if (lower.includes(k) || k.includes(lower)) return val
+  }
+  // Word-based match for compound labels (e.g. "Electronic Components & Home Audio", "Patio, Lawn and Garden")
+  for (const [key, val] of Object.entries(map)) {
+    const parts = key.toLowerCase().replace(/[&,]/g, " ").split(/\s+/).filter(Boolean)
+    for (const part of parts) {
+      const stem = part.length > 4 ? part.replace(/s$/, "") : part
+      if (lower.includes(part) || lower.includes(stem)) return val
+    }
   }
   const hash = category.split("").reduce((a, c) => a + c.charCodeAt(0), 0)
   const fallbacks = [
     { bg: "from-rose-100 to-pink-100", text: "text-rose-700", border: "border-rose-200" },
     { bg: "from-amber-100 to-yellow-100", text: "text-amber-700", border: "border-amber-200" },
+    { bg: "from-blue-100 to-sky-100", text: "text-blue-700", border: "border-blue-200" },
     { bg: "from-violet-100 to-purple-100", text: "text-violet-700", border: "border-violet-200" },
     { bg: "from-emerald-100 to-teal-100", text: "text-emerald-700", border: "border-emerald-200" },
-    { bg: "from-indigo-100 to-blue-100", text: "text-indigo-700", border: "border-indigo-200" },
-    { bg: "from-fuchsia-100 to-purple-100", text: "text-fuchsia-700", border: "border-fuchsia-200" },
-    { bg: "from-cyan-100 to-sky-100", text: "text-cyan-700", border: "border-cyan-200" },
-    { bg: "from-lime-100 to-green-100", text: "text-lime-700", border: "border-lime-200" },
     { bg: "from-orange-100 to-amber-100", text: "text-orange-700", border: "border-orange-200" },
+    { bg: "from-indigo-100 to-blue-100", text: "text-indigo-700", border: "border-indigo-200" },
+    { bg: "from-teal-100 to-cyan-100", text: "text-teal-700", border: "border-teal-200" },
+    { bg: "from-fuchsia-100 to-purple-100", text: "text-fuchsia-700", border: "border-fuchsia-200" },
   ]
   return fallbacks[hash % fallbacks.length]
 }
@@ -193,17 +203,18 @@ export function TrendingGifts() {
                   />
                 </div>
                 <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-2">
+                <div className="absolute top-3 left-3 right-3 flex flex-col gap-1.5">
                   {gift.category ? (() => {
                     const colors = getCategoryColor(gift.category)
+                    const isLong = gift.category.length > 28
                     return (
-                      <div className={`min-w-0 flex-1 truncate bg-gradient-to-r ${colors.bg} backdrop-blur-sm ${colors.text} px-3 py-1 rounded-full text-xs font-bold shadow-md border ${colors.border}`} title={gift.category}>
+                      <div className={`w-fit max-w-[220px] truncate bg-gradient-to-r ${colors.bg} backdrop-blur-sm ${colors.text} rounded-full font-bold shadow-md border ${colors.border} ${isLong ? "px-2 py-0.5 text-[10px]" : "px-3 py-1 text-xs"}`} title={gift.category}>
                         {gift.category}
                       </div>
                     )
-                  })() : <div className="min-w-0 flex-1" />}
+                  })() : null}
                   {gift.originalPrice != null && gift.originalPrice > gift.price && (
-                    <div className="flex-shrink-0 bg-gradient-to-r from-red-500 to-rose-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-lg animate-pulse">
+                    <div className="self-end bg-gradient-to-r from-red-500 to-rose-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-lg animate-pulse">
                       SALE
                     </div>
                   )}
