@@ -409,24 +409,25 @@ export default function GuestContributePage() {
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-[#DAA520]/10">
           {/* Collection Title & Message Section */}
           {giftDetails?.bannerImage ? (
-            <div className="relative">
-              <img 
-                src={giftDetails.bannerImage} 
-                alt={giftDetails.giftName}
-                className="w-full h-48 object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
-              <div className="absolute bottom-0 left-0 right-0 p-5 text-center">
-                <h1 className="text-xl font-bold text-white drop-shadow-lg mb-1">
+            <>
+              <div className="relative w-full flex items-center justify-center bg-[#F5F1E8] min-h-[200px]">
+                <img 
+                  src={giftDetails.bannerImage} 
+                  alt={giftDetails.giftName}
+                  className="w-full h-auto max-h-[400px] object-contain"
+                />
+              </div>
+              <div className="p-5 text-center border-b border-[#DAA520]/10" style={{ background: `linear-gradient(135deg, ${colorTheme}15, ${colorTheme}25)` }}>
+                <h1 className="text-xl font-bold text-[#654321] mb-2">
                   {giftDetails?.collectionTitle || 'Gift Collection'}
                 </h1>
                 {invitationMessage && (
-                  <p className="text-[13px] text-white/90 leading-relaxed max-w-md mx-auto drop-shadow">
+                  <p className="text-[14px] text-[#8B4513]/90 leading-relaxed max-w-md mx-auto">
                     {invitationMessage}
                   </p>
                 )}
               </div>
-            </div>
+            </>
           ) : (
             <div 
               className="p-5 text-center border-b border-[#DAA520]/10"
